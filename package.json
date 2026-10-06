@@ -1,0 +1,59 @@
+{
+  "name": "ha-mnml",
+  "private": true,
+  "description": "MNML for Home Assistant: cards, their editors, templates and a theme, in one integration.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "build": "pnpm run build:frontend && pnpm run build:theme",
+    "build:frontend": "node src/build/main.ts custom_components/mnml/www",
+    "build:theme": "node src/theme/main.ts custom_components/mnml/www",
+    "check": "pnpm run check:format && pnpm run check:lint && pnpm run check:md && pnpm run check:unused && pnpm run check:ruff && pnpm run check:ruff-format && pnpm run check:mypy && pnpm run check:hassfest && pnpm run test",
+    "check:format": "oxfmt --check",
+    "check:lint": "oxlint",
+    "check:md": "markdownlint-cli2",
+    "check:unused": "knip",
+    "check:ruff": "uv run ruff check",
+    "check:ruff-format": "uv run ruff format --check",
+    "check:mypy": "uv run mypy",
+    "check:hassfest": "docker run --rm --platform linux/amd64 -v \"$PWD\":/github/workspace:ro ghcr.io/home-assistant/hassfest",
+    "demo": "node tools/up.ts",
+    "fix": "pnpm run fix:ids && pnpm run fix:format && pnpm run fix:lint && pnpm run fix:md && pnpm run fix:ruff && pnpm run fix:ruff-format",
+    "fix:ids": "node src/templates/ids-main.ts",
+    "fix:format": "oxfmt",
+    "fix:lint": "oxlint --fix",
+    "fix:md": "markdownlint-cli2 --fix",
+    "fix:ruff": "uv run ruff check --fix",
+    "fix:ruff-format": "uv run ruff format",
+    "look": "node tools/look.ts",
+    "screenshots": "node tools/screenshots.ts",
+    "test": "pnpm run test:frontend && pnpm run test:python",
+    "test:frontend": "vitest run",
+    "test:python": "uv run pytest",
+    "test:python-floor": "uv run --no-project --python 3.13 --with pytest-homeassistant-custom-component==0.13.254 --with home-assistant-frontend==20250531.4 --with 'pycares<5' pytest",
+    "walk": "node tools/walk.ts",
+    "zip": "node tools/zip.ts"
+  },
+  "dependencies": {
+    "home-assistant-js-websocket": "^9.7.1",
+    "lit": "^3.3.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "jsdom": "^30.1.2",
+    "knip": "^6.39.0",
+    "markdownlint-cli2": "^0.23.3",
+    "minify-literals": "^2.2.0",
+    "oxfmt": "^0.71.0",
+    "oxlint": "^1.86.0",
+    "oxlint-tsgolint": "^7.0.2003",
+    "playwright": "^1.63.0",
+    "rolldown": "^1.2.12",
+    "vitest": "^5.0.3",
+    "yaml": "^2.9.1"
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "packageManager": "pnpm@12.9.1"
+}

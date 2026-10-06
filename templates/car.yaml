@@ -1,0 +1,309 @@
+car:
+  description: A car's tile, its fuel, and its doors, windows, alarm and tyres chips; it brings the car's pop-up. The defaults are BMW CarData's words.
+  slots:
+    key: { kind: text, required: true, group: Basics }
+    icon: { kind: icon, default: mdi:car, group: Basics }
+    metadata: { kind: entity, required: true, label: Car, group: Basics }
+    fuel: { kind: entity, required: true, group: Fuel }
+    remaining_fuel: { kind: entity, group: Fuel }
+    range: { kind: entity, group: Fuel }
+    mileage: { kind: entity, required: true, group: Status }
+    service: { kind: entity, group: Status }
+    battery_voltage: { kind: entity, group: Status }
+    coolant_temperature: { kind: entity, group: Status }
+    lock: { kind: entity, required: true, group: Locks }
+    alarm: { kind: entity, required: true, group: Locks }
+    alarm_active: { kind: entity, required: true, group: Locks }
+    doors: { kind: entities, required: true, group: Openings }
+    hood: { kind: entity, required: true, group: Openings }
+    tailgate: { kind: entity, required: true, group: Openings }
+    windows: { kind: entities, required: true, group: Openings }
+    sunroof: { kind: entity, group: Openings }
+    tyres: { kind: entities, required: true, group: Tyres }
+    tyre_targets: { kind: entities, required: true, group: Tyres }
+    location: { kind: entity, required: true, group: Basics }
+    lock_words:
+      kind: object
+      default: { secured: Locked, selectivelocked: Partly locked }
+      group: Locks
+      fields:
+        secured: { kind: text }
+        selectivelocked: { kind: text }
+    alarm_words:
+      kind: object
+      default: { doorsonly: Doors only, doorstiltcabin: Armed }
+      group: Locks
+      fields:
+        doorsonly: { kind: text }
+        doorstiltcabin: { kind: text }
+    unlocked: { kind: texts, default: [unlocked, selectivelocked], group: Locks }
+    disarmed: { kind: texts, default: [unarmed], group: Locks }
+    open_states: { kind: texts, default: [open, intermediate], group: Openings }
+    tyre_low_share:
+      { kind: number, default: 0.9, help: Red under this share of the target., group: Tyres }
+    tyre_warn_share:
+      { kind: number, default: 0.95, help: Orange under this share of the target., group: Tyres }
+  card:
+    type: custom:mnml-tile-card
+    entity: '[[metadata]]'
+    label: device
+    icon: '[[icon]]'
+    popup: '#car-[[key]]'
+    state: [{ id: fuel, entity: '[[fuel]]', icon: true }]
+    chips:
+      - id: doors
+        type: status
+        name: Doors
+        icon: mdi:car-door
+        rules:
+          - id: lock
+            entities: ['[[lock]]']
+            words: '[[lock_words]]'
+            color: red
+            is: '[[unlocked]]'
+          - id: doors
+            entities: ['[[doors]]', '[[hood]]', '[[tailgate]]']
+            color: orange
+            is: ['on']
+      - id: windows
+        type: status
+        name: Windows
+        icon: mdi:car-windshield-outline
+        rules:
+          - id: windows
+            entities: ['[[windows]]', '[[sunroof]]']
+            color: orange
+            is: '[[open_states]]'
+      - id: alarm
+        type: status
+        name: Alarm
+        icon: mdi:shield-car
+        rules:
+          - id: alarm-active
+            entities: ['[[alarm_active]]']
+            color: red
+            is: ['on']
+          - id: alarm
+            entities: ['[[alarm]]']
+            words: '[[alarm_words]]'
+            color: amber
+            not: '[[disarmed]]'
+      - id: tyres
+        type: tyres
+        tyres: '[[tyres]]'
+        targets: '[[tyre_targets]]'
+        low_share: '[[tyre_low_share]]'
+        warn_share: '[[tyre_warn_share]]'
+    grid_options: { columns: 12 }
+  popups:
+    - id: car-popup
+      template: car-popup
+      slots:
+        key: '[[key]]'
+        icon: '[[icon]]'
+        metadata: '[[metadata]]'
+        fuel: '[[fuel]]'
+        remaining_fuel: '[[remaining_fuel]]'
+        range: '[[range]]'
+        mileage: '[[mileage]]'
+        service: '[[service]]'
+        battery_voltage: '[[battery_voltage]]'
+        coolant_temperature: '[[coolant_temperature]]'
+        lock: '[[lock]]'
+        alarm: '[[alarm]]'
+        alarm_active: '[[alarm_active]]'
+        doors: '[[doors]]'
+        hood: '[[hood]]'
+        tailgate: '[[tailgate]]'
+        windows: '[[windows]]'
+        sunroof: '[[sunroof]]'
+        tyres: '[[tyres]]'
+        tyre_targets: '[[tyre_targets]]'
+        location: '[[location]]'
+        lock_words: '[[lock_words]]'
+        alarm_words: '[[alarm_words]]'
+        unlocked: '[[unlocked]]'
+        disarmed: '[[disarmed]]'
+        tyre_low_share: '[[tyre_low_share]]'
+        tyre_warn_share: '[[tyre_warn_share]]'
+  example: &car
+    key: suv
+    metadata: sensor.suv_metadata
+    fuel: sensor.suv_fuel
+    mileage: sensor.suv_mileage
+    lock: sensor.suv_lock
+    alarm: sensor.suv_alarm
+    alarm_active: binary_sensor.suv_alarm
+    doors:
+      [
+        binary_sensor.suv_door_fl,
+        binary_sensor.suv_door_fr,
+        binary_sensor.suv_door_rl,
+        binary_sensor.suv_door_rr,
+      ]
+    hood: binary_sensor.suv_hood
+    tailgate: binary_sensor.suv_tailgate
+    windows:
+      [sensor.suv_window_fl, sensor.suv_window_fr, sensor.suv_window_rl, sensor.suv_window_rr]
+    tyres: [sensor.suv_tyre_fl, sensor.suv_tyre_fr, sensor.suv_tyre_rl, sensor.suv_tyre_rr]
+    tyre_targets:
+      [sensor.suv_target_fl, sensor.suv_target_fr, sensor.suv_target_rl, sensor.suv_target_rr]
+    location: device_tracker.suv
+
+car-plan:
+  description: A car seen from above, its openings and tyres.
+  slots:
+    doors: { kind: entities, required: true, group: Openings }
+    hood: { kind: entity, required: true, group: Openings }
+    tailgate: { kind: entity, required: true, group: Openings }
+    windows: { kind: entities, required: true, group: Openings }
+    sunroof: { kind: entity, group: Openings }
+    tyres: { kind: entities, required: true, group: Tyres }
+    tyre_targets: { kind: entities, required: true, group: Tyres }
+    tyre_low_share: { kind: number, default: 0.9, group: Tyres }
+    tyre_warn_share: { kind: number, default: 0.95, group: Tyres }
+  card:
+    type: custom:mnml-car-plan-card
+    title: Status
+    icon: mdi:car-info
+    doors: '[[doors]]'
+    hood: '[[hood]]'
+    tailgate: '[[tailgate]]'
+    windows: '[[windows]]'
+    sunroof: '[[sunroof]]'
+    tyres: '[[tyres]]'
+    tyre_targets: '[[tyre_targets]]'
+    tyre_low_share: '[[tyre_low_share]]'
+    tyre_warn_share: '[[tyre_warn_share]]'
+  example:
+    doors:
+      [
+        binary_sensor.suv_door_fl,
+        binary_sensor.suv_door_fr,
+        binary_sensor.suv_door_rl,
+        binary_sensor.suv_door_rr,
+      ]
+    hood: binary_sensor.suv_hood
+    tailgate: binary_sensor.suv_tailgate
+    windows:
+      [sensor.suv_window_fl, sensor.suv_window_fr, sensor.suv_window_rl, sensor.suv_window_rr]
+    tyres: [sensor.suv_tyre_fl, sensor.suv_tyre_fr, sensor.suv_tyre_rl, sensor.suv_tyre_rr]
+    tyre_targets:
+      [sensor.suv_target_fl, sensor.suv_target_fr, sensor.suv_target_rl, sensor.suv_target_rr]
+
+car-popup:
+  description: A car's pop-up, its security, its plan, its details and where it is.
+  slots:
+    key: { kind: text, required: true }
+    icon: { kind: icon, default: mdi:car }
+    metadata: { kind: entity, required: true }
+    fuel: { kind: entity, required: true }
+    remaining_fuel: { kind: entity }
+    range: { kind: entity }
+    mileage: { kind: entity, required: true }
+    service: { kind: entity }
+    battery_voltage: { kind: entity }
+    coolant_temperature: { kind: entity }
+    lock: { kind: entity, required: true }
+    alarm: { kind: entity, required: true }
+    alarm_active: { kind: entity, required: true }
+    doors: { kind: entities, required: true }
+    hood: { kind: entity, required: true }
+    tailgate: { kind: entity, required: true }
+    windows: { kind: entities, required: true }
+    sunroof: { kind: entity }
+    tyres: { kind: entities, required: true }
+    tyre_targets: { kind: entities, required: true }
+    location: { kind: entity, required: true }
+    lock_words:
+      kind: object
+      default: { secured: Locked, selectivelocked: Partly locked }
+      fields:
+        secured: { kind: text }
+        selectivelocked: { kind: text }
+    alarm_words:
+      kind: object
+      default: { doorsonly: Doors only, doorstiltcabin: Armed }
+      fields:
+        doorsonly: { kind: text }
+        doorstiltcabin: { kind: text }
+    unlocked: { kind: texts, default: [unlocked, selectivelocked] }
+    disarmed: { kind: texts, default: [unarmed] }
+    tyre_low_share: { kind: number, default: 0.9 }
+    tyre_warn_share: { kind: number, default: 0.95 }
+  card:
+    hash: '#car-[[key]]'
+    cards:
+      - id: header
+        type: custom:mnml-header-card
+        label: device
+        icon: '[[icon]]'
+        entity: '[[metadata]]'
+        state: [{ id: part, serial: true }]
+      - id: security
+        type: custom:mnml-list-card
+        title: Security
+        icon: mdi:shield-car
+        rows:
+          - id: lock
+            entity: '[[lock]]'
+            words: '[[lock_words]]'
+            color: red
+            when: { is: '[[unlocked]]' }
+          - id: alarm
+            entity: '[[alarm]]'
+            words: '[[alarm_words]]'
+            color: amber
+            when: { not: '[[disarmed]]' }
+          - id: alarm_active
+            entity: '[[alarm_active]]'
+            name: Alarm
+            flag: true
+            color: red
+            show: { is: ['on'] }
+      - id: car-plan
+        template: car-plan
+        slots:
+          doors: '[[doors]]'
+          hood: '[[hood]]'
+          tailgate: '[[tailgate]]'
+          windows: '[[windows]]'
+          sunroof: '[[sunroof]]'
+          tyres: '[[tyres]]'
+          tyre_targets: '[[tyre_targets]]'
+          tyre_low_share: '[[tyre_low_share]]'
+          tyre_warn_share: '[[tyre_warn_share]]'
+      - id: details
+        type: custom:mnml-list-card
+        title: Details
+        icon: mdi:information-outline
+        rows:
+          - id: fuel
+            entity: '[[fuel]]'
+          - id: remaining_fuel
+            if: remaining_fuel
+            entity: '[[remaining_fuel]]'
+          - id: range
+            if: range
+            entity: '[[range]]'
+          - id: mileage
+            entity: '[[mileage]]'
+          - id: service
+            if: service
+            entity: '[[service]]'
+            name: Service in
+          - id: battery_voltage
+            if: battery_voltage
+            entity: '[[battery_voltage]]'
+          - id: coolant_temperature
+            if: coolant_temperature
+            entity: '[[coolant_temperature]]'
+      - id: heading
+        type: custom:mnml-heading-card
+        title: Location
+        icon: mdi:map-marker
+      - id: map
+        type: map
+        entities: ['[[location]]']
+        aspect_ratio: '3:1'
+  example: *car

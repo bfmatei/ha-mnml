@@ -1,0 +1,280 @@
+3d-printer-actions:
+  description: A 3D printer's Cancel, Pause, Resume and Continue buttons, each shown in the job state it applies to.
+  slots:
+    entity: { kind: entity, required: true }
+    actions:
+      kind: object
+      required: true
+      fields:
+        pause: { kind: entity }
+        resume: { kind: entity }
+        continue: { kind: entity }
+        cancel: { kind: entity }
+  card:
+    - id: cancel
+      type: service
+      entity: '[[actions.cancel]]'
+      service: button.press
+      name: Cancel
+      icon: mdi:stop
+      show: { entity: '[[entity]]', is: [printing, paused, attention] }
+    - id: pause
+      type: service
+      entity: '[[actions.pause]]'
+      service: button.press
+      name: Pause
+      icon: mdi:pause
+      show: { entity: '[[entity]]', is: [printing] }
+    - id: resume
+      type: service
+      entity: '[[actions.resume]]'
+      service: button.press
+      name: Resume
+      icon: mdi:play
+      show: { entity: '[[entity]]', is: [paused] }
+    - id: continue
+      type: service
+      entity: '[[actions.continue]]'
+      service: button.press
+      name: Continue
+      icon: mdi:play
+      show: { entity: '[[entity]]', is: [attention] }
+  example:
+    entity: sensor.3d_printer
+    actions:
+      {
+        cancel: button.3d_printer_cancel,
+        pause: button.3d_printer_pause,
+        resume: button.3d_printer_resume,
+        continue: button.3d_printer_continue,
+      }
+
+3d-printer-card:
+  description: A 3D printer as an item, its outlet or its state and job progress, opening its pop-up.
+  slots:
+    key: { kind: text, required: true }
+    printer3d:
+      kind: object
+      required: true
+      fields:
+        entity: { kind: entity, required: true }
+        progress: { kind: entity }
+        filename: { kind: entity }
+        material: { kind: entity }
+        speed: { kind: entity }
+        start: { kind: entity }
+        finish: { kind: entity }
+        nozzle:
+          kind: object
+          fields:
+            temperature: { kind: entity }
+            target: { kind: entity }
+        bed:
+          kind: object
+          fields:
+            temperature: { kind: entity }
+            target: { kind: entity }
+        camera: { kind: entity }
+        actions:
+          kind: object
+          required: true
+          fields:
+            pause: { kind: entity }
+            resume: { kind: entity }
+            continue: { kind: entity }
+            cancel: { kind: entity }
+        outlet:
+          kind: object
+          fields:
+            entity: { kind: entity, required: true }
+            energy:
+              kind: object
+              fields:
+                power: { kind: entity }
+                today: { kind: entity }
+                total: { kind: entity }
+  card:
+    type: custom:mnml-entity-card
+    entity: '[[printer3d.entity]]'
+    state:
+      - id: not-printer3d-outlet
+        unless: printer3d.outlet
+      - id: printer3d-outlet
+        if: printer3d.outlet
+        entity: '[[printer3d.outlet.entity]]'
+        when: { entity: '[[printer3d.outlet.entity]]', is: ['off'] }
+      - id: printer3d-outlet-2
+        if: printer3d.outlet
+        when: { entity: '[[printer3d.outlet.entity]]', not: ['off'] }
+      - id: printer3d-progress
+        entity: '[[printer3d.progress]]'
+        when: { entity: '[[printer3d.entity]]', is: [printing, paused, attention] }
+    popup: '#[[key]]-3d-printer'
+    controls:
+      - id: 3d-printer-actions
+        template: 3d-printer-actions
+        slots: { entity: '[[printer3d.entity]]', actions: '[[printer3d.actions]]' }
+      - id: printer3d-outlet
+        if: printer3d.outlet
+        template: power
+        slots: { entity: '[[printer3d.outlet.entity]]' }
+        show: { entity: '[[printer3d.entity]]', not: [printing, paused, attention] }
+  example:
+    key: office
+    printer3d:
+      {
+        entity: sensor.3d_printer,
+        progress: sensor.3d_printer_progress,
+        actions:
+          {
+            cancel: button.3d_printer_cancel,
+            pause: button.3d_printer_pause,
+            resume: button.3d_printer_resume,
+            continue: button.3d_printer_continue,
+          },
+      }
+
+3d-printer-popup:
+  description: A room's 3D printer pop-up, its camera, print, temperatures and power.
+  slots:
+    key: { kind: text, required: true }
+    name: { kind: text, required: true }
+    printer3d:
+      kind: object
+      required: true
+      fields:
+        entity: { kind: entity, required: true }
+        progress: { kind: entity, required: true }
+        filename: { kind: entity, required: true }
+        material: { kind: entity, required: true }
+        speed: { kind: entity, required: true }
+        start: { kind: entity, required: true }
+        finish: { kind: entity, required: true }
+        nozzle:
+          kind: object
+          required: true
+          fields:
+            temperature: { kind: entity, required: true }
+            target: { kind: entity }
+        bed:
+          kind: object
+          required: true
+          fields:
+            temperature: { kind: entity, required: true }
+            target: { kind: entity }
+        camera: { kind: entity }
+        actions:
+          kind: object
+          required: true
+          fields:
+            pause: { kind: entity }
+            resume: { kind: entity }
+            continue: { kind: entity }
+            cancel: { kind: entity }
+        outlet:
+          kind: object
+          fields:
+            entity: { kind: entity, required: true }
+            energy:
+              kind: object
+              fields:
+                power: { kind: entity, required: true }
+                today: { kind: entity }
+                total: { kind: entity }
+  card:
+    hash: '#[[key]]-3d-printer'
+    cards:
+      - id: header
+        type: custom:mnml-header-card
+        entity: '[[printer3d.entity]]'
+        state: [{ id: name, text: '[[name]]' }]
+        controls:
+          - id: 3d-printer-actions
+            template: 3d-printer-actions
+            slots: { entity: '[[printer3d.entity]]', actions: '[[printer3d.actions]]' }
+        back: true
+      - id: printer3d-camera
+        if: printer3d.camera
+        type: custom:mnml-heading-card
+        title: Camera
+        icon: mdi:cctv
+      - id: printer3d-camera-2
+        if: printer3d.camera
+        type: picture-entity
+        entity: '[[printer3d.camera]]'
+        show_name: false
+        show_state: false
+        camera_view: live
+      - id: print
+        type: custom:mnml-list-card
+        title: Print
+        icon: mdi:printer-3d-nozzle
+        rows:
+          - id: printer3d-material
+            entity: '[[printer3d.material]]'
+          - id: printer3d-progress
+            entity: '[[printer3d.progress]]'
+            show: { entity: '[[printer3d.entity]]', is: [printing, paused, attention] }
+          - id: printer3d-filename
+            entity: '[[printer3d.filename]]'
+            show: { entity: '[[printer3d.entity]]', is: [printing, paused, attention] }
+          - id: printer3d-speed
+            entity: '[[printer3d.speed]]'
+            show: { entity: '[[printer3d.entity]]', is: [printing, paused, attention] }
+          - id: printer3d-start
+            entity: '[[printer3d.start]]'
+            relative: true
+            show: { entity: '[[printer3d.entity]]', is: [printing, paused, attention] }
+          - id: printer3d-finish
+            entity: '[[printer3d.finish]]'
+            relative: true
+            show: { entity: '[[printer3d.entity]]', is: [printing, paused, attention] }
+      - id: temperatures
+        type: custom:mnml-list-card
+        title: Temperatures
+        icon: mdi:thermometer
+        headers: [Heater, Now, Target]
+        rows:
+          - id: printer3d-nozzle-temperature
+            entity: '[[printer3d.nozzle.temperature]]'
+            strip: ' temperature'
+            values: ['[[printer3d.nozzle.temperature]]', '[[printer3d.nozzle.target]]']
+          - id: printer3d-bed-temperature
+            entity: '[[printer3d.bed.temperature]]'
+            strip: ' temperature'
+            values: ['[[printer3d.bed.temperature]]', '[[printer3d.bed.target]]']
+      - id: printer3d-outlet
+        if: printer3d.outlet
+        type: custom:mnml-heading-card
+        title: Power
+        icon: mdi:power-plug
+      - id: printer3d-outlet-2
+        if: printer3d.outlet
+        template: switch-card
+        slots: { entity: '[[printer3d.outlet.entity]]' }
+      - id: printer3d-outlet-energy
+        if: printer3d.outlet.energy
+        template: energy-table
+        slots: { meters: ['[[printer3d.outlet.energy]]'] }
+  example:
+    key: office
+    name: Office
+    printer3d:
+      {
+        entity: sensor.3d_printer,
+        material: sensor.3d_printer_material,
+        progress: sensor.3d_printer_progress,
+        filename: sensor.3d_printer_file,
+        speed: sensor.3d_printer_speed,
+        start: sensor.3d_printer_start,
+        finish: sensor.3d_printer_finish,
+        nozzle: { temperature: sensor.nozzle, target: sensor.nozzle_target },
+        bed: { temperature: sensor.bed, target: sensor.bed_target },
+        actions:
+          {
+            cancel: button.3d_printer_cancel,
+            pause: button.3d_printer_pause,
+            resume: button.3d_printer_resume,
+            continue: button.3d_printer_continue,
+          },
+      }

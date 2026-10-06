@@ -1,0 +1,18 @@
+home-heading:
+  description: A heading of the home's own, kept by MNML, which every dashboard can place.
+  slots:
+    title: { kind: text, required: true }
+  card:
+    type: custom:mnml-heading-card
+    title: '[[title]]'
+    icon: mdi:home-heart
+    grid_options: { columns: full }
+  popups:
+    - id: home
+      hash: '#home-heading'
+      cards:
+        - id: markdown
+          type: markdown
+          content: This pop-up comes from a template of the home.
+  example:
+    title: Templates of the home

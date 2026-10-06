@@ -1,0 +1,44 @@
+[project]
+name = "ha-mnml"
+version = "0.1.0"
+requires-python = ">=3.14.2"
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+extend-exclude = ["node_modules", ".ha"]
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = ["D", "COM812", "CPY001"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "PLR2004", "SLF001", "ARG001"]
+
+[tool.mypy]
+strict = true
+explicit_package_bases = true
+files = ["custom_components", "tests"]
+
+[dependency-groups]
+dev = [
+  "home-assistant-frontend==20260826.7",
+  "mypy>=2.4.0",
+  "pytest-homeassistant-custom-component==0.13.367",
+  "ruff>=0.16.10",
+]
+
+[[tool.mypy.overrides]]
+module = "pytest_homeassistant_custom_component.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["homeassistant.components.http", "homeassistant.components.websocket_api"]
+implicit_reexport = true

@@ -1,0 +1,71 @@
+select-card:
+  description: A dropdown over a select entity.
+  slots:
+    entity: { kind: entity, required: true }
+  card:
+    type: custom:mnml-select-card
+    entity: '[[entity]]'
+  example:
+    entity: select.ac_power_saving
+
+number-slider:
+  description: A slider over a number entity.
+  slots:
+    entity: { kind: entity, required: true }
+  card:
+    type: custom:mnml-slider-card
+    entity: '[[entity]]'
+    slider: value
+  example:
+    entity: number.ac_dehumidifier
+
+switch-card:
+  description: A switch as an item with its power toggle.
+  slots:
+    entity: { kind: entity, required: true }
+  card:
+    type: custom:mnml-entity-card
+    entity: '[[entity]]'
+    color: amber
+    controls:
+      - id: power
+        template: power
+        slots: { entity: '[[entity]]' }
+  example:
+    entity: switch.kitchen_outlet
+
+diffuser-card:
+  description: A diffuser with its amount, an amount slider and its power toggle.
+  slots:
+    entity: { kind: entity, required: true }
+    amount: { kind: entity, required: true }
+  card:
+    type: custom:mnml-entity-card
+    entity: '[[entity]]'
+    color: amber
+    state: [{ id: part }, { id: amount, entity: '[[amount]]' }]
+    controls:
+      - id: slider
+        type: slider
+        entity: '[[amount]]'
+        slider: value
+        name: Amount
+        icon: mdi:spray
+      - id: power
+        template: power
+        slots: { entity: '[[entity]]' }
+  example:
+    entity: switch.office_diffuser
+    amount: number.office_diffuser_amount
+
+media-card:
+  description: A media player, opening a pop-up when it has one.
+  slots:
+    entity: { kind: entity, required: true }
+    popup: { kind: text }
+  card:
+    type: custom:mnml-media-card
+    entity: '[[entity]]'
+    popup: '[[popup]]'
+  example:
+    entity: media_player.living_tv

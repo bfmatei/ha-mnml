@@ -1,0 +1,283 @@
+unifi-network:
+  description: A UniFi network's tile, its latency, and its devices, VPN and firmware chips; it brings the network's pop-up and one per Wi-Fi network.
+  slots:
+    latency: { kind: entities, required: true, group: Basics }
+    wan: { kind: entity, label: WAN, group: Basics }
+    devices: { kind: entities, required: true, group: Devices }
+    wifi:
+      kind: objects
+      label: Wi-Fi networks
+      group: Wi-Fi
+      fields:
+        key: { kind: text, required: true }
+        enabled: { kind: entity, required: true }
+        qr: { kind: entity, label: QR code }
+        switchable: { kind: flag }
+    vpn: { kind: entities, label: VPN, group: VPN }
+    clients:
+      kind: object
+      group: Wi-Fi
+      fields:
+        entity: { kind: entity, required: true }
+        names: { kind: entity }
+        networks:
+          kind: objects
+          required: true
+          fields:
+            name: { kind: text }
+            icon: { kind: icon }
+            subnet: { kind: text, required: true }
+    router:
+      kind: object
+      required: true
+      group: Basics
+      fields:
+        cpu: { kind: entity, required: true, label: CPU }
+        temperature: { kind: entity, required: true }
+    firmware: { kind: entities, required: true, group: Devices }
+    device_up:
+      {
+        kind: texts,
+        default: [connected, upgrading, provisioning],
+        label: Up states,
+        group: Devices,
+      }
+  card:
+    type: custom:mnml-tile-card
+    name: Network
+    icon: mdi:router-network
+    popup: '#network'
+    state: [{ id: latency-0, entity: '[[latency.0]]', icon: true }]
+    chips:
+      - id: devices
+        type: status
+        name: Devices
+        icon: mdi:lan
+        rules:
+          [
+            {
+              id: devices,
+              entities: ['[[devices]]'],
+              label: device,
+              color: red,
+              not: '[[device_up]]',
+            },
+          ]
+      - id: vpn
+        if: vpn
+        type: status
+        name: VPN
+        icon: mdi:vpn
+        rules: [{ id: vpn, entities: ['[[vpn]]'], label: device, color: red, is: ['off'] }]
+      - id: firmware
+        type: status
+        name: Firmware
+        icon: mdi:memory
+        rules:
+          [{ id: firmware, entities: ['[[firmware]]'], label: device, color: amber, is: ['on'] }]
+    grid_options: { columns: 12 }
+  popups:
+    - id: network-popup
+      template: network-popup
+      slots:
+        latency: '[[latency]]'
+        wan: '[[wan]]'
+        devices: '[[devices]]'
+        wifi: '[[wifi]]'
+        vpn: '[[vpn]]'
+        clients: '[[clients]]'
+        router: '[[router]]'
+        firmware: '[[firmware]]'
+        device_up: '[[device_up]]'
+    - id: each-wifi
+      each: wifi
+      as: network
+      template: wifi-popup
+      slots: { wifi: '[[network]]' }
+  example: &network
+    latency: [sensor.router_latency]
+    devices: [sensor.router_state]
+    router: { cpu: sensor.router_cpu, temperature: sensor.router_temperature }
+    firmware: [update.router_firmware]
+
+wifi-item:
+  description: A Wi-Fi network as an item, its switch when it may be switched from the dashboard, opening its pop-up.
+  slots:
+    wifi:
+      kind: object
+      required: true
+      fields:
+        key: { kind: text, required: true }
+        enabled: { kind: entity, required: true }
+        qr: { kind: entity, label: QR code }
+        switchable: { kind: flag }
+  card:
+    type: custom:mnml-entity-card
+    entity: '[[wifi.enabled]]'
+    label: device
+    popup: '#network-[[wifi.key]]'
+    controls?:
+      - id: wifi-switchable
+        if: wifi.switchable
+        template: power
+        slots: { entity: '[[wifi.enabled]]' }
+  example:
+    wifi: { key: guests, enabled: switch.guests_wifi, switchable: true }
+
+network-popup:
+  description: The network's pop-up, its internet, devices, router, VPN, Wi-Fi networks, clients and firmware.
+  slots:
+    latency: { kind: entities, required: true }
+    wan: { kind: entity }
+    devices: { kind: entities, required: true }
+    wifi:
+      kind: objects
+      fields:
+        key: { kind: text, required: true }
+        enabled: { kind: entity, required: true }
+        qr: { kind: entity, label: QR code }
+        switchable: { kind: flag }
+    vpn: { kind: entities }
+    clients:
+      kind: object
+      fields:
+        entity: { kind: entity, required: true }
+        names: { kind: entity }
+        networks:
+          kind: objects
+          required: true
+          fields:
+            name: { kind: text }
+            icon: { kind: icon }
+            subnet: { kind: text, required: true }
+    router:
+      kind: object
+      required: true
+      fields:
+        cpu: { kind: entity, required: true, label: CPU }
+        temperature: { kind: entity, required: true }
+    firmware: { kind: entities, required: true }
+    device_up: { kind: texts, default: [connected, upgrading, provisioning] }
+  card:
+    hash: '#network'
+    cards:
+      - id: header
+        type: custom:mnml-header-card
+        name: Network
+        icon: mdi:router-network
+        state: [{ id: latency-0, entity: '[[latency.0]]', icon: true }]
+      - id: internet
+        type: custom:mnml-list-card
+        title: Internet
+        icon: mdi:web
+        rows:
+          - id: each-latency
+            each: latency
+            as: probe
+            entity: '[[probe]]'
+          - id: wan
+            if: wan
+            template: link-row
+            slots: { entity: '[[wan]]' }
+      - id: devices
+        type: custom:mnml-list-card
+        title: Devices
+        icon: mdi:lan
+        rows:
+          - id: each-devices
+            each: devices
+            as: device
+            entity: '[[device]]'
+            label: device
+            color: red
+            when: { not: '[[device_up]]' }
+      - id: router
+        type: custom:mnml-list-card
+        title: Router
+        icon: mdi:router
+        rows:
+          - id: router-cpu
+            entity: '[[router.cpu]]'
+            bar: true
+          - id: router-temperature
+            entity: '[[router.temperature]]'
+      - id: vpn
+        if: vpn
+        type: custom:mnml-list-card
+        title: VPN
+        icon: mdi:vpn
+        rows:
+          - id: each-vpn
+            each: vpn
+            as: tunnel
+            entity: '[[tunnel]]'
+            label: device
+            color: red
+            when: { is: ['off'] }
+      - id: wifi
+        if: wifi
+        type: custom:mnml-heading-card
+        title: Wi-Fi
+        icon: mdi:wifi
+      - id: each-wifi
+        each: wifi
+        as: network
+        template: wifi-item
+        slots: { wifi: '[[network]]' }
+      - id: clients
+        if: clients
+        type: custom:mnml-clients-card
+        entity: '[[clients.entity]]'
+        names: '[[clients.names]]'
+        networks: '[[clients.networks]]'
+        fold: true
+      - id: firmware
+        type: custom:mnml-list-card
+        title: Firmware
+        icon: mdi:memory
+        rows:
+          - id: each-firmware
+            each: firmware
+            as: update
+            template: pending-row
+            slots: { entity: '[[update]]' }
+  example: *network
+
+wifi-popup:
+  description: A Wi-Fi network's pop-up, its switch and the QR code to join it while it is on.
+  slots:
+    wifi:
+      kind: object
+      required: true
+      fields:
+        key: { kind: text, required: true }
+        enabled: { kind: entity, required: true }
+        qr: { kind: entity, label: QR code }
+        switchable: { kind: flag }
+  card:
+    hash: '#network-[[wifi.key]]'
+    cards:
+      - id: header
+        type: custom:mnml-header-card
+        entity: '[[wifi.enabled]]'
+        label: device
+        state: [{ id: network, text: Network }, { id: part-2, when: { is: ['off'] } }]
+        controls?:
+          - id: wifi-switchable
+            if: wifi.switchable
+            template: power
+            slots: { entity: '[[wifi.enabled]]' }
+        back: true
+      - id: heading
+        type: custom:mnml-heading-card
+        title: Scan to join
+        icon: mdi:qrcode-scan
+        visibility: { template: while-not-off, slots: { entity: '[[wifi.enabled]]' } }
+      - id: picture-entity
+        type: picture-entity
+        entity: '[[wifi.qr]]'
+        show_name: false
+        show_state: false
+        visibility: { template: while-not-off, slots: { entity: '[[wifi.enabled]]' } }
+  example:
+    wifi: { key: guests, enabled: switch.guests_wifi, qr: image.guests_wifi_qr, switchable: true }

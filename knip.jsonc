@@ -1,0 +1,17 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignoreBinaries": ["uv"],
+  "entry": [
+    "src/cards/register.ts",
+    "src/cards/loader.ts",
+    "src/editors/main.ts",
+    "src/panel/main.ts",
+    "src/contract/cards.ts",
+    "src/home/types.ts",
+    "src/contract/entities.ts",
+    "src/contract/templates.ts",
+    "src/**/*.test.ts",
+    "tools/*.ts",
+    "demo/*.ts",
+  ],
+}

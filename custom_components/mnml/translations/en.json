@@ -1,0 +1,40 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "MNML",
+        "description": "Adds MNML's cards, their editors and the MNML theme to Home Assistant."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "MNML is already set up."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "MNML",
+        "data": {
+          "default_theme": "Use MNML as the default theme"
+        },
+        "data_description": {
+          "default_theme": "For everyone who has not picked a theme in their profile, in light and dark mode."
+        }
+      }
+    }
+  },
+  "issues": {
+    "theme_not_loaded": {
+      "title": "Home Assistant does not load the MNML theme",
+      "description": "MNML could not make Home Assistant load its theme from `{path}`, so it took the file away again. Home Assistant loads it when `configuration.yaml` reads the `themes` folder like this, after a restart:\n\n```yaml\nfrontend:\n  themes: !include_dir_merge_named themes\n```"
+    },
+    "hand_loaded_bundle": {
+      "title": "MNML Cards are also loaded by hand",
+      "description": "The dashboard resource `{url}` loads MNML Cards a second time, which defines every card twice. Remove it in Settings, Dashboards, the three dots, Resources, or from `lovelace: resources:` in YAML. The repair goes when MNML next starts."
+    },
+    "second_theme": {
+      "title": "Two themes are named MNML",
+      "description": "`{file}` also defines a theme named MNML, so one of the two is lost. Remove that file, or remove the standalone MNML Theme from HACS. The repair goes when MNML next starts."
+    }
+  }
+}

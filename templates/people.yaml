@@ -1,0 +1,303 @@
+person:
+  description: A person's tile, whether they are driving or in a focus, and their devices' batteries; it brings the person's and each device's pop-up.
+  slots:
+    key: { kind: text, required: true, discover: area.id, group: Basics }
+    entity: { kind: entity, required: true, label: Person, group: Basics }
+    health:
+      kind: object
+      group: Health
+      fields:
+        steps: { kind: entity, required: true }
+        distance: { kind: entity, required: true }
+        flights_climbed: { kind: entity, required: true }
+        active_energy: { kind: entity, required: true }
+        resting_energy: { kind: entity, required: true }
+    devices:
+      kind: objects
+      required: true
+      group: Devices
+      fields:
+        key: { kind: text, required: true }
+        name: { kind: text }
+        icon: { kind: icon }
+        tracker: { kind: entity, required: true }
+        battery: { kind: entity, required: true }
+        battery_state: { kind: entity, required: true }
+        connection: { kind: entity, required: true }
+        network: { kind: entity, required: true }
+        storage: { kind: entity, required: true }
+        focus: { kind: entity, required: true }
+        focus_name: { kind: entity }
+        activity: { kind: entity, required: true }
+        permission: { kind: entity, required: true }
+    activities: { kind: entities, group: Status }
+    focuses: { kind: entities, group: Status }
+    batteries: { kind: entities, group: Devices }
+  card:
+    type: custom:mnml-tile-card
+    entity: '[[entity]]'
+    popup: '#person-[[key]]'
+    state: [{ id: part }]
+    chips:
+      - id: driving
+        type: status
+        name: Driving
+        icon: mdi:steering
+        rules: [{ id: activities, entities: ['[[activities]]'], color: amber, is: [automotive] }]
+      - id: do-not-disturb
+        type: status
+        name: Do not disturb
+        icon: mdi:moon-waning-crescent
+        rules: [{ id: focuses, entities: ['[[focuses]]'], color: amber, is: ['on'] }]
+    problems: { batteries: '[[batteries]]' }
+    grid_options: { columns: 12 }
+  popups:
+    - id: person-popup
+      template: person-popup
+      slots: { key: '[[key]]', entity: '[[entity]]', health: '[[health]]', devices: '[[devices]]' }
+    - id: each-devices
+      each: devices
+      as: device
+      template: device-popup
+      slots: { key: '[[key]]', entity: '[[entity]]', device: '[[device]]' }
+  example:
+    key: alex
+    entity: person.alex
+    devices:
+      [
+        {
+          key: phone,
+          name: Phone,
+          icon: mdi:cellphone,
+          tracker: device_tracker.alex_phone,
+          battery: sensor.alex_phone_battery,
+          battery_state: sensor.alex_phone_battery_state,
+          storage: sensor.alex_phone_storage,
+          connection: sensor.alex_phone_connection,
+          network: sensor.alex_phone_ssid,
+          activity: sensor.alex_phone_activity,
+          focus: binary_sensor.alex_phone_focus,
+          permission: sensor.alex_phone_location_permission,
+        },
+      ]
+    activities: [sensor.alex_phone_activity]
+    focuses: [binary_sensor.alex_phone_focus]
+    batteries: [sensor.alex_phone_battery]
+
+device-card:
+  description: A person's device as an item, its place and battery, opening its pop-up.
+  slots:
+    key: { kind: text, required: true }
+    device:
+      kind: object
+      required: true
+      fields:
+        key: { kind: text, required: true }
+        name: { kind: text }
+        icon: { kind: icon }
+        tracker: { kind: entity, required: true }
+        battery: { kind: entity }
+        battery_state: { kind: entity }
+        connection: { kind: entity }
+        network: { kind: entity }
+        storage: { kind: entity }
+        focus: { kind: entity }
+        focus_name: { kind: entity }
+        activity: { kind: entity }
+        permission: { kind: entity }
+  card:
+    type: custom:mnml-entity-card
+    entity: '[[device.tracker]]'
+    name: '[[device.name]]'
+    icon: '[[device.icon]]'
+    state: [{ id: part }, { id: device-battery, entity: '[[device.battery]]', icon: true }]
+    popup: '#person-[[key]]-[[device.key]]'
+  example:
+    key: alex
+    device:
+      {
+        key: phone,
+        name: Phone,
+        icon: mdi:cellphone,
+        tracker: device_tracker.alex_phone,
+        battery: sensor.alex_phone_battery,
+      }
+
+person-popup:
+  description: A person's pop-up, their devices, their location access and their health.
+  slots:
+    key: { kind: text, required: true }
+    entity: { kind: entity, required: true }
+    health:
+      kind: object
+      fields:
+        steps: { kind: entity, required: true }
+        distance: { kind: entity, required: true }
+        flights_climbed: { kind: entity, required: true }
+        active_energy: { kind: entity, required: true }
+        resting_energy: { kind: entity, required: true }
+    devices:
+      kind: objects
+      required: true
+      fields:
+        key: { kind: text, required: true }
+        name: { kind: text }
+        icon: { kind: icon }
+        tracker: { kind: entity, required: true }
+        battery: { kind: entity }
+        battery_state: { kind: entity }
+        connection: { kind: entity }
+        network: { kind: entity }
+        storage: { kind: entity }
+        focus: { kind: entity }
+        focus_name: { kind: entity }
+        activity: { kind: entity }
+        permission: { kind: entity, required: true }
+  card:
+    hash: '#person-[[key]]'
+    cards:
+      - id: header
+        type: custom:mnml-header-card
+        entity: '[[entity]]'
+        state: [{ id: part }]
+      - id: heading
+        type: custom:mnml-heading-card
+        title: Devices
+        icon: mdi:cellphone-link
+      - id: each-devices
+        each: devices
+        as: device
+        template: device-card
+        slots: { key: '[[key]]', device: '[[device]]' }
+      - id: location-access
+        type: custom:mnml-list-card
+        title: Location access
+        icon: mdi:map-marker-alert
+        rows:
+          - id: each-devices
+            each: devices
+            as: device
+            entity: '[[device.permission]]'
+            name: '[[device.name]]'
+            color: orange
+            show: { not: [authorized always] }
+      - id: health
+        if: health
+        type: custom:mnml-list-card
+        title: Health
+        icon: mdi:heart-pulse
+        rows:
+          - id: health-steps
+            entity: '[[health.steps]]'
+            zero_when_empty: true
+          - id: health-distance
+            entity: '[[health.distance]]'
+            zero_when_empty: true
+          - id: health-flights_climbed
+            entity: '[[health.flights_climbed]]'
+            zero_when_empty: true
+          - id: health-active_energy
+            entity: '[[health.active_energy]]'
+            zero_when_empty: true
+          - id: health-resting_energy
+            entity: '[[health.resting_energy]]'
+            zero_when_empty: true
+  example:
+    key: alex
+    entity: person.alex
+    devices:
+      [
+        {
+          key: phone,
+          name: Phone,
+          icon: mdi:cellphone,
+          tracker: device_tracker.alex_phone,
+          battery: sensor.alex_phone_battery,
+          permission: sensor.alex_phone_location_permission,
+        },
+      ]
+
+device-popup:
+  description: A person's device pop-up, its battery and its details.
+  slots:
+    key: { kind: text, required: true }
+    entity: { kind: entity, required: true }
+    device:
+      kind: object
+      required: true
+      fields:
+        key: { kind: text, required: true }
+        name: { kind: text }
+        icon: { kind: icon }
+        tracker: { kind: entity }
+        battery: { kind: entity, required: true }
+        battery_state: { kind: entity, required: true }
+        connection: { kind: entity, required: true }
+        network: { kind: entity, required: true }
+        storage: { kind: entity, required: true }
+        focus: { kind: entity, required: true }
+        focus_name: { kind: entity }
+        activity: { kind: entity, required: true }
+        permission: { kind: entity, required: true }
+  card:
+    hash: '#person-[[key]]-[[device.key]]'
+    cards:
+      - id: header
+        type: custom:mnml-header-card
+        name: '[[device.name]]'
+        icon: '[[device.icon]]'
+        entity: '[[device.tracker]]'
+        state: [{ id: entity, entity: '[[entity]]', name: true }]
+        back: true
+      - id: battery
+        type: custom:mnml-list-card
+        title: Battery
+        icon: mdi:battery-charging-medium
+        rows:
+          - id: device-battery
+            entity: '[[device.battery]]'
+            bar: true
+            low: 20
+            critical: 5
+          - id: device-battery_state
+            entity: '[[device.battery_state]]'
+      - id: details
+        type: custom:mnml-list-card
+        title: Details
+        icon: mdi:information-outline
+        rows:
+          - id: device-storage
+            entity: '[[device.storage]]'
+          - id: device-connection
+            entity: '[[device.connection]]'
+          - id: device-network
+            entity: '[[device.network]]'
+          - id: device-activity
+            entity: '[[device.activity]]'
+          - id: device-focus
+            entity: '[[device.focus]]'
+          - id: device-focus_name
+            if: device.focus_name
+            entity: '[[device.focus_name]]'
+          - id: device-permission
+            entity: '[[device.permission]]'
+            color: orange
+            when: { not: [authorized always] }
+  example:
+    key: alex
+    entity: person.alex
+    device:
+      {
+        key: phone,
+        name: Phone,
+        icon: mdi:cellphone,
+        tracker: device_tracker.alex_phone,
+        battery: sensor.alex_phone_battery,
+        battery_state: sensor.alex_phone_battery_state,
+        storage: sensor.alex_phone_storage,
+        connection: sensor.alex_phone_connection,
+        network: sensor.alex_phone_ssid,
+        activity: sensor.alex_phone_activity,
+        focus: binary_sensor.alex_phone_focus,
+        permission: sensor.alex_phone_location_permission,
+      }

@@ -1,0 +1,153 @@
+section-heading:
+  description: A section's heading, the full width of the section.
+  slots:
+    title: { kind: text, required: true }
+    icon: { kind: icon, required: true }
+    state: { kind: objects }
+    controls: { kind: objects }
+  card:
+    type: custom:mnml-heading-card
+    title: '[[title]]'
+    icon: '[[icon]]'
+    state: '[[state]]'
+    controls: '[[controls]]'
+    grid_options: { columns: full }
+  example:
+    title: Rooms
+    icon: mdi:floor-plan
+
+power:
+  description: A filled power toggle for an entity, lit while the entity is on.
+  slots:
+    entity: { kind: entity, required: true }
+    color: { kind: text, default: amber }
+    when: { kind: object }
+  card:
+    type: toggle
+    entity: '[[entity]]'
+    icon: mdi:power
+    color: '[[color]]'
+    when: '[[when]]'
+    primary: true
+  example:
+    entity: light.kitchen
+
+nav-chip:
+  description: A coloured chip that opens a pop-up.
+  slots:
+    entity: { kind: entity, required: true }
+    popup: { kind: text, required: true }
+    color: { kind: text, required: true }
+    when: { kind: object }
+  card:
+    type: nav
+    entity: '[[entity]]'
+    popup: '[[popup]]'
+    color: '[[color]]'
+    when: '[[when]]'
+  example:
+    entity: climate.living
+    popup: '#living-heating'
+    color: orange
+
+while-not-off:
+  description: The visibility that shows a card while its entity is not off.
+  slots:
+    entity: { kind: entity, required: true }
+  card:
+    - id: entity
+      condition: state
+      entity: '[[entity]]'
+      state_not: 'off'
+  example:
+    entity: light.kitchen
+
+batteries:
+  description: A folding list of batteries, lowest first, orange under 20 % and red under 5 %.
+  slots:
+    batteries: { kind: entities }
+    low: { kind: number, default: 20 }
+    critical: { kind: number, default: 5 }
+  card:
+    - id: batteries
+      if: batteries
+      type: custom:mnml-list-card
+      lowest_first: true
+      fold: true
+      summary: lowest
+      title: Batteries
+      icon: mdi:battery-charging-medium
+      rows:
+        - id: each-batteries
+          each: batteries
+          as: battery
+          entity: '[[battery]]'
+          label: device
+          bar: true
+          low: '[[low]]'
+          critical: '[[critical]]'
+  example:
+    batteries: [sensor.window_battery, sensor.door_battery]
+
+energy-table:
+  description: A folding table of meters, now, today and in total, the heading summing what they draw now.
+  slots:
+    meters:
+      kind: objects
+      fields:
+        power: { kind: entity, required: true }
+        today: { kind: entity }
+        total: { kind: entity }
+  card:
+    type: custom:mnml-list-card
+    fold: true
+    summary: { sum: 1 }
+    title: Energy
+    icon: mdi:lightning-bolt
+    headers: [Item, Now, Today, Total]
+    rows:
+      - id: each-meters
+        each: meters
+        as: meter
+        entity: '[[meter.power]]'
+        label: device
+        values: ['[[meter.power]]', '[[meter.today]]', '[[meter.total]]']
+  example:
+    meters:
+      - { power: sensor.plug_power, today: sensor.plug_energy_today, total: sensor.plug_energy }
+
+pending-row:
+  description: A list row that flags an update while it is pending.
+  slots:
+    entity: { kind: entity, required: true }
+  card:
+    entity: '[[entity]]'
+    label: device
+    flag: true
+    show: { is: ['on'] }
+  example:
+    entity: update.router_firmware
+
+stopped-row:
+  description: A list row, red, shown while a service or guest is off.
+  slots:
+    entity: { kind: entity, required: true }
+  card:
+    entity: '[[entity]]'
+    label: device
+    color: red
+    show: { is: ['off'] }
+  example:
+    entity: binary_sensor.server_status
+
+link-row:
+  description: A list row for a link speed, orange while it is not the full speed.
+  slots:
+    entity: { kind: entity, required: true }
+    speed: { kind: text, default: '10000' }
+  card:
+    entity: '[[entity]]'
+    color: orange
+    when: { not: ['[[speed]]'] }
+  example:
+    entity: sensor.router_wan_link_speed

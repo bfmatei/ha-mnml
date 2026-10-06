@@ -1,0 +1,65 @@
+# Editing in the UI
+
+Every MNML card is in Home Assistant's card picker: **Add card**, then **By card**, where a search for MNML lists them by name, MNML Agenda to MNML Tile. Each has a description and a link to its keys. The cards that can show something with any home's entities have a live preview there, and each starts from a stub with a fitting entity of the home: a light for the slider, a media player for the media card.
+
+## A card's editor
+
+- **Panels**, in the order of the card's keys: what it shows (the entity, the name, the icon), what it does, its colour and conditions, then its parts. Each is Home Assistant's own expansion panel, with an icon and a summary of what it holds (an entity's name, a count of parts such as 1 control or 3 controls, or not set) that follows each change; the first is open, and the others are drawn when first opened.
+- **Kinds.** A card or part that comes in kinds starts with a switch between them, and shows only that kind's fields: a header or tile of an entity or of a name and icon, a select card of an entity or of scenes, a state line that is a text, an attribute, minutes, a serial, the name or the value, and a control's type. Switching keeps the keys both kinds have.
+- **Parts.** State lines, controls and chips, status rules, list rows, items, calendars, message sources and networks are lists. Each part is a row named by its name or entity, with its kind where the parts have kinds; it opens on a click, and its three-dot menu moves it up or down, copies it, or deletes it. **Add** takes a kind where the parts have kinds. **Paste** puts the part last copied, in this browser, into any list of the same parts: a control copied from a heading pastes into a tile's chips.
+- **Pickers.** Entities are picked from the domains the key takes, icons with Home Assistant's icon picker, pop-ups from the hashes of this dashboard's pop-ups or typed, with or without the `#`, services and colours from their lists. Words are pairs of a state and its word; a state given twice is marked, and nothing is written until every state differs, while the boxes keep what was typed, so two states can be swapped. The car's doors, windows and tyres are four entities each, front left, front right, rear left, rear right.
+- **The YAML it writes** holds only the card's keys. A field at the card's default writes nothing, a switch turned off removes its key, and keys keep their place. Home Assistant's Layout and Visibility tabs work as for any card.
+
+## The template card's editor
+
+- **The gallery**, when no template is chosen, when the card names a template the dashboard does not know (said above it), or on **Change**: the home's own templates first, then the shipped ones by family, each as the home has changed it, with a filter over names and descriptions. Each template that draws a card has a live preview, drawn with the first area of the home where its discovery fills every required slot, or with its `example`. Previews are drawn as they scroll into view, and leave the dashboard's pop-ups alone; the first opening fetches every family, which the browser caches, and a card that names a template waits for them rather than showing the gallery. A template picked there starts as its tile showed it: in that area, or with its `example`, or else filled in yourself; picking the template already chosen keeps the card as it is.
+- **The template**, under its name and description, with **Change** to go back to the gallery, and, for an admin, **Edit this template**, which closes the card's dialog (Home Assistant asks first when the card has changes not saved) and opens the template in the MNML panel. Then where its values come from:
+  - **Find in an area**: the template finds its devices in the area picked. Each field and each part says where its value comes from: found in the area, nothing found there, set by you, or not set, for a value cleared there (`null`, `''` or `[]`). A value changed in the form goes to `slots`, which replaces discovery for that slot alone; an edit back to what was found leaves no override, and **Use what the area found** gives a panel's slots back to the area. `slots` goes when none is left.
+  - **Fill in yourself**: every slot in `slots`, and no `area`.
+  - **Find in the whole home**, offered only for a template whose rules look in the whole home (`scope: all`): neither `area` nor `slots`, and the fields show what the home found. An edit there fills the card in yourself, from what was found.
+- **Switching keeps the values.** From an area to filling in yourself, what the area found and what was set become `slots`. Back to an area, the values that differ from what the area finds stay in `slots`, and a slot the area finds but the card lacked is set to none; the area is the one whose id or name matches the card's `key` or `name`, and when none does, the card stays as it is until an area is picked.
+- **Panels.** The slots are grouped into panels by the template's `group:`, each with an icon and a summary, and labelled and explained by its `label:` and `help:` ([Writing a template](templates.md#writing-a-template)). An optional part the card lacks is offered with **Add**, and **Remove** takes it away. A slot of kind `object` or `objects` without `fields` is kept as written, and set in YAML.
+- **The preview** is the card as it is, and leaves the dashboard's pop-ups alone: a template's pop-ups are announced by the card on the dashboard, not by its preview.
+
+## When the editor cannot show a card
+
+A card with a key the editor does not know, or a value it cannot hold, opens in Home Assistant's YAML editor, with the reason. The pop-ups card has no form, and opens in YAML. The editors are a file of their own beside the bundle, `mnml-cards-editors-<hash>.js`, named by its content and loaded the first time a card is edited; a load that fails is tried again on the next edit.
+
+## The MNML panel
+
+**MNML** in the sidebar, for admins, at `/mnml`, is where the home's templates are kept and built. It is a file of its own, `mnml-cards-panel.js`, which the integration registers.
+
+**The library** lists every template: shipped, customised (a shipped one with the home's changes), the home's own, and those with a conflict. Each row has the template's family, its status ("customised, 3 changes") and where it is used ("on 9 cards, 2 dashboards", counted from every dashboard). A filter searches names, descriptions and families, and chips narrow it to a status. **New** asks for a name and opens a template to start from, a heading with a title slot; **Import** takes a YAML file or pasted text, a mapping of names to templates (or a dashboard's configuration, whose `mnml_templates:` it reads), shows what each becomes, lets one named like a template the home keeps replace it, sit beside it under a new name, or be skipped, and saves; **Export** writes the templates shown, or one from its row, whole, to a `.yaml` file. Each row's menu also has:
+
+- **Duplicate**, a copy under a new name, as a template of the home's own;
+- **History**, the earlier versions, a deleted or reset template's included, the one chosen restored at once;
+- **Rename**, for the home's own templates, which reads each dashboard kept in the UI again and updates its template cards, names the YAML ones to change by hand, and keeps the old name beside the new one while a dashboard could not be saved;
+- **Delete**, or **Reset to shipped** for a customised one, each saying where the template is used.
+
+While a dashboard holds `mnml_templates:` that MNML does not keep, the library offers to import them: one named like a shipped template comes in as changes to it, any other as the home's own. When dashboards hold different versions of one name, the import says so and takes the first found, the `mnml-templates` dashboard's first. Nothing on the dashboards is written. A copy of a shipped template written before parts had ids takes the shipped template's ids, so a copy that matches it is no change at all and is not offered. An action of the library that fails says why in a dialog.
+
+**The builder** opens a template at `/mnml/templates/<name>`. Its header has the back arrow, the template's name over what it is (your template, as shipped, or its count of changes to the shipped template), **Undo** and **Redo**, a menu, and **Save**, which is off while there is nothing to save. The menu has:
+
+- **Discard the changes**, back to the last save, or, for a new template not saved yet, back to the library; it is offered only when the draft differs from what is stored;
+- **Reset to shipped**, for a shipped template with changes, which puts the shipped template in the draft;
+- **History**, which puts an earlier version in the draft;
+- **Duplicate** and **Export**, of the draft as it stands.
+
+Its tabs are **Card**, **Pop-ups**, **Slots**, **Example** and **YAML**. On a phone, the Card and Pop-ups tabs show one pane at a time, chosen under the tabs.
+
+- **The outline**, on the left, is the card's tree, or the pop-ups': every card and part, fragment uses with their template's name, a badge for `if`, `unless` and `each`, and a mark on every part the home changed. A list's parts are dragged to reorder, or moved from their menu, which also duplicates and deletes; **Add to** takes a card, a part of a fitting kind, or a fragment.
+- **The preview**, in the middle, is the template as drawn: the expanded card, and its pop-ups behind the hashes listed under it, tried on the example or on an area picked above it. A template whose card is a pop-up (a hash and no type) is tried as that pop-up, listed with the others. A draft that does not expand says why there. A change in the home reaches the preview and the forms without drawing the builder again.
+- **The inspector**, on the right, is the selected part: when it is shown (always, or only if slots are set or not set), its fields bound to slots (a field holding `[[slot]]`, alone or in text, with a button to set it by hand instead), a binder that gives a field a slot of a kind that fits it (an entity field an `entity` slot, a text field a `text`, `number`, `icon` or `entity` one), its kind where parts come in kinds, and its other fields in Home Assistant's form. A fragment use picks its template and gives its slots values or slots of this template. A part the form does not know is changed in the YAML tab.
+- **Slots** lists the slots by panel. Each has its kind, label, help, panel, required and default, and the rules that find it as sentences: "Use the area's temperature sensor", or "Find the first sensor with device class battery from the integration ... in the area", or else another rule. In a shipped template, a slot that differs from the shipped one is marked changed. "In (area) it finds ..." tries the rules on an area as they change. The fields of an `object` or `objects` slot are slots of their own, and the fields of a "one per device" rule are written in YAML.
+- **Example** fills the slots for the preview and for the check on save.
+- **YAML** is the whole template, in Home Assistant's code editor where the page has one and in a text area otherwise; **Apply** takes it back to the other tabs, and a problem is said under it.
+
+Every edit can be undone and redone. A part added in the panel gets an id that starts with `my-`, which no shipped part's does. A part without an id, or with the id of another part of its list, gets one when the template opens and when YAML is applied: the id of the shipped part it matches, or else a new `my-` one.
+
+**Save** first checks every default against its slot's kind, that every slot the template reads (in `[[...]]`, `if`, `unless` and `each`, wherever it sits) is one it declares, and that no two parts of a list share an id; then it expands the draft with its example and has every card check its configuration. It refuses with the reason, keeping the draft. A template of the home's own is saved whole. A shipped one is saved as the changes from the shipped template to the draft, and only when those changes give the draft back; an edit back to the shipped template saves no change, and resets it. A save that would store what is stored already sends nothing.
+
+A template whose changes a release has touched since opens with them laid over, says which still apply and which are left out (a part gone, or an id the shipped template now gives a part of its own), and marks those parts in the outline; it can be saved as it stands, which keeps the changes that apply and clears the conflicts.
+
+Leaving a template with changes not saved, by its back arrow, the browser's back or closing the page, asks first. A new template or a duplicate is kept only once saved: left without saving, it is gone, and its name is free again.
+
+The panel follows the store while it is open, so a save from another browser shows in its library at once.

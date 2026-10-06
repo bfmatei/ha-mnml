@@ -1,0 +1,69 @@
+template:
+  - sensor:
+      - name: Fixture clients
+        unique_id: fixture_clients
+        state: '3'
+        attributes:
+          data: >-
+            {{ [{'name': 'Laptop', 'ipAddress': '10.1.10.5', 'type': 'WIRELESS'},
+                {'name': 'NAS', 'ipAddress': '10.1.50.2', 'type': 'WIRED'},
+                {'name': '', 'ipAddress': '10.1.10.9', 'type': 'VPN'}] }}
+      - name: Fixture steps
+        unique_id: fixture_steps
+        unit_of_measurement: steps
+        state: '{{ none }}'
+      - name: Fixture window front left
+        unique_id: fixture_window_front_left
+        state: OPEN
+      - name: Fixture window front right
+        unique_id: fixture_window_front_right
+        state: CLOSED
+      - name: Fixture window rear left
+        unique_id: fixture_window_rear_left
+        state: INTERMEDIATE
+      - name: Fixture window rear right
+        unique_id: fixture_window_rear_right
+        state: CLOSED
+      - name: Fixture tyre front left
+        unique_id: fixture_tyre_front_left
+        unit_of_measurement: bar
+        state: '2.4'
+      - name: Fixture tyre front right
+        unique_id: fixture_tyre_front_right
+        unit_of_measurement: bar
+        state: '2.4'
+      - name: Fixture tyre rear left
+        unique_id: fixture_tyre_rear_left
+        unit_of_measurement: bar
+        state: '2.0'
+      - name: Fixture tyre rear right
+        unique_id: fixture_tyre_rear_right
+        unit_of_measurement: bar
+        state: '2.4'
+      - name: Fixture tyre target
+        unique_id: fixture_tyre_target
+        unit_of_measurement: bar
+        state: '2.4'
+  - binary_sensor:
+      - name: Fixture door front left
+        unique_id: fixture_door_front_left
+        device_class: door
+        state: 'false'
+      - name: Fixture door front right
+        unique_id: fixture_door_front_right
+        device_class: door
+        state: 'true'
+      - name: Fixture door rear left
+        unique_id: fixture_door_rear_left
+        device_class: door
+        state: 'false'
+      - name: Fixture door rear right
+        unique_id: fixture_door_rear_right
+        device_class: door
+        state: 'false'
+      - name: Fixture hood
+        unique_id: fixture_hood
+        state: 'false'
+      - name: Fixture tailgate
+        unique_id: fixture_tailgate
+        state: 'false'

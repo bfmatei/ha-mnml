@@ -1,0 +1,48 @@
+template:
+  - triggers:
+      - trigger: event
+        event_type: mnml_message
+        id: add
+      - trigger: event
+        event_type: mnml_message_clear
+        id: clear
+    sensor:
+      - name: Messages
+        unique_id: mnml_messages
+        default_entity_id: sensor.messages
+        icon: mdi:bell-outline
+        state: >-
+          {%- set kept = this.attributes.messages | default([]) -%}
+          {%- if trigger.id == 'add' -%}
+            {{- [kept | count + 1, 20] | min -}}
+          {%- elif trigger.event.data.id | default('') -%}
+            {{- kept | rejectattr('id', 'eq', trigger.event.data.id) | list | count -}}
+          {%- else -%}
+            0
+          {%- endif -%}
+        attributes:
+          messages: >-
+            {%- set kept = this.attributes.messages | default([]) -%}
+            {%- if trigger.id == 'add' -%}
+              {{- ([{'id': trigger.event.context.id, 'title': trigger.event.data.title | default('') | string, 'message': trigger.event.data.message | default('') | string, 'severity': trigger.event.data.severity | default('') | string, 'source': trigger.event.data.source | default('') | string, 'time': trigger.event.time_fired.isoformat()}] + kept)[:20] -}}
+            {%- elif trigger.event.data.id | default('') -%}
+              {{- kept | rejectattr('id', 'eq', trigger.event.data.id) | list -}}
+            {%- else -%}
+              {{- [] -}}
+            {%- endif -%}
+
+script:
+  clear_messages:
+    alias: Clear messages
+    description: Removes one message by its id, or all of them without one.
+    fields:
+      id:
+        name: Message
+        description: The id of the message to remove. Leave it out to remove them all.
+        selector:
+          text: null
+    sequence:
+      - event: mnml_message_clear
+        event_data:
+          id: "{{ id | default('') }}"
+    mode: queued

@@ -1,0 +1,667 @@
+room:
+  description: A room's tile, its temperature and humidity, its window, door, lock and climate chips, its lights, and the problems dot; it brings the room's pop-ups.
+  slots:
+    key:
+      {
+        kind: text,
+        required: true,
+        discover: area.id,
+        help: "Names the room's pop-ups.",
+        group: Basics,
+      }
+    name: { kind: text, required: true, discover: area.name, group: Basics }
+    icon: { kind: icon, default: mdi:texture-box, discover: area.icon, group: Basics }
+    temperature:
+      {
+        kind: entity,
+        discover: [area.temperature, { domain: sensor, device_class: temperature }],
+        group: Sensors,
+      }
+    humidity:
+      {
+        kind: entity,
+        discover: [area.humidity, { domain: sensor, device_class: humidity }],
+        group: Sensors,
+      }
+    window:
+      { kind: entity, discover: { domain: binary_sensor, device_class: window }, group: Sensors }
+    door: { kind: entity, discover: { domain: binary_sensor, device_class: door }, group: Sensors }
+    lock: { kind: entity, discover: { domain: lock }, group: Sensors }
+    lights:
+      kind: object
+      required: true
+      group: Lights
+      fields:
+        group: { kind: entity, required: true }
+        color: { kind: flag }
+        members:
+          kind: objects
+          fields:
+            entity: { kind: entity, required: true }
+            members: { kind: entities }
+        scenes: { kind: entities }
+        active_scene: { kind: entity }
+      discover:
+        fields:
+          group: [{ domain: light, platform: group }, { domain: light }]
+          members: { per: device, where: { domain: light }, fields: { entity: { domain: light } } }
+          scenes: { domain: scene }
+    heating:
+      kind: object
+      group: Climate
+      fields:
+        entity: { kind: entity, required: true }
+        preset: { kind: flag }
+        thermostats:
+          kind: objects
+          fields:
+            valve: { kind: entity, required: true }
+            battery: { kind: entity }
+        batteries: { kind: entities }
+      discover:
+        fields:
+          entity: { domain: climate }
+    ac:
+      kind: object
+      label: Air conditioning
+      group: Climate
+      fields:
+        entity: { kind: entity, required: true }
+        fan: { kind: flag }
+        swing: { kind: flag }
+        horizontal_swing: { kind: flag }
+        power_saving: { kind: entity }
+        dehumidifier: { kind: entity }
+        energy:
+          kind: object
+          fields:
+            power: { kind: entity, required: true }
+            today: { kind: entity }
+            total: { kind: entity }
+    vacuum:
+      kind: object
+      group: Devices
+      fields:
+        entity: { kind: entity, required: true }
+        status: { kind: entity }
+        error: { kind: entity }
+        battery: { kind: entity }
+        current_room: { kind: entity }
+        progress: { kind: entity, required: true }
+        area: { kind: entity, required: true }
+        time: { kind: entity, required: true }
+        last_clean: { kind: entity, required: true }
+        mop_attached: { kind: entity, required: true }
+        water_box_attached: { kind: entity }
+        totals:
+          kind: object
+          fields:
+            count: { kind: entity, required: true }
+            area: { kind: entity, required: true }
+            time: { kind: entity, required: true }
+        map: { kind: entity }
+        routines: { kind: entities }
+        settings: { kind: entities }
+        consumables:
+          kind: objects
+          fields:
+            entity: { kind: entity, required: true }
+            reset: { kind: entity }
+        warnings: { kind: entities }
+        dock:
+          kind: object
+          fields:
+            error: { kind: entity }
+            dust_emptying: { kind: entity, required: true }
+            mop_drying: { kind: entity, required: true }
+            mop_drying_time_left: { kind: entity }
+            mop_washing: { kind: entity, required: true }
+            consumables:
+              kind: objects
+              fields:
+                entity: { kind: entity, required: true }
+                reset: { kind: entity }
+            warnings: { kind: entities }
+    printer3d:
+      kind: object
+      label: 3D printer
+      group: Devices
+      fields:
+        entity: { kind: entity, required: true }
+        progress: { kind: entity, required: true }
+        filename: { kind: entity, required: true }
+        material: { kind: entity, required: true }
+        speed: { kind: entity, required: true }
+        start: { kind: entity, required: true }
+        finish: { kind: entity, required: true }
+        nozzle:
+          kind: object
+          required: true
+          fields:
+            temperature: { kind: entity, required: true }
+            target: { kind: entity }
+        bed:
+          kind: object
+          required: true
+          fields:
+            temperature: { kind: entity, required: true }
+            target: { kind: entity }
+        camera: { kind: entity }
+        actions:
+          kind: object
+          required: true
+          fields:
+            pause: { kind: entity }
+            resume: { kind: entity }
+            continue: { kind: entity }
+            cancel: { kind: entity }
+        outlet:
+          kind: object
+          fields:
+            entity: { kind: entity, required: true }
+            energy:
+              kind: object
+              fields:
+                power: { kind: entity, required: true }
+                today: { kind: entity }
+                total: { kind: entity }
+    media:
+      kind: objects
+      label: Players
+      group: Media
+      fields:
+        entity: { kind: entity, required: true }
+        key: { kind: text }
+      discover:
+        {
+          per: device,
+          where: { domain: media_player },
+          fields: { entity: { domain: media_player } },
+        }
+    speakers:
+      kind: objects
+      group: Media
+      fields:
+        key: { kind: text, required: true }
+        entity: { kind: entity, required: true }
+        bass: { kind: entity, required: true }
+        treble: { kind: entity, required: true }
+        balance: { kind: entity }
+        loudness: { kind: entity, required: true }
+        tv:
+          kind: object
+          label: TV
+          fields:
+            input_format: { kind: entity }
+            night_sound: { kind: entity, required: true }
+            speech_enhancement: { kind: entity, required: true }
+            audio_delay: { kind: entity, required: true }
+        subwoofer:
+          kind: object
+          fields:
+            enabled: { kind: entity, required: true }
+            gain: { kind: entity, required: true }
+        surround:
+          kind: object
+          fields:
+            enabled: { kind: entity, required: true }
+            level: { kind: entity, required: true }
+            music_level: { kind: entity, required: true }
+            music_full_volume: { kind: entity, required: true }
+    outlets:
+      kind: objects
+      group: Devices
+      fields:
+        entity: { kind: entity, required: true }
+        energy:
+          kind: object
+          fields:
+            power: { kind: entity }
+            today: { kind: entity }
+            total: { kind: entity }
+      discover:
+        {
+          per: device,
+          where: { domain: switch, device_class: outlet },
+          fields: { entity: { domain: switch, device_class: outlet } },
+        }
+    diffuser:
+      kind: object
+      group: Devices
+      fields:
+        entity: { kind: entity, required: true }
+        amount: { kind: entity, required: true }
+    batteries:
+      {
+        kind: entities,
+        discover: { domain: sensor, device_class: battery },
+        help: Low ones show in the problems dot.,
+        group: Problems,
+      }
+    leaks:
+      {
+        kind: entities,
+        discover: { domain: binary_sensor, device_class: moisture },
+        label: Leak sensors,
+        group: Problems,
+      }
+    meters:
+      kind: objects
+      group: Energy
+      fields:
+        power: { kind: entity, required: true }
+        today: { kind: entity }
+        total: { kind: entity }
+  card:
+    type: custom:mnml-tile-card
+    name: '[[name]]'
+    icon: '[[icon]]'
+    popup: '#[[key]]'
+    state:
+      - id: temperature
+        entity: '[[temperature]]'
+        icon: true
+      - id: humidity
+        entity: '[[humidity]]'
+        icon: true
+    chips?:
+      - id: window
+        if: window
+        type: indicator
+        entity: '[[window]]'
+        color: orange
+      - id: door
+        if: door
+        type: indicator
+        entity: '[[door]]'
+        color: orange
+      - id: lock
+        if: lock
+        type: toggle
+        entity: '[[lock]]'
+        color: red
+        when: { is: [unlocked, open, jammed] }
+      - id: ac
+        if: ac
+        template: nav-chip
+        slots:
+          { entity: '[[ac.entity]]', popup: '#[[key]]-ac', color: blue, when: { not: ['off'] } }
+      - id: heating
+        if: heating
+        template: nav-chip
+        slots:
+          {
+            entity: '[[heating.entity]]',
+            popup: '#[[key]]-heating',
+            color: orange,
+            when: { not: ['off'] },
+          }
+    item:
+      template: light-item
+      slots:
+        entity: '[[lights.group]]'
+        popup: '#[[key]]-lights'
+        scenes: '[[lights.scenes]]'
+        active_scene: '[[lights.active_scene]]'
+        color: '[[lights.color]]'
+    problems?:
+      leaks?: '[[leaks]]'
+      batteries?: '[[batteries]]'
+    grid_options: { columns: 12 }
+  popups:
+    - id: room-popup
+      template: room-popup
+      slots:
+        key: '[[key]]'
+        name: '[[name]]'
+        icon: '[[icon]]'
+        temperature: '[[temperature]]'
+        humidity: '[[humidity]]'
+        window: '[[window]]'
+        door: '[[door]]'
+        lock: '[[lock]]'
+        lights: '[[lights]]'
+        heating: '[[heating]]'
+        ac: '[[ac]]'
+        vacuum: '[[vacuum]]'
+        printer3d: '[[printer3d]]'
+        media: '[[media]]'
+        outlets: '[[outlets]]'
+        diffuser: '[[diffuser]]'
+        batteries: '[[batteries]]'
+        meters: '[[meters]]'
+    - id: lights-popup
+      template: lights-popup
+      slots:
+        key: '[[key]]'
+        name: '[[name]]'
+        group: '[[lights.group]]'
+        color: '[[lights.color]]'
+        members: '[[lights.members]]'
+        scenes: '[[lights.scenes]]'
+        active_scene: '[[lights.active_scene]]'
+    - id: heating
+      if: heating
+      template: heating-popup
+      slots:
+        key: '[[key]]'
+        name: '[[name]]'
+        entity: '[[heating.entity]]'
+        preset: '[[heating.preset]]'
+        thermostats: '[[heating.thermostats]]'
+        batteries: '[[heating.batteries]]'
+    - id: ac
+      if: ac
+      template: ac-popup
+      slots:
+        key: '[[key]]'
+        name: '[[name]]'
+        entity: '[[ac.entity]]'
+        fan: '[[ac.fan]]'
+        swing: '[[ac.swing]]'
+        horizontal_swing: '[[ac.horizontal_swing]]'
+        power_saving: '[[ac.power_saving]]'
+        dehumidifier: '[[ac.dehumidifier]]'
+        energy: '[[ac.energy]]'
+    - id: vacuum
+      if: vacuum
+      template: vacuum-popup
+      slots: { key: '[[key]]', name: '[[name]]', vacuum: '[[vacuum]]' }
+    - id: printer3d
+      if: printer3d
+      template: 3d-printer-popup
+      slots: { key: '[[key]]', name: '[[name]]', printer3d: '[[printer3d]]' }
+    - id: each-speakers
+      each: speakers
+      as: speaker
+      template: speaker-popup
+      slots: { key: '[[key]]', name: '[[name]]', speaker: '[[speaker]]' }
+  example:
+    key: kitchen
+    name: Kitchen
+    icon: mdi:fridge
+    temperature: sensor.kitchen_temperature
+    humidity: sensor.kitchen_humidity
+    lights: { group: light.kitchen_lights }
+
+room-media-card:
+  description: A room's media player, opening its speaker pop-up when it is a speaker.
+  slots:
+    key: { kind: text, required: true }
+    member:
+      kind: object
+      required: true
+      fields:
+        entity: { kind: entity, required: true }
+        key: { kind: text }
+  card:
+    - id: member-key
+      if: member.key
+      template: media-card
+      slots: { entity: '[[member.entity]]', popup: '#[[key]]-[[member.key]]' }
+    - id: not-member-key
+      unless: member.key
+      template: media-card
+      slots: { entity: '[[member.entity]]' }
+  example:
+    key: living
+    member: { entity: media_player.living_tv }
+
+room-popup:
+  description: A room's pop-up, its lights, climate, media and other devices, its batteries and its energy.
+  slots:
+    key: { kind: text, required: true }
+    name: { kind: text, required: true }
+    icon: { kind: icon, default: mdi:texture-box }
+    temperature: { kind: entity }
+    humidity: { kind: entity }
+    window: { kind: entity }
+    door: { kind: entity }
+    lock: { kind: entity }
+    lights:
+      kind: object
+      required: true
+      fields:
+        group: { kind: entity, required: true }
+        members:
+          kind: objects
+          fields:
+            entity: { kind: entity }
+            members: { kind: entities }
+        scenes: { kind: entities }
+        active_scene: { kind: entity }
+        color: { kind: flag }
+    heating:
+      kind: object
+      fields:
+        entity: { kind: entity, required: true }
+        preset: { kind: flag }
+        thermostats:
+          kind: objects
+          fields:
+            valve: { kind: entity }
+            battery: { kind: entity }
+        batteries: { kind: entities }
+    ac:
+      kind: object
+      fields:
+        entity: { kind: entity, required: true }
+        fan: { kind: flag }
+        swing: { kind: flag }
+        horizontal_swing: { kind: flag }
+        power_saving: { kind: entity }
+        dehumidifier: { kind: entity }
+        energy:
+          kind: object
+          fields:
+            power: { kind: entity }
+            today: { kind: entity }
+            total: { kind: entity }
+    vacuum:
+      kind: object
+      fields:
+        entity: { kind: entity, required: true }
+        status: { kind: entity }
+        error: { kind: entity }
+        battery: { kind: entity }
+        current_room: { kind: entity }
+        progress: { kind: entity }
+        area: { kind: entity }
+        time: { kind: entity }
+        last_clean: { kind: entity }
+        mop_attached: { kind: entity }
+        water_box_attached: { kind: entity }
+        totals:
+          kind: object
+          fields:
+            count: { kind: entity }
+            area: { kind: entity }
+            time: { kind: entity }
+        map: { kind: entity }
+        routines: { kind: entities }
+        settings: { kind: entities }
+        consumables:
+          kind: objects
+          fields:
+            entity: { kind: entity }
+            reset: { kind: entity }
+        warnings: { kind: entities }
+        dock:
+          kind: object
+          fields:
+            error: { kind: entity }
+            dust_emptying: { kind: entity }
+            mop_drying: { kind: entity }
+            mop_drying_time_left: { kind: entity }
+            mop_washing: { kind: entity }
+            consumables:
+              kind: objects
+              fields:
+                entity: { kind: entity }
+                reset: { kind: entity }
+            warnings: { kind: entities }
+    printer3d:
+      kind: object
+      fields:
+        entity: { kind: entity, required: true }
+        progress: { kind: entity }
+        filename: { kind: entity }
+        material: { kind: entity }
+        speed: { kind: entity }
+        start: { kind: entity }
+        finish: { kind: entity }
+        nozzle:
+          kind: object
+          fields:
+            temperature: { kind: entity }
+            target: { kind: entity }
+        bed:
+          kind: object
+          fields:
+            temperature: { kind: entity }
+            target: { kind: entity }
+        camera: { kind: entity }
+        actions:
+          kind: object
+          required: true
+          fields:
+            pause: { kind: entity }
+            resume: { kind: entity }
+            continue: { kind: entity }
+            cancel: { kind: entity }
+        outlet:
+          kind: object
+          fields:
+            entity: { kind: entity, required: true }
+            energy:
+              kind: object
+              fields:
+                power: { kind: entity }
+                today: { kind: entity }
+                total: { kind: entity }
+    media:
+      kind: objects
+      fields:
+        entity: { kind: entity, required: true }
+        key: { kind: text }
+    outlets:
+      kind: objects
+      fields:
+        entity: { kind: entity, required: true }
+        energy:
+          kind: object
+          fields:
+            power: { kind: entity }
+            today: { kind: entity }
+            total: { kind: entity }
+    diffuser:
+      kind: object
+      fields:
+        entity: { kind: entity, required: true }
+        amount: { kind: entity, required: true }
+    batteries: { kind: entities }
+    meters:
+      kind: objects
+      fields:
+        power: { kind: entity, required: true }
+        today: { kind: entity }
+        total: { kind: entity }
+  card:
+    hash: '#[[key]]'
+    cards:
+      - id: header
+        type: custom:mnml-header-card
+        name: '[[name]]'
+        icon: '[[icon]]'
+        state:
+          - id: temperature
+            entity: '[[temperature]]'
+            icon: true
+          - id: humidity
+            entity: '[[humidity]]'
+            icon: true
+        controls?:
+          - id: lock
+            if: lock
+            type: toggle
+            entity: '[[lock]]'
+            color: red
+            when: { is: [unlocked, open, jammed] }
+          - id: window
+            if: window
+            type: indicator
+            entity: '[[window]]'
+            color: orange
+          - id: door
+            if: door
+            type: indicator
+            entity: '[[door]]'
+            color: orange
+      - id: heading
+        type: custom:mnml-heading-card
+        title: Lights
+        icon: mdi:lightbulb-group
+      - id: light-card
+        template: light-card
+        slots:
+          entity: '[[lights.group]]'
+          popup: '#[[key]]-lights'
+          scenes: '[[lights.scenes]]'
+          active_scene: '[[lights.active_scene]]'
+          color: '[[lights.color]]'
+      - id: ac-heating
+        if: [ac, heating]
+        type: custom:mnml-heading-card
+        title: Climate
+        icon: mdi:thermostat
+      - id: ac
+        if: ac
+        template: ac-item
+        slots: { key: '[[key]]', entity: '[[ac.entity]]' }
+      - id: heating
+        if: heating
+        template: heating-item
+        slots: { key: '[[key]]', entity: '[[heating.entity]]', preset: '[[heating.preset]]' }
+      - id: media
+        if: media
+        type: custom:mnml-heading-card
+        title: Media
+        icon: mdi:multimedia
+      - id: each-media
+        each: media
+        as: member
+        template: room-media-card
+        slots: { key: '[[key]]', member: '[[member]]' }
+      - id: vacuum-printer3d-outlets-diffuser
+        if: [vacuum, printer3d, outlets, diffuser]
+        type: custom:mnml-heading-card
+        title: Other
+        icon: mdi:devices
+      - id: vacuum
+        if: vacuum
+        template: vacuum-card
+        slots: { key: '[[key]]', vacuum: '[[vacuum]]' }
+      - id: printer3d
+        if: printer3d
+        template: 3d-printer-card
+        slots: { key: '[[key]]', printer3d: '[[printer3d]]' }
+      - id: each-outlets
+        each: outlets
+        as: outlet
+        template: switch-card
+        slots: { entity: '[[outlet.entity]]' }
+      - id: diffuser
+        if: diffuser
+        template: diffuser-card
+        slots: { entity: '[[diffuser.entity]]', amount: '[[diffuser.amount]]' }
+      - id: batteries
+        template: batteries
+        slots: { batteries: '[[batteries]]' }
+      - id: meters
+        if: meters
+        template: energy-table
+        slots: { meters: '[[meters]]' }
+  example:
+    key: kitchen
+    name: Kitchen
+    lights: { group: light.kitchen_lights }

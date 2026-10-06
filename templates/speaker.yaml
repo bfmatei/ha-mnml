@@ -1,0 +1,135 @@
+speaker-popup:
+  description: A speaker's pop-up, its sound, and its TV, subwoofer and surround settings when it has them.
+  slots:
+    key: { kind: text, required: true }
+    name: { kind: text, required: true }
+    speaker:
+      kind: object
+      required: true
+      fields:
+        key: { kind: text, required: true }
+        entity: { kind: entity, required: true }
+        bass: { kind: entity, required: true }
+        treble: { kind: entity, required: true }
+        balance: { kind: entity }
+        loudness: { kind: entity, required: true }
+        tv:
+          kind: object
+          fields:
+            input_format: { kind: entity }
+            night_sound: { kind: entity, required: true }
+            speech_enhancement: { kind: entity, required: true }
+            audio_delay: { kind: entity, required: true }
+        subwoofer:
+          kind: object
+          fields:
+            enabled: { kind: entity, required: true }
+            gain: { kind: entity, required: true }
+        surround:
+          kind: object
+          fields:
+            enabled: { kind: entity, required: true }
+            level: { kind: entity, required: true }
+            music_level: { kind: entity, required: true }
+            music_full_volume: { kind: entity, required: true }
+  card:
+    hash: '#[[key]]-[[speaker.key]]'
+    cards:
+      - id: header
+        type: custom:mnml-header-card
+        entity: '[[speaker.entity]]'
+        state: [{ id: name, text: '[[name]]' }]
+        back: true
+      - id: heading
+        type: custom:mnml-heading-card
+        title: Sound
+        icon: mdi:tune-vertical
+      - id: slider
+        type: custom:mnml-slider-card
+        entity: '[[speaker.entity]]'
+        slider: volume
+        name: Volume
+        icon: mdi:volume-high
+      - id: number-slider
+        template: number-slider
+        slots: { entity: '[[speaker.bass]]' }
+      - id: number-slider-2
+        template: number-slider
+        slots: { entity: '[[speaker.treble]]' }
+      - id: speaker-balance
+        if: speaker.balance
+        template: number-slider
+        slots: { entity: '[[speaker.balance]]' }
+      - id: switch-card
+        template: switch-card
+        slots: { entity: '[[speaker.loudness]]' }
+      - id: speaker-tv
+        if: speaker.tv
+        type: custom:mnml-heading-card
+        title: TV
+        icon: mdi:television
+        state?:
+          - id: speaker-tv-input_format
+            if: speaker.tv.input_format
+            entity: '[[speaker.tv.input_format]]'
+      - id: speaker-tv-2
+        if: speaker.tv
+        template: switch-card
+        slots: { entity: '[[speaker.tv.night_sound]]' }
+      - id: speaker-tv-3
+        if: speaker.tv
+        template: switch-card
+        slots: { entity: '[[speaker.tv.speech_enhancement]]' }
+      - id: speaker-tv-4
+        if: speaker.tv
+        template: number-slider
+        slots: { entity: '[[speaker.tv.audio_delay]]' }
+      - id: speaker-subwoofer
+        if: speaker.subwoofer
+        type: custom:mnml-heading-card
+        title: Subwoofer
+        icon: mdi:speaker
+      - id: speaker-subwoofer-2
+        if: speaker.subwoofer
+        template: switch-card
+        slots: { entity: '[[speaker.subwoofer.enabled]]' }
+      - id: speaker-subwoofer-3
+        if: speaker.subwoofer
+        template: number-slider
+        slots: { entity: '[[speaker.subwoofer.gain]]' }
+        visibility: { template: while-not-off, slots: { entity: '[[speaker.subwoofer.enabled]]' } }
+      - id: speaker-surround
+        if: speaker.surround
+        type: custom:mnml-heading-card
+        title: Surround
+        icon: mdi:surround-sound
+      - id: speaker-surround-2
+        if: speaker.surround
+        template: switch-card
+        slots: { entity: '[[speaker.surround.enabled]]' }
+      - id: speaker-surround-3
+        if: speaker.surround
+        template: number-slider
+        slots: { entity: '[[speaker.surround.level]]' }
+        visibility: { template: while-not-off, slots: { entity: '[[speaker.surround.enabled]]' } }
+      - id: speaker-surround-4
+        if: speaker.surround
+        template: number-slider
+        slots: { entity: '[[speaker.surround.music_level]]' }
+        visibility: { template: while-not-off, slots: { entity: '[[speaker.surround.enabled]]' } }
+      - id: speaker-surround-5
+        if: speaker.surround
+        template: switch-card
+        slots: { entity: '[[speaker.surround.music_full_volume]]' }
+        visibility: { template: while-not-off, slots: { entity: '[[speaker.surround.enabled]]' } }
+  example:
+    key: living
+    name: Living
+    speaker:
+      {
+        key: sonos,
+        entity: media_player.sonos,
+        bass: number.sonos_bass,
+        treble: number.sonos_treble,
+        loudness: switch.sonos_loudness,
+      }

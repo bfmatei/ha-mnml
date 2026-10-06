@@ -1,0 +1,221 @@
+media-server:
+  description: A media server's tile, what is being watched, and its requests, downloads, health and update chips; it brings its pop-up. The parts are Plex, Seerr, Radarr and Sonarr.
+  slots:
+    streams: { kind: entity, required: true }
+    update: { kind: entity }
+    requests:
+      kind: object
+      fields:
+        pending: { kind: entity, required: true }
+        processing: { kind: entity, required: true }
+    movies:
+      kind: object
+      fields:
+        queue: { kind: entity, required: true }
+        count: { kind: entity, required: true }
+        health: { kind: entity }
+        space: { kind: entity }
+        calendar: { kind: entity }
+    shows:
+      kind: object
+      fields:
+        queue: { kind: entity, required: true }
+        count: { kind: entity, required: true }
+        wanted: { kind: entity }
+        upcoming: { kind: entity }
+        calendar: { kind: entity }
+    none: { kind: texts, default: ['0', unknown, unavailable] }
+  card:
+    type: custom:mnml-tile-card
+    name: Media
+    icon: mdi:play-box-multiple-outline
+    popup: '#media'
+    state: [{ id: streams, entity: '[[streams]]', icon: true }]
+    chips:
+      - id: requests
+        if: requests
+        type: status
+        name: Requests
+        icon: mdi:account-clock-outline
+        rules:
+          [
+            {
+              id: requests-pending,
+              entities: ['[[requests.pending]]'],
+              color: amber,
+              not: '[[none]]',
+            },
+          ]
+      - id: movies-shows
+        if: [movies, shows]
+        type: status
+        name: Downloads
+        icon: mdi:download
+        rules:
+          [
+            {
+              id: movies-queue,
+              entities: ['[[movies.queue]]', '[[shows.queue]]'],
+              label: device,
+              color: amber,
+              not: '[[none]]',
+            },
+          ]
+      - id: movies-health
+        if: movies.health
+        type: status
+        name: Health
+        icon: mdi:heart-pulse
+        rules:
+          [
+            {
+              id: movies-health,
+              entities: ['[[movies.health]]'],
+              label: device,
+              color: red,
+              is: ['on'],
+            },
+          ]
+      - id: update
+        if: update
+        type: status
+        name: Update
+        icon: mdi:package-up
+        rules: [{ id: update, entities: ['[[update]]'], label: device, color: amber, is: ['on'] }]
+    grid_options: { columns: 12 }
+  popups:
+    - id: media-popup
+      template: media-popup
+      slots:
+        streams: '[[streams]]'
+        update: '[[update]]'
+        requests: '[[requests]]'
+        movies: '[[movies]]'
+        shows: '[[shows]]'
+  example: &media
+    streams: sensor.plex_watching
+    movies: { queue: sensor.radarr_queue, count: sensor.radarr_movies }
+
+media-popup:
+  description: The media server's pop-up, what is being watched, its requests, downloads, upcoming releases, library and update.
+  slots:
+    streams: { kind: entity, required: true }
+    update: { kind: entity }
+    requests:
+      kind: object
+      fields:
+        pending: { kind: entity, required: true }
+        processing: { kind: entity, required: true }
+    movies:
+      kind: object
+      fields:
+        queue: { kind: entity, required: true }
+        count: { kind: entity, required: true }
+        health: { kind: entity }
+        space: { kind: entity }
+        calendar: { kind: entity }
+    shows:
+      kind: object
+      fields:
+        queue: { kind: entity, required: true }
+        count: { kind: entity, required: true }
+        wanted: { kind: entity }
+        upcoming: { kind: entity }
+        calendar: { kind: entity }
+  card:
+    hash: '#media'
+    cards:
+      - id: header
+        type: custom:mnml-header-card
+        name: Media
+        icon: mdi:play-box-multiple-outline
+        state: [{ id: streams, entity: '[[streams]]', icon: true }]
+      - id: watching
+        type: custom:mnml-list-card
+        title: Watching
+        icon: mdi:play-circle-outline
+        rows: [{ id: streams, entity: '[[streams]]' }]
+      - id: requests
+        if: requests
+        type: custom:mnml-list-card
+        title: Requests
+        icon: mdi:account-clock-outline
+        rows:
+          - id: requests-pending
+            entity: '[[requests.pending]]'
+            color: amber
+            when: { not: ['0'] }
+          - id: requests-processing
+            entity: '[[requests.processing]]'
+      - id: movies-shows
+        if: [movies, shows]
+        type: custom:mnml-list-card
+        title: Downloads
+        icon: mdi:download
+        rows:
+          - id: movies
+            if: movies
+            entity: '[[movies.queue]]'
+            label: device
+            color: amber
+            when: { not: ['0'] }
+          - id: shows
+            if: shows
+            entity: '[[shows.queue]]'
+            label: device
+            color: amber
+            when: { not: ['0'] }
+          - id: shows-wanted
+            if: shows.wanted
+            entity: '[[shows.wanted]]'
+          - id: movies-health
+            if: movies.health
+            entity: '[[movies.health]]'
+            label: device
+            flag: true
+            color: red
+            show: { is: ['on'] }
+      - id: shows-calendar-movies-calendar
+        if: [shows.calendar, movies.calendar]
+        type: custom:mnml-agenda-card
+        title: Upcoming
+        icon: mdi:calendar-clock
+        sources:
+          - id: shows-calendar
+            if: shows.calendar
+            entity: '[[shows.calendar]]'
+            kind: episodes
+          - id: movies-calendar
+            if: movies.calendar
+            entity: '[[movies.calendar]]'
+            kind: movies
+      - id: movies-shows-2
+        if: [movies, shows]
+        type: custom:mnml-list-card
+        title: Library
+        icon: mdi:filmstrip-box-multiple
+        rows:
+          - id: movies
+            if: movies
+            entity: '[[movies.count]]'
+            label: device
+          - id: shows
+            if: shows
+            entity: '[[shows.count]]'
+            label: device
+          - id: shows-upcoming
+            if: shows.upcoming
+            entity: '[[shows.upcoming]]'
+          - id: movies-space
+            if: movies.space
+            entity: '[[movies.space]]'
+      - id: update
+        if: update
+        type: custom:mnml-list-card
+        title: Update
+        icon: mdi:package-up
+        rows:
+          - id: pending-row
+            template: pending-row
+            slots: { entity: '[[update]]' }
+  example: *media

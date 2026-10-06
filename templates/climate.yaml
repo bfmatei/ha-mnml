@@ -1,0 +1,265 @@
+ac-controls:
+  description: An AC's target temperature slider and its mode menu, blue while it runs.
+  slots:
+    entity: { kind: entity, required: true }
+  card:
+    - id: slider
+      type: slider
+      entity: '[[entity]]'
+      slider: temperature
+      name: Target temperature
+      icon: mdi:thermometer
+      color: blue
+      show: { not: ['off'] }
+    - id: select
+      type: select
+      entity: '[[entity]]'
+      attribute: hvac_modes
+      color: blue
+      when: { not: ['off'] }
+      primary: true
+  example:
+    entity: climate.bedroom_ac
+
+heating-controls:
+  description: A heating's target temperature slider, its preset menu when it has presets, and its power toggle, orange while it runs.
+  slots:
+    entity: { kind: entity, required: true }
+    preset: { kind: flag }
+  card:
+    - id: slider
+      type: slider
+      entity: '[[entity]]'
+      slider: temperature
+      name: Target temperature
+      icon: mdi:thermometer
+      color: orange
+      show: { not: ['off'] }
+    - id: preset
+      if: preset
+      type: select
+      entity: '[[entity]]'
+      attribute: preset_modes
+      show: { not: ['off'] }
+    - id: power
+      template: power
+      slots: { entity: '[[entity]]', color: orange, when: { not: ['off'] } }
+  example:
+    entity: climate.bedroom_heating
+
+ac-item:
+  description: An AC as an item that opens its pop-up.
+  slots:
+    key: { kind: text, required: true }
+    entity: { kind: entity, required: true }
+  card:
+    type: custom:mnml-entity-card
+    entity: '[[entity]]'
+    color: blue
+    when: { not: ['off'] }
+    state:
+      - id: part
+        when: { is: ['off'] }
+      - id: temperature
+        attribute: temperature
+        when: { not: ['off'] }
+      - id: hvac-action
+        attribute: hvac_action
+        when: { not: ['off'] }
+    popup: '#[[key]]-ac'
+    controls:
+      - id: ac-controls
+        template: ac-controls
+        slots: { entity: '[[entity]]' }
+  example:
+    key: bedroom
+    entity: climate.bedroom_ac
+
+heating-item:
+  description: A heating as an item that opens its pop-up.
+  slots:
+    key: { kind: text, required: true }
+    entity: { kind: entity, required: true }
+    preset: { kind: flag }
+  card:
+    type: custom:mnml-entity-card
+    entity: '[[entity]]'
+    color: orange
+    when: { not: ['off'] }
+    state:
+      - id: part
+        when: { is: ['off'] }
+      - id: temperature
+        attribute: temperature
+        when: { not: ['off'] }
+      - id: hvac-action
+        attribute: hvac_action
+        when: { not: ['off'] }
+    popup: '#[[key]]-heating'
+    controls:
+      - id: heating-controls
+        template: heating-controls
+        slots: { entity: '[[entity]]', preset: '[[preset]]' }
+  example:
+    key: bedroom
+    entity: climate.bedroom_heating
+
+heating-popup:
+  description: A room's heating pop-up, its target, its preset, its valves and their batteries.
+  slots:
+    key: { kind: text, required: true }
+    name: { kind: text, required: true }
+    entity: { kind: entity, required: true }
+    preset: { kind: flag }
+    thermostats:
+      kind: objects
+      fields:
+        valve: { kind: entity, required: true }
+        battery: { kind: entity }
+    batteries: { kind: entities }
+  card:
+    hash: '#[[key]]-heating'
+    cards:
+      - id: header
+        type: custom:mnml-header-card
+        name: Heating
+        icon: mdi:radiator
+        entity: '[[entity]]'
+        color: orange
+        when: { not: ['off'] }
+        state: [{ id: name, text: '[[name]]' }]
+        controls:
+          - id: heating-controls
+            template: heating-controls
+            slots: { entity: '[[entity]]', preset: '[[preset]]' }
+        back: true
+      - id: heading
+        type: custom:mnml-heading-card
+        title: Settings
+        icon: mdi:tune
+      - id: slider
+        type: custom:mnml-slider-card
+        entity: '[[entity]]'
+        slider: temperature
+        name: Target temperature
+        icon: mdi:thermometer
+        color: orange
+        turn_on: true
+      - id: preset
+        if: preset
+        type: custom:mnml-select-card
+        entity: '[[entity]]'
+        attribute: preset_modes
+        name: Preset
+        icon: mdi:tune-variant
+        visibility: { template: while-not-off, slots: { entity: '[[entity]]' } }
+      - id: valves
+        type: custom:mnml-list-card
+        title: Valves
+        icon: mdi:valve
+        rows:
+          - id: each-thermostats
+            each: thermostats
+            as: thermostat
+            entity: '[[thermostat.valve]]'
+            label: device
+            bar: true
+      - id: batteries
+        template: batteries
+        slots: { batteries: '[[batteries]]' }
+  example:
+    key: bedroom
+    name: Bedroom
+    entity: climate.bedroom_heating
+    thermostats: [{ valve: sensor.radiator_valve, battery: sensor.radiator_battery }]
+    batteries: [sensor.radiator_battery]
+
+ac-popup:
+  description: A room's AC pop-up, its target, its fan, swing and other settings, and its energy.
+  slots:
+    key: { kind: text, required: true }
+    name: { kind: text, required: true }
+    entity: { kind: entity, required: true }
+    fan: { kind: flag }
+    swing: { kind: flag }
+    horizontal_swing: { kind: flag }
+    power_saving: { kind: entity }
+    dehumidifier: { kind: entity }
+    energy:
+      kind: object
+      fields:
+        power: { kind: entity, required: true }
+        today: { kind: entity }
+        total: { kind: entity }
+  card:
+    hash: '#[[key]]-ac'
+    cards:
+      - id: header
+        type: custom:mnml-header-card
+        name: AC
+        icon: mdi:air-conditioner
+        entity: '[[entity]]'
+        color: blue
+        when: { not: ['off'] }
+        state: [{ id: name, text: '[[name]]' }]
+        controls:
+          - id: ac-controls
+            template: ac-controls
+            slots: { entity: '[[entity]]' }
+        back: true
+      - id: heading
+        type: custom:mnml-heading-card
+        title: Temperature
+        icon: mdi:thermometer
+        visibility: { template: while-not-off, slots: { entity: '[[entity]]' } }
+      - id: slider
+        type: custom:mnml-slider-card
+        entity: '[[entity]]'
+        slider: temperature
+        name: Target temperature
+        icon: mdi:thermometer
+        color: blue
+        visibility: { template: while-not-off, slots: { entity: '[[entity]]' } }
+      - id: fan-swing-horizontal_swing-power_saving-dehumidifier
+        if: [fan, swing, horizontal_swing, power_saving, dehumidifier]
+        type: custom:mnml-heading-card
+        title: Settings
+        icon: mdi:tune
+      - id: fan
+        if: fan
+        type: custom:mnml-select-card
+        entity: '[[entity]]'
+        attribute: fan_modes
+        name: Fan
+        icon: mdi:fan
+      - id: swing
+        if: swing
+        type: custom:mnml-select-card
+        entity: '[[entity]]'
+        attribute: swing_modes
+        name: Swing
+        icon: mdi:arrow-oscillating
+      - id: horizontal_swing
+        if: horizontal_swing
+        type: custom:mnml-select-card
+        entity: '[[entity]]'
+        attribute: swing_horizontal_modes
+        name: Horizontal swing
+        icon: mdi:arrow-left-right
+      - id: power_saving
+        if: power_saving
+        template: select-card
+        slots: { entity: '[[power_saving]]' }
+      - id: dehumidifier
+        if: dehumidifier
+        template: number-slider
+        slots: { entity: '[[dehumidifier]]' }
+      - id: energy
+        if: energy
+        template: energy-table
+        slots: { meters: ['[[energy]]'] }
+  example:
+    key: bedroom
+    name: Bedroom
+    entity: climate.bedroom_ac
+    fan: true

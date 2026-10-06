@@ -1,0 +1,15 @@
+{
+  "config": {
+    "default": true,
+    "MD013": false,
+  },
+  "globs": ["**/*.md"],
+  "ignores": [
+    "node_modules/**",
+    "out/**",
+    ".ha/**",
+    ".venv/**",
+    "custom_components/mnml/www/**",
+    "CLAUDE.md",
+  ],
+}

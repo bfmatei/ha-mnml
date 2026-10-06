@@ -1,0 +1,27 @@
+views:
+  - title: Templates
+    path: templates
+    type: sections
+    max_columns: 4
+    sections:
+      - type: grid
+        cards:
+          - type: custom:mnml-template-card
+            template: home-heading
+            slots:
+              title: Templates of the home
+          - type: custom:mnml-template-card
+            template: section-heading
+            slots:
+              title: Rooms
+              icon: mdi:floor-plan
+          - type: custom:mnml-template-card
+            template: room
+            area: living
+          - type: custom:mnml-template-card
+            template: room
+            area: kitchen
+      - type: grid
+        cards:
+          - type: custom:mnml-popups-card
+            width: 560px

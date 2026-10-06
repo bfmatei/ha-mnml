@@ -1,0 +1,329 @@
+vacuum-actions:
+  description: A vacuum's Dock, Locate, Start and Stop buttons, each shown when it applies.
+  slots:
+    entity: { kind: entity, required: true }
+  card:
+    - id: dock
+      type: service
+      entity: '[[entity]]'
+      service: vacuum.return_to_base
+      name: Dock
+      icon: mdi:home-import-outline
+      show: { not: [docked] }
+    - id: locate
+      type: service
+      entity: '[[entity]]'
+      service: vacuum.locate
+      name: Locate
+      icon: mdi:map-marker-question
+      show: { is: [docked] }
+    - id: start
+      type: service
+      entity: '[[entity]]'
+      service: vacuum.start
+      name: Start
+      icon: mdi:play
+      primary: true
+      show: { not: [cleaning] }
+    - id: stop
+      type: service
+      entity: '[[entity]]'
+      service: vacuum.stop
+      name: Stop
+      icon: mdi:stop
+      primary: true
+      show: { is: [cleaning] }
+  example:
+    entity: vacuum.robot
+
+vacuum-card:
+  description: A vacuum as an item, its error, status, room, battery and dock, opening its pop-up.
+  slots:
+    key: { kind: text, required: true }
+    vacuum:
+      kind: object
+      required: true
+      fields:
+        entity: { kind: entity, required: true }
+        status: { kind: entity }
+        error: { kind: entity }
+        battery: { kind: entity }
+        current_room: { kind: entity }
+        progress: { kind: entity }
+        area: { kind: entity }
+        time: { kind: entity }
+        last_clean: { kind: entity }
+        mop_attached: { kind: entity }
+        water_box_attached: { kind: entity }
+        totals:
+          kind: object
+          fields:
+            count: { kind: entity }
+            area: { kind: entity }
+            time: { kind: entity }
+        map: { kind: entity }
+        routines: { kind: entities }
+        settings: { kind: entities }
+        consumables:
+          kind: objects
+          fields:
+            entity: { kind: entity }
+            reset: { kind: entity }
+        warnings: { kind: entities }
+        dock:
+          kind: object
+          fields:
+            error: { kind: entity }
+            dust_emptying: { kind: entity }
+            mop_drying: { kind: entity }
+            mop_drying_time_left: { kind: entity }
+            mop_washing: { kind: entity }
+            consumables:
+              kind: objects
+              fields:
+                entity: { kind: entity }
+                reset: { kind: entity }
+            warnings: { kind: entities }
+  card:
+    type: custom:mnml-entity-card
+    entity: '[[vacuum.entity]]'
+    state:
+      - id: vacuum-error
+        entity: '[[vacuum.error]]'
+        icon: true
+        when: { not: [none] }
+      - id: vacuum-status
+        entity: '[[vacuum.status]]'
+      - id: vacuum-current_room
+        entity: '[[vacuum.current_room]]'
+        when: { entity: '[[vacuum.entity]]', is: [cleaning] }
+      - id: vacuum-battery
+        entity: '[[vacuum.battery]]'
+      - id: vacuum-dock
+        if: vacuum.dock
+        entity: '[[vacuum.dock.error]]'
+        icon: true
+        when: { not: [ok] }
+      - id: vacuum-dock-2
+        if: vacuum.dock
+        entity: '[[vacuum.dock.mop_drying_time_left]]'
+        minutes: true
+        when: { entity: '[[vacuum.dock.mop_drying]]', is: ['on'] }
+    popup: '#[[key]]-vacuum'
+    controls:
+      - id: vacuum-actions
+        template: vacuum-actions
+        slots: { entity: '[[vacuum.entity]]' }
+  example:
+    key: living
+    vacuum:
+      {
+        entity: vacuum.robot,
+        error: sensor.robot_error,
+        status: sensor.robot_status,
+        current_room: sensor.robot_room,
+        battery: sensor.robot_battery,
+      }
+
+vacuum-popup:
+  description: A room's vacuum pop-up, its routines, map, details, settings, dock, maintenance and totals.
+  slots:
+    key: { kind: text, required: true }
+    name: { kind: text, required: true }
+    vacuum:
+      kind: object
+      required: true
+      fields:
+        entity: { kind: entity, required: true }
+        status: { kind: entity }
+        error: { kind: entity }
+        battery: { kind: entity }
+        current_room: { kind: entity }
+        progress: { kind: entity, required: true }
+        area: { kind: entity, required: true }
+        time: { kind: entity, required: true }
+        last_clean: { kind: entity, required: true }
+        mop_attached: { kind: entity, required: true }
+        water_box_attached: { kind: entity }
+        totals:
+          kind: object
+          fields:
+            count: { kind: entity, required: true }
+            area: { kind: entity, required: true }
+            time: { kind: entity, required: true }
+        map: { kind: entity }
+        routines: { kind: entities }
+        settings: { kind: entities }
+        consumables:
+          kind: objects
+          fields:
+            entity: { kind: entity, required: true }
+            reset: { kind: entity }
+        warnings: { kind: entities }
+        dock:
+          kind: object
+          fields:
+            error: { kind: entity }
+            dust_emptying: { kind: entity, required: true }
+            mop_drying: { kind: entity, required: true }
+            mop_drying_time_left: { kind: entity }
+            mop_washing: { kind: entity, required: true }
+            consumables:
+              kind: objects
+              fields:
+                entity: { kind: entity, required: true }
+                reset: { kind: entity }
+            warnings: { kind: entities }
+  card:
+    hash: '#[[key]]-vacuum'
+    cards:
+      - id: header
+        type: custom:mnml-header-card
+        name: Vacuum
+        icon: mdi:robot-vacuum
+        entity: '[[vacuum.entity]]'
+        state: [{ id: name, text: '[[name]]' }]
+        controls:
+          - id: vacuum-actions
+            template: vacuum-actions
+            slots: { entity: '[[vacuum.entity]]' }
+        back: true
+      - id: vacuum-routines
+        if: vacuum.routines
+        type: custom:mnml-heading-card
+        title: Routines
+        icon: mdi:play-box-multiple
+      - id: vacuum-routines-2
+        if: vacuum.routines
+        type: grid
+        columns: 2
+        square: false
+        cards:
+          - id: each-vacuum-routines
+            each: vacuum.routines
+            as: routine
+            type: custom:mnml-button-card
+            entity: '[[routine]]'
+            service: button.press
+      - id: heading
+        type: custom:mnml-heading-card
+        title: Map
+        icon: mdi:map
+      - id: picture-entity
+        type: picture-entity
+        entity: '[[vacuum.map]]'
+        show_name: false
+        show_state: false
+        aspect_ratio: '1.8'
+      - id: details
+        type: custom:mnml-list-card
+        title: Details
+        icon: mdi:information-outline
+        rows:
+          - id: vacuum-progress
+            entity: '[[vacuum.progress]]'
+            bar: true
+            show: { entity: '[[vacuum.entity]]', is: [cleaning] }
+          - id: vacuum-area
+            entity: '[[vacuum.area]]'
+            show: { entity: '[[vacuum.entity]]', is: [cleaning] }
+          - id: vacuum-time
+            entity: '[[vacuum.time]]'
+            show: { entity: '[[vacuum.entity]]', is: [cleaning] }
+          - id: vacuum-last_clean
+            entity: '[[vacuum.last_clean]]'
+            relative: true
+            show: { entity: '[[vacuum.entity]]', not: [cleaning] }
+          - id: vacuum-mop_attached
+            entity: '[[vacuum.mop_attached]]'
+          - id: vacuum-water_box_attached
+            if: vacuum.water_box_attached
+            entity: '[[vacuum.water_box_attached]]'
+      - id: vacuum-settings
+        if: vacuum.settings
+        type: custom:mnml-heading-card
+        title: Settings
+        icon: mdi:tune
+      - id: each-vacuum-settings
+        each: vacuum.settings
+        as: setting
+        template: select-card
+        slots: { entity: '[[setting]]' }
+      - id: vacuum-dock
+        if: vacuum.dock
+        type: custom:mnml-heading-card
+        title: Dock
+        icon: mdi:home-import-outline
+      - id: vacuum-dock-2
+        if: vacuum.dock
+        template: switch-card
+        slots: { entity: '[[vacuum.dock.dust_emptying]]' }
+      - id: vacuum-dock-3
+        if: vacuum.dock
+        template: switch-card
+        slots: { entity: '[[vacuum.dock.mop_drying]]' }
+      - id: vacuum-dock-4
+        if: vacuum.dock
+        template: switch-card
+        slots: { entity: '[[vacuum.dock.mop_washing]]' }
+      - id: vacuum-consumables-vacuum-warnings-vacuum-dock-consumables-vacuum-dock-warnings
+        if: [vacuum.consumables, vacuum.warnings, vacuum.dock.consumables, vacuum.dock.warnings]
+        type: custom:mnml-list-card
+        fold: true
+        title: Maintenance
+        icon: mdi:wrench
+        rows:
+          - id: each-vacuum-consumables
+            each: vacuum.consumables
+            as: consumable
+            entity: '[[consumable.entity]]'
+            strip: ' time left'
+            reset: '[[consumable.reset]]'
+          - id: each-vacuum-dock-consumables
+            each: vacuum.dock.consumables
+            as: consumable
+            entity: '[[consumable.entity]]'
+            strip: ' time left'
+            reset: '[[consumable.reset]]'
+          - id: each-vacuum-warnings
+            each: vacuum.warnings
+            as: warning
+            entity: '[[warning]]'
+            flag: true
+            color: orange
+            show: { is: ['on'] }
+          - id: each-vacuum-dock-warnings
+            each: vacuum.dock.warnings
+            as: warning
+            entity: '[[warning]]'
+            flag: true
+            color: orange
+            show: { is: ['on'] }
+      - id: vacuum-totals
+        if: vacuum.totals
+        type: custom:mnml-list-card
+        fold: true
+        title: Totals
+        icon: mdi:counter
+        rows:
+          - id: vacuum-totals-count
+            entity: '[[vacuum.totals.count]]'
+          - id: vacuum-totals-area
+            entity: '[[vacuum.totals.area]]'
+            strip: ' (total)'
+          - id: vacuum-totals-time
+            entity: '[[vacuum.totals.time]]'
+            strip: ' (total)'
+  example:
+    key: living
+    name: Living
+    vacuum:
+      {
+        entity: vacuum.robot,
+        map: image.robot_map,
+        progress: sensor.robot_progress,
+        area: sensor.robot_area,
+        time: sensor.robot_time,
+        last_clean: sensor.robot_last_clean,
+        mop_attached: binary_sensor.robot_mop,
+      }

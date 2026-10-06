@@ -1,0 +1,494 @@
+proxmox-server:
+  description: A Proxmox VE server's tile, its CPU and memory, and its guests, checks, backups and notifications chips; it brings the server's and the notifications' pop-ups. The checks, backups and notifications read sensors that the server's own jobs keep.
+  slots:
+    outlet:
+      kind: object
+      required: true
+      group: Power
+      fields:
+        entity: { kind: entity, required: true }
+        energy:
+          kind: object
+          fields:
+            power: { kind: entity, required: true }
+            today: { kind: entity }
+            total: { kind: entity }
+    cpu: { kind: entity, required: true, label: CPU, group: Load }
+    memory: { kind: entity, required: true, group: Load }
+    last_boot: { kind: entity, required: true, group: Load }
+    uplink: { kind: entity, group: Load }
+    temperatures:
+      kind: object
+      group: Load
+      fields:
+        cpu: { kind: entity, required: true, label: CPU }
+        root_disk: { kind: entity, required: true }
+    storage: { kind: entities, group: Storage }
+    disks:
+      kind: object
+      group: Storage
+      fields:
+        pool: { kind: entity, required: true }
+        failing: { kind: entity, required: true }
+        life_left: { kind: entity, required: true }
+    guests:
+      kind: objects
+      group: Guests
+      fields:
+        host: { kind: text }
+        status: { kind: entity, required: true }
+        cpu: { kind: entity, label: CPU }
+        memory: { kind: entity }
+        disk:
+          kind: object
+          fields:
+            used: { kind: entity }
+            size: { kind: entity }
+    backups:
+      kind: object
+      group: Health
+      fields:
+        last: { kind: entity, required: true }
+        problem: { kind: entity, required: true }
+        bucket: { kind: entity }
+    checks:
+      kind: object
+      group: Health
+      fields:
+        failed: { kind: entity, required: true }
+        last_run: { kind: entity, required: true }
+        overdue: { kind: entity, required: true }
+    notifications:
+      kind: object
+      group: Health
+      fields:
+        messages: { kind: entity, required: true }
+        clear: { kind: entity, required: true }
+        sources:
+          kind: objects
+          fields:
+            source: { kind: text }
+            name: { kind: text }
+    guest_statuses: { kind: entities, group: Guests }
+    guest_disks:
+      kind: objects
+      group: Storage
+      fields:
+        used: { kind: entity, required: true }
+        size: { kind: entity }
+    message_sources:
+      kind: objects
+      group: Health
+      fields:
+        source: { kind: text }
+        name: { kind: text }
+        entity: { kind: entity }
+    disk_high: { kind: number, default: 80, group: Thresholds }
+    disk_full: { kind: number, default: 90, group: Thresholds }
+    disk_life_low: { kind: number, default: 20, group: Thresholds }
+    disk_life_critical: { kind: number, default: 10, group: Thresholds }
+    cpu_hot: { kind: number, default: 85, label: CPU hot, group: Thresholds }
+    cpu_critical: { kind: number, default: 95, label: CPU critical, group: Thresholds }
+    root_disk_hot: { kind: number, default: 70, group: Thresholds }
+    root_disk_critical: { kind: number, default: 80, group: Thresholds }
+    bucket_high: { kind: number, default: 18, group: Thresholds }
+    bucket_full: { kind: number, default: 19, group: Thresholds }
+  card:
+    type: custom:mnml-tile-card
+    name: Server
+    icon: mdi:server
+    popup: '#proxmox'
+    state:
+      - id: cpu
+        entity: '[[cpu]]'
+        icon: true
+      - id: memory
+        entity: '[[memory]]'
+        icon: true
+    chips:
+      - id: status
+        type: status
+        name: Guests
+        icon: mdi:server-network
+        rules:
+          [
+            {
+              id: guest-statuses,
+              entities: ['[[guest_statuses]]'],
+              label: device,
+              color: red,
+              is: ['off'],
+            },
+          ]
+      - id: checks
+        if: checks
+        type: status
+        name: Checks
+        icon: mdi:clipboard-check-outline
+        rules:
+          - id: checks-failed
+            entities: ['[[checks.failed]]']
+            color: red
+            not: ['0', unknown, unavailable]
+          - id: checks-overdue
+            entities: ['[[checks.overdue]]']
+            color: orange
+            is: ['on']
+      - id: backups
+        if: backups
+        type: status
+        name: Backups
+        icon: mdi:cloud-upload-outline
+        rules: [{ id: backups-problem, entities: ['[[backups.problem]]'], color: red, is: ['on'] }]
+      - id: notifications
+        if: notifications
+        type: nav
+        entity: '[[notifications.messages]]'
+        popup: '#proxmox-notifications'
+        color: amber
+        when: { not: ['0'] }
+    grid_options: { columns: 12 }
+  popups:
+    - id: proxmox-popup
+      template: proxmox-popup
+      slots:
+        outlet: '[[outlet]]'
+        cpu: '[[cpu]]'
+        memory: '[[memory]]'
+        last_boot: '[[last_boot]]'
+        uplink: '[[uplink]]'
+        temperatures: '[[temperatures]]'
+        storage: '[[storage]]'
+        disks: '[[disks]]'
+        guests: '[[guests]]'
+        backups: '[[backups]]'
+        checks: '[[checks]]'
+        notifications: '[[notifications]]'
+        guest_statuses: '[[guest_statuses]]'
+        guest_disks: '[[guest_disks]]'
+        message_sources: '[[message_sources]]'
+        disk_high: '[[disk_high]]'
+        disk_full: '[[disk_full]]'
+        disk_life_low: '[[disk_life_low]]'
+        disk_life_critical: '[[disk_life_critical]]'
+        cpu_hot: '[[cpu_hot]]'
+        cpu_critical: '[[cpu_critical]]'
+        root_disk_hot: '[[root_disk_hot]]'
+        root_disk_critical: '[[root_disk_critical]]'
+        bucket_high: '[[bucket_high]]'
+        bucket_full: '[[bucket_full]]'
+    - id: notifications
+      if: notifications
+      template: notifications-popup
+      slots:
+        notifications: '[[notifications]]'
+        message_sources: '[[message_sources]]'
+  example: &server
+    outlet: { entity: switch.server_outlet }
+    cpu: sensor.server_cpu
+    memory: sensor.server_memory
+    last_boot: sensor.server_last_boot
+    guests:
+      [{ status: binary_sensor.guest_status, cpu: sensor.guest_cpu, memory: sensor.guest_memory }]
+    guest_statuses: [binary_sensor.guest_status]
+
+proxmox-popup:
+  description: The server's pop-up, its notifications, stopped guests, checks, host, disks, storage, energy, guests and backups.
+  slots:
+    outlet:
+      kind: object
+      required: true
+      fields:
+        entity: { kind: entity, required: true }
+        energy:
+          kind: object
+          fields:
+            power: { kind: entity, required: true }
+            today: { kind: entity }
+            total: { kind: entity }
+    cpu: { kind: entity, required: true }
+    memory: { kind: entity, required: true }
+    last_boot: { kind: entity, required: true }
+    uplink: { kind: entity }
+    temperatures:
+      kind: object
+      fields:
+        cpu: { kind: entity, required: true, label: CPU }
+        root_disk: { kind: entity, required: true }
+    storage: { kind: entities }
+    disks:
+      kind: object
+      fields:
+        pool: { kind: entity, required: true }
+        failing: { kind: entity, required: true }
+        life_left: { kind: entity, required: true }
+    guests:
+      kind: objects
+      fields:
+        host: { kind: text }
+        status: { kind: entity, required: true }
+        cpu: { kind: entity, label: CPU }
+        memory: { kind: entity }
+        disk:
+          kind: object
+          fields:
+            used: { kind: entity }
+            size: { kind: entity }
+    backups:
+      kind: object
+      fields:
+        last: { kind: entity, required: true }
+        problem: { kind: entity, required: true }
+        bucket: { kind: entity }
+    checks:
+      kind: object
+      fields:
+        failed: { kind: entity, required: true }
+        last_run: { kind: entity, required: true }
+        overdue: { kind: entity, required: true }
+    notifications:
+      kind: object
+      fields:
+        messages: { kind: entity, required: true }
+        clear: { kind: entity }
+        sources:
+          kind: objects
+          fields:
+            source: { kind: text }
+            name: { kind: text }
+    guest_statuses: { kind: entities }
+    guest_disks:
+      kind: objects
+      fields:
+        used: { kind: entity, required: true }
+        size: { kind: entity }
+    message_sources:
+      kind: objects
+      fields:
+        source: { kind: text }
+        name: { kind: text }
+        entity: { kind: entity }
+    disk_high: { kind: number, default: 80 }
+    disk_full: { kind: number, default: 90 }
+    disk_life_low: { kind: number, default: 20 }
+    disk_life_critical: { kind: number, default: 10 }
+    cpu_hot: { kind: number, default: 85 }
+    cpu_critical: { kind: number, default: 95 }
+    root_disk_hot: { kind: number, default: 70 }
+    root_disk_critical: { kind: number, default: 80 }
+    bucket_high: { kind: number, default: 18 }
+    bucket_full: { kind: number, default: 19 }
+  card:
+    hash: '#proxmox'
+    cards:
+      - id: header
+        type: custom:mnml-header-card
+        name: Server
+        icon: mdi:server
+        state:
+          - id: cpu
+            entity: '[[cpu]]'
+            icon: true
+          - id: memory
+            entity: '[[memory]]'
+            icon: true
+      - id: notifications
+        if: notifications
+        type: custom:mnml-entity-card
+        entity: '[[notifications.messages]]'
+        color: amber
+        when: { not: ['0'] }
+        state:
+          - id: none
+            text: None
+            when: { is: ['0'] }
+          - id: part-2
+            when: { not: ['0'] }
+        popup: '#proxmox-notifications'
+      - id: stopped
+        type: custom:mnml-list-card
+        title: Stopped
+        icon: mdi:stop-circle-outline
+        rows:
+          - id: each-guests
+            each: guests
+            as: guest
+            template: stopped-row
+            slots: { entity: '[[guest.status]]' }
+      - id: checks
+        if: checks
+        type: custom:mnml-list-card
+        title: Daily checks
+        icon: mdi:clipboard-check-outline
+        rows:
+          - id: checks-failed
+            entity: '[[checks.failed]]'
+            color: red
+            when: { not: ['0'] }
+          - id: checks-last_run
+            entity: '[[checks.last_run]]'
+            relative: true
+          - id: checks-overdue
+            entity: '[[checks.overdue]]'
+            flag: true
+            color: orange
+            show: { is: ['on'] }
+      - id: host
+        type: custom:mnml-list-card
+        title: Host
+        icon: mdi:harddisk
+        rows:
+          - id: outlet-entity
+            entity: '[[outlet.entity]]'
+            color: amber
+            when: { is: ['on'] }
+          - id: cpu
+            entity: '[[cpu]]'
+          - id: memory
+            entity: '[[memory]]'
+            bar: true
+          - id: last_boot
+            entity: '[[last_boot]]'
+            relative: true
+          - id: uplink
+            if: uplink
+            template: link-row
+            slots: { entity: '[[uplink]]' }
+          - id: temperatures
+            if: temperatures
+            entity: '[[temperatures.cpu]]'
+            high: '[[cpu_hot]]'
+            critical_high: '[[cpu_critical]]'
+          - id: temperatures-2
+            if: temperatures
+            entity: '[[temperatures.root_disk]]'
+            high: '[[root_disk_hot]]'
+            critical_high: '[[root_disk_critical]]'
+      - id: disks
+        if: disks
+        type: custom:mnml-list-card
+        title: Disks
+        icon: mdi:harddisk
+        rows:
+          - id: disks-pool
+            entity: '[[disks.pool]]'
+            color: red
+            when: { not: [ONLINE] }
+          - id: disks-failing
+            entity: '[[disks.failing]]'
+            color: red
+            when: { not: ['0'] }
+          - id: disks-life_left
+            entity: '[[disks.life_left]]'
+            bar: true
+            low: '[[disk_life_low]]'
+            critical: '[[disk_life_critical]]'
+      - id: storage
+        type: custom:mnml-list-card
+        fold: true
+        summary: highest
+        title: Storage
+        icon: mdi:database
+        rows:
+          - id: each-storage
+            each: storage
+            as: store
+            entity: '[[store]]'
+            label: device
+            bar: true
+      - id: outlet-energy
+        if: outlet.energy
+        template: energy-table
+        slots: { meters: ['[[outlet.energy]]'] }
+      - id: guests
+        type: custom:mnml-list-card
+        title: Guests
+        icon: mdi:server-network
+        headers: [Guest, CPU, Memory]
+        rows:
+          - id: each-guests
+            each: guests
+            as: guest
+            entity: '[[guest.status]]'
+            label: device
+            values: ['[[guest.cpu]]', '[[guest.memory]]']
+      - id: guest_disks
+        if: guest_disks
+        type: custom:mnml-list-card
+        fold: true
+        summary: highest
+        title: Guest disks
+        icon: mdi:harddisk
+        rows:
+          - id: each-guest_disks
+            each: guest_disks
+            as: disk
+            entity: '[[disk.used]]'
+            label: device
+            bar: true
+            of: '[[disk.size]]'
+            high: '[[disk_high]]'
+            critical_high: '[[disk_full]]'
+      - id: backups
+        if: backups
+        type: custom:mnml-list-card
+        title: Backups
+        icon: mdi:cloud-upload-outline
+        rows:
+          - id: backups-last
+            entity: '[[backups.last]]'
+            relative: true
+          - id: backups-problem
+            entity: '[[backups.problem]]'
+            color: red
+            show: { is: ['on'] }
+          - id: backups-bucket
+            if: backups.bucket
+            entity: '[[backups.bucket]]'
+            high: '[[bucket_high]]'
+            critical_high: '[[bucket_full]]'
+  example: *server
+
+notifications-popup:
+  description: The server's notifications pop-up, every message and a button that clears them all.
+  slots:
+    notifications:
+      kind: object
+      required: true
+      fields:
+        messages: { kind: entity, required: true }
+        clear: { kind: entity, required: true }
+        sources:
+          kind: objects
+          fields:
+            source: { kind: text }
+            name: { kind: text }
+    message_sources:
+      kind: objects
+      fields:
+        source: { kind: text }
+        name: { kind: text }
+        entity: { kind: entity }
+  card:
+    hash: '#proxmox-notifications'
+    cards:
+      - id: header
+        type: custom:mnml-header-card
+        entity: '[[notifications.messages]]'
+        state: [{ id: server, text: Server }]
+        controls:
+          - id: service
+            type: service
+            entity: '[[notifications.clear]]'
+            service: script.turn_on
+            name: Clear all
+            icon: mdi:notification-clear-all
+            show: { entity: '[[notifications.messages]]', not: ['0'] }
+        back: true
+      - id: messages
+        type: custom:mnml-messages-card
+        entity: '[[notifications.messages]]'
+        clear: '[[notifications.clear]]'
+        sources?: '[[message_sources]]'
+  example:
+    notifications: { messages: sensor.messages, clear: script.clear_messages }

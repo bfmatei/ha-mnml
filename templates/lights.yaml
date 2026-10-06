@@ -1,0 +1,192 @@
+light-controls:
+  description: A light's brightness, white temperature and, for a colour light, hue sliders, then its power toggle.
+  slots:
+    entity: { kind: entity, required: true }
+    color: { kind: flag }
+  card:
+    - id: brightness
+      type: slider
+      entity: '[[entity]]'
+      slider: brightness
+      name: Brightness
+      icon: mdi:brightness-6
+      color: amber
+      show: { not: ['off'] }
+    - id: white-temperature
+      type: slider
+      entity: '[[entity]]'
+      slider: color_temp
+      name: White temperature
+      icon: mdi:white-balance-sunny
+      show: { not: ['off'] }
+    - id: color
+      if: color
+      type: slider
+      entity: '[[entity]]'
+      slider: hue
+      name: Color
+      icon: mdi:palette
+      show: { not: ['off'] }
+    - id: power
+      template: power
+      slots: { entity: '[[entity]]' }
+  example:
+    entity: light.kitchen
+
+light-item:
+  description: A light as an item, with its brightness, the active scene while it is on, its scenes and its sliders.
+  slots:
+    entity: { kind: entity, required: true }
+    strip_word: { kind: text }
+    popup: { kind: text }
+    scenes: { kind: entities }
+    active_scene: { kind: entity }
+    color: { kind: flag }
+  card:
+    entity: '[[entity]]'
+    strip_word: '[[strip_word]]'
+    color: amber
+    state:
+      - id: part
+        when: { is: ['off'] }
+      - id: brightness
+        attribute: brightness
+      - id: active_scene
+        if: active_scene
+        entity: '[[active_scene]]'
+        when: { entity: '[[entity]]', is: ['on'] }
+    popup: '[[popup]]'
+    controls:
+      - id: scenes
+        if: scenes
+        type: scenes
+        scenes: '[[scenes]]'
+        active_scene: '[[active_scene]]'
+        name: Scenes
+        icon: mdi:palette-swatch
+      - id: light-controls
+        template: light-controls
+        slots: { entity: '[[entity]]', color: '[[color]]' }
+  example:
+    entity: light.kitchen
+    popup: '#kitchen-lights'
+
+light-card:
+  description: A light, or a light group with its members folded under it.
+  slots:
+    entity: { kind: entity, required: true, label: Light, group: Basics }
+    members: { kind: entities, group: Basics }
+    strip_word: { kind: text, group: More }
+    popup: { kind: text, label: Pop-up, group: More }
+    scenes: { kind: entities, group: Scenes }
+    active_scene: { kind: entity, group: Scenes }
+    color: { kind: flag, group: Basics }
+  card:
+    type: custom:mnml-entity-card
+    template: light-item
+    slots:
+      entity: '[[entity]]'
+      strip_word: '[[strip_word]]'
+      popup: '[[popup]]'
+      scenes: '[[scenes]]'
+      active_scene: '[[active_scene]]'
+      color: '[[color]]'
+    items?:
+      - id: each-members
+        each: members
+        as: member
+        template: light-item
+        slots:
+          entity: '[[member]]'
+          strip_word: '[[strip_word]]'
+          popup: '[[popup]]'
+          scenes: '[[scenes]]'
+          active_scene: '[[active_scene]]'
+          color: '[[color]]'
+  example:
+    entity: light.kitchen_lights
+    members: [light.kitchen_ceiling, light.kitchen_counter]
+
+lights-popup:
+  description: A room's lights pop-up, its sliders over the whole group, its scenes and every light.
+  slots:
+    key: { kind: text, required: true }
+    name: { kind: text, required: true }
+    group: { kind: entity, required: true }
+    color: { kind: flag }
+    members:
+      kind: objects
+      fields:
+        entity: { kind: entity, required: true }
+        members: { kind: entities }
+    scenes: { kind: entities }
+    active_scene: { kind: entity }
+  card:
+    hash: '#[[key]]-lights'
+    cards:
+      - id: header
+        type: custom:mnml-header-card
+        name: Lights
+        icon: mdi:lightbulb-group
+        entity: '[[group]]'
+        color: amber
+        state: [{ id: name, text: '[[name]]' }]
+        controls:
+          - id: power
+            template: power
+            slots: { entity: '[[group]]' }
+        back: true
+      - id: heading
+        type: custom:mnml-heading-card
+        title: All lights
+        icon: mdi:lightbulb-group
+        visibility: { template: while-not-off, slots: { entity: '[[group]]' } }
+      - id: brightness
+        type: custom:mnml-slider-card
+        entity: '[[group]]'
+        slider: brightness
+        name: Brightness
+        icon: mdi:brightness-6
+        color: amber
+        visibility: { template: while-not-off, slots: { entity: '[[group]]' } }
+      - id: white-temperature
+        type: custom:mnml-slider-card
+        entity: '[[group]]'
+        slider: color_temp
+        name: White temperature
+        icon: mdi:white-balance-sunny
+        visibility: { template: while-not-off, slots: { entity: '[[group]]' } }
+      - id: color
+        if: color
+        type: custom:mnml-slider-card
+        entity: '[[group]]'
+        slider: hue
+        name: Color
+        icon: mdi:palette
+        visibility: { template: while-not-off, slots: { entity: '[[group]]' } }
+      - id: scenes
+        if: scenes
+        type: custom:mnml-select-card
+        scenes: '[[scenes]]'
+        active_scene: '[[active_scene]]'
+        name: Scenes
+        icon: mdi:palette-swatch
+      - id: members
+        if: members
+        type: custom:mnml-heading-card
+        title: Lights
+        icon: mdi:lightbulb-group
+      - id: each-members
+        each: members
+        as: member
+        template: light-card
+        slots:
+          entity: '[[member.entity]]'
+          members: '[[member.members]]'
+          strip_word: Light
+          color: '[[color]]'
+  example:
+    key: kitchen
+    name: Kitchen
+    group: light.kitchen_lights
+    members: [{ entity: light.kitchen_ceiling }]

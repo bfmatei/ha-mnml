@@ -1,0 +1,118 @@
+views:
+  - title: MNML
+    path: cards
+    type: sections
+    max_columns: 4
+    sections:
+      - type: grid
+        cards:
+          - type: custom:mnml-template-card
+            template: section-heading
+            slots:
+              title: Templates
+              icon: mdi:shape
+          - type: custom:mnml-heading-card
+            title: Controls
+            icon: mdi:tune-variant
+            grid_options:
+              columns: 12
+          - type: custom:mnml-slider-card
+            entity: light.bed_light
+            slider: brightness
+          - type: custom:mnml-select-card
+            entity: climate.hvac
+            attribute: hvac_modes
+          - type: custom:mnml-entity-card
+            entity: light.ceiling_lights
+            controls:
+              - type: toggle
+                entity: light.ceiling_lights
+          - type: custom:mnml-button-card
+            entity: button.push
+            service: button.press
+      - type: grid
+        cards:
+          - type: custom:mnml-tile-card
+            name: Living
+            icon: mdi:sofa
+            popup: '#living'
+            state:
+              - entity: sensor.outside_temperature
+                icon: true
+            chips:
+              - type: toggle
+                entity: switch.decorative_lights
+            item:
+              entity: light.living_room_rgbww_lights
+          - type: custom:mnml-list-card
+            title: Readings
+            icon: mdi:gauge
+            rows:
+              - entity: sensor.outside_humidity
+                bar: true
+                low: 30
+                critical: 20
+              - entity: sensor.carbon_dioxide
+              - entity: sensor.fixture_steps
+                zero_when_empty: true
+          - type: custom:mnml-media-card
+            entity: media_player.living_room
+          - type: custom:mnml-agenda-card
+            title: Upcoming
+            icon: mdi:calendar-clock
+            sources:
+              - entity: calendar.calendar_1
+                kind: movies
+      - type: grid
+        cards:
+          - type: custom:mnml-messages-card
+            entity: sensor.messages
+            clear: script.clear_messages
+          - type: custom:mnml-clients-card
+            entity: sensor.fixture_clients
+            networks:
+              - name: Users
+                icon: mdi:account-group
+                subnet: 10.1.10.0/24
+              - name: Servers
+                icon: mdi:server
+                subnet: 10.1.50.0/24
+          - type: custom:mnml-car-plan-card
+            title: Car
+            icon: mdi:car
+            doors:
+              - binary_sensor.fixture_door_front_left
+              - binary_sensor.fixture_door_front_right
+              - binary_sensor.fixture_door_rear_left
+              - binary_sensor.fixture_door_rear_right
+            hood: binary_sensor.fixture_hood
+            tailgate: binary_sensor.fixture_tailgate
+            windows:
+              - sensor.fixture_window_front_left
+              - sensor.fixture_window_front_right
+              - sensor.fixture_window_rear_left
+              - sensor.fixture_window_rear_right
+            tyres:
+              - sensor.fixture_tyre_front_left
+              - sensor.fixture_tyre_front_right
+              - sensor.fixture_tyre_rear_left
+              - sensor.fixture_tyre_rear_right
+            tyre_targets:
+              - sensor.fixture_tyre_target
+              - sensor.fixture_tyre_target
+              - sensor.fixture_tyre_target
+              - sensor.fixture_tyre_target
+            tyre_low_share: 0.85
+            tyre_warn_share: 0.95
+          - type: custom:mnml-popups-card
+            width: 560px
+            popups:
+              - hash: '#living'
+                cards:
+                  - type: custom:mnml-header-card
+                    name: Living
+                    icon: mdi:sofa
+                  - type: custom:mnml-list-card
+                    rows:
+                      - entity: light.living_room_rgbww_lights
+                      - entity: sensor.outside_temperature

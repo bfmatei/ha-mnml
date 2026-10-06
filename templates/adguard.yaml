@@ -1,0 +1,115 @@
+adguard:
+  description: An AdGuard Home tile, its block ratio and speed, its update chip and its protection toggle; it brings its pop-up.
+  slots:
+    protection: { kind: entity, required: true, group: Status }
+    queries: { kind: entity, required: true, group: Traffic }
+    blocked: { kind: entity, required: true, group: Traffic }
+    ratio: { kind: entity, required: true, group: Traffic }
+    speed: { kind: entity, required: true, group: Traffic }
+    rules: { kind: entity, group: Traffic }
+    update: { kind: entity, required: true, group: Status }
+  card:
+    type: custom:mnml-tile-card
+    entity: '[[protection]]'
+    label: device
+    popup: '#adguard'
+    state:
+      - id: ratio
+        entity: '[[ratio]]'
+        icon: true
+      - id: speed
+        entity: '[[speed]]'
+        icon: true
+    chips:
+      - id: status
+        type: status
+        name: Update
+        icon: mdi:package-up
+        rules: [{ id: update, entities: ['[[update]]'], label: device, color: amber, is: ['on'] }]
+      - id: toggle
+        type: toggle
+        entity: '[[protection]]'
+        color: amber
+    grid_options: { columns: 12 }
+  popups:
+    - id: adguard-popup
+      template: adguard-popup
+      slots:
+        protection: '[[protection]]'
+        queries: '[[queries]]'
+        blocked: '[[blocked]]'
+        ratio: '[[ratio]]'
+        speed: '[[speed]]'
+        rules: '[[rules]]'
+        update: '[[update]]'
+  example: &adguard
+    protection: switch.adguard_protection
+    queries: sensor.adguard_queries
+    blocked: sensor.adguard_blocked
+    ratio: sensor.adguard_ratio
+    speed: sensor.adguard_speed
+    update: update.adguard
+
+adguard-popup:
+  description: AdGuard Home's pop-up, its queries, blocklists and update.
+  slots:
+    protection: { kind: entity, required: true }
+    queries: { kind: entity, required: true }
+    blocked: { kind: entity, required: true }
+    ratio: { kind: entity, required: true }
+    speed: { kind: entity, required: true }
+    rules: { kind: entity }
+    update: { kind: entity, required: true }
+  card:
+    hash: '#adguard'
+    cards:
+      - id: header
+        type: custom:mnml-header-card
+        entity: '[[protection]]'
+        label: device
+        color: orange
+        when: { is: ['off'] }
+        state:
+          - id: ratio
+            entity: '[[ratio]]'
+            icon: true
+          - id: speed
+            entity: '[[speed]]'
+            icon: true
+        controls:
+          - id: power
+            template: power
+            slots: { entity: '[[protection]]' }
+      - id: queries
+        type: custom:mnml-list-card
+        title: Queries
+        icon: mdi:dns
+        rows:
+          - id: queries
+            entity: '[[queries]]'
+          - id: blocked
+            entity: '[[blocked]]'
+          - id: ratio
+            entity: '[[ratio]]'
+            bar: true
+          - id: speed
+            entity: '[[speed]]'
+      - id: rules
+        if: rules
+        type: custom:mnml-list-card
+        title: Blocklists
+        icon: mdi:filter-outline
+        rows:
+          - id: rules
+            entity: '[[rules]]'
+            color: red
+            when: { is: ['0'] }
+      - id: update
+        type: custom:mnml-list-card
+        title: Update
+        icon: mdi:package-up
+        rows:
+          - id: pending-row
+            template: pending-row
+            slots: { entity: '[[update]]' }
+  example: *adguard

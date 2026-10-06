@@ -1,0 +1,185 @@
+home-assistant:
+  description: Home Assistant's tile, its memory and free disk, and its services, updates and firmware chips; it brings its pop-up, with each room's firmware.
+  slots:
+    cpu: { kind: entity, required: true, label: CPU, group: Load }
+    memory: { kind: entity, required: true, group: Load }
+    disk_free: { kind: entity, required: true, group: Load }
+    disk_used: { kind: entity, required: true, group: Load }
+    services: { kind: entities, group: Updates }
+    updates: { kind: entities, group: Updates }
+    firmware: { kind: entities, group: Updates }
+    all_firmware:
+      {
+        kind: entities,
+        discover: { domain: update, device_class: firmware, scope: all },
+        group: Updates,
+      }
+    room_firmware:
+      kind: objects
+      group: Updates
+      fields:
+        name: { kind: text, required: true }
+        firmware: { kind: entities }
+      discover:
+        {
+          per: area,
+          scope: all,
+          fields: { name: area.name, firmware: { domain: update, device_class: firmware } },
+        }
+  card:
+    type: custom:mnml-tile-card
+    name: Home Assistant
+    icon: mdi:home-assistant
+    popup: '#system'
+    state:
+      - id: memory
+        entity: '[[memory]]'
+        icon: true
+      - id: disk_free
+        entity: '[[disk_free]]'
+        icon: true
+    chips:
+      - id: services
+        type: status
+        name: Services
+        icon: mdi:lan-connect
+        rules:
+          [{ id: services, entities: ['[[services]]'], label: device, color: red, is: ['off'] }]
+      - id: updates
+        type: status
+        name: Updates
+        icon: mdi:package-up
+        rules: [{ id: updates, entities: ['[[updates]]'], label: device, color: amber, is: ['on'] }]
+      - id: firmware
+        type: status
+        name: Firmware
+        icon: mdi:memory
+        rules:
+          [
+            {
+              id: all-firmware,
+              entities: ['[[all_firmware]]'],
+              label: device,
+              color: amber,
+              is: ['on'],
+            },
+          ]
+    grid_options: { columns: 12 }
+  popups:
+    - id: system-popup
+      template: system-popup
+      slots:
+        cpu: '[[cpu]]'
+        memory: '[[memory]]'
+        disk_free: '[[disk_free]]'
+        disk_used: '[[disk_used]]'
+        services: '[[services]]'
+        updates: '[[updates]]'
+        firmware: '[[firmware]]'
+        all_firmware: '[[all_firmware]]'
+        room_firmware: '[[room_firmware]]'
+  example: &home_assistant
+    cpu: sensor.ha_cpu
+    memory: sensor.ha_memory
+    disk_free: sensor.ha_disk_free
+    disk_used: sensor.ha_disk_used
+    services: [binary_sensor.matter_server]
+    updates: [update.home_assistant_core]
+    firmware: [update.zigbee_firmware]
+    all_firmware: [update.zigbee_firmware, update.kitchen_plug_firmware]
+    room_firmware: [{ name: Kitchen, firmware: [update.kitchen_plug_firmware] }]
+
+system-popup:
+  description: Home Assistant's pop-up, its resources, services, updates, its own firmware and each room's.
+  slots:
+    cpu: { kind: entity, required: true }
+    memory: { kind: entity, required: true }
+    disk_free: { kind: entity, required: true }
+    disk_used: { kind: entity, required: true }
+    services: { kind: entities }
+    updates: { kind: entities }
+    firmware: { kind: entities }
+    all_firmware:
+      { kind: entities, discover: { domain: update, device_class: firmware, scope: all } }
+    room_firmware:
+      kind: objects
+      fields:
+        name: { kind: text, required: true }
+        firmware: { kind: entities }
+      discover:
+        {
+          per: area,
+          scope: all,
+          fields: { name: area.name, firmware: { domain: update, device_class: firmware } },
+        }
+  card:
+    hash: '#system'
+    cards:
+      - id: header
+        type: custom:mnml-header-card
+        name: Home Assistant
+        icon: mdi:home-assistant
+        state:
+          - id: memory
+            entity: '[[memory]]'
+            icon: true
+          - id: disk_free
+            entity: '[[disk_free]]'
+            icon: true
+      - id: resources
+        type: custom:mnml-list-card
+        title: Resources
+        icon: mdi:chip
+        rows:
+          - id: cpu
+            entity: '[[cpu]]'
+          - id: memory
+            entity: '[[memory]]'
+            bar: true
+          - id: disk_used
+            entity: '[[disk_used]]'
+          - id: disk_free
+            entity: '[[disk_free]]'
+      - id: services
+        type: custom:mnml-list-card
+        title: Services
+        icon: mdi:lan-connect
+        rows:
+          - id: each-services
+            each: services
+            as: service
+            template: stopped-row
+            slots: { entity: '[[service]]' }
+      - id: updates
+        type: custom:mnml-list-card
+        title: Updates
+        icon: mdi:package-up
+        rows:
+          - id: each-updates
+            each: updates
+            as: update
+            template: pending-row
+            slots: { entity: '[[update]]' }
+      - id: firmware
+        type: custom:mnml-list-card
+        title: Firmware
+        icon: mdi:memory
+        rows:
+          - id: each-firmware
+            each: firmware
+            as: update
+            template: pending-row
+            slots: { entity: '[[update]]' }
+      - id: each-room_firmware
+        each: room_firmware
+        as: room
+        type: custom:mnml-list-card
+        title: '[[room.name]] firmware'
+        icon: mdi:memory
+        rows:
+          - id: each-room-firmware
+            each: room.firmware
+            as: update
+            template: pending-row
+            slots: { entity: '[[update]]' }
+  example: *home_assistant
