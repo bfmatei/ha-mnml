@@ -1,8 +1,10 @@
+import { lookOf } from '../contract/builder.ts';
 import type {
   CarChoice,
   PersonChoice,
   Plan,
   RoomChoice,
+  SectionKey,
   SystemChoice,
 } from '../contract/builder.ts';
 import type { TemplateCard } from '../contract/cards.ts';
@@ -18,16 +20,20 @@ function card(template: string, slots?: Record<string, Value>, area?: string): T
   return { type: 'custom:mnml-template-card', template, area, slots };
 }
 
-export function roomCard(room: RoomChoice): TemplateCard {
-  return card('room', room.slots, room.area);
+export function roomCard(room: RoomChoice, template = 'room'): TemplateCard {
+  return card(template, room.slots, room.area);
 }
 
-export function personCard(person: PersonChoice, registries: Registries): TemplateCard {
-  return card('person', { ...personOf(registries, person.entity), ...person.slots });
+export function personCard(
+  person: PersonChoice,
+  registries: Registries,
+  template = 'person',
+): TemplateCard {
+  return card(template, { ...personOf(registries, person.entity), ...person.slots });
 }
 
-export function carCard(car: CarChoice): TemplateCard {
-  return card('car', { ...car.slots, key: car.key });
+export function carCard(car: CarChoice, template = 'car'): TemplateCard {
+  return card(template, { ...car.slots, key: car.key });
 }
 
 export function systemCard(
@@ -41,7 +47,8 @@ export function systemCard(
     : card(choice.template, { ...discover(template, undefined, registries), ...choice.slots });
 }
 
-function section(title: string, icon: string, cards: TemplateCard[]): Section[] {
+function section(plan: Plan, key: SectionKey, cards: TemplateCard[]): Section[] {
+  const { title, icon } = lookOf(plan, key);
   return cards.length === 0
     ? []
     : [
@@ -54,6 +61,9 @@ function section(title: string, icon: string, cards: TemplateCard[]): Section[] 
 }
 
 export function dashboardOf(plan: Plan, registries: Registries, templates: Templates): Dashboard {
+  const rooms = lookOf(plan, 'rooms').template;
+  const people = lookOf(plan, 'people').template;
+  const cars = lookOf(plan, 'garage').template;
   return {
     title: plan.title,
     views: [
@@ -65,21 +75,27 @@ export function dashboardOf(plan: Plan, registries: Registries, templates: Templ
         max_columns: 3,
         sections: [
           ...section(
-            'Rooms',
-            'mdi:floor-plan',
-            plan.rooms.filter((room) => Object.hasOwn(registries.areas, room.area)).map(roomCard),
+            plan,
+            'rooms',
+            plan.rooms
+              .filter((room) => Object.hasOwn(registries.areas, room.area))
+              .map((room) => roomCard(room, rooms)),
           ),
           ...section(
-            'People',
-            'mdi:account-group',
+            plan,
+            'people',
             plan.people
               .filter((person) => Object.hasOwn(registries.states, person.entity))
-              .map((person) => personCard(person, registries)),
+              .map((person) => personCard(person, registries, people)),
           ),
-          ...section('Garage', 'mdi:garage', plan.cars.map(carCard)),
           ...section(
-            'System',
-            'mdi:server-network',
+            plan,
+            'garage',
+            plan.cars.map((car) => carCard(car, cars)),
+          ),
+          ...section(
+            plan,
+            'system',
             plan.system.map((choice) => systemCard(choice, registries, templates)),
           ),
           {

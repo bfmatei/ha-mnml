@@ -152,3 +152,33 @@ test('a room whose area is gone and a person who is gone are left out', () => {
     ['person.jane'],
   );
 });
+
+test("a section's look names its heading and the template of its cards; a plan without looks is as before", () => {
+  const plain = sent(PLAN);
+  assert.deepEqual(sent({ ...PLAN, sections: {} }), plain);
+  const looked = sent({
+    ...PLAN,
+    sections: {
+      rooms: { title: 'Spaces', icon: 'mdi:home-floor-1', template: 'room' },
+      people: { title: 'Us' },
+    },
+  });
+  const cards = looked.views.flatMap((view) => view.sections.flatMap((section) => section.cards));
+  const headings = cards
+    .filter(
+      (card): card is TemplateCard => 'template' in card && card.template === 'section-heading',
+    )
+    .map((card) => [card.slots?.['title'], card.slots?.['icon']]);
+  assert.deepEqual(headings, [
+    ['Spaces', 'mdi:home-floor-1'],
+    ['Us', 'mdi:account-group'],
+  ]);
+  const own = sent({ ...PLAN, sections: { rooms: { template: 'my-room' } } });
+  const rooms = own.views
+    .flatMap((view) => view.sections.flatMap((section) => section.cards))
+    .filter((card): card is TemplateCard => 'area' in card && card.area !== undefined);
+  assert.deepEqual(
+    rooms.map((card) => card.template),
+    ['my-room', 'my-room'],
+  );
+});
