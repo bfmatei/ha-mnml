@@ -267,3 +267,23 @@ test('the markup minifier leaves a style binding as written, with nothing after 
     rmSync(dir, { recursive: true });
   }
 });
+
+test('every step of pnpm check runs in a job of the check workflow, so splitting it into jobs drops none', () => {
+  const scripts: Record<string, string> = JSON.parse(readFileSync('package.json', 'utf8')).scripts;
+  const steps = (name: string): string[] => {
+    const chained = [...(scripts[name] ?? '').matchAll(/pnpm run ([\w:-]+)/g)].map(
+      (match) => match[1] ?? '',
+    );
+    return chained.length === 0 ? [name] : chained.flatMap(steps);
+  };
+  const workflow = readFileSync('.github/workflows/check.yml', 'utf8');
+  const missing = steps('check').filter((step) => !workflow.includes(`pnpm run ${step}\n`));
+  assert.deepEqual(missing, []);
+  assert.ok(workflow.includes('pnpm run test:python-floor\n'), 'and the oldest Home Assistant too');
+  assert.ok(
+    readFileSync('.github/workflows/release.yml', 'utf8').includes(
+      'uses: ./.github/workflows/check.yml',
+    ),
+    'a release runs the same checks',
+  );
+});

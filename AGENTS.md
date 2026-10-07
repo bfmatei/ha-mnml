@@ -7,6 +7,7 @@ Working rules for agents in this repository.
 ## Ground rules
 
 - **Don't commit or push** unless asked. The working tree as you find it is the maintainer's work in progress: read it first, build on it, never revert or stash it.
+- **`main` takes changes only through pull requests:** a branch, a pull request, the checks green, a squash merge. Nothing pushes to `main` directly.
 - **`pnpm check` is the gate** and must pass before you hand back. There are no git hooks.
 - **The public interface** is `cards.ts`, the templates (a template's name and slots are kept like a card's keys), the theme's name (`MNML`) and its `mnml-*` variables, and the integration's domain (`mnml`) and options. A new optional key, card, variable or option is a minor release; a renamed or removed one, or a changed meaning, is a major one. Release notes live in GitHub releases, written when a version is tagged.
 - **One version,** in `custom_components/mnml/manifest.json`; a release tag `vX.Y.Z` must match it.

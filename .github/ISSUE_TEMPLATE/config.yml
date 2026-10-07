@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://github.com/bfmatei/ha-mnml/wiki
+    about: The cards' keys, the templates, the panel and the theme.
+  - name: Security report
+    url: https://github.com/bfmatei/ha-mnml/security/advisories/new
+    about: Report a vulnerability privately.
