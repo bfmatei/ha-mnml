@@ -65,8 +65,10 @@ function registriesOf(hass: HomeAssistant | undefined): Registries {
 
 const isIcon = (value: string): value is MdiIcon => ICON.test(value);
 
-const message = (error: unknown): string =>
-  error instanceof Error ? error.message : String(error);
+const message = (error: unknown): string => {
+  const said = field(error, 'message');
+  return typeof said === 'string' ? said : String(error);
+};
 
 function asConfig(card: TemplateCard): Record<string, Value> {
   const value = toValue(card);
@@ -397,7 +399,7 @@ export class MnmlPlanEditor extends LitElement {
     try {
       await host.save(tidy, this.where);
     } catch (error) {
-      this.problem = error instanceof Error ? error.message : String(error);
+      this.problem = message(error);
     } finally {
       this.saving = false;
     }

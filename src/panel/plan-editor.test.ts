@@ -324,3 +324,14 @@ test('a system card outside the five is listed, and kept when another changes', 
   assert.deepEqual(saved[0]?.[0].system, [{ template: 'room' }]);
   element.remove();
 });
+
+test("a save Home Assistant refuses says Home Assistant's reason", async () => {
+  const { element, root } = await editor();
+  element.host = {
+    save: () => Promise.reject({ code: 'invalid_format', message: 'expected a dictionary' }),
+    leave: () => undefined,
+  };
+  await save(element, root);
+  assert.equal(text(control(root, '.problem-line')), 'expected a dictionary');
+  element.remove();
+});
