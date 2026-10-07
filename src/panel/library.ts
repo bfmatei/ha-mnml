@@ -54,6 +54,7 @@ export class MnmlLibrary extends LitElement {
   @property({ attribute: false }) rows: readonly Row[] = [];
   @property({ attribute: false }) offer: Offer | undefined;
   @property({ attribute: false }) actions: LibraryActions | undefined;
+  @property({ attribute: false }) start: (() => void) | undefined;
   @state() private text = '';
   @state() private filter: Filter = 'all';
 
@@ -176,6 +177,18 @@ export class MnmlLibrary extends LitElement {
           </button>
         </div>
       </div>
+      ${
+        this.start === undefined
+          ? ''
+          : html`<div class="offer">
+              ${icon('mdi:view-dashboard-edit-outline')}<span
+                >New to MNML? It makes a dashboard from your home in a minute.</span
+              >
+              <button type="button" class="action primary" @click=${this.start}>
+                Build your dashboard
+              </button>
+            </div>`
+      }
       ${
         offer !== undefined && offer.templates > 0
           ? html`<div class="offer">

@@ -197,6 +197,117 @@ export const PANEL_STYLE = css`
     flex: 1;
     min-width: 200px;
   }
+  .start {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 16px;
+    border: 1px solid var(--primary-color);
+    border-radius: 12px;
+    background: var(--card-background-color);
+  }
+  .start > ha-icon {
+    --mdc-icon-size: 40px;
+    color: var(--primary-color);
+  }
+  .start-words {
+    flex: 1;
+    min-width: 220px;
+  }
+  .start-words h2 {
+    margin: 0 0 4px;
+    font-size: 18px;
+    font-weight: 500;
+  }
+  .start-words p {
+    margin: 0;
+    color: var(--secondary-text-color);
+  }
+  .start-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .plan-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .plan-title h1 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 400;
+  }
+  .plan-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 16px;
+    border: 1px solid var(--divider-color);
+    border-radius: 12px;
+    background: var(--card-background-color);
+  }
+  .plan-section h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 500;
+  }
+  .plan-section p {
+    margin: 0;
+  }
+  .plan-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 40px;
+  }
+  .plan-row input[type='checkbox'] {
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    flex: none;
+    accent-color: var(--primary-color);
+  }
+  .plan-tile {
+    flex: 1;
+    min-width: 0;
+    max-width: 420px;
+  }
+  .plan-words {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+  }
+  .plan-row.off .plan-words > span:first-child {
+    color: var(--secondary-text-color);
+  }
+  .plan-field {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .plan-field > span:first-child {
+    width: 120px;
+    color: var(--secondary-text-color);
+  }
+  .plan-icon {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 200px;
+  }
+  .board-name {
+    font-weight: 500;
+  }
+  .row-actions {
+    display: flex;
+    gap: 4px;
+    padding: 0 8px;
+  }
   .library-list {
     display: flex;
     flex-direction: column;

@@ -64,6 +64,7 @@ export interface HomeAssistant {
   ): Promise<unknown>;
   connection: HassConnection;
   user?: { is_admin: boolean };
+  panels?: Readonly<Record<string, unknown>>;
 }
 
 const NO_VALUE = new Set(['', 'unknown', 'unavailable', 'none']);

@@ -136,3 +136,19 @@ test('every card of the default plan draws', () => {
     assert.equal(expanded.missing, undefined, card.template);
   }
 });
+
+test('a room whose area is gone and a person who is gone are left out', () => {
+  const cards = templateCards({
+    ...PLAN,
+    rooms: [{ area: 'attic' }, { area: 'kitchen' }],
+    people: [{ entity: 'person.gone' }, { entity: 'person.jane' }],
+  });
+  assert.deepEqual(
+    cards.filter((card) => card.template === 'room').map((card) => card.area),
+    ['kitchen'],
+  );
+  assert.deepEqual(
+    cards.filter((card) => card.template === 'person').map((card) => card.slots?.['entity']),
+    ['person.jane'],
+  );
+});

@@ -3,22 +3,22 @@ import type { MdiIcon, PersonId } from './entities.ts';
 import { isMapping } from './templates.ts';
 import type { Value } from './templates.ts';
 
-interface RoomChoice {
+export interface RoomChoice {
   area: string;
   slots?: Record<string, Value>;
 }
 
-interface PersonChoice {
+export interface PersonChoice {
   entity: PersonId;
   slots?: Record<string, Value>;
 }
 
-interface CarChoice {
+export interface CarChoice {
   key: string;
   slots: Record<string, Value>;
 }
 
-interface SystemChoice {
+export interface SystemChoice {
   template: string;
   slots?: Record<string, Value>;
 }

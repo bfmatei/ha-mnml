@@ -2,6 +2,9 @@ import { html, LitElement, nothing } from 'lit';
 import type { PropertyValues, TemplateResult } from 'lit';
 import { property, query, state } from 'lit/decorators.js';
 
+import { dashboardOf } from '../builder/dashboard.ts';
+import { defaultPlan } from '../builder/plan.ts';
+import type { Plan } from '../contract/builder.ts';
 import { isTemplate } from '../contract/templates.ts';
 import type { Template, Templates } from '../contract/templates.ts';
 import { loadHaForm } from '../editors/ha-form.ts';
@@ -13,17 +16,34 @@ import { icon } from '../ha/templates.ts';
 import { SHIPPED_TEMPLATES } from '../store/shipped.ts';
 import { onShared, sharedTemplates } from '../store/store.ts';
 import { applyChanges, isChange } from '../templates/changes.ts';
+import type { Registries } from '../templates/discover.ts';
 import { OWNER } from '../templates/families.ts';
 
 import { MnmlBuilder, storedAs } from './builder.ts';
 import type { BuilderHost, Entry } from './builder.ts';
+import {
+  addressFor,
+  boardsOf,
+  builtOf,
+  forgetDashboard,
+  makeDashboard,
+  rebuildDashboard,
+  undoDashboard,
+} from './building.ts';
+import type { Board, Built } from './building.ts';
+import { MnmlDashboards } from './dashboards.ts';
+import type { DashboardActions, DashboardRow } from './dashboards.ts';
 import { draftOf, rowsOf, usesOf } from './data.ts';
 import type { Dashboard, Draft, Kept, Row } from './data.ts';
 import { ask, askName, confirmIt } from './dialog.ts';
+import type { Choice as Option } from './dialog.ts';
 import { MnmlBinder } from './inspector.ts';
 import { MnmlLibrary } from './library.ts';
 import type { LibraryActions } from './library.ts';
+import { MnmlLiveCard } from './live-card.ts';
 import { loadLovelace } from './lovelace.ts';
+import { MnmlPlanEditor } from './plan-editor.ts';
+import type { PlanHost } from './plan-editor.ts';
 import { MnmlPreview } from './preview.ts';
 import { PAGE_STYLE, PANEL_STYLE } from './style.ts';
 import {
@@ -47,6 +67,7 @@ interface Route {
 
 const BASE = '/mnml';
 const NAME = /^\/templates\/([a-z0-9][a-z0-9_-]{0,63})$/;
+const BOARD = /^\/dashboards(?:\/(new|[a-z0-9_]+(?:-[a-z0-9_]+)+))?$/;
 const NOTHING_KEPT: Kept = { own: {}, changes: {} };
 const NEW_TEMPLATE: Template = {
   description: '',
@@ -67,6 +88,27 @@ const message = (error: unknown): string => {
 };
 
 const nameIn = (path: string): string | undefined => NAME.exec(path)?.[1];
+
+function plural(count: number, one: string, many: string): string {
+  return `${count} ${count === 1 ? one : many}`;
+}
+
+function summary(plan: Plan): string {
+  const parts = [
+    { count: plan.rooms.length, one: 'room', many: 'rooms' },
+    { count: plan.people.length, one: 'person', many: 'people' },
+    { count: plan.cars.length, one: 'car', many: 'cars' },
+    { count: plan.system.length, one: 'system card', many: 'system cards' },
+  ].filter((part) => part.count > 0);
+  return parts.length === 0
+    ? 'nothing but its pop-ups yet'
+    : parts.map((part) => plural(part.count, part.one, part.many)).join(', ');
+}
+
+function goTo(path: string): void {
+  history.pushState(null, '', path);
+  window.dispatchEvent(new CustomEvent('location-changed', { detail: { replace: false } }));
+}
 
 function download(name: string, text: string): void {
   const link = document.createElement('a');
@@ -108,6 +150,9 @@ export class MnmlPanel extends LitElement {
   @state() private kept: Kept | undefined;
   @state() private shipped: Templates | undefined;
   @state() private dashboards: Dashboard[] = [];
+  @state() private built: Built[] | undefined;
+  @state() private boards: Board[] = [];
+  @state() private newPlan: Plan | undefined;
   @state() private failure: string | undefined;
   @state() private path = location.pathname.startsWith(BASE)
     ? location.pathname.slice(BASE.length)
@@ -118,6 +163,11 @@ export class MnmlPanel extends LitElement {
   private started = false;
   private unlisten: (() => void) | undefined;
   private readonly fresh = new Map<string, Draft>();
+  private known: { kept: Kept | undefined; shipped: Templates | undefined; all: Templates } = {
+    kept: undefined,
+    shipped: undefined,
+    all: {},
+  };
 
   set hass(hass: HomeAssistant) {
     this.current = hass;
@@ -222,9 +272,45 @@ export class MnmlPanel extends LitElement {
     },
   };
 
+  private readonly send = (message: { type: string } & Record<string, unknown>): Promise<unknown> =>
+    this.call(message);
+
+  private readonly dashboardActions: DashboardActions = {
+    quickStart: () => {
+      this.attempt(() => this.quickStart());
+    },
+    stepByStep: () => {
+      this.go(`${BASE}/dashboards/new`);
+    },
+    open: (built) => {
+      goTo(`/${built.url_path}`);
+    },
+    edit: (built) => {
+      this.go(`${BASE}/dashboards/${built.url_path}`);
+    },
+    undo: (built) => {
+      this.attempt(() => this.undo(built));
+    },
+    forget: (built) => {
+      this.attempt(() => this.forget(built));
+    },
+  };
+
+  private readonly planHost: PlanHost = {
+    save: (plan, address) => this.build(plan, address),
+    leave: () => {
+      this.go(`${BASE}/dashboards`);
+    },
+  };
+
   protected override willUpdate(changed: PropertyValues): void {
     if (!changed.has('path') && !changed.has('kept') && !changed.has('shipped')) {
       return;
+    }
+    if (BOARD.exec(this.path)?.[1] !== 'new') {
+      this.newPlan = undefined;
+    } else if (this.newPlan === undefined && this.shipped !== undefined) {
+      this.newPlan = defaultPlan(this.registries(), this.resolved());
     }
     const name = nameIn(this.path);
     const before = this.opened;
@@ -273,6 +359,44 @@ export class MnmlPanel extends LitElement {
     await SHIPPED_TEMPLATES.need(Object.keys(OWNER));
     this.shipped = SHIPPED_TEMPLATES.templates();
     await this.readDashboards();
+    await this.readBuilt();
+  }
+
+  private async readBuilt(): Promise<void> {
+    let listed: unknown;
+    try {
+      listed = await this.call({ type: 'mnml/dashboards/list' });
+    } catch {
+      listed = undefined;
+    }
+    this.built = builtOf(listed);
+  }
+
+  private async refresh(): Promise<void> {
+    await this.readDashboards();
+    await this.readBuilt();
+  }
+
+  private registries(): Registries {
+    const hass = this.current;
+    return {
+      areas: hass?.areas ?? {},
+      devices: hass?.devices ?? {},
+      entities: hass?.entities ?? {},
+      states: hass?.states ?? {},
+    };
+  }
+
+  private addresses(): Set<string> {
+    return new Set([
+      ...this.boards.map((board) => board.url_path),
+      ...(this.built ?? []).map((built) => built.url_path),
+      ...Object.keys(this.current?.panels ?? {}),
+    ]);
+  }
+
+  private boardOf(built: Built): Board | undefined {
+    return this.boards.find((board) => board.url_path === built.url_path);
   }
 
   private async readDashboards(): Promise<void> {
@@ -286,6 +410,7 @@ export class MnmlPanel extends LitElement {
     } catch {
       listed = [];
     }
+    this.boards = boardsOf(listed);
     const boards: { path: string | null; title: string; storage: boolean }[] = [
       { path: null, title: 'Overview', storage: true },
       ...(Array.isArray(listed) ? listed : []).flatMap((item) => {
@@ -319,6 +444,9 @@ export class MnmlPanel extends LitElement {
   }
 
   private resolved(): Templates {
+    if (this.known.kept === this.kept && this.known.shipped === this.shipped) {
+      return this.known.all;
+    }
     const shipped = this.shipped ?? {};
     const kept = this.kept ?? NOTHING_KEPT;
     const changed = Object.fromEntries(
@@ -327,7 +455,12 @@ export class MnmlPanel extends LitElement {
         return base === undefined ? [] : [[name, applyChanges(base, changes).template]];
       }),
     );
-    return { ...shipped, ...changed, ...kept.own };
+    this.known = {
+      kept: this.kept,
+      shipped: this.shipped,
+      all: { ...shipped, ...changed, ...kept.own },
+    };
+    return this.known.all;
   }
 
   private taken(): Set<string> {
@@ -367,10 +500,78 @@ export class MnmlPanel extends LitElement {
     );
     const boards = new Set(Object.keys(waiting).flatMap((name) => from[name] ?? []));
     return html`<mnml-library
+      .start=${
+        this.built?.length === 0
+          ? () => {
+              this.go(`${BASE}/dashboards`);
+            }
+          : undefined
+      }
       .rows=${this.rows()}
       .offer=${{ templates: Object.keys(waiting).length, dashboards: boards.size }}
       .actions=${this.libraryActions}
     ></mnml-library>`;
+  }
+
+  private drawBoards(at: string | undefined): TemplateResult {
+    const built = this.built;
+    if (built === undefined) {
+      return html`<p class="muted loading">Reading the dashboards...</p>`;
+    }
+    if (at === undefined) {
+      const rows: DashboardRow[] = built.map((each) => ({
+        built: each,
+        board: this.boardOf(each),
+      }));
+      return html`<mnml-dashboards
+        .rows=${rows}
+        .actions=${this.dashboardActions}
+      ></mnml-dashboards>`;
+    }
+    const kept = built.find((each) => each.url_path === at);
+    const plan = at === 'new' ? this.newPlan : kept?.plan;
+    if (plan === undefined) {
+      return html`<div class="library">
+        <p>MNML did not build a dashboard at /${at}.</p>
+        <button
+          type="button"
+          class="action"
+          @click=${() => {
+            this.go(`${BASE}/dashboards`);
+          }}
+        >
+          Back to the dashboards
+        </button>
+      </div>`;
+    }
+    return html`<mnml-plan-editor
+      .hass=${this.current}
+      .templates=${this.resolved()}
+      .plan=${plan}
+      .address=${kept?.url_path ?? addressFor(plan.title, this.addresses())}
+      .fresh=${kept === undefined}
+      .taken=${this.addresses()}
+      .host=${this.planHost}
+    ></mnml-plan-editor>`;
+  }
+
+  private drawTabs(): TemplateResult | typeof nothing {
+    if (this.path !== '' && this.path !== '/dashboards') {
+      return nothing;
+    }
+    const tab = (label: string, path: string): TemplateResult =>
+      html`<button
+        type="button"
+        class=${this.path === path ? 'tab active' : 'tab'}
+        @click=${() => {
+          this.go(`${BASE}${path}`);
+        }}
+      >
+        ${label}
+      </button>`;
+    return html`<div class="tabs">
+      ${tab('Templates', '')} ${tab('Dashboards', '/dashboards')}
+    </div>`;
   }
 
   private drawContent(): TemplateResult {
@@ -381,6 +582,10 @@ export class MnmlPanel extends LitElement {
     }
     if (this.kept === undefined || this.shipped === undefined) {
       return html`<p class="muted loading">Reading the templates...</p>`;
+    }
+    const board = BOARD.exec(this.path);
+    if (board !== null) {
+      return this.drawBoards(board[1]);
     }
     const name = nameIn(this.path);
     if (name === undefined) {
@@ -424,8 +629,107 @@ export class MnmlPanel extends LitElement {
         <ha-menu-button .hass=${this.current} .narrow=${this.narrow}></ha-menu-button>
         <span class="toolbar-title">MNML</span>
       </div>
-      ${content}
+      ${this.drawTabs()} ${content}
     </div>`;
+  }
+
+  private async offerOpen(plan: Plan, address: string, done: string): Promise<void> {
+    const open = await ask(
+      this.renderRoot,
+      done,
+      html`<p>${plan.title} is at /${address}, in the sidebar.</p>`,
+      [{ label: 'Open it', value: true, primary: true }],
+    );
+    if (open === true) {
+      goTo(`/${address}`);
+    }
+  }
+
+  private async quickStart(): Promise<void> {
+    const registries = this.registries();
+    const templates = this.resolved();
+    const plan = defaultPlan(registries, templates);
+    const address = addressFor(plan.title, this.addresses());
+    const sure = await confirmIt(
+      this.renderRoot,
+      'Quick start',
+      `MNML makes ${plan.title} at /${address}: ${summary(plan)}. Edit changes any of it later.`,
+      'Make it',
+    );
+    if (!sure) {
+      return;
+    }
+    await makeDashboard(this.send, address, plan, dashboardOf(plan, registries, templates));
+    await this.refresh();
+    await this.offerOpen(plan, address, `${plan.title} is ready`);
+  }
+
+  private async build(plan: Plan, address: string): Promise<void> {
+    const at = BOARD.exec(this.path)?.[1];
+    const built = this.built?.find((each) => each.url_path === at);
+    const config = dashboardOf(plan, this.registries(), this.resolved());
+    if (built === undefined) {
+      await makeDashboard(this.send, address, plan, config);
+    } else {
+      const sure = await confirmIt(
+        this.renderRoot,
+        `Rebuild ${built.plan.title}?`,
+        'MNML replaces its cards, with any change made to them by hand. Undo brings back the version this replaces.',
+        'Rebuild',
+      );
+      if (!sure) {
+        return;
+      }
+      await rebuildDashboard(this.send, built, this.boardOf(built), plan, config);
+    }
+    await this.refresh();
+    this.go(`${BASE}/dashboards`, true);
+    await this.offerOpen(
+      plan,
+      built?.url_path ?? address,
+      built === undefined ? `${plan.title} is ready` : `${plan.title} is rebuilt`,
+    );
+  }
+
+  private async undo(built: Built): Promise<void> {
+    const board = this.boardOf(built);
+    const previous = built.previous;
+    if (board === undefined || previous === undefined) {
+      return;
+    }
+    const sure = await confirmIt(
+      this.renderRoot,
+      `Undo the last rebuild of ${built.plan.title}?`,
+      `Its cards, title and icon go back to how they were before it: ${previous.plan.title}, with ${summary(previous.plan)}.`,
+      'Undo',
+    );
+    if (!sure) {
+      return;
+    }
+    await undoDashboard(this.send, built, board);
+    await this.refresh();
+  }
+
+  private async forget(built: Built): Promise<void> {
+    const board = this.boardOf(built);
+    const choices: Option<'forget' | 'delete'>[] = [
+      ...(board === undefined ? [] : [{ label: 'Delete it too', value: 'delete' } as const]),
+      { label: 'Forget', value: 'forget', primary: true },
+    ];
+    const choice = await ask(
+      this.renderRoot,
+      `Forget ${built.plan.title}?`,
+      html`<p>
+        MNML stops building it. The dashboard stays in Home Assistant as it is, unless it is deleted
+        too.
+      </p>`,
+      choices,
+    );
+    if (choice === undefined) {
+      return;
+    }
+    await forgetDashboard(this.send, built, board, choice === 'delete');
+    await this.refresh();
   }
 
   private async create(): Promise<void> {
@@ -699,6 +1003,9 @@ export class MnmlPanel extends LitElement {
 const ELEMENTS = {
   'mnml-panel': MnmlPanel,
   'mnml-builder': MnmlBuilder,
+  'mnml-dashboards': MnmlDashboards,
+  'mnml-plan-editor': MnmlPlanEditor,
+  'mnml-live-card': MnmlLiveCard,
   'mnml-library': MnmlLibrary,
   'mnml-preview': MnmlPreview,
   'mnml-yaml': MnmlYaml,

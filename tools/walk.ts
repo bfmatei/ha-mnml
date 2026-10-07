@@ -1,7 +1,8 @@
 import type { Page } from 'playwright';
 
-import { VIEWPORTS, launch, signedIn } from './browser.ts';
+import { VIEWPORTS, errorCards, launch, signedIn } from './browser.ts';
 import { readEnv } from './env.ts';
+import { connect } from './socket.ts';
 
 const env = readEnv();
 const NEW = 'walk-new';
@@ -57,6 +58,51 @@ async function saved(page: Page): Promise<void> {
   await page.locator('mnml-builder').getByRole('button', { name: 'Save' }).click();
   await settle(page, 2000);
 }
+
+async function roomsIn(url_path: string): Promise<number> {
+  const session = await connect(env);
+  try {
+    const config = await session.call<{
+      views: { sections: { cards: { template?: string }[] }[] }[];
+    }>({ type: 'lovelace/config', url_path });
+    return config.views
+      .flatMap((view) => view.sections)
+      .flatMap((section) => section.cards)
+      .filter((card) => card.template === 'room').length;
+  } finally {
+    session.close();
+  }
+}
+
+async function forgetBuilt(): Promise<void> {
+  const session = await connect(env);
+  try {
+    const kept = await session.call<{ dashboards: Record<string, unknown> }>({
+      type: 'mnml/dashboards/list',
+    });
+    const boards = await session.call<{ id: string; url_path: string }[]>({
+      type: 'lovelace/dashboards/list',
+    });
+    for (const url_path of Object.keys(kept.dashboards)) {
+      const board = boards.find((each) => each.url_path === url_path);
+      if (board !== undefined) {
+        await session.call({ type: 'lovelace/dashboards/delete', dashboard_id: board.id });
+      }
+      await session.call({ type: 'mnml/dashboards/delete', url_path });
+    }
+  } finally {
+    session.close();
+  }
+}
+
+async function boardsPage(page: Page): Promise<void> {
+  await page.goto(`${env.HA_URL}/mnml/dashboards`, { waitUntil: 'domcontentloaded' });
+  await page.locator('mnml-dashboards .library-head').waitFor({ timeout: 30000 });
+  await settle(page);
+}
+
+const dialogButton = (page: Page, name: string) =>
+  page.locator('dialog.dialog').getByRole('button', { name, exact: true });
 
 async function builderProblem(page: Page): Promise<string | undefined> {
   const said = await page.locator('mnml-builder .problem').allTextContents();
@@ -180,6 +226,76 @@ for (const name of [NEW]) {
   await settle(page, 2000);
   check((await row(page, name).count()) === 0, `${name} is deleted`);
 }
+
+await forgetBuilt();
+await boardsPage(page);
+check(
+  (await page.locator('mnml-dashboards .start').count()) === 1,
+  'with no dashboard built, the Dashboards tab offers to build one',
+);
+await page.locator('mnml-dashboards').getByRole('button', { name: 'Quick start' }).click();
+await dialogButton(page, 'Make it').click();
+await dialogButton(page, 'Open it').click();
+await page.waitForURL(`${env.HA_URL}/dashboard-home**`, { timeout: 30000 });
+await page.locator('mnml-template-card').first().waitFor({ timeout: 30000 });
+await settle(page, 3000);
+check(
+  (await page.locator('mnml-template-card').count()) > 3,
+  'the quick start makes a dashboard of template cards, and opens it',
+);
+const quickErrors = await errorCards(page);
+check(
+  quickErrors.length === 0,
+  `the quick start's dashboard draws no error card${quickErrors.length === 0 ? '' : `: ${quickErrors.join(' | ')}`}`,
+);
+const quickRooms = await roomsIn('dashboard-home');
+check(quickRooms > 0, `the quick start has the rooms with lights (${quickRooms})`);
+
+await boardsPage(page);
+check(
+  (await page.locator('mnml-dashboards').getByRole('button', { name: 'Edit Home' }).count()) ===
+    1 && (await page.locator('mnml-dashboards [aria-label^="Undo"]').count()) === 0,
+  'the dashboard is listed, with nothing to undo yet',
+);
+await page.locator('mnml-dashboards').getByRole('button', { name: 'Edit Home' }).click();
+await page.locator('mnml-plan-editor .plan-section').first().waitFor({ timeout: 30000 });
+await page.locator('mnml-plan-editor input.fact-input').first().fill('Walk home');
+await page.locator('mnml-plan-editor input[type="checkbox"]:checked').first().uncheck();
+await page.locator('mnml-plan-editor').getByRole('button', { name: 'Rebuild' }).click();
+await dialogButton(page, 'Rebuild').click();
+await dialogButton(page, 'Cancel').click();
+await settle(page);
+check(
+  (await page
+    .locator('mnml-dashboards')
+    .getByRole('button', { name: 'Edit Walk home' })
+    .count()) === 1 && (await roomsIn('dashboard-home')) === quickRooms - 1,
+  'a rebuild takes the new title and drops the room unticked',
+);
+
+await page
+  .locator('mnml-dashboards')
+  .getByRole('button', { name: 'Undo the last rebuild of Walk home' })
+  .click();
+await dialogButton(page, 'Undo').click();
+await settle(page);
+check(
+  (await page.locator('mnml-dashboards').getByRole('button', { name: 'Edit Home' }).count()) ===
+    1 && (await roomsIn('dashboard-home')) === quickRooms,
+  'an undo brings back the title and the rooms from before the rebuild',
+);
+
+await page.locator('mnml-dashboards').getByRole('button', { name: 'Forget Home' }).click();
+await dialogButton(page, 'Delete it too').click();
+await settle(page);
+const left = await connect(env);
+const boardsLeft = await left.call<{ url_path: string }[]>({ type: 'lovelace/dashboards/list' });
+left.close();
+check(
+  (await page.locator('mnml-dashboards .start').count()) === 1 &&
+    !boardsLeft.some((board) => board.url_path === 'dashboard-home'),
+  'forgetting with Delete it too removes the dashboard from Home Assistant',
+);
 
 check(
   errors.length === 0,
