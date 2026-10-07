@@ -1,4 +1,10 @@
-import type { Plan } from '../contract/builder.ts';
+import type {
+  CarChoice,
+  PersonChoice,
+  Plan,
+  RoomChoice,
+  SystemChoice,
+} from '../contract/builder.ts';
 import type { TemplateCard } from '../contract/cards.ts';
 import type { Templates, Value } from '../contract/templates.ts';
 import { headingSlots } from '../home/slots.ts';
@@ -10,6 +16,29 @@ import { personOf } from './person.ts';
 
 function card(template: string, slots?: Record<string, Value>, area?: string): TemplateCard {
   return { type: 'custom:mnml-template-card', template, area, slots };
+}
+
+export function roomCard(room: RoomChoice): TemplateCard {
+  return card('room', room.slots, room.area);
+}
+
+export function personCard(person: PersonChoice, registries: Registries): TemplateCard {
+  return card('person', { ...personOf(registries, person.entity), ...person.slots });
+}
+
+export function carCard(car: CarChoice): TemplateCard {
+  return card('car', { ...car.slots, key: car.key });
+}
+
+export function systemCard(
+  choice: SystemChoice,
+  registries: Registries,
+  templates: Templates,
+): TemplateCard {
+  const template = templates[choice.template];
+  return choice.slots === undefined || template === undefined
+    ? card(choice.template)
+    : card(choice.template, { ...discover(template, undefined, registries), ...choice.slots });
 }
 
 function section(title: string, icon: string, cards: TemplateCard[]): Section[] {
@@ -25,12 +54,6 @@ function section(title: string, icon: string, cards: TemplateCard[]): Section[] 
 }
 
 export function dashboardOf(plan: Plan, registries: Registries, templates: Templates): Dashboard {
-  const system = plan.system.map(({ template, slots }) => {
-    const found = templates[template];
-    return slots === undefined || found === undefined
-      ? card(template)
-      : card(template, { ...discover(found, undefined, registries), ...slots });
-  });
   return {
     title: plan.title,
     views: [
@@ -44,21 +67,21 @@ export function dashboardOf(plan: Plan, registries: Registries, templates: Templ
           ...section(
             'Rooms',
             'mdi:floor-plan',
-            plan.rooms.map((room) => card('room', room.slots, room.area)),
+            plan.rooms.filter((room) => Object.hasOwn(registries.areas, room.area)).map(roomCard),
           ),
           ...section(
             'People',
             'mdi:account-group',
-            plan.people.map((person) =>
-              card('person', { ...personOf(registries, person.entity), ...person.slots }),
-            ),
+            plan.people
+              .filter((person) => Object.hasOwn(registries.states, person.entity))
+              .map((person) => personCard(person, registries)),
           ),
+          ...section('Garage', 'mdi:garage', plan.cars.map(carCard)),
           ...section(
-            'Garage',
-            'mdi:garage',
-            plan.cars.map((car) => card('car', { ...car.slots, key: car.key })),
+            'System',
+            'mdi:server-network',
+            plan.system.map((choice) => systemCard(choice, registries, templates)),
           ),
-          ...section('System', 'mdi:server-network', system),
           {
             type: 'grid',
             column_span: 3,

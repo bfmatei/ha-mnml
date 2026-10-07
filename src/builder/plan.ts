@@ -1,5 +1,6 @@
 import { SYSTEM_TEMPLATES, isPersonId } from '../contract/builder.ts';
 import type { Plan } from '../contract/builder.ts';
+import type { PersonId } from '../contract/entities.ts';
 import type { Instance, Templates, Value } from '../contract/templates.ts';
 import { discover } from '../templates/discover.ts';
 import type { Registries } from '../templates/discover.ts';
@@ -15,7 +16,7 @@ function draws(templates: Templates, instance: Instance, found: Record<string, V
   }
 }
 
-function roomShows(registries: Registries, templates: Templates, area: string): boolean {
+export function roomShows(registries: Registries, templates: Templates, area: string): boolean {
   const room = templates['room'];
   if (room === undefined) {
     return false;
@@ -27,7 +28,7 @@ function roomShows(registries: Registries, templates: Templates, area: string): 
   );
 }
 
-function systemFills(registries: Registries, templates: Templates, name: string): boolean {
+export function systemFills(registries: Registries, templates: Templates, name: string): boolean {
   const template = templates[name];
   return (
     template !== undefined &&
@@ -35,10 +36,14 @@ function systemFills(registries: Registries, templates: Templates, name: string)
   );
 }
 
-export function defaultPlan(registries: Registries, templates: Templates): Plan {
-  const people = [
+export function peopleIn(registries: Registries): PersonId[] {
+  return [
     ...new Set([...Object.keys(registries.entities), ...Object.keys(registries.states)]),
   ].filter(isPersonId);
+}
+
+export function defaultPlan(registries: Registries, templates: Templates): Plan {
+  const people = peopleIn(registries);
   return {
     title: 'Home',
     icon: 'mdi:home-variant',

@@ -9,6 +9,7 @@ A minimal card set for Home Assistant, with its editors, its templates and its t
 - **Cards** for the things a home is made of: a room tile with its chips, items with their controls, lists and tables, a heading per section, a media card, a car seen from above, an agenda, a messages feed and a client list. Every card is plain YAML, `type: custom:mnml-<name>-card`.
 - **Pop-ups** for everything a tile opens, drawn by one `custom:mnml-popups-card` on the dashboard and opened by hash (`#living`, `#living-lights`). They are dialogs on a desktop and sheets on a phone, and moving from one to another keeps the backdrop still.
 - **Templates** for whole tiles and their pop-ups: a room, a person, a car, a server, the network, AdGuard Home, Home Assistant and a media server. Place one by area and it finds its own entities, or spell its slots by hand, or write your own.
+- **A dashboard builder** in the MNML panel, which makes a whole dashboard from your home in one click, or step by step, and rebuilds it when the home changes.
 - **A theme**, light and dark, that the cards are designed for, installed with them. The cards also work under any other.
 - **A home generator** for those who keep their dashboard in code: describe the home once, typed, and get the whole dashboard.
 
@@ -42,7 +43,9 @@ The theme lives in `config/themes/mnml-integration/`, which the integration owns
 
 ## Quick start
 
-Add the one pop-up card anywhere on the dashboard; it takes no space:
+The fastest start is the builder: open **MNML** in the sidebar, then **Dashboards**, and pick **Quick start**. MNML makes a dashboard with a tile for each room with lights, one for each person, and the system cards it finds the entities of, and puts it in the sidebar. **Step by step** lets you choose the rooms and their order, the people, the system cards and how pop-ups open first; either way, the dashboard's row opens the builder again to change it and **Rebuild**, and **Undo** goes back one rebuild. [Building a dashboard](docs/editors.md#building-a-dashboard) has the details.
+
+To place cards by hand, add the one pop-up card anywhere on a dashboard; it takes no space:
 
 ```yaml
 type: custom:mnml-popups-card
