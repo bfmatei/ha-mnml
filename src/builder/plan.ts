@@ -1,5 +1,5 @@
-import { SYSTEM_TEMPLATES, isPersonId } from '../contract/builder.ts';
-import type { Plan } from '../contract/builder.ts';
+import { SECTION_LOOKS, SYSTEM_TEMPLATES, isPersonId } from '../contract/builder.ts';
+import type { Plan, Recipe, SectionKey, SectionLook } from '../contract/builder.ts';
 import type { PersonId } from '../contract/entities.ts';
 import type { Instance, Templates, Value } from '../contract/templates.ts';
 import { discover } from '../templates/discover.ts';
@@ -46,19 +46,62 @@ export function peopleIn(registries: Registries): PersonId[] {
   ].filter(isPersonId);
 }
 
-export function defaultPlan(registries: Registries, templates: Templates): Plan {
-  const people = peopleIn(registries);
+export const DEFAULT_RECIPE: Recipe = {
+  title: 'Home',
+  icon: 'mdi:home-variant',
+  open: { tablet: 'unfold', desktop: 'unfold' },
+  sections: { rooms: {}, people: {}, system: {} },
+  templates: {},
+};
+
+const KEYS: readonly SectionKey[] = ['rooms', 'people', 'garage', 'system'];
+
+function lookIn(recipe: Recipe, key: SectionKey): SectionLook {
+  const given = recipe.sections[key];
+  const fallback = SECTION_LOOKS[key];
+  if (given === undefined) {
+    return {};
+  }
   return {
-    title: 'Home',
-    icon: 'mdi:home-variant',
-    rooms: Object.values(registries.areas)
-      .filter((area) => roomShows(registries, templates, area.area_id))
-      .map((area) => ({ area: area.area_id })),
-    people: people.map((entity) => ({ entity })),
-    cars: [],
-    system: SYSTEM_TEMPLATES.filter((name) => systemFills(registries, templates, name)).map(
-      (template) => ({ template }),
-    ),
-    open: { tablet: 'unfold', desktop: 'unfold' },
+    ...(given.title === undefined ? {} : { title: given.title }),
+    ...(given.icon === undefined || given.icon === fallback.icon ? {} : { icon: given.icon }),
+    ...(given.template === undefined || given.template === fallback.template
+      ? {}
+      : { template: given.template }),
   };
+}
+
+export function planFrom(recipe: Recipe, registries: Registries, templates: Templates): Plan {
+  const looks = Object.fromEntries(
+    KEYS.flatMap((key) => {
+      const look = lookIn(recipe, key);
+      return Object.keys(look).length === 0 ? [] : [[key, look]];
+    }),
+  );
+  const { rooms, people, system } = recipe.sections;
+  const roomTemplate = rooms?.template ?? 'room';
+  return {
+    title: recipe.title,
+    icon: recipe.icon,
+    rooms:
+      rooms === undefined
+        ? []
+        : Object.values(registries.areas)
+            .filter((area) => roomShows(registries, templates, area.area_id, roomTemplate))
+            .map((area) => ({ area: area.area_id })),
+    people: people === undefined ? [] : peopleIn(registries).map((entity) => ({ entity })),
+    cars: [],
+    system:
+      system === undefined
+        ? []
+        : (system.templates ?? SYSTEM_TEMPLATES)
+            .filter((name) => systemFills(registries, templates, name))
+            .map((template) => ({ template })),
+    open: { ...recipe.open },
+    ...(Object.keys(looks).length === 0 ? {} : { sections: looks }),
+  };
+}
+
+export function defaultPlan(registries: Registries, templates: Templates): Plan {
+  return planFrom(DEFAULT_RECIPE, registries, templates);
 }

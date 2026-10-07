@@ -1,7 +1,7 @@
 import type { PopupOpen } from './cards.ts';
 import type { MdiIcon, PersonId } from './entities.ts';
 import { isMapping } from './templates.ts';
-import type { Value } from './templates.ts';
+import type { Template, Value } from './templates.ts';
 
 export interface RoomChoice {
   area: string;
@@ -40,6 +40,18 @@ export interface Plan {
   system: SystemChoice[];
   open: PopupOpen;
   sections?: Partial<Record<SectionKey, SectionLook>>;
+}
+
+export interface RecipeSection extends SectionLook {
+  templates?: string[];
+}
+
+export interface Recipe {
+  title: string;
+  icon: MdiIcon;
+  open: PopupOpen;
+  sections: Partial<Record<SectionKey, RecipeSection>>;
+  templates: Record<string, Template>;
 }
 
 interface Look {
