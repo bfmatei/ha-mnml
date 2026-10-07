@@ -2,6 +2,7 @@ proxmox-server:
   description: A Proxmox VE server's tile, its CPU and memory, and its guests, checks, backups and notifications chips; it brings the server's and the notifications' pop-ups. The checks, backups and notifications read sensors that the server's own jobs keep.
   slots:
     outlet:
+      help: 'The outlet the server is plugged into, with its power.'
       kind: object
       required: true
       group: Power
@@ -13,9 +14,17 @@ proxmox-server:
             power: { kind: entity, required: true }
             today: { kind: entity }
             total: { kind: entity }
-    cpu: { kind: entity, required: true, label: CPU, group: Load }
-    memory: { kind: entity, required: true, group: Load }
-    last_boot: { kind: entity, required: true, group: Load }
+    cpu:
+      { kind: entity, required: true, label: CPU, group: Load, help: "The server's processor use." }
+    memory: { kind: entity, required: true, group: Load, help: "The server's memory use." }
+    last_boot:
+      {
+        kind: entity,
+        required: true,
+        group: Load,
+        label: 'Last boot',
+        help: 'When the server last started.',
+      }
     uplink: { kind: entity, group: Load }
     temperatures:
       kind: object
@@ -69,30 +78,34 @@ proxmox-server:
           fields:
             source: { kind: text }
             name: { kind: text }
-    guest_statuses: { kind: entities, group: Guests }
+    guest_statuses: { kind: entities, group: Guests, label: 'Guest statuses' }
     guest_disks:
+      label: 'Guest disks'
       kind: objects
       group: Storage
       fields:
         used: { kind: entity, required: true }
         size: { kind: entity }
     message_sources:
+      label: 'Message sources'
       kind: objects
       group: Health
       fields:
         source: { kind: text }
         name: { kind: text }
         entity: { kind: entity }
-    disk_high: { kind: number, default: 80, group: Thresholds }
-    disk_full: { kind: number, default: 90, group: Thresholds }
-    disk_life_low: { kind: number, default: 20, group: Thresholds }
-    disk_life_critical: { kind: number, default: 10, group: Thresholds }
+    disk_high: { kind: number, default: 80, group: Thresholds, label: 'Disk high' }
+    disk_full: { kind: number, default: 90, group: Thresholds, label: 'Disk full' }
+    disk_life_low: { kind: number, default: 20, group: Thresholds, label: 'Disk life low' }
+    disk_life_critical:
+      { kind: number, default: 10, group: Thresholds, label: 'Disk life critical' }
     cpu_hot: { kind: number, default: 85, label: CPU hot, group: Thresholds }
     cpu_critical: { kind: number, default: 95, label: CPU critical, group: Thresholds }
-    root_disk_hot: { kind: number, default: 70, group: Thresholds }
-    root_disk_critical: { kind: number, default: 80, group: Thresholds }
-    bucket_high: { kind: number, default: 18, group: Thresholds }
-    bucket_full: { kind: number, default: 19, group: Thresholds }
+    root_disk_hot: { kind: number, default: 70, group: Thresholds, label: 'Root disk hot' }
+    root_disk_critical:
+      { kind: number, default: 80, group: Thresholds, label: 'Root disk critical' }
+    bucket_high: { kind: number, default: 18, group: Thresholds, label: 'Bucket high' }
+    bucket_full: { kind: number, default: 19, group: Thresholds, label: 'Bucket full' }
   card:
     type: custom:mnml-tile-card
     name: Server

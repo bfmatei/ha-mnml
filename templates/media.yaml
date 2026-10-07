@@ -1,7 +1,7 @@
 media-server:
   description: A media server's tile, what is being watched, and its requests, downloads, health and update chips; it brings its pop-up. The parts are Plex, Seerr, Radarr and Sonarr.
   slots:
-    streams: { kind: entity, required: true }
+    streams: { kind: entity, required: true, help: 'The number of streams playing.' }
     update: { kind: entity }
     requests:
       kind: object

@@ -2,6 +2,7 @@ home-assistant:
   description: Home Assistant's tile, its memory and free disk, and its services, updates and firmware chips; it brings its pop-up, with each room's firmware.
   slots:
     cpu:
+      help: "Home Assistant's processor use."
       kind: entity
       required: true
       label: CPU
@@ -9,12 +10,15 @@ home-assistant:
       discover:
         { domain: sensor, platform: systemmonitor, translation_key: processor_use, scope: all }
     memory:
+      help: "Home Assistant's memory use, as a share."
       kind: entity
       required: true
       group: Load
       discover:
         { domain: sensor, platform: systemmonitor, translation_key: memory_use_percent, scope: all }
     disk_free:
+      label: 'Disk free'
+      help: 'The free space on its disk.'
       kind: entity
       required: true
       group: Load
@@ -22,6 +26,8 @@ home-assistant:
         - { domain: sensor, platform: hassio, translation_key: disk_free, scope: all }
         - { domain: sensor, platform: systemmonitor, translation_key: disk_free, scope: all }
     disk_used:
+      label: 'Disk used'
+      help: 'The space used on its disk.'
       kind: entity
       required: true
       group: Load
@@ -36,11 +42,13 @@ home-assistant:
     firmware: { kind: entities, group: Updates }
     all_firmware:
       {
+        label: 'All firmware',
         kind: entities,
         discover: { domain: update, device_class: firmware, scope: all },
         group: Updates,
       }
     room_firmware:
+      label: 'Firmware by room'
       kind: objects
       group: Updates
       fields:

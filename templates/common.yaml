@@ -1,8 +1,8 @@
 section-heading:
   description: A section's heading, the full width of the section.
   slots:
-    title: { kind: text, required: true }
-    icon: { kind: icon, required: true }
+    title: { kind: text, required: true, help: "The heading's text." }
+    icon: { kind: icon, required: true, help: "The heading's icon." }
     state: { kind: objects }
     controls: { kind: objects }
   card:

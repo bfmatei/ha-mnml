@@ -3,13 +3,21 @@ room:
   slots:
     key:
       {
+        label: 'Short name',
         kind: text,
         required: true,
         discover: area.id,
         help: "Names the room's pop-ups.",
         group: Basics,
       }
-    name: { kind: text, required: true, discover: area.name, group: Basics }
+    name:
+      {
+        kind: text,
+        required: true,
+        discover: area.name,
+        group: Basics,
+        help: "The room's name on its tile.",
+      }
     icon: { kind: icon, default: mdi:texture-box, discover: area.icon, group: Basics }
     temperature:
       {
@@ -28,6 +36,7 @@ room:
     door: { kind: entity, discover: { domain: binary_sensor, device_class: door }, group: Sensors }
     lock: { kind: entity, discover: { domain: lock }, group: Sensors }
     lights:
+      help: "The room's lights: their group, and the members it controls."
       kind: object
       required: true
       group: Lights

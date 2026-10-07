@@ -2,22 +2,26 @@ adguard:
   description: An AdGuard Home tile, its block ratio and speed, its update chip and its protection toggle; it brings its pop-up.
   slots:
     protection:
+      help: "The switch that turns AdGuard Home's protection on and off."
       kind: entity
       required: true
       group: Status
       discover: { domain: switch, platform: adguard, translation_key: protection, scope: all }
     queries:
+      help: 'The DNS queries answered.'
       kind: entity
       required: true
       group: Traffic
       discover: { domain: sensor, platform: adguard, translation_key: dns_queries, scope: all }
     blocked:
+      help: 'The DNS queries blocked.'
       kind: entity
       required: true
       group: Traffic
       discover:
         { domain: sensor, platform: adguard, translation_key: dns_queries_blocked, scope: all }
     ratio:
+      help: 'The share of the queries blocked.'
       kind: entity
       required: true
       group: Traffic
@@ -29,6 +33,7 @@ adguard:
           scope: all,
         }
     speed:
+      help: 'The average time to answer a query.'
       kind: entity
       required: true
       group: Traffic
@@ -39,6 +44,7 @@ adguard:
       group: Traffic
       discover: { domain: sensor, platform: adguard, translation_key: rules_count, scope: all }
     update:
+      help: "AdGuard Home's update."
       kind: entity
       required: true
       group: Status
