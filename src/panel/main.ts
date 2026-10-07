@@ -3,8 +3,9 @@ import type { PropertyValues, TemplateResult } from 'lit';
 import { property, query, state } from 'lit/decorators.js';
 
 import { dashboardOf } from '../builder/dashboard.ts';
-import { defaultPlan } from '../builder/plan.ts';
-import type { Plan } from '../contract/builder.ts';
+import { defaultPlan, planFrom } from '../builder/plan.ts';
+import { readRecipe, recipeOf, recipeText } from '../builder/recipe.ts';
+import type { Plan, Recipe } from '../contract/builder.ts';
 import { isTemplate } from '../contract/templates.ts';
 import type { Template, Templates } from '../contract/templates.ts';
 import { loadHaForm } from '../editors/ha-form.ts';
@@ -46,6 +47,7 @@ import { loadLovelace } from './lovelace.ts';
 import { MnmlPlanEditor } from './plan-editor.ts';
 import type { PlanHost } from './plan-editor.ts';
 import { MnmlPreview } from './preview.ts';
+import { bringing, broughtIn, previewOf, summary } from './share.ts';
 import { PAGE_STYLE, PANEL_STYLE } from './style.ts';
 import {
   dashboardTemplates,
@@ -90,22 +92,6 @@ const message = (error: unknown): string => {
 };
 
 const nameIn = (path: string): string | undefined => NAME.exec(path)?.[1];
-
-function plural(count: number, one: string, many: string): string {
-  return `${count} ${count === 1 ? one : many}`;
-}
-
-function summary(plan: Plan): string {
-  const parts = [
-    { count: plan.rooms.length, one: 'room', many: 'rooms' },
-    { count: plan.people.length, one: 'person', many: 'people' },
-    { count: plan.cars.length, one: 'car', many: 'cars' },
-    { count: plan.system.length, one: 'system card', many: 'system cards' },
-  ].filter((part) => part.count > 0);
-  return parts.length === 0
-    ? 'nothing but its pop-ups yet'
-    : parts.map((part) => plural(part.count, part.one, part.many)).join(', ');
-}
 
 function goTo(path: string): void {
   history.pushState(null, '', path);
@@ -300,6 +286,12 @@ export class MnmlPanel extends LitElement {
     },
     forget: (built) => {
       this.attempt(() => this.forget(built));
+    },
+    share: (built) => {
+      this.attempt(() => this.share(built));
+    },
+    fromTemplate: () => {
+      this.attempt(() => this.fromTemplate());
     },
   };
 
@@ -736,6 +728,115 @@ export class MnmlPanel extends LitElement {
     }
   }
 
+  private async share(built: Built): Promise<void> {
+    const text = recipeText(recipeOf(built.plan, this.resolved(), this.shipped ?? {}));
+    const choices: Option<'copy' | 'download'>[] = [
+      ...(window.isSecureContext && 'clipboard' in navigator
+        ? [{ label: 'Copy', value: 'copy' } as const]
+        : []),
+      { label: 'Download', value: 'download', primary: true },
+    ];
+    const choice = await ask(
+      this.renderRoot,
+      `Share ${built.plan.title}`,
+      html`<p class="muted">
+          Its layout, its sections' looks and every template of yours it uses. Its layout names no
+          area, person or entity of this home; the templates go whole, and a template's example may
+          name this home's entities.
+        </p>
+        <textarea
+          class="yaml-text"
+          readonly
+          aria-label="The dashboard template"
+          .value=${text}
+        ></textarea>`,
+      choices,
+    );
+    if (choice === 'copy') {
+      await navigator.clipboard.writeText(text);
+    } else if (choice === 'download') {
+      download(`${built.url_path}.yaml`, text);
+    }
+  }
+
+  private async fromTemplate(): Promise<void> {
+    const shipped = this.shipped ?? {};
+    let text = '';
+    let recipe: Recipe | undefined;
+    const read = await ask(
+      this.renderRoot,
+      'A dashboard from a template',
+      html`<input
+          type="file"
+          accept=".yaml,.yml,text/yaml"
+          aria-label="A dashboard template file"
+          @change=${async (event: Event) => {
+            const files = field(event.target, 'files');
+            const file = files instanceof FileList ? files[0] : undefined;
+            const area = event.target instanceof Element ? event.target.nextElementSibling : null;
+            text = (await file?.text()) ?? text;
+            if (area instanceof HTMLTextAreaElement) {
+              area.value = text;
+            }
+          }}
+        /><textarea
+          class="yaml-text"
+          placeholder="Paste a dashboard template, or choose a file"
+          aria-label="A dashboard template in YAML"
+          @input=${(event: Event) => {
+            const value = field(event.target, 'value');
+            text = typeof value === 'string' ? value : '';
+          }}
+        ></textarea>`,
+      [{ label: 'Next', value: true, primary: true }],
+      () => {
+        try {
+          recipe = readRecipe(text, shipped);
+          return undefined;
+        } catch (error) {
+          return message(error);
+        }
+      },
+    );
+    if (read !== true || recipe === undefined) {
+      return;
+    }
+    const incoming = planImport(
+      recipe.templates,
+      shipped,
+      this.kept ?? NOTHING_KEPT,
+      this.resolved(),
+    );
+    const { offered, choices, alone } = bringing(incoming);
+    const looked = planFrom(recipe, this.registries(), { ...this.resolved(), ...recipe.templates });
+    const open = await ask(
+      this.renderRoot,
+      recipe.title,
+      html`<p>${previewOf(recipe, looked)}</p>
+        ${
+          incoming.length === 0
+            ? nothing
+            : html`<p class="muted">
+                  It brings these templates. Replacing one changes it on every dashboard of this
+                  home; keeping both brings this one in beside it, under a new name.
+                </p>
+                ${this.fatesOf(offered, choices, [], alone)}`
+        }`,
+      [{ label: 'Open in the builder', value: true, primary: true }],
+    );
+    if (open !== true) {
+      return;
+    }
+    const brought = broughtIn(recipe, offered, choices, this.taken());
+    await Promise.all(brought.save.map((each) => this.save(each.name, entryFor(each, shipped))));
+    const templates = {
+      ...this.resolved(),
+      ...Object.fromEntries(brought.save.map((each) => [each.name, each.template])),
+    };
+    this.newPlan = planFrom(brought.recipe, this.registries(), templates);
+    this.go(`${BASE}/dashboards/new`);
+  }
+
   private async forget(built: Built): Promise<void> {
     const board = this.boardOf(built);
     const choices: Option<'forget' | 'delete'>[] = [
@@ -843,6 +944,65 @@ export class MnmlPanel extends LitElement {
     );
   }
 
+  private fatesOf(
+    plan: readonly Incoming[],
+    choices: Record<string, Choice>,
+    differ: readonly string[] = [],
+    alone: ReadonlySet<string> = new Set(),
+  ): TemplateResult {
+    return html`<div class="import-plan">
+      ${plan.map(
+        (incoming) =>
+          html`<div class="import-row">
+            <code>${incoming.name}</code><span class="muted">${FATES[incoming.fate]}</span>
+            ${
+              incoming.from.length > 0
+                ? html`<span class="muted">from ${incoming.from.join(', ')}</span>`
+                : nothing
+            }
+            ${
+              differ.includes(incoming.name)
+                ? html`<span class="muted"
+                    >the dashboards hold different versions of it; this is the one from
+                    ${incoming.from[0] ?? 'the first'}</span
+                  >`
+                : nothing
+            }
+            ${
+              incoming.clash
+                ? html`<select
+                    class="word"
+                    aria-label=${`What to do with ${incoming.name}`}
+                    @change=${(event: Event) => {
+                      const value = field(event.target, 'value');
+                      choices[incoming.name] =
+                        value === 'both' ? 'both' : value === 'skip' ? 'skip' : 'replace';
+                    }}
+                  >
+                    <option
+                      value="replace"
+                      ?selected=${(choices[incoming.name] ?? 'replace') === 'replace'}
+                    >
+                      Replace the one MNML keeps
+                    </option>
+                    ${
+                      alone.has(incoming.name)
+                        ? nothing
+                        : html`<option value="both" ?selected=${choices[incoming.name] === 'both'}>
+                            Keep both, this one under a new name
+                          </option>`
+                    }
+                    <option value="skip" ?selected=${choices[incoming.name] === 'skip'}>
+                      Skip it
+                    </option>
+                  </select>`
+                : nothing
+            }
+          </div>`,
+      )}
+    </div>`;
+  }
+
   private async importFrom(
     found: Record<string, Template>,
     from: Record<string, readonly string[]> = {},
@@ -854,44 +1014,7 @@ export class MnmlPanel extends LitElement {
     const go = await ask(
       this.renderRoot,
       'Import',
-      html`<div class="import-plan">
-          ${plan.map(
-            (incoming) =>
-              html`<div class="import-row">
-                <code>${incoming.name}</code><span class="muted">${FATES[incoming.fate]}</span>
-                ${
-                  incoming.from.length > 0
-                    ? html`<span class="muted">from ${incoming.from.join(', ')}</span>`
-                    : nothing
-                }
-                ${
-                  differ.includes(incoming.name)
-                    ? html`<span class="muted"
-                        >the dashboards hold different versions of it; this is the one from
-                        ${incoming.from[0] ?? 'the first'}</span
-                      >`
-                    : nothing
-                }
-                ${
-                  incoming.clash
-                    ? html`<select
-                        class="word"
-                        aria-label=${`What to do with ${incoming.name}`}
-                        @change=${(event: Event) => {
-                          const value = field(event.target, 'value');
-                          choices[incoming.name] =
-                            value === 'both' ? 'both' : value === 'skip' ? 'skip' : 'replace';
-                        }}
-                      >
-                        <option value="replace">Replace the one MNML keeps</option>
-                        <option value="both">Keep both, this one under a new name</option>
-                        <option value="skip">Skip it</option>
-                      </select>`
-                    : nothing
-                }
-              </div>`,
-          )}
-        </div>
+      html`${this.fatesOf(plan, choices, differ)}
         <p class="muted">Nothing on the dashboards is written.</p>`,
       [{ label: 'Import', value: true, primary: true }],
     );

@@ -43,7 +43,7 @@ The theme lives in `config/themes/mnml-integration/`, which the integration owns
 
 ## Quick start
 
-The fastest start is the builder: open **MNML** in the sidebar and pick **Quick start**. MNML makes a dashboard with a tile for each room with lights, one for each person, and the system cards it finds the entities of, and puts it in the sidebar. **Step by step** lets you choose the rooms and their order, the people, the system cards and how pop-ups open first; either way, the dashboard's row opens the builder again to change it and **Rebuild**, and **Undo** goes back one rebuild. [Building a dashboard](docs/editors.md#building-a-dashboard) has the details.
+The fastest start is the builder: open **MNML** in the sidebar and pick **Quick start**. MNML makes a dashboard with a tile for each room with lights, one for each person, and the system cards it finds the entities of, and puts it in the sidebar. **Step by step** lets you choose the rooms and their order, the people, the system cards and how pop-ups open first; either way, the dashboard's row opens the builder again to change it and **Rebuild**, and **Undo** goes back one rebuild. A dashboard is shared with **Share**, as a dashboard template without your home's areas, people or entities, and made from one with **From a template**, filled with the home that imports it. [Building a dashboard](docs/editors.md#building-a-dashboard) and [Sharing a dashboard](docs/editors.md#sharing-a-dashboard) have the details.
 
 To place cards by hand, add the one pop-up card anywhere on a dashboard; it takes no space:
 
@@ -85,6 +85,8 @@ The **MNML** panel in Home Assistant's sidebar, for admins, keeps the home's tem
 Slots and their discovery rules are set as sentences ("Find the first sensor with device class temperature in the area"). YAML is one tab among them.
 
 ![The template library](docs/screenshots/panel-library.png)
+
+![The Simple tab of the template builder](docs/screenshots/panel-simple.png)
 
 ![The builder](docs/screenshots/panel-builder.png)
 

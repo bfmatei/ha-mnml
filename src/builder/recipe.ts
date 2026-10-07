@@ -1,6 +1,6 @@
 import { parse } from 'yaml';
 
-import { lookOf } from '../contract/builder.ts';
+import { SECTION_LOOKS, lookOf } from '../contract/builder.ts';
 import type { Plan, Recipe, RecipeSection, SectionKey } from '../contract/builder.ts';
 import type { PopupOpen, PopupOpening } from '../contract/cards.ts';
 import type { MdiIcon } from '../contract/entities.ts';
@@ -119,6 +119,9 @@ function openOf(value: Value | undefined): PopupOpen {
 }
 
 function sectionOf(key: SectionKey, value: Value): RecipeSection {
+  if (value === null) {
+    return {};
+  }
   if (!isMapping(value)) {
     return refuse(`The ${key} section is not a mapping.`);
   }
@@ -162,7 +165,7 @@ export function readRecipe(text: string, shipped: Templates): Recipe {
       return refuse("This is a dashboard's configuration, not a dashboard template.");
     }
     const values = Object.values(parsed);
-    if (values.length > 0 && values.every(isTemplate)) {
+    if (isMapping(parsed['mnml_templates']) || (values.length > 0 && values.every(isTemplate))) {
       return refuse('This is a set of templates, which the Templates tab imports.');
     }
     return refuse('This is not a dashboard template: it has no mnml_dashboard:.');
@@ -183,7 +186,11 @@ export function readRecipe(text: string, shipped: Templates): Recipe {
       return refuse("The dashboard template's templates are not a mapping of names.");
     }
     for (const [name, template] of Object.entries(templates)) {
-      if (!isName(name) || !isTemplate(template)) {
+      if (
+        !isName(name) ||
+        !isTemplate(template) ||
+        (!isMapping(template.card) && !Array.isArray(template.card))
+      ) {
         return refuse(`${name} in the dashboard template is not a template.`);
       }
       bundled[name] = template;
@@ -200,16 +207,16 @@ export function readRecipe(text: string, shipped: Templates): Recipe {
     }
     read[known] = sectionOf(known, value);
   }
-  for (const key of KEYS) {
+  const roots = KEYS.flatMap((key) => {
     const section = read[key];
-    const names = [
-      ...(section?.template === undefined ? [] : [section.template]),
-      ...(section?.templates ?? []),
-    ];
-    for (const name of names) {
-      if (bundled[name] === undefined && shipped[name] === undefined) {
-        return refuse(`${name} is neither shipped nor in the dashboard template.`);
-      }
+    const template = section?.template ?? SECTION_LOOKS[key].template;
+    return section === undefined
+      ? []
+      : [...(template === undefined ? [] : [template]), ...(section.templates ?? [])];
+  });
+  for (const name of needed(roots, { ...shipped, ...bundled })) {
+    if (bundled[name] === undefined && shipped[name] === undefined) {
+      return refuse(`${name} is neither shipped nor in the dashboard template.`);
     }
   }
   return { title, icon, open: openOf(inner['open']), sections: read, templates: bundled };
@@ -238,9 +245,12 @@ export function renamedRecipe(recipe: Recipe, renames: Readonly<Record<string, s
   for (const key of KEYS) {
     const section = recipe.sections[key];
     if (section !== undefined) {
+      const template = section.template ?? SECTION_LOOKS[key].template;
       sections[key] = {
         ...section,
-        ...(section.template === undefined ? {} : { template: name(section.template) }),
+        ...(template === undefined || name(template) === template
+          ? {}
+          : { template: name(template) }),
         ...(section.templates === undefined ? {} : { templates: section.templates.map(name) }),
       };
     }

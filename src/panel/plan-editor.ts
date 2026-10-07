@@ -5,8 +5,15 @@ import { live } from 'lit/directives/live.js';
 
 import { carFrom, personFrom, roomFrom, systemFrom } from '../builder/customized.ts';
 import { carCard, personCard, roomCard, systemCard } from '../builder/dashboard.ts';
+import { personOf } from '../builder/person.ts';
 import { peopleIn, roomShows, systemFills } from '../builder/plan.ts';
-import { SECTION_LOOKS, SYSTEM_TEMPLATES, isPlan, lookOf } from '../contract/builder.ts';
+import {
+  SECTION_LOOKS,
+  SYSTEM_NAMES,
+  SYSTEM_TEMPLATES,
+  isPlan,
+  lookOf,
+} from '../contract/builder.ts';
 import type {
   PersonChoice,
   Plan,
@@ -49,13 +56,6 @@ const OPENINGS: readonly { opening: PopupOpening; label: string }[] = [
   { opening: 'dialog', label: 'A dialog in the middle' },
   { opening: 'unfold', label: 'Unfolded from its tile' },
 ];
-const SYSTEM_NAMES: Readonly<Record<string, string>> = {
-  'home-assistant': 'Home Assistant',
-  'proxmox-server': 'Proxmox VE server',
-  'unifi-network': 'UniFi network',
-  adguard: 'AdGuard Home',
-  'media-server': 'Media server',
-};
 
 function registriesOf(hass: HomeAssistant | undefined): Registries {
   return {
@@ -155,6 +155,63 @@ function withLook(
   );
   const sections = Object.keys(look).length === 0 ? others : { ...others, [key]: look };
   return Object.keys(sections).length === 0 ? undefined : sections;
+}
+
+function kept(
+  slots: Record<string, Value> | undefined,
+  declared: ReadonlySet<string>,
+): Record<string, Value> | undefined {
+  if (slots === undefined) {
+    return undefined;
+  }
+  const left = Object.fromEntries(Object.entries(slots).filter(([slot]) => declared.has(slot)));
+  return Object.keys(left).length === 0 ? undefined : left;
+}
+
+function withDeclared(plan: Plan, key: SectionKey, declared: ReadonlySet<string>): Plan {
+  if (key === 'rooms') {
+    return {
+      ...plan,
+      rooms: plan.rooms.map((room) => {
+        const slots = kept(room.slots, declared);
+        return slots === undefined ? { area: room.area } : { area: room.area, slots };
+      }),
+    };
+  }
+  if (key === 'people') {
+    return {
+      ...plan,
+      people: plan.people.map((person) => {
+        const slots = kept(person.slots, declared);
+        return slots === undefined ? { entity: person.entity } : { entity: person.entity, slots };
+      }),
+    };
+  }
+  if (key === 'garage') {
+    return {
+      ...plan,
+      cars: plan.cars.map((car) => ({ key: car.key, slots: kept(car.slots, declared) ?? {} })),
+    };
+  }
+  return plan;
+}
+
+function trimmed(sections: Plan['sections']): Plan['sections'] {
+  if (sections === undefined) {
+    return undefined;
+  }
+  const looks = Object.fromEntries(
+    Object.entries(sections).flatMap(([key, look]) => {
+      const title = look.title?.trim();
+      const { title: _title, ...rest } = look;
+      const next: SectionLook = {
+        ...rest,
+        ...(title === undefined || title === '' ? {} : { title }),
+      };
+      return Object.keys(next).length === 0 ? [] : [[key, next]];
+    }),
+  );
+  return Object.keys(looks).length === 0 ? undefined : looks;
 }
 
 function withSystem(chosen: readonly SystemChoice[], choice: SystemChoice): SystemChoice[] {
@@ -297,7 +354,13 @@ export class MnmlPlanEditor extends LitElement {
     if (plan === undefined || host === undefined) {
       return;
     }
-    const tidy = { ...plan, title: plan.title.trim() };
+    const sections = trimmed(plan.sections);
+    const { sections: _looks, ...rest } = plan;
+    const tidy: Plan = {
+      ...rest,
+      title: plan.title.trim(),
+      ...(sections === undefined ? {} : { sections }),
+    };
     this.problem = this.check(tidy);
     if (this.problem !== undefined) {
       return;
@@ -377,17 +440,41 @@ export class MnmlPlanEditor extends LitElement {
     const fallback = SECTION_LOOKS[key];
     const given = plan.sections?.[key];
     const name = fallback.title;
+    const registries = registriesOf(this.hass);
+    const writes =
+      key === 'people'
+        ? [
+            ...new Set(
+              peopleIn(registries).flatMap((entity) => Object.keys(personOf(registries, entity))),
+            ),
+          ]
+        : key === 'garage'
+          ? ['key']
+          : [];
     const tiles = Object.entries(rolesOf(this.templates))
-      .filter(([, role]) => role === 'tile')
+      .filter(
+        ([template, role]) =>
+          role === 'tile' &&
+          writes.every((slot) => Object.hasOwn(this.templates[template]?.slots ?? {}, slot)),
+      )
       .map(([template]) => template)
       .toSorted();
     const current = lookOf(plan, key).template;
     const change = (next: Partial<Record<keyof SectionLook, string>>): void => {
       const draft = this.draft;
-      if (draft !== undefined) {
-        this.draft = { ...draft, sections: withLook(draft, key, next) };
-        this.problem = undefined;
+      if (draft === undefined) {
+        return;
       }
+      const sections = withLook(draft, key, next);
+      const template = next.template;
+      const declared = new Set(
+        Object.keys(template === undefined ? {} : (this.templates[template]?.slots ?? {})),
+      );
+      this.draft =
+        template === undefined
+          ? { ...draft, sections }
+          : { ...withDeclared(draft, key, declared), sections };
+      this.problem = undefined;
     };
     return html`<div class="plan-look">
       <input
@@ -396,7 +483,7 @@ export class MnmlPlanEditor extends LitElement {
         placeholder=${fallback.title}
         .value=${live(given?.title ?? '')}
         @input=${(event: Event) => {
-          change({ title: text(event).trim() });
+          change({ title: text(event) });
         }}
       />
       <input

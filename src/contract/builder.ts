@@ -85,6 +85,14 @@ export const SYSTEM_TEMPLATES: readonly string[] = [
   'media-server',
 ];
 
+export const SYSTEM_NAMES: Readonly<Record<string, string>> = {
+  'home-assistant': 'Home Assistant',
+  'proxmox-server': 'Proxmox VE server',
+  'unifi-network': 'UniFi network',
+  adguard: 'AdGuard Home',
+  'media-server': 'Media server',
+};
+
 const OPENINGS = new Set(['sheet', 'dialog', 'unfold']);
 const DEVICES = new Set(['phone', 'tablet', 'desktop']);
 

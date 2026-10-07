@@ -43,6 +43,8 @@ function recorded(): { actions: DashboardActions; done: string[] } {
       edit: note('edit'),
       undo: note('undo'),
       forget: note('forget'),
+      share: note('share'),
+      fromTemplate: note('from a template'),
     },
   };
 }
@@ -115,5 +117,29 @@ test('a dashboard deleted in Home Assistant offers no Undo, which would have not
   element.rows = [{ built: { ...BUILT, previous: { plan: PLAN, config: {} } }, board: undefined }];
   const root = await mounted(element);
   assert.equal(root.querySelector('[aria-label="Undo the last rebuild of Home"]'), null);
+  element.remove();
+});
+
+test('a built dashboard is shared from its row, and one is made from a template in the head or the offer', async () => {
+  const empty = new MnmlDashboards();
+  const first = recorded();
+  empty.actions = first.actions;
+  const offer = await mounted(empty);
+  button(offer, 'From a template').click();
+  assert.deepEqual(first.done, ['from a template']);
+  empty.remove();
+  const element = new MnmlDashboards();
+  const { actions, done } = recorded();
+  element.actions = actions;
+  element.rows = [
+    {
+      built: BUILT,
+      board: { id: 'dashboard_home', url_path: 'dashboard-home', title: 'Home', icon: undefined },
+    },
+  ];
+  const root = await mounted(element);
+  button(root, 'Share Home').click();
+  button(root, 'From a template').click();
+  assert.deepEqual(done, ['share dashboard-home', 'from a template']);
   element.remove();
 });

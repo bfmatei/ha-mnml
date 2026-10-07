@@ -37,7 +37,7 @@ A card with a key the editor does not know, or a value it cannot hold, opens in 
 - **Quick start** says what it makes and where, then makes it at once: a room tile for each area where the room template has something to show (a light), in the order Home Assistant lists the areas; a tile for each person; the system cards whose entities MNML finds in the home; pop-ups that unfold from their tiles on a tablet and a computer. Its address is the title after `dashboard-`, free of every dashboard and panel the home has.
 - **Step by step** opens the builder on the same choices, at `/mnml/dashboards/new`.
 
-**The builder** is one page, a section for each part of the dashboard. Each of Rooms, People, Garage and System has, under its name, the title and the icon of its heading on the dashboard, and for all but System the template its cards are drawn with, among the tiles ([Roles](templates.md#roles)): a template of the home's own, such as a copy of `room` with changes, draws every room. Left empty, they are what the builder uses otherwise (Rooms, `mdi:floor-plan`, `room`; People, `mdi:account-group`, `person`; Garage, `mdi:garage`, `car`; System, `mdi:server-network`).
+**The builder** is one page, a section for each part of the dashboard. Each of Rooms, People, Garage and System has, under its name, the title and the icon of its heading on the dashboard, and for all but System the template its cards are drawn with, among the tiles that take the slots its rows are given ([Roles](templates.md#roles)), a template changed dropping the slots set on rows that it does not have: a template of the home's own, such as a copy of `room` with changes, draws every room. Left empty, they are what the builder uses otherwise (Rooms, `mdi:floor-plan`, `room`; People, `mdi:account-group`, `person`; Garage, `mdi:garage`, `car`; System, `mdi:server-network`).
 
 - **Dashboard**: its title and icon, and for a new one its address: lower case letters and digits, with at least one `-` between them, as Home Assistant asks of a dashboard's address, and at most 64 long.
 - **Rooms**: each area, ticked to show it, its tile drawn live, and moved up and down. An area where the room template has nothing to show cannot be ticked, and says so.
@@ -49,6 +49,25 @@ A card with a key the editor does not know, or a value it cannot hold, opens in 
 **Customize**, on any row shown, opens the template card's editor on that row's card, with what MNML found and the row's changes ([The template card's editor](#the-template-cards-editor)). **Done** checks that the card still draws with its own template, and keeps only what differs from what MNML finds: a room keeps its overrides over its area, a person and a system card what differs from what MNML finds of them, so a rebuild still follows the home in the rest.
 
 **Create** makes the dashboard in Home Assistant, in the sidebar, and keeps what was chosen. **Rebuild** asks first, keeps the cards it is about to replace (it stops when it cannot read them), then replaces the dashboard's cards, with any change made to them by hand, and its title and icon; the version it replaces is kept, cards and choices, until the next rebuild, for **Undo**. A room whose area is gone, or a person who is gone, is left out of what is built. What MNML keeps of each dashboard lives in the integration ([The integration](architecture.md#custom_componentsmnml-the-integration)).
+
+### Sharing a dashboard
+
+A dashboard MNML built is shared as a dashboard template: **Share** on its row shows it as YAML, to download as `<address>.yaml`, or to copy where the browser allows it (Home Assistant over HTTPS). It holds the dashboard's title, icon and pop-up openings, its sections (each one with something in it, or a look) with their looks, the system templates chosen, and every template it uses, inside others too, that is not the shipped one as shipped: the home's own and the shipped ones it changed, whole, their examples with them. Its layout names no area, person, slot set on a row or car of the home; a template's example goes as it is, and may name the home's entities.
+
+```yaml
+mnml_dashboard:
+  title: Home
+  icon: mdi:home-variant
+  open: { tablet: unfold, desktop: unfold }
+  sections:
+    rooms: { title: Spaces, template: my-room }
+    people: {}
+    system: { templates: [home-assistant, adguard] }
+  templates:
+    my-room: { description: ..., slots: ..., card: ... }
+```
+
+**From a template**, beside Quick start and Step by step, and in the head once a dashboard is built, takes a file or pasted text. It refuses what is not a dashboard template and says what it is instead (a dashboard's configuration, or a set of templates for the Templates tab), and a section template that is neither shipped nor in it. Then it says what the template makes in this home ("Here it makes 6 rooms, 2 people. AdGuard Home needs its entities: ..."): the areas where its rooms template draws, every person, its system templates whose entities MNML finds, and an empty garage, since a car's entities are this home's. The templates it brings are listed as the library's import lists them: new, the same as here, or one that would change a template of the home or a shipped one, which it replaces (on every dashboard of the home), sits beside under a new name, the choice it starts on, or skips. A changed `section-heading` is replaced or skipped, since every dashboard draws its headings with it. **Open in the builder** saves them and opens the builder on what it makes, with the names they came in under, inside the templates too, as Step by step does; **Create** makes the dashboard.
 
 ### Templates
 
