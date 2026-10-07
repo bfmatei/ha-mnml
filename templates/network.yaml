@@ -1,9 +1,21 @@
 unifi-network:
   description: A UniFi network's tile, its latency, and its devices, VPN and firmware chips; it brings the network's pop-up and one per Wi-Fi network.
   slots:
-    latency: { kind: entities, required: true, group: Basics }
+    latency:
+      {
+        kind: entities,
+        required: true,
+        group: Basics,
+        help: "The sensors of the network's latency, the first on the tile.",
+      }
     wan: { kind: entity, label: WAN, group: Basics }
-    devices: { kind: entities, required: true, group: Devices }
+    devices:
+      {
+        kind: entities,
+        required: true,
+        group: Devices,
+        help: "The network's devices, for their state.",
+      }
     wifi:
       kind: objects
       label: Wi-Fi networks
@@ -28,13 +40,15 @@ unifi-network:
             icon: { kind: icon }
             subnet: { kind: text, required: true }
     router:
+      help: "The router's processor use and temperature."
       kind: object
       required: true
       group: Basics
       fields:
         cpu: { kind: entity, required: true, label: CPU }
         temperature: { kind: entity, required: true }
-    firmware: { kind: entities, required: true, group: Devices }
+    firmware:
+      { kind: entities, required: true, group: Devices, help: "The devices' firmware updates." }
     device_up:
       {
         kind: texts,

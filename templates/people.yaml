@@ -1,8 +1,16 @@
 person:
   description: A person's tile, whether they are driving or in a focus, and their devices' batteries; it brings the person's and each device's pop-up.
   slots:
-    key: { kind: text, required: true, discover: area.id, group: Basics }
-    entity: { kind: entity, required: true, label: Person, group: Basics }
+    key:
+      {
+        kind: text,
+        required: true,
+        discover: area.id,
+        group: Basics,
+        label: 'Short name',
+        help: "Names the person's pop-ups: jane gives #person-jane.",
+      }
+    entity: { kind: entity, required: true, label: Person, group: Basics, help: 'The person.' }
     health:
       kind: object
       group: Health

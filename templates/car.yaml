@@ -1,28 +1,60 @@
 car:
   description: A car's tile, its fuel, and its doors, windows, alarm and tyres chips; it brings the car's pop-up. The defaults are BMW CarData's words.
   slots:
-    key: { kind: text, required: true, group: Basics }
+    key:
+      {
+        kind: text,
+        required: true,
+        group: Basics,
+        label: 'Short name',
+        help: "Names the car's pop-ups: sedan gives #car-sedan.",
+      }
     icon: { kind: icon, default: mdi:car, group: Basics }
-    metadata: { kind: entity, required: true, label: Car, group: Basics }
-    fuel: { kind: entity, required: true, group: Fuel }
-    remaining_fuel: { kind: entity, group: Fuel }
+    metadata:
+      {
+        kind: entity,
+        required: true,
+        label: Car,
+        group: Basics,
+        help: "The sensor whose attributes hold the car's make and model.",
+      }
+    fuel: { kind: entity, required: true, group: Fuel, help: 'The fuel level.' }
+    remaining_fuel: { kind: entity, group: Fuel, label: 'Remaining fuel' }
     range: { kind: entity, group: Fuel }
-    mileage: { kind: entity, required: true, group: Status }
+    mileage: { kind: entity, required: true, group: Status, help: 'The distance driven.' }
     service: { kind: entity, group: Status }
-    battery_voltage: { kind: entity, group: Status }
-    coolant_temperature: { kind: entity, group: Status }
-    lock: { kind: entity, required: true, group: Locks }
-    alarm: { kind: entity, required: true, group: Locks }
-    alarm_active: { kind: entity, required: true, group: Locks }
-    doors: { kind: entities, required: true, group: Openings }
-    hood: { kind: entity, required: true, group: Openings }
-    tailgate: { kind: entity, required: true, group: Openings }
-    windows: { kind: entities, required: true, group: Openings }
+    battery_voltage: { kind: entity, group: Status, label: 'Battery voltage' }
+    coolant_temperature: { kind: entity, group: Status, label: 'Coolant temperature' }
+    lock: { kind: entity, required: true, group: Locks, help: "The car's lock state." }
+    alarm: { kind: entity, required: true, group: Locks, help: "The alarm's arming state." }
+    alarm_active:
+      {
+        kind: entity,
+        required: true,
+        group: Locks,
+        label: 'Alarm sounding',
+        help: 'On while the alarm sounds.',
+      }
+    doors:
+      { kind: entities, required: true, group: Openings, help: 'One per door, open or closed.' }
+    hood: { kind: entity, required: true, group: Openings, help: 'The hood, open or closed.' }
+    tailgate:
+      { kind: entity, required: true, group: Openings, help: 'The tailgate, open or closed.' }
+    windows:
+      { kind: entities, required: true, group: Openings, help: 'One per window, open or closed.' }
     sunroof: { kind: entity, group: Openings }
-    tyres: { kind: entities, required: true, group: Tyres }
-    tyre_targets: { kind: entities, required: true, group: Tyres }
-    location: { kind: entity, required: true, group: Basics }
+    tyres: { kind: entities, required: true, group: Tyres, help: "Each tyre's pressure." }
+    tyre_targets:
+      {
+        kind: entities,
+        required: true,
+        group: Tyres,
+        label: 'Tyre targets',
+        help: "Each tyre's target pressure, in the order of the tyres.",
+      }
+    location: { kind: entity, required: true, group: Basics, help: "The car's device tracker." }
     lock_words:
+      label: 'Lock words'
       kind: object
       default: { secured: Locked, selectivelocked: Partly locked }
       group: Locks
@@ -30,6 +62,7 @@ car:
         secured: { kind: text }
         selectivelocked: { kind: text }
     alarm_words:
+      label: 'Alarm words'
       kind: object
       default: { doorsonly: Doors only, doorstiltcabin: Armed }
       group: Locks
@@ -38,11 +71,24 @@ car:
         doorstiltcabin: { kind: text }
     unlocked: { kind: texts, default: [unlocked, selectivelocked], group: Locks }
     disarmed: { kind: texts, default: [unarmed], group: Locks }
-    open_states: { kind: texts, default: [open, intermediate], group: Openings }
+    open_states:
+      { kind: texts, default: [open, intermediate], group: Openings, label: 'Open states' }
     tyre_low_share:
-      { kind: number, default: 0.9, help: Red under this share of the target., group: Tyres }
+      {
+        kind: number,
+        default: 0.9,
+        help: Red under this share of the target.,
+        group: Tyres,
+        label: 'Low tyre share',
+      }
     tyre_warn_share:
-      { kind: number, default: 0.95, help: Orange under this share of the target., group: Tyres }
+      {
+        kind: number,
+        default: 0.95,
+        help: Orange under this share of the target.,
+        group: Tyres,
+        label: 'Warning tyre share',
+      }
   card:
     type: custom:mnml-tile-card
     entity: '[[metadata]]'

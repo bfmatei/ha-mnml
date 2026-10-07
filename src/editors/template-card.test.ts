@@ -513,6 +513,7 @@ test('switching a card filled by hand to an area keeps every value, and back aga
 
 test('in an area, every field says where its value comes from', async () => {
   const { root } = await openRoom({ ...MINE, area: 'living', slots: { name: 'Living room' } });
+  await click(labelled(root, 'Change what it found'));
   const form = formWith(root, 'name');
   assert.equal(form?.computeHelper?.({ name: 'name' }), 'Set by you');
   assert.equal(form?.computeHelper?.({ name: 'key' }), "Names the room's pop-ups. Found in Living");
@@ -520,6 +521,7 @@ test('in an area, every field says where its value comes from', async () => {
 
 test('in an area, the notes, the summary and the way back follow an edit while the form stays', async () => {
   const { root } = await openRoom({ ...MINE, area: 'living', slots: {} });
+  await click(labelled(root, 'Change what it found'));
   const form = formWith(root, 'name');
   assert.ok(form);
   const helper = (name: string): string | undefined => form.computeHelper?.({ name });
@@ -569,6 +571,7 @@ test('typing in a field does not redraw the form, in an area too', async () => {
 
 test('in an area, an edit back to what was found leaves no override, and slots goes when none is left', async () => {
   const { root, dispatched } = await openRoom({ ...MINE, area: 'living', slots: {} });
+  await click(labelled(root, 'Change what it found'));
   const form = formWith(root, 'name');
   await fire(form, { key: 'living', name: 'Living room' });
   assert.deepEqual(lastConfig(dispatched)['slots'], { name: 'Living room' });
@@ -616,6 +619,7 @@ test('while the templates load, a card that names one waits for them, with no ga
 test('values remembered for one template do not follow the card to another', async () => {
   const opened = await openRoom({ ...MINE, area: 'living', slots: {} });
   const { root, dispatched } = opened;
+  await click(labelled(root, 'Change what it found'));
   await fire(formWith(root, 'name'), { key: 'living', name: 'Den' });
   await again(opened);
   await click(labelled(root, 'Change the template'));
@@ -682,6 +686,7 @@ test('in the whole home, the form shows what the home found, not what was set be
   });
   await click(labelled(opened.root, 'Find in the whole home'));
   await again(opened);
+  await click(labelled(opened.root, 'Change what it found'));
   assert.deepEqual(formWith(opened.root, 'updates')?.data['updates'], ['update.core']);
 });
 
@@ -691,6 +696,7 @@ test('in the whole home, the first edit fills the card in yourself and keeps the
     template: 'homey',
   });
   assert.deepEqual(checked(root), ['Find in the whole home']);
+  await click(labelled(root, 'Change what it found'));
   const form = formWith(root, 'updates');
   const box = form?.shadowRoot?.querySelector('input');
   assert.ok(form && box);
@@ -734,4 +740,41 @@ test("a preview in the gallery leaves the dashboard's pop-ups alone", async () =
   shown([{ isIntersecting: true, target: first }]);
   await settle();
   assert.equal(Reflect.get(cards[0] ?? {}, 'preview'), true);
+});
+
+const panelHeads = (root: ParentNode): Record<string, string | null> =>
+  Object.fromEntries(
+    [...root.querySelectorAll('.panel-head')].map((head) => [
+      head.getAttribute('aria-label') ?? '',
+      head.getAttribute('aria-expanded'),
+    ]),
+  );
+
+test('placed by area, the editor says what it found there, and folds every panel with nothing missing', async () => {
+  const { root } = await openRoom({ ...MINE, area: 'living' });
+  const summary = root.querySelector('.found');
+  assert.ok(summary);
+  assert.equal(text(summary), 'Found in Living: Key, Name, Temperature');
+  assert.equal(root.querySelector('.needs'), null);
+  assert.deepEqual(panelHeads(root), { Basics: 'false', Sensors: 'false', Climate: 'false' });
+  await click(labelled(root, 'Change what it found'));
+  assert.deepEqual(panelHeads(root), { Basics: 'true', Sensors: 'true', Climate: 'true' });
+});
+
+test('a required slot nothing fills is named, and its panel is open', async () => {
+  const { root } = await openRoom({
+    type: 'custom:mnml-template-card',
+    template: 'personish',
+    area: 'living',
+  });
+  assert.equal(text(root.querySelector('.needs')), 'Needs: Who');
+  assert.ok(Object.values(panelHeads(root)).includes('true'));
+});
+
+test('in the whole home, the summary says so; filled in yourself, there is none', async () => {
+  const home = await openRoom({ type: 'custom:mnml-template-card', template: 'homey' });
+  assert.equal(text(home.root.querySelector('.found')), 'Found in the whole home: Updates');
+  const yourself = await openRoom({ ...MINE, slots: { key: 'living', name: 'Living' } });
+  assert.equal(yourself.root.querySelector('.found'), null);
+  assert.equal(Object.values(panelHeads(yourself.root))[0], 'true');
 });

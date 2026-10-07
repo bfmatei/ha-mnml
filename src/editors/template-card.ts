@@ -15,7 +15,7 @@ import { SHIPPED_TEMPLATES } from '../store/shipped.ts';
 import { onShared, resolvedTemplates, sharedTemplates } from '../store/store.ts';
 import type { SharedState } from '../store/store.ts';
 import { discover } from '../templates/discover.ts';
-import { toValue } from '../templates/expand.ts';
+import { filled, toValue } from '../templates/expand.ts';
 import { OWNER } from '../templates/families.ts';
 import { rolesOf } from '../templates/roles.ts';
 
@@ -450,22 +450,72 @@ export class MnmlTemplateCardEditor extends LitElement {
       },
     };
     const context = this.drawing();
+    const groups = groupsOf(slots);
+    const finds = origin.source !== 'yourself' && (origin.source === 'home' || origin.where !== '');
+    const missing = new Set(
+      Object.entries(slots)
+        .filter(([slotName, spec]) => spec.required === true && !filled(slot.get()[slotName]))
+        .map(([slotName]) => slotName),
+    );
     return html`<div class="object">
       ${this.header(name, template)} ${this.sources(template, slots)}
       ${origin.source === 'area' ? this.areaForm(template) : nothing}
+      ${
+        finds
+          ? this.findings(slots, origin, missing, () => {
+              for (const group of groups) {
+                context.open.set(`group:${group.name}`, true);
+              }
+              context.redraw();
+            })
+          : nothing
+      }
       ${repeat(
-        groupsOf(slots),
+        groups,
         (group) => group.name,
         (group, index) =>
-          sectionPanel(context, `group:${group.name}`, index === 0, {
-            icon: group.icon,
-            title: group.name,
-            summary: summarize(shape, group.slots, slot.get(), this.hass),
-            body: () =>
-              this.groupBody(template, group.name, group.slots, shape, slot, context, origin),
-          }),
+          sectionPanel(
+            context,
+            `group:${group.name}`,
+            finds ? group.slots.some((slotName) => missing.has(slotName)) : index === 0,
+            {
+              icon: group.icon,
+              title: group.name,
+              summary: summarize(shape, group.slots, slot.get(), this.hass),
+              body: () =>
+                this.groupBody(template, group.name, group.slots, shape, slot, context, origin),
+            },
+          ),
       )}
       ${kept(slots).map((leftover) => html`<div class="heading">${leftover}: set in YAML</div>`)}
+    </div>`;
+  }
+
+  private findings(
+    slots: Readonly<Record<string, SlotSpec>>,
+    origin: Origin,
+    missing: ReadonlySet<string>,
+    openAll: () => void,
+  ): TemplateResult {
+    const found = Object.entries(slots)
+      .filter(([slotName]) => filled(origin.found[slotName]))
+      .map(([slotName, spec]) => slotLabel(slotName, spec));
+    const where = origin.source === 'home' ? 'the whole home' : origin.where;
+    return html`<div class="findings">
+      ${
+        found.length === 0
+          ? html`<div class="found">Nothing found in ${where}</div>`
+          : html`<div class="found">Found in ${where}: ${found.join(', ')}</div>`
+      }
+      ${
+        missing.size === 0
+          ? nothing
+          : html`<div class="needs">
+              Needs:
+              ${[...missing].map((slotName) => slotLabel(slotName, slots[slotName] ?? { kind: 'text' })).join(', ')}
+            </div>`
+      }
+      ${adder('Change what it found', 'mdi:pencil-outline', openAll, 'Change what it found')}
     </div>`;
   }
 

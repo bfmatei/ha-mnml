@@ -133,6 +133,19 @@ export const EDITOR_STYLE = css`
   .problem {
     color: var(--error-color);
   }
+  .findings {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    font-size: 14px;
+  }
+  .found {
+    color: var(--primary-text-color);
+  }
+  .needs {
+    color: var(--error-color);
+  }
   .fold {
     justify-content: flex-start;
     margin: 12px 0 0;
