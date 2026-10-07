@@ -54,7 +54,6 @@ jobs:
       - uses: hacs/action@d556e736723344f83838d08488c983a15381059a
         with:
           category: integration
-          ignore: brands
   publish:
     needs: [build, floor, hacs]
     runs-on: ubuntu-latest

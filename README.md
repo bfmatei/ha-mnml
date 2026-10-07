@@ -150,6 +150,7 @@ pnpm zip      # mnml.zip, the release, from custom_components/mnml/
 pnpm demo     # the throwaway Home Assistant, running the integration, with the demo and the examples
 pnpm look     # every card, template, editor, pop-up and the panel on the throwaway, in both themes, phone and desktop
 pnpm walk     # the panel walked through on the throwaway: edit, save, reset, new, duplicate, delete
+pnpm icons    # custom_components/mnml/brand/: the PNG icons from icon-light.svg and icon-dark.svg
 ```
 
 [AGENTS.md](AGENTS.md) holds the working rules, for people and coding agents alike.
