@@ -622,7 +622,13 @@ export const PANEL_STYLE = css`
     gap: 8px;
   }
   .yaml,
-  .example,
+  .slots-tab {
+    padding: 16px;
+    max-width: 960px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
   .simple-work {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -693,13 +699,6 @@ export const PANEL_STYLE = css`
   }
   .example p {
     margin: 0;
-  }
-  .slots-tab {
-    padding: 16px;
-    max-width: 960px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
   }
   .yaml-text {
     box-sizing: border-box;

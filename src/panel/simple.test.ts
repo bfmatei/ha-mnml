@@ -6,8 +6,8 @@ import { isMapping } from '../contract/templates.ts';
 import type { Template } from '../contract/templates.ts';
 import { readTemplates } from '../templates/shipped.ts';
 
-import { simpleOf, switchedOff, switchedOn } from './simple.ts';
-import { valueAt } from './tree.ts';
+import { keptPart, simpleOf, switchedOff, switchedOn } from './simple.ts';
+import { valueAt, withValue } from './tree.ts';
 
 const SHIPPED = readTemplates();
 const ROOM = SHIPPED['room'];
@@ -73,6 +73,9 @@ test("a part of the home's own template comes back from what was kept when it we
   const kept = valueAt(TILE, ['card', 'chips', '#sun']);
   const off = switchedOff(TILE, ['card', 'chips', '#sun']);
   assert.equal(rowOf(off, undefined, 'sun'), undefined);
+  const remembered = new Map([['card/chips/#sun', keptPart(TILE, ['card', 'chips', '#sun'])]]);
+  const row = simpleOf(off, undefined, remembered).find((each) => each.path.at(-1) === '#sun');
+  assert.equal(row?.on, false);
   assert.deepEqual(
     switchedOn(off, undefined, ['card', 'chips', '#sun'], { value: kept, after: 'wind' }),
     TILE,
@@ -87,4 +90,45 @@ test('the shipped room has its chips as switches, with their conditions in words
   assert.equal(window?.condition, 'when window is set');
   assert.ok(rows.some((row) => row.path.at(-1) === '#lock'));
   assert.ok(rows.every((row) => !row.label.includes('[[')));
+});
+
+test('a part switched off and on again within the session keeps what was changed in it', () => {
+  const path = ['card', 'chips', '#wind'];
+  const recoloured = withValue(TILE, [...path, 'color'], 'red');
+  const off = switchedOff(recoloured, path);
+  assert.deepEqual(switchedOn(off, TILE, path, keptPart(recoloured, path)), recoloured);
+});
+
+test('a list with every part switched off keeps a switch for each', () => {
+  const sheet: Template = {
+    card: {
+      hash: '#garden',
+      cards: [
+        { id: 'first', type: 'custom:mnml-heading-card', title: 'First' },
+        { id: 'second', type: 'custom:mnml-heading-card', title: 'Second' },
+      ],
+    },
+  };
+  const none = switchedOff(switchedOff(sheet, ['card', 'cards', '#first']), [
+    'card',
+    'cards',
+    '#second',
+  ]);
+  const rows = simpleOf(none, sheet).filter((row) => row.switchable);
+  assert.deepEqual(
+    rows.map((row) => [row.path.at(-1), row.on]),
+    [
+      ['#first', false],
+      ['#second', false],
+    ],
+  );
+  const own = simpleOf(
+    none,
+    undefined,
+    new Map([['card/cards/#first', keptPart(sheet, ['card', 'cards', '#first'])]]),
+  ).filter((row) => row.switchable);
+  assert.deepEqual(
+    own.map((row) => [row.path.at(-1), row.on]),
+    [['#first', false]],
+  );
 });

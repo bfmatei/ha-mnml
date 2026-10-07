@@ -620,16 +620,16 @@ export class MnmlBuilder extends LitElement {
     const shipped = this.draft?.shipped;
     return html`<div class=${classMap({ 'simple-work': true, narrow: this.narrow })}>
       <div class="pane">
-        ${drawSimple(simpleOf(this.template, shipped), {
+        ${drawSimple(simpleOf(this.template, shipped, this.kept), {
           toggle: (row, on): void => {
             const where = row.path.join('/');
             if (on) {
-              this.replace(switchedOn(this.template, shipped, row.path, this.kept.get(where)));
+              const back = switchedOn(this.template, shipped, row.path, this.kept.get(where));
+              this.kept.delete(where);
+              this.replace(back);
               return;
             }
-            if (shipped === undefined) {
-              this.kept.set(where, keptPart(this.template, row.path));
-            }
+            this.kept.set(where, keptPart(this.template, row.path));
             this.replace(switchedOff(this.template, row.path));
           },
           look: (look, value): void => {

@@ -10,7 +10,7 @@ import { COLORS } from '../editors/lists.ts';
 import { field } from '../ha/field.ts';
 
 import { partOf } from './outline.ts';
-import type { Part } from './outline.ts';
+import type { Group, Part } from './outline.ts';
 import { inserted, valueAt, withValue } from './tree.ts';
 import type { Path } from './tree.ts';
 
@@ -87,19 +87,54 @@ function rowOf(part: Part, group: string, depth: number, switchable: boolean): S
   };
 }
 
+type Kept = ReadonlyMap<string, KeptPart>;
+
+const keyOf = (path: Path): string => path.join('/');
+
+function groupsOf(part: Part, shipped: Template | undefined, kept: Kept): Group[] {
+  const groups = [...part.groups];
+  const has = (path: Path): boolean => groups.some((group) => keyOf(group.path) === keyOf(path));
+  const original = shipped === undefined ? undefined : valueAt(shipped, part.path);
+  if (isMapping(original)) {
+    for (const group of partOf(original, part.path, part.shape, 0).groups) {
+      if (group.list && !has(group.path)) {
+        groups.push({ ...group, parts: [] });
+      }
+    }
+  }
+  for (const where of kept.keys()) {
+    const path = where.split('/');
+    const list = path.slice(0, -1);
+    const key = list.at(-1);
+    if (key !== undefined && keyOf(list.slice(0, -1)) === keyOf(part.path) && !has(list)) {
+      groups.push({
+        key,
+        label: key.endsWith('?') ? key.slice(0, -1) : key,
+        path: list,
+        of: undefined,
+        cards: true,
+        list: true,
+        parts: [],
+      });
+    }
+  }
+  return groups;
+}
+
 function walk(
   part: Part,
   shipped: Template | undefined,
+  kept: Kept,
   group: string,
   depth: number,
   switchable: boolean,
   out: SimpleRow[],
 ): void {
   out.push(rowOf(part, group, depth, switchable));
-  for (const inner of part.groups) {
+  for (const inner of groupsOf(part, shipped, kept)) {
     if (!inner.list) {
       for (const each of inner.parts) {
-        walk(each, shipped, inner.label, depth + 1, false, out);
+        walk(each, shipped, kept, inner.label, depth + 1, false, out);
       }
       continue;
     }
@@ -109,27 +144,44 @@ function walk(
       const id = idOf(item);
       return id === undefined ? [] : [`#${id}`];
     });
-    for (const segment of merged([...present.keys()], ids)) {
-      const kept = present.get(segment);
-      if (kept !== undefined) {
-        walk(kept, shipped, inner.label, depth + 1, true, out);
+    const order = merged([...present.keys()], ids);
+    for (const [where, entry] of kept) {
+      const path = where.split('/');
+      const segment = path.at(-1) ?? '';
+      if (keyOf(path.slice(0, -1)) !== keyOf(inner.path) || order.includes(segment)) {
         continue;
       }
-      const item = original.find((each) => `#${idOf(each) ?? ''}` === segment);
+      const after = entry.after === undefined ? -1 : order.indexOf(`#${entry.after}`);
+      order.splice(after === -1 ? order.length : after + 1, 0, segment);
+    }
+    for (const segment of order) {
+      const here = present.get(segment);
+      if (here !== undefined) {
+        walk(here, shipped, kept, inner.label, depth + 1, true, out);
+        continue;
+      }
+      const item =
+        kept.get(keyOf([...inner.path, segment]))?.value ??
+        original.find((each) => `#${idOf(each) ?? ''}` === segment);
       if (isMapping(item)) {
-        const gone = partOf(item, [...inner.path, segment], inner.of, original.indexOf(item));
+        const gone = partOf(item, [...inner.path, segment], inner.of, 0);
         out.push({ ...rowOf(gone, inner.label, depth + 1, true), on: false, looks: [] });
       }
     }
   }
 }
 
-export function simpleOf(template: Template, shipped: Template | undefined): SimpleRow[] {
+export function simpleOf(
+  template: Template,
+  shipped: Template | undefined,
+  kept: Kept = new Map(),
+): SimpleRow[] {
   const card = template.card;
   const rows: SimpleRow[] = [];
   walk(
     partOf(isMapping(card) ? card : {}, ['card'], undefined, 0),
     shipped,
+    kept,
     'Card',
     0,
     false,
@@ -150,14 +202,14 @@ export function switchedOn(
 ): Template {
   const listPath = path.slice(0, -1);
   const segment = path.at(-1) ?? '';
-  const value = shipped === undefined ? kept?.value : valueAt(shipped, path);
+  const value = kept?.value ?? (shipped === undefined ? undefined : valueAt(shipped, path));
   if (value === undefined) {
     return template;
   }
   const list = listAt(template, listPath);
   const ids = list.map((item) => idOf(item));
-  let after: string | undefined = kept?.after;
-  if (shipped !== undefined) {
+  let after = kept?.after !== undefined && ids.includes(kept.after) ? kept.after : undefined;
+  if (after === undefined && shipped !== undefined) {
     const original = listAt(shipped, listPath).map((item) => idOf(item));
     const index = original.indexOf(segment.slice(1));
     after = original
@@ -189,9 +241,9 @@ const changed = (event: Event): string => {
   return typeof value === 'string' ? value : '';
 };
 
-function drawLook(look: SimpleLook, actions: SimpleActions): TemplateResult {
+function drawLook(look: SimpleLook, of: string, actions: SimpleActions): TemplateResult {
   const where = look.path.join('/');
-  const label = look.key === 'color' ? 'Colour' : look.key === 'icon' ? 'Icon' : 'Text';
+  const label = `${of}: ${look.key === 'color' ? 'colour' : look.key === 'icon' ? 'icon' : look.key}`;
   if (look.key === 'color') {
     const options = COLORS.includes(look.value) ? COLORS : [look.value, ...COLORS];
     return html`<select
@@ -258,7 +310,7 @@ export function drawSimple(rows: readonly SimpleRow[], actions: SimpleActions): 
             <span>${row.label}</span>
             ${row.condition === undefined ? nothing : html`<span class="muted">${row.condition}</span>`}
           </span>
-          ${row.on ? row.looks.map((look) => drawLook(look, actions)) : nothing}
+          ${row.on ? row.looks.map((look) => drawLook(look, row.label, actions)) : nothing}
         </div>`,
     )}
   </div>`;

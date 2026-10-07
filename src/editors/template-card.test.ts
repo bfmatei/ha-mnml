@@ -761,14 +761,14 @@ test('placed by area, the editor says what it found there, and folds every panel
   assert.deepEqual(panelHeads(root), { Basics: 'true', Sensors: 'true', Climate: 'true' });
 });
 
-test('a required slot nothing fills is named, and its panel is open', async () => {
+test('a template with no discovery placed in an area shows no summary, and its first panel open', async () => {
   const { root } = await openRoom({
     type: 'custom:mnml-template-card',
     template: 'personish',
     area: 'living',
   });
-  assert.equal(text(root.querySelector('.needs')), 'Needs: Who');
-  assert.ok(Object.values(panelHeads(root)).includes('true'));
+  assert.equal(root.querySelector('.found'), null);
+  assert.equal(Object.values(panelHeads(root))[0], 'true');
 });
 
 test('in the whole home, the summary says so; filled in yourself, there is none', async () => {
@@ -777,4 +777,57 @@ test('in the whole home, the summary says so; filled in yourself, there is none'
   const yourself = await openRoom({ ...MINE, slots: { key: 'living', name: 'Living' } });
   assert.equal(yourself.root.querySelector('.found'), null);
   assert.equal(Object.values(panelHeads(yourself.root))[0], 'true');
+});
+
+const LIGHTY = {
+  description: 'Lights by area.',
+  slots: {
+    lights: {
+      kind: 'object',
+      required: true,
+      label: 'Lights',
+      group: 'Lights',
+      fields: { group: { kind: 'entity', required: true }, scenes: { kind: 'entities' } },
+      discover: { fields: { scenes: { domain: 'scene' } } },
+    },
+  },
+  card: { type: 'custom:mnml-heading-card', title: 'Lights', icon: 'mdi:lightbulb' },
+};
+
+const PLAIN = {
+  description: 'Set by hand.',
+  slots: { title: { kind: 'text', required: true } },
+  card: { type: 'custom:mnml-heading-card', title: '[[title]]', icon: 'mdi:star' },
+};
+
+function sceneHass(): Record<string, unknown> {
+  const store = fakeStore();
+  store.kept = own({ lighty: LIGHTY, plain: PLAIN });
+  return {
+    ...store.hass,
+    areas: { living: { area_id: 'living', name: 'Living' } },
+    devices: {},
+    entities: { 'scene.living_relax': { entity_id: 'scene.living_relax', area_id: 'living' } },
+    states: {
+      'scene.living_relax': { entity_id: 'scene.living_relax', state: 'x', attributes: {} },
+    },
+  };
+}
+
+test('a required field nothing fills inside a slot found in part is named, and its panel open', async () => {
+  const { root } = await openWith(
+    { type: 'custom:mnml-template-card', template: 'lighty', area: 'living' },
+    sceneHass(),
+  );
+  assert.equal(text(root.querySelector('.found')), 'Found in Living: Lights');
+  assert.equal(text(root.querySelector('.needs')), 'Needs: Lights');
+  assert.ok(Object.values(panelHeads(root)).includes('true'));
+});
+
+test('a template that finds nothing anywhere says nothing about what it found', async () => {
+  const { root } = await openWith(
+    { type: 'custom:mnml-template-card', template: 'plain', area: 'living' },
+    sceneHass(),
+  );
+  assert.equal(root.querySelector('.found'), null);
 });
