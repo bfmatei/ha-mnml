@@ -17,6 +17,7 @@ import type { SharedState } from '../store/store.ts';
 import { discover } from '../templates/discover.ts';
 import { toValue } from '../templates/expand.ts';
 import { OWNER } from '../templates/families.ts';
+import { rolesOf } from '../templates/roles.ts';
 
 import { adder, keysForm } from './draw.ts';
 import type { Context, Slot } from './draw.ts';
@@ -82,6 +83,7 @@ export class MnmlTemplateCardEditor extends LitElement {
   @state() private loaded = false;
   @state() private values: Record<string, Value> | undefined;
   @state() private pendingArea = false;
+  @state() private everything = false;
   private loading = false;
   private stopShared: (() => void) | undefined;
   private observer: IntersectionObserver | undefined;
@@ -267,59 +269,83 @@ export class MnmlTemplateCardEditor extends LitElement {
 
   private tiles(templates: Templates): TemplateResult {
     const own = new Set(this.ownNames);
+    const roles = rolesOf(templates);
     const words = this.filter.trim().toLowerCase();
-    const groups = new Map<string, string[]>();
-    for (const name of Object.keys(templates).toSorted()) {
-      const template = templates[name];
-      const text = `${name} ${template?.description ?? ''}`.toLowerCase();
-      if (template === undefined || (words !== '' && !text.includes(words))) {
-        continue;
+    const names = Object.keys(templates)
+      .toSorted()
+      .filter((name) => {
+        const text = `${name} ${templates[name]?.description ?? ''}`.toLowerCase();
+        return words === '' || text.includes(words);
+      });
+    const tiles = names.filter((name) => roles[name] === 'tile');
+    const rest = names.filter((name) => roles[name] !== 'tile');
+    const grouped = (from: readonly string[]): TemplateResult => {
+      const groups = new Map<string, string[]>();
+      for (const name of from) {
+        const group = own.has(name) ? 'Yours' : `Shipped: ${OWNER[name] ?? 'common'}`;
+        groups.set(group, [...(groups.get(group) ?? []), name]);
       }
-      const group = own.has(name) ? 'Yours' : `Shipped: ${OWNER[name] ?? 'common'}`;
-      groups.set(group, [...(groups.get(group) ?? []), name]);
-    }
-    const order = [...groups.keys()].toSorted((a, b) =>
-      a === 'Yours' ? -1 : b === 'Yours' ? 1 : a.localeCompare(b),
-    );
-    const tile = (name: string): TemplateResult | typeof nothing => {
-      const template = templates[name];
-      if (template === undefined) {
-        return nothing;
-      }
-      const use = `Use ${name}`;
-      return html`<button
-        type="button"
-        class="control tile"
-        aria-label=${use}
-        title=${use}
-        @click=${quietly(() => {
-          this.pick(name);
-        })}
-      >
-        <div class="tile-name">${name}</div>
-        <div class="tile-description">${template.description ?? ''}</div>
-        ${
-          drawsCard(template)
-            ? html`<div class="tile-preview" data-template=${name}>
-                ${this.previews.get(name) ?? nothing}
-              </div>`
-            : nothing
-        }
-      </button>`;
+      const order = [...groups.keys()].toSorted((a, b) =>
+        a === 'Yours' ? -1 : b === 'Yours' ? 1 : a.localeCompare(b),
+      );
+      return html`${repeat(
+        order,
+        (group) => group,
+        (group) =>
+          html`<div class="heading">${group}</div>
+            <div class="tiles">
+              ${repeat(
+                groups.get(group) ?? [],
+                (name) => name,
+                (name) => this.tile(templates, name),
+              )}
+            </div>`,
+      )}`;
     };
-    return html`${repeat(
-      order,
-      (group) => group,
-      (group) =>
-        html`<div class="heading">${group}</div>
-          <div class="tiles">
-            ${repeat(
-              groups.get(group) ?? [],
-              (name) => name,
-              (name) => tile(name),
-            )}
-          </div>`,
-    )}`;
+    const open = this.everything || words !== '';
+    return html`${grouped(tiles)}
+    ${
+      rest.length === 0
+        ? nothing
+        : html`<button
+              type="button"
+              class="control fold"
+              aria-expanded=${open}
+              @click=${quietly(() => {
+                this.everything = !this.everything;
+              })}
+            >
+              Pop-ups and parts (${rest.length})
+            </button>
+            ${open ? grouped(rest) : nothing}`
+    }`;
+  }
+
+  private tile(templates: Templates, name: string): TemplateResult | typeof nothing {
+    const template = templates[name];
+    if (template === undefined) {
+      return nothing;
+    }
+    const use = `Use ${name}`;
+    return html`<button
+      type="button"
+      class="control tile"
+      aria-label=${use}
+      title=${use}
+      @click=${quietly(() => {
+        this.pick(name);
+      })}
+    >
+      <div class="tile-name">${name}</div>
+      <div class="tile-description">${template.description ?? ''}</div>
+      ${
+        drawsCard(template)
+          ? html`<div class="tile-preview" data-template=${name}>
+              ${this.previews.get(name) ?? nothing}
+            </div>`
+          : nothing
+      }
+    </button>`;
   }
 
   private async preview(target: Element): Promise<void> {

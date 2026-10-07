@@ -96,7 +96,7 @@ A template with a shipped name replaces the shipped one everywhere, inside other
 
 ## Editing in the UI
 
-Every card is in Home Assistant's card picker (**Add card**, **By card**, then search for MNML), and every card with keys but the pop-ups card opens in a form: Home Assistant's own pickers for entities and icons, sections that open on a click, and a list editor for controls, rows and the other parts, with copy and paste between cards. The template card's editor has a gallery of every template with a live preview, and a form for the chosen template: it finds the template's devices in an area, or in the whole home, or lets you fill them in yourself, in panels the template describes; for an admin, **Edit this template** opens it in the MNML panel. The YAML it writes is the YAML you would write. [Editing in the UI](docs/editors.md) has the details.
+Every card is in Home Assistant's card picker (**Add card**, **By card**, then search for MNML), and every card with keys but the pop-ups card opens in a form: Home Assistant's own pickers for entities and icons, sections that open on a click, and a list editor for controls, rows and the other parts, with copy and paste between cards. The template card's editor has a gallery of the tiles with a live preview, the pop-ups and parts folded under them, and a form for the chosen template: it finds the template's devices in an area, or in the whole home, or lets you fill them in yourself, in panels the template describes; for an admin, **Edit this template** opens it in the MNML panel. The YAML it writes is the YAML you would write. [Editing in the UI](docs/editors.md) has the details.
 
 ![A card's editor](docs/screenshots/card-editor.png)
 

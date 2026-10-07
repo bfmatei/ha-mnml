@@ -123,6 +123,22 @@ export const PANEL_STYLE = css`
     color: var(--primary-color);
     border-color: var(--primary-color);
   }
+  .switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 32px;
+    padding: 0 8px 0 0;
+    color: var(--secondary-text-color);
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .switch input {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    accent-color: var(--primary-color);
+  }
   .chips {
     display: flex;
     flex-wrap: wrap;

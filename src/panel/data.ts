@@ -2,6 +2,7 @@ import { isMapping } from '../contract/templates.ts';
 import type { Template, Templates, Value } from '../contract/templates.ts';
 import { applyChanges } from '../templates/changes.ts';
 import type { Change, Conflict } from '../templates/changes.ts';
+import type { Role } from '../templates/roles.ts';
 
 export type Status = 'shipped' | 'customised' | 'own' | 'conflict';
 
@@ -22,6 +23,7 @@ export interface Row {
   status: Status;
   changes: number;
   use: Use;
+  role: Role;
 }
 
 export interface Clash {
@@ -83,6 +85,7 @@ export function rowsOf(
   owner: Readonly<Record<string, string>>,
   kept: Kept,
   uses: ReadonlyMap<string, Use>,
+  roles: Readonly<Record<string, Role>>,
 ): Row[] {
   const names = [...new Set([...Object.keys(shipped), ...Object.keys(kept.own)])].toSorted();
   return names.map((name) => {
@@ -106,6 +109,7 @@ export function rowsOf(
       status,
       changes: changes.length,
       use: uses.get(name) ?? NONE,
+      role: roles[name] ?? 'tile',
     };
   });
 }
