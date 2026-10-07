@@ -2,7 +2,7 @@
 
 A minimal card set for Home Assistant, with its editors, its templates and its theme, in one integration. Flat cards on one hairline edge, colour only where something needs you, and pop-ups that open by the URL hash, so the back button and a shared link both work.
 
-![The demo home on a desktop, light theme](docs/screenshots/desktop-light.png)
+![The demo home on a desktop, light and dark](docs/screenshots/desktop.png)
 
 ## What you get
 
@@ -27,7 +27,7 @@ A minimal card set for Home Assistant, with its editors, its templates and its t
 | -------------------------------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------ |
 | ![The server pop-up](docs/screenshots/popup-proxmox.png) | ![The 3D printer pop-up](docs/screenshots/popup-office-3d-printer.png) | ![The media server pop-up](docs/screenshots/popup-media.png) |
 
-Every screenshot is of the demo home, Joe's and Jane's, on a throwaway Home Assistant; `pnpm screenshots` takes them again.
+Every screenshot is of the demo home, Joe's and Jane's, on a throwaway Home Assistant; `pnpm screenshots` takes them again, and joins the desktop's light and dark into the one at the top, light above the diagonal and dark below it.
 
 ## Install
 
@@ -43,7 +43,7 @@ The theme lives in `config/themes/mnml-integration/`, which the integration owns
 
 ## Quick start
 
-The fastest start is the builder: open **MNML** in the sidebar, then **Dashboards**, and pick **Quick start**. MNML makes a dashboard with a tile for each room with lights, one for each person, and the system cards it finds the entities of, and puts it in the sidebar. **Step by step** lets you choose the rooms and their order, the people, the system cards and how pop-ups open first; either way, the dashboard's row opens the builder again to change it and **Rebuild**, and **Undo** goes back one rebuild. [Building a dashboard](docs/editors.md#building-a-dashboard) has the details.
+The fastest start is the builder: open **MNML** in the sidebar and pick **Quick start**. MNML makes a dashboard with a tile for each room with lights, one for each person, and the system cards it finds the entities of, and puts it in the sidebar. **Step by step** lets you choose the rooms and their order, the people, the system cards and how pop-ups open first; either way, the dashboard's row opens the builder again to change it and **Rebuild**, and **Undo** goes back one rebuild. [Building a dashboard](docs/editors.md#building-a-dashboard) has the details.
 
 To place cards by hand, add the one pop-up card anywhere on a dashboard; it takes no space:
 

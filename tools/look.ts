@@ -131,7 +131,7 @@ const cardEditors = (page: Page): Promise<{ opened: number; problems: string[] }
   });
 
 async function panel(page: Page): Promise<string[]> {
-  await page.goto(`${env.HA_URL}/mnml`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`${env.HA_URL}/mnml/templates`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(8000);
   const listed = await page.locator('mnml-panel .library-row').count();
   const problems = listed > 0 ? [] : ['the panel lists no template'];

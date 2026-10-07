@@ -44,7 +44,7 @@ for (const [name, size] of Object.entries(VIEWPORTS)) {
         });
         await page.waitForTimeout(800);
       }
-      await page.goto(`${env.HA_URL}/mnml`, { waitUntil: 'domcontentloaded' });
+      await page.goto(`${env.HA_URL}/mnml/templates`, { waitUntil: 'domcontentloaded' });
       await page.waitForTimeout(8000);
       await page.screenshot({ path: `${OUT}/panel-library.png` });
       console.log(`${OUT}/panel-library.png`);

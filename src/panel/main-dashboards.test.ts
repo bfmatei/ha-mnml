@@ -77,3 +77,23 @@ test("the builder page follows Home Assistant's states, as the panel is given th
   assert.equal(Reflect.get(editor, 'hass'), next);
   panel.remove();
 });
+
+test('the panel opens on its dashboards, and keeps its templates at /templates', async () => {
+  const panel = new MnmlPanel();
+  panel.hass = hassWith(() => Promise.resolve({ dashboards: {} })) as never;
+  panel.route = { path: '' };
+  document.body.append(panel);
+  await settled(panel);
+  const tabs = [...(panel.shadowRoot?.querySelectorAll('.tab') ?? [])].map((tab) => text(tab));
+  assert.deepEqual(tabs, ['Dashboards', 'Templates']);
+  assert.ok(panel.shadowRoot?.querySelector('mnml-dashboards'));
+  assert.equal(panel.shadowRoot?.querySelector('.tab.active')?.textContent?.trim(), 'Dashboards');
+  panel.route = { path: '/templates' };
+  await settled(panel);
+  assert.ok(panel.shadowRoot?.querySelector('mnml-library'));
+  assert.equal(panel.shadowRoot?.querySelector('.tab.active')?.textContent?.trim(), 'Templates');
+  panel.route = { path: '/dashboards' };
+  await settled(panel);
+  assert.ok(panel.shadowRoot?.querySelector('mnml-dashboards'));
+  panel.remove();
+});
