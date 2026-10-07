@@ -1,0 +1,41 @@
+name: Bug
+description: Something in MNML does not work as it should.
+labels: [bug]
+body:
+  - type: input
+    id: mnml
+    attributes:
+      label: MNML version
+      description: Settings, Devices & services, MNML, or HACS.
+      placeholder: 0.3.0
+    validations:
+      required: true
+  - type: input
+    id: home-assistant
+    attributes:
+      label: Home Assistant version
+      placeholder: 2026.10.0
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happens
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: The card's YAML
+      description: The card or template involved, with any personal entity ids changed.
+      render: yaml
+  - type: input
+    id: where
+    attributes:
+      label: Browser and device
+      placeholder: Safari on an iPhone, the Companion app on an iPad, Chrome on a desktop
+  - type: textarea
+    id: more
+    attributes:
+      label: Screenshots or console errors

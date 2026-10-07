@@ -1,0 +1,16 @@
+name: Feature
+description: An idea for a card, a template, an option or the panel.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What you would like
+      description: What it should show or do, and where.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: What you are trying to do, and what you do today instead.

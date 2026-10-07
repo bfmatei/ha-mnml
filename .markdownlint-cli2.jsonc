@@ -11,5 +11,6 @@
     ".venv/**",
     "custom_components/mnml/www/**",
     "CLAUDE.md",
+    ".github/pull_request_template.md",
   ],
 }
