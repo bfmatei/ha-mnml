@@ -137,7 +137,7 @@ test('HACS installs the zip the release attaches, and the integration serves the
   assert.equal(BUNDLE, 'mnml-cards.js');
   assert.deepEqual(JSON.parse(readFileSync('hacs.json', 'utf8')), {
     name: 'MNML',
-    homeassistant: '2025.6.0',
+    homeassistant: '2026.10.0b0',
     render_readme: true,
     hide_default_branch: true,
     zip_release: true,

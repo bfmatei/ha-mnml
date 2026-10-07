@@ -1,6 +1,6 @@
 {
   "name": "MNML",
-  "homeassistant": "2025.6.0",
+  "homeassistant": "2026.10.0b0",
   "render_readme": true,
   "hide_default_branch": true,
   "zip_release": true,

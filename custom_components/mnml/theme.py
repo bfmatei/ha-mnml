@@ -2,7 +2,7 @@ import shutil
 from functools import partial
 from pathlib import Path
 
-import voluptuous as vol
+import probatio as vol
 from homeassistant.components.frontend import (
     DATA_DEFAULT_DARK_THEME,
     DATA_DEFAULT_THEME,

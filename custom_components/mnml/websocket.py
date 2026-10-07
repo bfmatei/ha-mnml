@@ -1,7 +1,7 @@
 import json
 from typing import Any
 
-import voluptuous as vol
+import probatio as vol
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.util.hass_dict import HassKey

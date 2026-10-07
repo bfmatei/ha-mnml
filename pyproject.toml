@@ -29,9 +29,9 @@ files = ["custom_components", "tests"]
 
 [dependency-groups]
 dev = [
-  "home-assistant-frontend==20260826.7",
+  "home-assistant-frontend==20260930.1",
   "mypy>=2.4.0",
-  "pytest-homeassistant-custom-component==0.13.367",
+  "pytest-homeassistant-custom-component==0.13.369",
   "ruff>=0.16.10",
 ]
 

@@ -30,7 +30,7 @@
     "test": "pnpm run test:frontend && pnpm run test:python",
     "test:frontend": "vitest run",
     "test:python": "uv run pytest",
-    "test:python-floor": "uv run --no-project --python 3.13 --with pytest-homeassistant-custom-component==0.13.254 --with home-assistant-frontend==20250531.4 --with 'pycares<5' pytest",
+    "test:python-floor": "uv run --no-project --python 3.14 --with pytest-homeassistant-custom-component==0.13.368 --with home-assistant-frontend==20260930.0 pytest",
     "walk": "node tools/walk.ts",
     "zip": "node tools/zip.ts"
   },

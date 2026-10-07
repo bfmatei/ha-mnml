@@ -8,7 +8,7 @@ import { connect } from './socket.ts';
 
 const NAME = 'mnml-ha';
 const PORT = 8124;
-const IMAGE = 'ghcr.io/home-assistant/home-assistant:stable';
+const IMAGE = 'ghcr.io/home-assistant/home-assistant:beta';
 const URL = `http://localhost:${PORT}`;
 const OWNER = { name: 'Demo', username: 'demo', password: 'demo' };
 const CONFIG = [
