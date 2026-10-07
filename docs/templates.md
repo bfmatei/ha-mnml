@@ -918,7 +918,7 @@ A person's tile, whether they are driving or in a focus, and their devices' batt
 | `health.flights_climbed` | entity   | required            |           |
 | `health.active_energy`   | entity   | required            |           |
 | `health.resting_energy`  | entity   | required            |           |
-| `devices`                | objects  | required            |           |
+| `devices`                | objects  |                     |           |
 | `devices.key`            | text     | required            |           |
 | `devices.name`           | text     |                     |           |
 | `devices.icon`           | icon     |                     |           |
@@ -974,7 +974,7 @@ A person's pop-up, their devices, their location access and their health.
 | `health.flights_climbed` | entity  | required            |          |
 | `health.active_energy`   | entity  | required            |          |
 | `health.resting_energy`  | entity  | required            |          |
-| `devices`                | objects | required            |          |
+| `devices`                | objects |                     |          |
 | `devices.key`            | text    | required            |          |
 | `devices.name`           | text    |                     |          |
 | `devices.icon`           | icon    |                     |          |
