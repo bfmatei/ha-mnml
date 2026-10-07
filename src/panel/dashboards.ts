@@ -15,6 +15,8 @@ export interface DashboardActions {
   edit: (built: Built) => void;
   undo: (built: Built) => void;
   forget: (built: Built) => void;
+  share: (built: Built) => void;
+  fromTemplate: () => void;
 }
 
 export interface DashboardRow {
@@ -62,6 +64,9 @@ export class MnmlDashboards extends LitElement {
         <button type="button" class="action" @click=${() => actions?.stepByStep()}>
           ${icon('mdi:format-list-checks')}<span>Step by step</span>
         </button>
+        <button type="button" class="action" @click=${() => actions?.fromTemplate()}>
+          ${icon('mdi:file-import-outline')}<span>From a template</span>
+        </button>
       </div>
     </div>`;
   }
@@ -99,6 +104,7 @@ export class MnmlDashboards extends LitElement {
             ? nothing
             : button('mdi:undo', `Undo the last rebuild of ${title}`, () => actions?.undo(built))
         }
+        ${button('mdi:share-variant', `Share ${title}`, () => actions?.share(built))}
         ${button('mdi:delete-outline', `Forget ${title}`, () => actions?.forget(built))}
       </span>
     </div>`;
@@ -113,6 +119,9 @@ export class MnmlDashboards extends LitElement {
           this.rows.length === 0
             ? nothing
             : html`<div class="library-tools">
+                <button type="button" class="action" @click=${() => actions?.fromTemplate()}>
+                  ${icon('mdi:file-import-outline')}<span>From a template</span>
+                </button>
                 <button type="button" class="action primary" @click=${() => actions?.stepByStep()}>
                   ${icon('mdi:plus')}<span>Build another</span>
                 </button>

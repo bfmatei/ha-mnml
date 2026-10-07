@@ -50,6 +50,25 @@ A card with a key the editor does not know, or a value it cannot hold, opens in 
 
 **Create** makes the dashboard in Home Assistant, in the sidebar, and keeps what was chosen. **Rebuild** asks first, keeps the cards it is about to replace (it stops when it cannot read them), then replaces the dashboard's cards, with any change made to them by hand, and its title and icon; the version it replaces is kept, cards and choices, until the next rebuild, for **Undo**. A room whose area is gone, or a person who is gone, is left out of what is built. What MNML keeps of each dashboard lives in the integration ([The integration](architecture.md#custom_componentsmnml-the-integration)).
 
+### Sharing a dashboard
+
+A dashboard MNML built is shared as a dashboard template: **Share** on its row shows it as YAML, to copy or download as `<address>.yaml`. It holds the dashboard's title, icon and pop-up openings, its sections (each one with something in it, or a look) with their looks, the system templates chosen, and every template it uses, inside others too, that is not the shipped one as shipped: the home's own and the shipped ones it changed, whole, their examples with them. No area, person, slot set on a row or car of the home is in it.
+
+```yaml
+mnml_dashboard:
+  title: Home
+  icon: mdi:home-variant
+  open: { tablet: unfold, desktop: unfold }
+  sections:
+    rooms: { title: Spaces, template: my-room }
+    people: {}
+    system: { templates: [home-assistant, adguard] }
+  templates:
+    my-room: { description: ..., slots: ..., card: ... }
+```
+
+**From a template**, beside Quick start and Step by step, and in the head once a dashboard is built, takes a file or pasted text. It refuses what is not a dashboard template and says what it is instead (a dashboard's configuration, or a set of templates for the Templates tab), and a section template that is neither shipped nor in it. Then it says what the template makes in this home ("Here it makes 6 rooms, 2 people. AdGuard Home needs its entities: ..."): the areas where its rooms template draws, every person, its system templates whose entities MNML finds, and an empty garage, since a car's entities are this home's. The templates it brings are listed as the library's import lists them, new, the same as here, or named like one the home keeps, which it replaces, sits beside under a new name, or skips. **Open in the builder** saves them and opens the builder on what it makes, with the names they came in under, as Step by step does; **Create** makes the dashboard.
+
 ### Templates
 
 **The library** lists the tiles, and with **Pop-ups and parts** switched on (remembered in the browser) every template: shipped, customised (a shipped one with the home's changes), the home's own, and those with a conflict. The home's own templates, and the shipped ones it changed or that have a conflict, are listed whatever the switch. With the switch off, a line under the list counts the pop-ups and parts left out, and a search that matches only those says so and offers to show them. Each row has the template's family, its status ("customised, 3 changes") and where it is used ("on 9 cards, 2 dashboards", counted from every dashboard). A filter searches names, descriptions and families, and chips narrow it to a status. **New** asks for a name and opens a template to start from, a heading with a title slot; **Import** takes a YAML file or pasted text, a mapping of names to templates (or a dashboard's configuration, whose `mnml_templates:` it reads), shows what each becomes, lets one named like a template the home keeps replace it, sit beside it under a new name, or be skipped, and saves; **Export** writes the templates shown, or one from its row, whole, to a `.yaml` file. Each row's menu also has:

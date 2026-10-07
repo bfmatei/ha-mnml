@@ -330,6 +330,18 @@ check(
   'an undo brings back the title and the rooms from before the rebuild',
 );
 
+await page.locator('mnml-dashboards').getByRole('button', { name: 'Share Home' }).click();
+const shared = await page
+  .locator('dialog.dialog textarea[aria-label="The dashboard template"]')
+  .inputValue();
+check(
+  shared.includes('mnml_dashboard:') &&
+    !shared.includes('person.') &&
+    !shared.includes('kitchen') &&
+    !shared.includes('living'),
+  'Share writes a dashboard template with no area or person of the home in it',
+);
+await dialogButton(page, 'Cancel').click();
 await page.locator('mnml-dashboards').getByRole('button', { name: 'Forget Home' }).click();
 await dialogButton(page, 'Delete it too').click();
 await settle(page);
@@ -341,6 +353,25 @@ check(
     !boardsLeft.some((board) => board.url_path === 'dashboard-home'),
   'forgetting with Delete it too removes the dashboard from Home Assistant',
 );
+
+await page.locator('mnml-dashboards').getByRole('button', { name: 'From a template' }).click();
+await page
+  .locator('dialog.dialog textarea[aria-label="A dashboard template in YAML"]')
+  .fill(shared);
+await dialogButton(page, 'Next').click();
+await dialogButton(page, 'Open in the builder').click();
+await page.locator('mnml-plan-editor .plan-section').first().waitFor({ timeout: 30000 });
+await page.locator('mnml-plan-editor').getByRole('button', { name: 'Create' }).click();
+await dialogButton(page, 'Open it').click();
+await page.waitForURL(`${env.HA_URL}/dashboard-home**`, { timeout: 30000 });
+await page.locator('mnml-template-card').first().waitFor({ timeout: 30000 });
+await settle(page, 3000);
+const remadeErrors = await errorCards(page);
+check(
+  remadeErrors.length === 0 && (await roomsIn('dashboard-home')) === quickRooms,
+  `a dashboard made from the shared template draws its rooms with no error card${remadeErrors.length === 0 ? '' : `: ${remadeErrors.join(' | ')}`}`,
+);
+await forgetBuilt();
 
 check(
   errors.length === 0,

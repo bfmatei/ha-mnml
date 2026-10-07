@@ -6,7 +6,13 @@ import { live } from 'lit/directives/live.js';
 import { carFrom, personFrom, roomFrom, systemFrom } from '../builder/customized.ts';
 import { carCard, personCard, roomCard, systemCard } from '../builder/dashboard.ts';
 import { peopleIn, roomShows, systemFills } from '../builder/plan.ts';
-import { SECTION_LOOKS, SYSTEM_TEMPLATES, isPlan, lookOf } from '../contract/builder.ts';
+import {
+  SECTION_LOOKS,
+  SYSTEM_NAMES,
+  SYSTEM_TEMPLATES,
+  isPlan,
+  lookOf,
+} from '../contract/builder.ts';
 import type {
   PersonChoice,
   Plan,
@@ -49,13 +55,6 @@ const OPENINGS: readonly { opening: PopupOpening; label: string }[] = [
   { opening: 'dialog', label: 'A dialog in the middle' },
   { opening: 'unfold', label: 'Unfolded from its tile' },
 ];
-const SYSTEM_NAMES: Readonly<Record<string, string>> = {
-  'home-assistant': 'Home Assistant',
-  'proxmox-server': 'Proxmox VE server',
-  'unifi-network': 'UniFi network',
-  adguard: 'AdGuard Home',
-  'media-server': 'Media server',
-};
 
 function registriesOf(hass: HomeAssistant | undefined): Registries {
   return {
