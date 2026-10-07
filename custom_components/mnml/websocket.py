@@ -88,17 +88,28 @@ CHANGES = vol.Schema({vol.Required("kind"): "changes", vol.Required("changes"): 
 URL_PATH = vol.All(str, vol.Match(r"\A[a-z0-9]+(?:-[a-z0-9]+)+\Z"), vol.Length(max=64))
 TEXT = vol.All(str, vol.Length(min=1))
 OPENING = vol.In(["sheet", "dialog", "unfold"])
+SECTION_KEYS = ("rooms", "people", "garage", "system")
 ICON = vol.All(str, vol.Match(r"\Amdi:[a-z0-9-]+\Z"))
 LOOK = {vol.Optional("title"): TEXT, vol.Optional("icon"): ICON}
 SECTIONS = vol.Schema(
     {
         **{
             vol.Optional(key): vol.Schema({**LOOK, vol.Optional("template"): NAME})
-            for key in ("rooms", "people", "garage")
+            for key in SECTION_KEYS[:3]
         },
         vol.Optional("system"): vol.Schema(LOOK),
     }
 )
+
+
+def section_order(value: list[str]) -> list[str]:
+    if len(set(value)) != len(value):
+        msg = "a section is listed once"
+        raise vol.Invalid(msg)
+    return value
+
+
+ORDER = vol.All([vol.In(SECTION_KEYS)], section_order)
 PLAN = vol.Schema(
     {
         vol.Required("title"): TEXT,
@@ -124,6 +135,7 @@ PLAN = vol.Schema(
             {vol.Optional(device): OPENING for device in ("phone", "tablet", "desktop")}
         ),
         vol.Optional("sections"): SECTIONS,
+        vol.Optional("order"): ORDER,
     }
 )
 PREVIOUS = vol.Schema({vol.Required("plan"): PLAN, vol.Required("config"): dict})

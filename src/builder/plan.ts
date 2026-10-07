@@ -103,6 +103,7 @@ export function planFrom(recipe: Recipe, registries: Registries, templates: Temp
             .map((template) => ({ template })),
     open: { ...recipe.open },
     ...(Object.keys(looks).length === 0 ? {} : { sections: looks }),
+    ...(recipe.order === undefined ? {} : { order: [...recipe.order] }),
   };
 }
 

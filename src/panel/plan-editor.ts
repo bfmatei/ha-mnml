@@ -9,18 +9,14 @@ import { personOf } from '../builder/person.ts';
 import { peopleIn, roomShows, systemFills } from '../builder/plan.ts';
 import {
   SECTION_LOOKS,
+  SECTION_ORDER,
   SYSTEM_NAMES,
   SYSTEM_TEMPLATES,
   isPlan,
   lookOf,
+  orderOf,
 } from '../contract/builder.ts';
-import type {
-  PersonChoice,
-  Plan,
-  SectionKey,
-  SectionLook,
-  SystemChoice,
-} from '../contract/builder.ts';
+import type { Plan, SectionKey, SectionLook, SystemChoice } from '../contract/builder.ts';
 import type { PopupOpen, PopupOpening, TemplateCard } from '../contract/cards.ts';
 import type { MdiIcon, PersonId } from '../contract/entities.ts';
 import { isMapping } from '../contract/templates.ts';
@@ -215,20 +211,40 @@ function trimmed(sections: Plan['sections']): Plan['sections'] {
 }
 
 function withSystem(chosen: readonly SystemChoice[], choice: SystemChoice): SystemChoice[] {
-  return SYSTEM_TEMPLATES.flatMap((name) =>
-    name === choice.template ? [choice] : chosen.filter((each) => each.template === name),
-  );
+  return chosen.some((each) => each.template === choice.template)
+    ? chosen.map((each) => (each.template === choice.template ? choice : each))
+    : [...chosen, choice];
 }
 
-function withPerson(
-  chosen: readonly PersonChoice[],
-  entity: PersonId,
-  order: readonly PersonId[],
-): PersonChoice[] {
-  return order.flatMap((each) => {
-    const kept = chosen.find((person) => person.entity === each);
-    return kept === undefined ? (each === entity ? [{ entity }] : []) : [kept];
-  });
+function withOrder(plan: Plan, order: readonly SectionKey[]): Plan {
+  const { order: _order, ...rest } = plan;
+  return order.every((key, index) => SECTION_ORDER[index] === key)
+    ? rest
+    : { ...rest, order: [...order] };
+}
+
+function moves(
+  label: string,
+  index: number,
+  count: number,
+  move: (by: number) => void,
+): TemplateResult {
+  return html`${iconButton(
+    'mdi:arrow-up',
+    `Move ${label} up`,
+    () => {
+      move(-1);
+    },
+    index === 0,
+  )}
+  ${iconButton(
+    'mdi:arrow-down',
+    `Move ${label} down`,
+    () => {
+      move(1);
+    },
+    index === count - 1,
+  )}`;
 }
 
 export class MnmlPlanEditor extends LitElement {
@@ -524,8 +540,7 @@ export class MnmlPlanEditor extends LitElement {
       (area) => !chosen.some((room) => room.area === area.area_id),
     );
     return html`<section class="plan-section">
-      <h2>Rooms</h2>
-      ${this.drawLook(plan, 'rooms')}
+      ${this.drawHeading(plan, 'rooms')} ${this.drawLook(plan, 'rooms')}
       <p class="muted">
         Each area with something for its tile gets a room. Tick the ones to show, in order.
       </p>
@@ -557,22 +572,9 @@ export class MnmlPlanEditor extends LitElement {
                 );
               },
             )}
-            ${iconButton(
-              'mdi:arrow-up',
-              'Move up',
-              () => {
-                this.change({ rooms: moved(chosen, index, -1) });
-              },
-              index === 0,
-            )}
-            ${iconButton(
-              'mdi:arrow-down',
-              'Move down',
-              () => {
-                this.change({ rooms: moved(chosen, index, 1) });
-              },
-              index === chosen.length - 1,
-            )}
+            ${moves(registries.areas[room.area]?.name ?? room.area, index, chosen.length, (by) => {
+              this.change({ rooms: moved(chosen, index, by) });
+            })}
           </span>
         </div>`,
       )}
@@ -602,61 +604,64 @@ export class MnmlPlanEditor extends LitElement {
   private drawPeople(plan: Plan, registries: Registries): TemplateResult {
     const look = templatesOf(plan);
     const people = peopleIn(registries);
+    const nameOf = (entity: PersonId): string => {
+      const name = registries.states[entity]?.attributes['friendly_name'];
+      return typeof name === 'string' ? name : entity;
+    };
+    const chosen = plan.people;
+    const others = people.filter((entity) => !chosen.some((person) => person.entity === entity));
     return html`<section class="plan-section">
-      <h2>People</h2>
-      ${this.drawLook(plan, 'people')}
+      ${this.drawHeading(plan, 'people')} ${this.drawLook(plan, 'people')}
       ${
-        people.length === 0
+        people.length === 0 && chosen.length === 0
           ? html`<p class="muted">Home Assistant has no people yet.</p>`
-          : people.map((entity) => {
-              const choice = plan.people.find((person) => person.entity === entity);
-              const name = registries.states[entity]?.attributes['friendly_name'];
-              return html`<div class=${choice === undefined ? 'plan-row off' : 'plan-row'}>
-                <input
-                  type="checkbox"
-                  aria-label=${`Show ${typeof name === 'string' ? name : entity}`}
-                  .checked=${live(choice !== undefined)}
-                  @change=${() => {
-                    this.change({
-                      people:
-                        choice === undefined
-                          ? withPerson(plan.people, entity, people)
-                          : plan.people.filter((person) => person !== choice),
-                    });
-                  }}
-                />
-                ${
-                  choice === undefined
-                    ? html`<span class="plan-words"
-                        >${typeof name === 'string' ? name : entity}</span
-                      >`
-                    : html`${this.drawTile(personCard(choice, registries, look.people))}
-                        <span class="row-actions">
-                          ${iconButton(
-                            'mdi:tune-variant',
-                            `Customize ${typeof name === 'string' ? name : entity}`,
-                            () => {
-                              this.edit(
-                                `Customize ${typeof name === 'string' ? name : entity}`,
-                                look.people,
-                                personCard(choice, registries, look.people),
-                                (config) => {
-                                  this.change({
-                                    people: plan.people.map((each) =>
-                                      each === choice
-                                        ? personFrom(choice, config, registries)
-                                        : each,
-                                    ),
-                                  });
-                                },
-                              );
-                            },
-                          )}
-                        </span>`
-                }
-              </div>`;
-            })
+          : nothing
       }
+      ${chosen.map(
+        (choice, index) => html`<div class="plan-row">
+          <input
+            type="checkbox"
+            aria-label=${`Show ${nameOf(choice.entity)}`}
+            .checked=${live(true)}
+            @change=${() => {
+              this.change({ people: chosen.filter((person) => person !== choice) });
+            }}
+          />
+          ${this.drawTile(personCard(choice, registries, look.people))}
+          <span class="row-actions">
+            ${iconButton('mdi:tune-variant', `Customize ${nameOf(choice.entity)}`, () => {
+              this.edit(
+                `Customize ${nameOf(choice.entity)}`,
+                look.people,
+                personCard(choice, registries, look.people),
+                (config) => {
+                  this.change({
+                    people: chosen.map((each) =>
+                      each === choice ? personFrom(choice, config, registries) : each,
+                    ),
+                  });
+                },
+              );
+            })}
+            ${moves(nameOf(choice.entity), index, chosen.length, (by) => {
+              this.change({ people: moved(chosen, index, by) });
+            })}
+          </span>
+        </div>`,
+      )}
+      ${others.map(
+        (entity) => html`<div class="plan-row off">
+          <input
+            type="checkbox"
+            aria-label=${`Show ${nameOf(entity)}`}
+            .checked=${live(false)}
+            @change=${() => {
+              this.change({ people: [...chosen, { entity }] });
+            }}
+          />
+          <span class="plan-words">${nameOf(entity)}</span>
+        </div>`,
+      )}
     </section>`;
   }
 
@@ -678,17 +683,19 @@ export class MnmlPlanEditor extends LitElement {
       slots: {},
     };
     return html`<section class="plan-section">
-      <h2>Garage</h2>
-      ${this.drawLook(plan, 'garage')}
+      ${this.drawHeading(plan, 'garage')} ${this.drawLook(plan, 'garage')}
       ${
         plan.cars.length === 0
           ? html`<p class="muted">A car's entities are chosen when it is added.</p>`
           : nothing
       }
       ${plan.cars.map(
-        (car) => html`<div class="plan-row">
+        (car, index) => html`<div class="plan-row">
           ${this.drawTile(carCard(car, look.cars))}
           <span class="row-actions">
+            ${moves(car.key, index, plan.cars.length, (by) => {
+              this.change({ cars: moved(plan.cars, index, by) });
+            })}
             ${iconButton('mdi:tune-variant', `Customize ${car.key}`, () => {
               this.edit(
                 `Customize ${car.key}`,
@@ -734,83 +741,127 @@ export class MnmlPlanEditor extends LitElement {
     </section>`;
   }
 
-  private drawSystemRow(plan: Plan, registries: Registries, name: string): TemplateResult {
-    const choice = plan.system.find((each) => each.template === name);
-    const fills =
-      choice?.slots !== undefined ||
-      this.remembered(`system:${name}`, () => systemFills(registries, this.templates, name));
-    const label = SYSTEM_NAMES[name] ?? name;
-    const keep = (from: SystemChoice) => (config: Record<string, Value>) => {
+  private keepSystem(plan: Plan, registries: Registries, from: SystemChoice) {
+    return (config: Record<string, Value>): void => {
       this.change({
         system: withSystem(plan.system, systemFrom(from, config, registries, this.templates)),
       });
     };
-    return html`<div class=${choice === undefined ? 'plan-row off' : 'plan-row'}>
+  }
+
+  private drawSystemChosen(
+    plan: Plan,
+    registries: Registries,
+    choice: SystemChoice,
+    index: number,
+  ): TemplateResult {
+    const label = SYSTEM_NAMES[choice.template] ?? choice.template;
+    return html`<div class="plan-row">
       <input
         type="checkbox"
         aria-label=${`Show ${label}`}
-        .checked=${live(choice !== undefined)}
-        ?disabled=${!fills && choice === undefined}
+        .checked=${live(true)}
         @change=${() => {
-          this.change({
-            system:
-              choice === undefined
-                ? withSystem(plan.system, { template: name })
-                : plan.system.filter((each) => each !== choice),
-          });
+          this.change({ system: plan.system.filter((each) => each !== choice) });
         }}
       />
+      ${this.drawTile(systemCard(choice, registries, this.templates))}
+      <span class="row-actions">
+        ${iconButton('mdi:tune-variant', `Customize ${label}`, () => {
+          this.edit(
+            `Customize ${label}`,
+            choice.template,
+            systemCard(choice, registries, this.templates),
+            this.keepSystem(plan, registries, choice),
+          );
+        })}
+        ${moves(label, index, plan.system.length, (by) => {
+          this.change({ system: moved(plan.system, index, by) });
+        })}
+      </span>
+    </div>`;
+  }
+
+  private drawSystemOther(plan: Plan, registries: Registries, name: string): TemplateResult {
+    const fills = this.remembered(`system:${name}`, () =>
+      systemFills(registries, this.templates, name),
+    );
+    const label = SYSTEM_NAMES[name] ?? name;
+    return html`<div class="plan-row off">
+      <input
+        type="checkbox"
+        aria-label=${`Show ${label}`}
+        .checked=${live(false)}
+        ?disabled=${!fills}
+        @change=${() => {
+          this.change({ system: withSystem(plan.system, { template: name }) });
+        }}
+      />
+      <span class="plan-words">
+        <span>${label}</span>
+        ${
+          fills
+            ? nothing
+            : html`<span class="muted">MNML does not find its entities in this home.</span>`
+        }
+      </span>
       ${
-        choice === undefined
-          ? html`<span class="plan-words">
-                <span>${label}</span>
-                ${
-                  fills
-                    ? nothing
-                    : html`<span class="muted"
-                        >MNML does not find all its entities in this home.</span
-                      >`
-                }
-              </span>
-              ${
-                fills
-                  ? nothing
-                  : html`<button
-                      type="button"
-                      class="action"
-                      @click=${() => {
-                        this.edit(
-                          label,
-                          name,
-                          systemCard({ template: name }, registries, this.templates),
-                          keep({ template: name }),
-                        );
-                      }}
-                    >
-                      Choose its entities
-                    </button>`
-              }`
-          : html`${this.drawTile(systemCard(choice, registries, this.templates))}
-              <span class="row-actions">
-                ${iconButton('mdi:tune-variant', `Customize ${label}`, () => {
-                  this.edit(
-                    `Customize ${label}`,
-                    name,
-                    systemCard(choice, registries, this.templates),
-                    keep(choice),
-                  );
-                })}
-              </span>`
+        fills
+          ? nothing
+          : html`<button
+              type="button"
+              class="action"
+              @click=${() => {
+                this.edit(
+                  label,
+                  name,
+                  systemCard({ template: name }, registries, this.templates),
+                  this.keepSystem(plan, registries, { template: name }),
+                );
+              }}
+            >
+              Choose its entities
+            </button>`
       }
     </div>`;
   }
 
   private drawSystem(plan: Plan, registries: Registries): TemplateResult {
+    const others = SYSTEM_TEMPLATES.filter(
+      (name) => !plan.system.some((choice) => choice.template === name),
+    );
     return html`<section class="plan-section">
-      <h2>System</h2>
-      ${this.drawLook(plan, 'system')}
-      ${SYSTEM_TEMPLATES.map((name) => this.drawSystemRow(plan, registries, name))}
+      ${this.drawHeading(plan, 'system')} ${this.drawLook(plan, 'system')}
+      ${plan.system.map((choice, index) => this.drawSystemChosen(plan, registries, choice, index))}
+      ${others.map((name) => this.drawSystemOther(plan, registries, name))}
     </section>`;
+  }
+
+  private drawHeading(plan: Plan, key: SectionKey): TemplateResult {
+    const order = orderOf(plan);
+    const index = order.indexOf(key);
+    const name = SECTION_LOOKS[key].title;
+    return html`<div class="plan-heading">
+      <h2>${name}</h2>
+      <span class="row-actions">
+        ${moves(`the ${name} section`, index, order.length, (by) => {
+          const draft = this.draft;
+          if (draft !== undefined) {
+            this.draft = withOrder(draft, moved(order, index, by));
+          }
+        })}
+      </span>
+    </div>`;
+  }
+
+  private drawPart(plan: Plan, key: SectionKey, registries: Registries): TemplateResult {
+    if (key === 'rooms') {
+      return this.drawRooms(plan, registries);
+    }
+    if (key === 'people') {
+      return this.drawPeople(plan, registries);
+    }
+    return key === 'garage' ? this.drawGarage(plan) : this.drawSystem(plan, registries);
   }
 
   private drawPopups(plan: Plan): TemplateResult {
@@ -879,9 +930,8 @@ export class MnmlPlanEditor extends LitElement {
         </div>
       </div>
       ${this.problem === undefined ? nothing : html`<p class="problem-line">${this.problem}</p>`}
-      ${this.drawDashboard(plan)} ${this.drawRooms(plan, registries)}
-      ${this.drawPeople(plan, registries)} ${this.drawGarage(plan)}
-      ${this.drawSystem(plan, registries)} ${this.drawPopups(plan)}
+      ${this.drawDashboard(plan)}
+      ${orderOf(plan).map((key) => this.drawPart(plan, key, registries))} ${this.drawPopups(plan)}
     </div>`;
   }
 }

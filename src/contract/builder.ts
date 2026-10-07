@@ -40,6 +40,25 @@ export interface Plan {
   system: SystemChoice[];
   open: PopupOpen;
   sections?: Partial<Record<SectionKey, SectionLook>>;
+  order?: SectionKey[];
+}
+
+export const SECTION_ORDER: readonly SectionKey[] = ['rooms', 'people', 'garage', 'system'];
+
+export function orderOf(plan: Pick<Plan, 'order'>): SectionKey[] {
+  const given = (plan.order ?? []).filter(
+    (key, index, all) => SECTION_ORDER.includes(key) && all.indexOf(key) === index,
+  );
+  return [...given, ...SECTION_ORDER.filter((key) => !given.includes(key))];
+}
+
+export function isOrder(value: unknown): value is SectionKey[] {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (key, index) => SECTION_ORDER.some((known) => known === key) && value.indexOf(key) === index,
+    )
+  );
 }
 
 export interface RecipeSection extends SectionLook {
@@ -51,6 +70,7 @@ export interface Recipe {
   icon: MdiIcon;
   open: PopupOpen;
   sections: Partial<Record<SectionKey, RecipeSection>>;
+  order?: SectionKey[];
   templates: Record<string, Template>;
 }
 
@@ -146,6 +166,7 @@ export function isPlan(value: unknown): value is Plan {
     typeof value['icon'] === 'string' &&
     ICON.test(value['icon']) &&
     sectionsOk(value['sections']) &&
+    (value['order'] === undefined || isOrder(value['order'])) &&
     listOf(value['rooms'], (room) => text(room['area']) && slotsOk(room['slots'])) &&
     listOf(value['people'], (person) => isPersonId(person['entity']) && slotsOk(person['slots'])) &&
     listOf(value['cars'], (car) => named(car['key']) && isMapping(car['slots'])) &&
