@@ -620,24 +620,30 @@ export class MnmlBuilder extends LitElement {
     const shipped = this.draft?.shipped;
     return html`<div class=${classMap({ 'simple-work': true, narrow: this.narrow })}>
       <div class="pane">
-        ${drawSimple(simpleOf(this.template, shipped, this.kept), {
-          toggle: (row, on): void => {
-            const where = row.path.join('/');
-            if (on) {
-              const back = switchedOn(this.template, shipped, row.path, this.kept.get(where));
-              this.kept.delete(where);
-              this.replace(back);
-              return;
-            }
-            this.kept.set(where, keptPart(this.template, row.path));
-            this.replace(switchedOff(this.template, row.path));
-          },
-          look: (look, value): void => {
-            if (value !== '') {
+        ${drawSimple(
+          simpleOf(this.template, shipped, this.kept),
+          {
+            toggle: (row, on): void => {
+              const where = row.path.join('/');
+              if (on) {
+                const back = switchedOn(this.template, shipped, row.path, this.kept.get(where));
+                this.kept.delete(where);
+                this.replace(back);
+                return;
+              }
+              this.kept.set(where, keptPart(this.template, row.path));
+              this.replace(switchedOff(this.template, row.path));
+            },
+            look: (look, value): void => {
+              if (value === '') {
+                this.requestUpdate();
+                return;
+              }
               this.replace(withValue(this.template, look.path, value));
-            }
+            },
           },
-        })}
+          this.hass,
+        )}
       </div>
       <div class="pane preview-pane">${this.drawPreview()}</div>
     </div>`;

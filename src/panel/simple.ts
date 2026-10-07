@@ -8,6 +8,7 @@ import { isMapping } from '../contract/templates.ts';
 import type { Template, Value } from '../contract/templates.ts';
 import { COLORS } from '../editors/lists.ts';
 import { field } from '../ha/field.ts';
+import type { HomeAssistant } from '../ha/hass.ts';
 
 import { partOf } from './outline.ts';
 import type { Group, Part } from './outline.ts';
@@ -20,6 +21,7 @@ interface SimpleLook {
   path: Path;
   key: LookKey;
   value: string;
+  original?: string;
 }
 
 export interface SimpleRow {
@@ -39,18 +41,30 @@ export interface KeptPart {
 }
 
 const LOOKS: readonly LookKey[] = ['name', 'title', 'icon', 'color'];
+const EDITOR_DOCS =
+  'https://github.com/bfmatei/ha-mnml/blob/main/docs/editors.md#the-template-cards-editor';
 
 const words = (label: string): string => label.replaceAll(/\[\[([^\]]+)\]\]/g, '$1');
 
 const idOf = (item: Value): string | undefined =>
   isMapping(item) && typeof item['id'] === 'string' ? item['id'] : undefined;
 
-function looksOf(part: Part): SimpleLook[] {
+function looksOf(part: Part, shipped: Template | undefined): SimpleLook[] {
   return LOOKS.flatMap((key) => {
     const value = part.value[key];
-    return typeof value === 'string' && !value.includes('[[')
-      ? [{ path: [...part.path, key], key, value }]
-      : [];
+    if (typeof value !== 'string' || value.includes('[[')) {
+      return [];
+    }
+    const path = [...part.path, key];
+    const original = shipped === undefined ? undefined : valueAt(shipped, path);
+    return [
+      {
+        path,
+        key,
+        value,
+        ...(typeof original === 'string' && original !== value ? { original } : {}),
+      },
+    ];
   });
 }
 
@@ -74,7 +88,13 @@ function merged(present: readonly string[], shipped: readonly string[]): string[
   return order;
 }
 
-function rowOf(part: Part, group: string, depth: number, switchable: boolean): SimpleRow {
+function rowOf(
+  part: Part,
+  group: string,
+  depth: number,
+  switchable: boolean,
+  shipped: Template | undefined,
+): SimpleRow {
   return {
     path: part.path,
     group,
@@ -83,7 +103,7 @@ function rowOf(part: Part, group: string, depth: number, switchable: boolean): S
     switchable,
     on: true,
     condition: part.badges.length === 0 ? undefined : part.badges.join(' and '),
-    looks: looksOf(part),
+    looks: looksOf(part, shipped),
   };
 }
 
@@ -130,7 +150,7 @@ function walk(
   switchable: boolean,
   out: SimpleRow[],
 ): void {
-  out.push(rowOf(part, group, depth, switchable));
+  out.push(rowOf(part, group, depth, switchable, shipped));
   for (const inner of groupsOf(part, shipped, kept)) {
     if (!inner.list) {
       for (const each of inner.parts) {
@@ -165,7 +185,7 @@ function walk(
         original.find((each) => `#${idOf(each) ?? ''}` === segment);
       if (isMapping(item)) {
         const gone = partOf(item, [...inner.path, segment], inner.of, 0);
-        out.push({ ...rowOf(gone, inner.label, depth + 1, true), on: false, looks: [] });
+        out.push({ ...rowOf(gone, inner.label, depth + 1, true, shipped), on: false, looks: [] });
       }
     }
   }
@@ -241,11 +261,18 @@ const changed = (event: Event): string => {
   return typeof value === 'string' ? value : '';
 };
 
-function drawLook(look: SimpleLook, of: string, actions: SimpleActions): TemplateResult {
+function drawLook(
+  look: SimpleLook,
+  of: string,
+  actions: SimpleActions,
+  hass: HomeAssistant | undefined,
+): TemplateResult {
   const where = look.path.join('/');
   const label = `${of}: ${look.key === 'color' ? 'colour' : look.key === 'icon' ? 'icon' : look.key}`;
   if (look.key === 'color') {
-    const options = COLORS.includes(look.value) ? COLORS : [look.value, ...COLORS];
+    const options = [
+      ...new Set([look.value, ...(look.original === undefined ? [] : [look.original]), ...COLORS]),
+    ];
     return html`<select
       class="area-picker"
       aria-label=${label}
@@ -261,6 +288,19 @@ function drawLook(look: SimpleLook, of: string, actions: SimpleActions): Templat
       )}
     </select>`;
   }
+  if (look.key === 'icon' && customElements.get('ha-icon-picker') !== undefined) {
+    return html`<ha-icon-picker
+      class="simple-picker"
+      aria-label=${label}
+      data-path=${where}
+      .hass=${hass}
+      .value=${look.value}
+      @value-changed=${(event: Event) => {
+        const value = field(field(event, 'detail'), 'value');
+        actions.look(look, typeof value === 'string' ? value : '');
+      }}
+    ></ha-icon-picker>`;
+  }
   return html`<span class="simple-look">
     ${look.key === 'icon' && look.value.startsWith('mdi:') ? html`<ha-icon .icon=${look.value}></ha-icon>` : nothing}
     <input
@@ -275,11 +315,16 @@ function drawLook(look: SimpleLook, of: string, actions: SimpleActions): Templat
   </span>`;
 }
 
-export function drawSimple(rows: readonly SimpleRow[], actions: SimpleActions): TemplateResult {
+export function drawSimple(
+  rows: readonly SimpleRow[],
+  actions: SimpleActions,
+  hass?: HomeAssistant,
+): TemplateResult {
   return html`<div class="simple">
     <p class="muted">
       What changes here changes this template everywhere it is used. A card's own entities and names
-      are set in its editor.
+      are set in
+      <a href=${EDITOR_DOCS} target="_blank" rel="noreferrer">its editor</a>.
     </p>
     ${rows.map(
       (row, index) => html`${
@@ -310,7 +355,7 @@ export function drawSimple(rows: readonly SimpleRow[], actions: SimpleActions): 
             <span>${row.label}</span>
             ${row.condition === undefined ? nothing : html`<span class="muted">${row.condition}</span>`}
           </span>
-          ${row.on ? row.looks.map((look) => drawLook(look, row.label, actions)) : nothing}
+          ${row.on ? row.looks.map((look) => drawLook(look, row.label, actions, hass)) : nothing}
         </div>`,
     )}
   </div>`;

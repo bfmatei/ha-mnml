@@ -831,3 +831,24 @@ test('a template that finds nothing anywhere says nothing about what it found', 
   );
   assert.equal(root.querySelector('.found'), null);
 });
+
+test('another template picked starts with its own folds, not the ones opened on the last', async () => {
+  const store = fakeStore();
+  store.kept = own({
+    'room-like': ROOM_LIKE,
+    'basic-two': {
+      description: 'Basics again.',
+      slots: {
+        first: { kind: 'text', group: 'Other' },
+        label: { kind: 'text', discover: 'area.name', group: 'Basics' },
+      },
+      card: { type: 'custom:mnml-heading-card', title: '[[label]]', icon: 'mdi:star' },
+    },
+  });
+  const { root } = await openWith({ ...MINE, area: 'living' }, { ...roomHass(), ...store.hass });
+  await click(labelled(root, 'Change what it found'));
+  assert.equal(panelHeads(root)['Basics'], 'true');
+  await click(labelled(root, 'Change the template'));
+  await click(labelled(root, 'Use basic-two'));
+  assert.equal(panelHeads(root)['Basics'], 'false');
+});

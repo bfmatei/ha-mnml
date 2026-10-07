@@ -28,6 +28,7 @@ import { discover } from '../templates/discover.ts';
 import type { Registries } from '../templates/discover.ts';
 import { expand, toValue } from '../templates/expand.ts';
 import { rolesOf } from '../templates/roles.ts';
+import type { Role } from '../templates/roles.ts';
 
 import { customize } from './customize.ts';
 import { PANEL_STYLE } from './style.ts';
@@ -263,6 +264,10 @@ export class MnmlPlanEditor extends LitElement {
   @state() private problem: string | undefined;
   @state() private saving = false;
   private readonly found = new Map<string, boolean>();
+  private known: { templates: Templates | undefined; roles: Readonly<Record<string, Role>> } = {
+    templates: undefined,
+    roles: {},
+  };
   private seen: readonly unknown[] = [];
 
   protected override willUpdate(changed: PropertyValues<this>): void {
@@ -279,6 +284,13 @@ export class MnmlPlanEditor extends LitElement {
     if (changed.has('address')) {
       this.where = this.address;
     }
+  }
+
+  private roles(): Readonly<Record<string, Role>> {
+    if (this.known.templates !== this.templates) {
+      this.known = { templates: this.templates, roles: rolesOf(this.templates) };
+    }
+    return this.known.roles;
   }
 
   private remembered(key: string, find: () => boolean): boolean {
@@ -467,7 +479,7 @@ export class MnmlPlanEditor extends LitElement {
         : key === 'garage'
           ? ['key']
           : [];
-    const tiles = Object.entries(rolesOf(this.templates))
+    const tiles = Object.entries(this.roles())
       .filter(
         ([template, role]) =>
           role === 'tile' &&

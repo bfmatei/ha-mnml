@@ -47,7 +47,7 @@ import { loadLovelace } from './lovelace.ts';
 import { MnmlPlanEditor } from './plan-editor.ts';
 import type { PlanHost } from './plan-editor.ts';
 import { MnmlPreview } from './preview.ts';
-import { bringing, broughtIn, previewOf, summary } from './share.ts';
+import { bringing, broughtIn, previewOf, previewPlan, summary } from './share.ts';
 import { PAGE_STYLE, PANEL_STYLE } from './style.ts';
 import {
   dashboardTemplates,
@@ -801,33 +801,40 @@ export class MnmlPanel extends LitElement {
     if (read !== true || recipe === undefined) {
       return;
     }
+    const given = recipe;
     const incoming = planImport(
-      recipe.templates,
+      given.templates,
       shipped,
       this.kept ?? NOTHING_KEPT,
       this.resolved(),
     );
     const { offered, choices, alone } = bringing(incoming);
-    const looked = planFrom(recipe, this.registries(), { ...this.resolved(), ...recipe.templates });
+    const taken = this.taken();
     const open = await ask(
       this.renderRoot,
-      recipe.title,
-      html`<p>${previewOf(recipe, looked)}</p>
-        ${
-          incoming.length === 0
-            ? nothing
-            : html`<p class="muted">
-                  It brings these templates. Replacing one changes it on every dashboard of this
-                  home; keeping both brings this one in beside it, under a new name.
-                </p>
-                ${this.fatesOf(offered, choices, [], alone)}`
-        }`,
+      given.title,
+      (redraw) =>
+        html`<p>
+            ${previewOf(
+              given,
+              previewPlan(given, offered, choices, taken, this.registries(), this.resolved()),
+            )}
+          </p>
+          ${
+            incoming.length === 0
+              ? nothing
+              : html`<p class="muted">
+                    It brings these templates. Replacing one changes it on every dashboard of this
+                    home; keeping both brings this one in beside it, under a new name.
+                  </p>
+                  ${this.fatesOf(offered, choices, [], alone, redraw)}`
+          }`,
       [{ label: 'Open in the builder', value: true, primary: true }],
     );
     if (open !== true) {
       return;
     }
-    const brought = broughtIn(recipe, offered, choices, this.taken());
+    const brought = broughtIn(given, offered, choices, this.taken());
     await Promise.all(brought.save.map((each) => this.save(each.name, entryFor(each, shipped))));
     const templates = {
       ...this.resolved(),
@@ -949,6 +956,7 @@ export class MnmlPanel extends LitElement {
     choices: Record<string, Choice>,
     differ: readonly string[] = [],
     alone: ReadonlySet<string> = new Set(),
+    changed: () => void = () => undefined,
   ): TemplateResult {
     return html`<div class="import-plan">
       ${plan.map(
@@ -977,6 +985,7 @@ export class MnmlPanel extends LitElement {
                       const value = field(event.target, 'value');
                       choices[incoming.name] =
                         value === 'both' ? 'both' : value === 'skip' ? 'skip' : 'replace';
+                      changed();
                     }}
                   >
                     <option

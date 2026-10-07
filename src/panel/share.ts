@@ -1,6 +1,9 @@
+import { planFrom } from '../builder/plan.ts';
 import { renamedRecipe } from '../builder/recipe.ts';
 import { SYSTEM_NAMES, SYSTEM_TEMPLATES } from '../contract/builder.ts';
 import type { Plan, Recipe } from '../contract/builder.ts';
+import type { Templates } from '../contract/templates.ts';
+import type { Registries } from '../templates/discover.ts';
 
 import { settleImport } from './transfer.ts';
 import type { Choice, Incoming } from './transfer.ts';
@@ -106,4 +109,20 @@ export function broughtIn(
     renamedSave.push({ ...each, template: renamed.templates[each.name] ?? each.template });
   }
   return { save: renamedSave, recipe: renamed };
+}
+
+export function previewPlan(
+  recipe: Recipe,
+  offered: readonly Incoming[],
+  choices: Readonly<Record<string, Choice>>,
+  taken: ReadonlySet<string>,
+  registries: Registries,
+  resolved: Templates,
+): Plan {
+  const brought = broughtIn(recipe, offered, choices, taken);
+  const templates = {
+    ...resolved,
+    ...Object.fromEntries(brought.save.map((each) => [each.name, each.template])),
+  };
+  return planFrom(brought.recipe, registries, templates);
 }
