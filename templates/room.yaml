@@ -38,7 +38,6 @@ room:
     lights:
       help: "The room's lights: their group, and the members it controls."
       kind: object
-      required: true
       group: Lights
       fields:
         group: { kind: entity, required: true }
@@ -268,9 +267,11 @@ room:
     popup: '#[[key]]'
     state:
       - id: temperature
+        if: temperature
         entity: '[[temperature]]'
         icon: true
       - id: humidity
+        if: humidity
         entity: '[[humidity]]'
         icon: true
     chips?:
@@ -306,6 +307,7 @@ room:
             when: { not: ['off'] },
           }
     item:
+      if: lights.group
       template: light-item
       slots:
         entity: '[[lights.group]]'
@@ -340,6 +342,7 @@ room:
         batteries: '[[batteries]]'
         meters: '[[meters]]'
     - id: lights-popup
+      if: lights.group
       template: lights-popup
       slots:
         key: '[[key]]'
@@ -396,7 +399,7 @@ room:
 room-media-card:
   description: A room's media player, opening its speaker pop-up when it is a speaker.
   slots:
-    key: { kind: text, required: true }
+    key: { kind: text }
     member:
       kind: object
       required: true
@@ -429,7 +432,6 @@ room-popup:
     lock: { kind: entity }
     lights:
       kind: object
-      required: true
       fields:
         group: { kind: entity, required: true }
         members:
@@ -584,9 +586,11 @@ room-popup:
         icon: '[[icon]]'
         state:
           - id: temperature
+            if: temperature
             entity: '[[temperature]]'
             icon: true
           - id: humidity
+            if: humidity
             entity: '[[humidity]]'
             icon: true
         controls?:
@@ -611,6 +615,7 @@ room-popup:
         title: Lights
         icon: mdi:lightbulb-group
       - id: light-card
+        if: lights.group
         template: light-card
         slots:
           entity: '[[lights.group]]'

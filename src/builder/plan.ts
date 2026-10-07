@@ -4,7 +4,7 @@ import type { PersonId } from '../contract/entities.ts';
 import type { Instance, Templates, Value } from '../contract/templates.ts';
 import { discover } from '../templates/discover.ts';
 import type { Registries } from '../templates/discover.ts';
-import { expand } from '../templates/expand.ts';
+import { expand, filled } from '../templates/expand.ts';
 
 const NAMING = new Set(['key', 'name', 'icon']);
 
@@ -34,9 +34,13 @@ export function roomShows(
 
 export function systemFills(registries: Registries, templates: Templates, name: string): boolean {
   const template = templates[name];
+  if (template === undefined) {
+    return false;
+  }
+  const found = discover(template, undefined, registries);
   return (
-    template !== undefined &&
-    draws(templates, { template: name }, discover(template, undefined, registries))
+    Object.values(found).some((value) => filled(value)) &&
+    draws(templates, { template: name }, found)
   );
 }
 

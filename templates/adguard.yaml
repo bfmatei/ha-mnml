@@ -10,20 +10,17 @@ adguard:
     queries:
       help: 'The DNS queries answered.'
       kind: entity
-      required: true
       group: Traffic
       discover: { domain: sensor, platform: adguard, translation_key: dns_queries, scope: all }
     blocked:
       help: 'The DNS queries blocked.'
       kind: entity
-      required: true
       group: Traffic
       discover:
         { domain: sensor, platform: adguard, translation_key: dns_queries_blocked, scope: all }
     ratio:
       help: 'The share of the queries blocked.'
       kind: entity
-      required: true
       group: Traffic
       discover:
         {
@@ -35,7 +32,6 @@ adguard:
     speed:
       help: 'The average time to answer a query.'
       kind: entity
-      required: true
       group: Traffic
       discover:
         { domain: sensor, platform: adguard, translation_key: average_processing_speed, scope: all }
@@ -46,7 +42,6 @@ adguard:
     update:
       help: "AdGuard Home's update."
       kind: entity
-      required: true
       group: Status
       discover: { domain: update, platform: adguard, scope: all }
   card:
@@ -56,9 +51,11 @@ adguard:
     popup: '#adguard'
     state:
       - id: ratio
+        if: ratio
         entity: '[[ratio]]'
         icon: true
       - id: speed
+        if: speed
         entity: '[[speed]]'
         icon: true
     chips:
@@ -95,12 +92,12 @@ adguard-popup:
   description: AdGuard Home's pop-up, its queries, blocklists and update.
   slots:
     protection: { kind: entity, required: true }
-    queries: { kind: entity, required: true }
-    blocked: { kind: entity, required: true }
-    ratio: { kind: entity, required: true }
-    speed: { kind: entity, required: true }
+    queries: { kind: entity }
+    blocked: { kind: entity }
+    ratio: { kind: entity }
+    speed: { kind: entity }
     rules: { kind: entity }
-    update: { kind: entity, required: true }
+    update: { kind: entity }
   card:
     hash: '#adguard'
     cards:
@@ -112,9 +109,11 @@ adguard-popup:
         when: { is: ['off'] }
         state:
           - id: ratio
+            if: ratio
             entity: '[[ratio]]'
             icon: true
           - id: speed
+            if: speed
             entity: '[[speed]]'
             icon: true
         controls:
@@ -127,13 +126,17 @@ adguard-popup:
         icon: mdi:dns
         rows:
           - id: queries
+            if: queries
             entity: '[[queries]]'
           - id: blocked
+            if: blocked
             entity: '[[blocked]]'
           - id: ratio
+            if: ratio
             entity: '[[ratio]]'
             bar: true
           - id: speed
+            if: speed
             entity: '[[speed]]'
       - id: rules
         if: rules
@@ -142,6 +145,7 @@ adguard-popup:
         icon: mdi:filter-outline
         rows:
           - id: rules
+            if: rules
             entity: '[[rules]]'
             color: red
             when: { is: ['0'] }
@@ -151,6 +155,7 @@ adguard-popup:
         icon: mdi:package-up
         rows:
           - id: pending-row
+            if: update
             template: pending-row
             slots: { entity: '[[update]]' }
   example: *adguard

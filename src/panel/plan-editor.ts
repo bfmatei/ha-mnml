@@ -526,7 +526,9 @@ export class MnmlPlanEditor extends LitElement {
     return html`<section class="plan-section">
       <h2>Rooms</h2>
       ${this.drawLook(plan, 'rooms')}
-      <p class="muted">Each area with a light gets a room tile. Tick the ones to show, in order.</p>
+      <p class="muted">
+        Each area with something for its tile gets a room. Tick the ones to show, in order.
+      </p>
       ${chosen.map(
         (room, index) => html`<div class="plan-row">
           <input
@@ -590,7 +592,7 @@ export class MnmlPlanEditor extends LitElement {
           />
           <span class="plan-words">
             <span>${area.name}</span>
-            ${shows ? nothing : html`<span class="muted">A room tile needs a light here.</span>`}
+            ${shows ? nothing : html`<span class="muted">Its template finds nothing to show here.</span>`}
           </span>
         </div>`;
       })}

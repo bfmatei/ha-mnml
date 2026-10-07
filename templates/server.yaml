@@ -4,7 +4,6 @@ proxmox-server:
     outlet:
       help: 'The outlet the server is plugged into, with its power.'
       kind: object
-      required: true
       group: Power
       fields:
         entity: { kind: entity, required: true }
@@ -14,17 +13,10 @@ proxmox-server:
             power: { kind: entity, required: true }
             today: { kind: entity }
             total: { kind: entity }
-    cpu:
-      { kind: entity, required: true, label: CPU, group: Load, help: "The server's processor use." }
-    memory: { kind: entity, required: true, group: Load, help: "The server's memory use." }
+    cpu: { kind: entity, label: CPU, group: Load, help: "The server's processor use." }
+    memory: { kind: entity, group: Load, help: "The server's memory use." }
     last_boot:
-      {
-        kind: entity,
-        required: true,
-        group: Load,
-        label: 'Last boot',
-        help: 'When the server last started.',
-      }
+      { kind: entity, group: Load, label: 'Last boot', help: 'When the server last started.' }
     uplink: { kind: entity, group: Load }
     temperatures:
       kind: object
@@ -113,9 +105,11 @@ proxmox-server:
     popup: '#proxmox'
     state:
       - id: cpu
+        if: cpu
         entity: '[[cpu]]'
         icon: true
       - id: memory
+        if: memory
         entity: '[[memory]]'
         icon: true
     chips:
@@ -210,7 +204,6 @@ proxmox-popup:
   slots:
     outlet:
       kind: object
-      required: true
       fields:
         entity: { kind: entity, required: true }
         energy:
@@ -219,9 +212,9 @@ proxmox-popup:
             power: { kind: entity, required: true }
             today: { kind: entity }
             total: { kind: entity }
-    cpu: { kind: entity, required: true }
-    memory: { kind: entity, required: true }
-    last_boot: { kind: entity, required: true }
+    cpu: { kind: entity }
+    memory: { kind: entity }
+    last_boot: { kind: entity }
     uplink: { kind: entity }
     temperatures:
       kind: object
@@ -300,9 +293,11 @@ proxmox-popup:
         icon: mdi:server
         state:
           - id: cpu
+            if: cpu
             entity: '[[cpu]]'
             icon: true
           - id: memory
+            if: memory
             entity: '[[memory]]'
             icon: true
       - id: notifications
@@ -352,15 +347,19 @@ proxmox-popup:
         icon: mdi:harddisk
         rows:
           - id: outlet-entity
+            if: outlet.entity
             entity: '[[outlet.entity]]'
             color: amber
             when: { is: ['on'] }
           - id: cpu
+            if: cpu
             entity: '[[cpu]]'
           - id: memory
+            if: memory
             entity: '[[memory]]'
             bar: true
           - id: last_boot
+            if: last_boot
             entity: '[[last_boot]]'
             relative: true
           - id: uplink

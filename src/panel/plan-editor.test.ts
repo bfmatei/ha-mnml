@@ -67,7 +67,7 @@ test('an area with no light offers no room, and one ticked comes last', async ()
   const hallway = labelled(root, 'Show Hallway');
   assert.ok(hallway instanceof HTMLInputElement);
   assert.equal(hallway.disabled, true);
-  assert.match(text(root), /A room tile needs a light here/);
+  assert.match(text(root), /Its template finds nothing to show here/);
   labelled(root, 'Show Kitchen').dispatchEvent(new Event('change'));
   await save(element, root);
   assert.deepEqual(saved[0]?.[0].rooms, [{ area: 'living' }, { area: 'kitchen' }]);

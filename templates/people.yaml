@@ -229,7 +229,7 @@ device-popup:
   description: A person's device pop-up, its battery and its details.
   slots:
     key: { kind: text, required: true }
-    entity: { kind: entity, required: true }
+    entity: { kind: entity }
     device:
       kind: object
       required: true
@@ -255,7 +255,7 @@ device-popup:
         name: '[[device.name]]'
         icon: '[[device.icon]]'
         entity: '[[device.tracker]]'
-        state: [{ id: entity, entity: '[[entity]]', name: true }]
+        state: [{ id: entity, if: entity, entity: '[[entity]]', name: true }]
         back: true
       - id: battery
         type: custom:mnml-list-card

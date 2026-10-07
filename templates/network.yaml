@@ -4,18 +4,11 @@ unifi-network:
     latency:
       {
         kind: entities,
-        required: true,
         group: Basics,
         help: "The sensors of the network's latency, the first on the tile.",
       }
     wan: { kind: entity, label: WAN, group: Basics }
-    devices:
-      {
-        kind: entities,
-        required: true,
-        group: Devices,
-        help: "The network's devices, for their state.",
-      }
+    devices: { kind: entities, group: Devices, help: "The network's devices, for their state." }
     wifi:
       kind: objects
       label: Wi-Fi networks
@@ -42,13 +35,11 @@ unifi-network:
     router:
       help: "The router's processor use and temperature."
       kind: object
-      required: true
       group: Basics
       fields:
         cpu: { kind: entity, required: true, label: CPU }
         temperature: { kind: entity, required: true }
-    firmware:
-      { kind: entities, required: true, group: Devices, help: "The devices' firmware updates." }
+    firmware: { kind: entities, group: Devices, help: "The devices' firmware updates." }
     device_up:
       {
         kind: texts,
@@ -141,9 +132,9 @@ wifi-item:
 network-popup:
   description: The network's pop-up, its internet, devices, router, VPN, Wi-Fi networks, clients and firmware.
   slots:
-    latency: { kind: entities, required: true }
+    latency: { kind: entities }
     wan: { kind: entity }
-    devices: { kind: entities, required: true }
+    devices: { kind: entities }
     wifi:
       kind: objects
       fields:
@@ -166,11 +157,10 @@ network-popup:
             subnet: { kind: text, required: true }
     router:
       kind: object
-      required: true
       fields:
         cpu: { kind: entity, required: true, label: CPU }
         temperature: { kind: entity, required: true }
-    firmware: { kind: entities, required: true }
+    firmware: { kind: entities }
     device_up: { kind: texts, default: [connected, upgrading, provisioning] }
   card:
     hash: '#network'
@@ -206,14 +196,17 @@ network-popup:
             color: red
             when: { not: '[[device_up]]' }
       - id: router
+        if: router
         type: custom:mnml-list-card
         title: Router
         icon: mdi:router
         rows:
           - id: router-cpu
+            if: router.cpu
             entity: '[[router.cpu]]'
             bar: true
           - id: router-temperature
+            if: router.temperature
             entity: '[[router.temperature]]'
       - id: vpn
         if: vpn

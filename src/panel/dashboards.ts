@@ -52,9 +52,9 @@ export class MnmlDashboards extends LitElement {
       <div class="start-words">
         <h2>Build your dashboard</h2>
         <p>
-          MNML makes a dashboard from your home: a tile for each room with lights, one for each
-          person, and the system cards it finds the entities of. Start at once, or choose what goes
-          in step by step. Either way, Edit changes it later.
+          MNML makes a dashboard from your home: a tile for each room it finds something in, one for
+          each person, and the system cards it finds the entities of. Start at once, or choose what
+          goes in step by step. Either way, Edit changes it later.
         </p>
       </div>
       <div class="start-actions">
