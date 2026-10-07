@@ -259,8 +259,29 @@ check(
 );
 await page.locator('mnml-dashboards').getByRole('button', { name: 'Edit Home' }).click();
 await page.locator('mnml-plan-editor .plan-section').first().waitFor({ timeout: 30000 });
+await page.locator('mnml-plan-editor').getByRole('button', { name: 'Customize Kitchen' }).click();
+await page
+  .locator('mnml-plan-editor dialog.customize mnml-template-card-editor')
+  .waitFor({ timeout: 30000 });
+await settle(page, 2000);
+check(
+  (await page
+    .locator('mnml-plan-editor dialog.customize')
+    .getByText('Find in an area', { exact: true })
+    .count()) > 0,
+  "Customize opens the template card's editor on the room, found in its area",
+);
+await page
+  .locator('mnml-plan-editor dialog.customize')
+  .getByRole('button', { name: 'Done' })
+  .click();
+await settle(page, 500);
+check(
+  (await page.locator('mnml-plan-editor dialog.customize').count()) === 0,
+  'Done with nothing changed closes it',
+);
 await page.locator('mnml-plan-editor input.fact-input').first().fill('Walk home');
-await page.locator('mnml-plan-editor input[type="checkbox"]:checked').first().uncheck();
+await page.locator('mnml-plan-editor').getByRole('checkbox', { name: 'Show Kitchen' }).click();
 await page.locator('mnml-plan-editor').getByRole('button', { name: 'Rebuild' }).click();
 await dialogButton(page, 'Rebuild').click();
 await dialogButton(page, 'Cancel').click();

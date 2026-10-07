@@ -85,7 +85,7 @@ OWN = vol.Schema(
 )
 CHANGES = vol.Schema({vol.Required("kind"): "changes", vol.Required("changes"): [CHANGE]})
 
-URL_PATH = vol.All(str, vol.Match(r"\A[a-z0-9_]+(?:-[a-z0-9_]+)+\Z"), vol.Length(max=64))
+URL_PATH = vol.All(str, vol.Match(r"\A[a-z0-9]+(?:-[a-z0-9]+)+\Z"), vol.Length(max=64))
 TEXT = vol.All(str, vol.Length(min=1))
 OPENING = vol.In(["sheet", "dialog", "unfold"])
 PLAN = vol.Schema(

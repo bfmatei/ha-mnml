@@ -31,21 +31,23 @@ A card with a key the editor does not know, or a value it cannot hold, opens in 
 
 ### Building a dashboard
 
-**Dashboards** lists the dashboards MNML built, each with its address and when it was built. A row opens the dashboard's builder; **Open** goes to the dashboard, **Undo** puts back the version the last rebuild replaced, and **Forget** stops MNML building it, leaving the dashboard in Home Assistant as it is or, with **Delete it too**, deleting it. A dashboard deleted in Home Assistant stays listed, and its builder makes it again. With none built, the tab, and the library above its templates, offer to build one:
+**Dashboards** lists the dashboards MNML built, each with its address and when it was built. A row opens the dashboard's builder; **Open** goes to the dashboard, **Undo** puts back the version the last rebuild replaced, and **Forget** stops MNML building it, leaving the dashboard in Home Assistant as it is or, with **Delete it too**, deleting it. A dashboard deleted in Home Assistant stays listed, without Open and Undo, and its builder makes it again. When the integration cannot give the list, the tab says why. With none built, the tab, and the library above its templates, offer to build one:
 
 - **Quick start** says what it makes and where, then makes it at once: a room tile for each area where the room template has something to show (a light), in the order Home Assistant lists the areas; a tile for each person; the system cards whose entities MNML finds in the home; pop-ups that unfold from their tiles on a tablet and a computer. Its address is the title after `dashboard-`, free of every dashboard and panel the home has.
 - **Step by step** opens the builder on the same choices, at `/mnml/dashboards/new`.
 
 **The builder** is one page, a section for each part of the dashboard:
 
-- **Dashboard**: its title and icon, and for a new one its address, which has a `-`, as Home Assistant asks of a dashboard's address.
+- **Dashboard**: its title and icon, and for a new one its address: lower case letters and digits, with at least one `-` between them, as Home Assistant asks of a dashboard's address, and at most 64 long.
 - **Rooms**: each area, ticked to show it, its tile drawn live, and moved up and down. An area where the room template has nothing to show cannot be ticked, and says so.
 - **People**: each person, ticked to show them, with their tile. A person's devices are the trackers of theirs that the companion app made, with the app's sensors.
-- **Garage**: the cars, each with its tile and **Remove**.
-- **System**: each system template (Home Assistant, a Proxmox VE server, a UniFi network, AdGuard Home, a media server), which can be ticked once MNML finds its entities.
+- **Garage**: the cars, each with its tile and **Remove**. **Add a car** opens the car template's editor; a car needs a key, its name in its pop-ups' hashes (`sedan` gives `#car-sedan`), and every entity the template requires.
+- **System**: each system template (Home Assistant, a Proxmox VE server, a UniFi network, AdGuard Home, a media server). One whose entities MNML finds in the whole home can be ticked: Home Assistant's from System Monitor and the Supervisor, AdGuard Home's from its integration. Any other has **Choose its entities**, which opens its editor.
 - **Pop-ups**: how a tile's pop-up opens on a phone, a tablet and a computer: a sheet, a dialog or unfolded from its tile, or the default (a sheet on a phone, a dialog elsewhere).
 
-**Create** makes the dashboard in Home Assistant, in the sidebar, and keeps what was chosen. **Rebuild** asks first, then replaces the dashboard's cards, with any change made to them by hand, and its title and icon; the version it replaces is kept, cards and choices, until the next rebuild, for **Undo**. A room whose area is gone, or a person who is gone, is left out of what is built. What MNML keeps of each dashboard lives in the integration ([The integration](architecture.md#custom_componentsmnml-the-integration)).
+**Customize**, on any row shown, opens the template card's editor on that row's card, with what MNML found and the row's changes ([The template card's editor](#the-template-cards-editor)). **Done** checks that the card still draws with its own template, and keeps only what differs from what MNML finds: a room keeps its overrides over its area, a person and a system card what differs from what MNML finds of them, so a rebuild still follows the home in the rest.
+
+**Create** makes the dashboard in Home Assistant, in the sidebar, and keeps what was chosen. **Rebuild** asks first, keeps the cards it is about to replace (it stops when it cannot read them), then replaces the dashboard's cards, with any change made to them by hand, and its title and icon; the version it replaces is kept, cards and choices, until the next rebuild, for **Undo**. A room whose area is gone, or a person who is gone, is left out of what is built. What MNML keeps of each dashboard lives in the integration ([The integration](architecture.md#custom_componentsmnml-the-integration)).
 
 ### Templates
 

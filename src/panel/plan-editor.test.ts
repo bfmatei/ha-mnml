@@ -143,3 +143,40 @@ test('a dashboard MNML built is rebuilt at its own address, which is not asked',
   assert.equal(saved[0]?.[1], 'dashboard-home');
   element.remove();
 });
+
+test('a room unticked leaves every box showing what is chosen', async () => {
+  const { element, root } = await editor();
+  const kitchen = labelled(root, 'Show Kitchen');
+  assert.ok(kitchen instanceof HTMLInputElement);
+  kitchen.checked = false;
+  kitchen.dispatchEvent(new Event('change'));
+  await element.updateComplete;
+  const living = labelled(root, 'Show Living');
+  const unticked = labelled(root, 'Show Kitchen');
+  assert.ok(living instanceof HTMLInputElement && unticked instanceof HTMLInputElement);
+  assert.equal(living.checked, true);
+  assert.equal(unticked.checked, false);
+  unticked.checked = true;
+  unticked.dispatchEvent(new Event('change'));
+  await element.updateComplete;
+  const hallway = labelled(root, 'Show Hallway');
+  assert.ok(hallway instanceof HTMLInputElement);
+  assert.equal(hallway.checked, false);
+  element.remove();
+});
+
+test('an address Home Assistant would refuse, with _ or longer than 64, is refused', async () => {
+  const { element, root, saved } = await editor();
+  const address = [...root.querySelectorAll<HTMLInputElement>('input.fact-input')][2];
+  assert.ok(address);
+  const refused = async (wrong: string): Promise<void> => {
+    address.value = wrong;
+    address.dispatchEvent(new Event('input'));
+    await save(element, root);
+    assert.match(text(control(root, '.problem-line')), /lower case letters and digits/);
+  };
+  await refused('my_home-x');
+  await refused(`dashboard-${'x'.repeat(60)}`);
+  assert.deepEqual(saved, []);
+  element.remove();
+});

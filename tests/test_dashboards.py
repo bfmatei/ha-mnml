@@ -125,6 +125,8 @@ async def test_a_dashboard_of_the_wrong_shape_is_refused(
         ("home", PLAN, {}),
         ("Dashboard-Home", PLAN, {}),
         ("dashboard-home\n", PLAN, {}),
+        ("my_home-x", PLAN, {}),
+        ("dashboard-" + "x" * 60, PLAN, {}),
         ("dashboard-home", {**PLAN, "title": ""}, {}),
         ("dashboard-home", {**PLAN, "icon": "home"}, {}),
         ("dashboard-home", {**PLAN, "rooms": [{"slots": {}}]}, {}),

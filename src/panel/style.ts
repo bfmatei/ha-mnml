@@ -750,6 +750,13 @@ export const PANEL_STYLE = css`
     width: min(560px, calc(100vw - 32px));
     box-sizing: border-box;
   }
+  .dialog.customize {
+    width: min(720px, calc(100vw - 32px));
+  }
+  .customize-body {
+    max-height: calc(100vh - 220px);
+    overflow: auto;
+  }
   .dialog::backdrop {
     background: rgba(0, 0, 0, 0.4);
   }

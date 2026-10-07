@@ -1,13 +1,48 @@
 adguard:
   description: An AdGuard Home tile, its block ratio and speed, its update chip and its protection toggle; it brings its pop-up.
   slots:
-    protection: { kind: entity, required: true, group: Status }
-    queries: { kind: entity, required: true, group: Traffic }
-    blocked: { kind: entity, required: true, group: Traffic }
-    ratio: { kind: entity, required: true, group: Traffic }
-    speed: { kind: entity, required: true, group: Traffic }
-    rules: { kind: entity, group: Traffic }
-    update: { kind: entity, required: true, group: Status }
+    protection:
+      kind: entity
+      required: true
+      group: Status
+      discover: { domain: switch, platform: adguard, translation_key: protection, scope: all }
+    queries:
+      kind: entity
+      required: true
+      group: Traffic
+      discover: { domain: sensor, platform: adguard, translation_key: dns_queries, scope: all }
+    blocked:
+      kind: entity
+      required: true
+      group: Traffic
+      discover:
+        { domain: sensor, platform: adguard, translation_key: dns_queries_blocked, scope: all }
+    ratio:
+      kind: entity
+      required: true
+      group: Traffic
+      discover:
+        {
+          domain: sensor,
+          platform: adguard,
+          translation_key: dns_queries_blocked_ratio,
+          scope: all,
+        }
+    speed:
+      kind: entity
+      required: true
+      group: Traffic
+      discover:
+        { domain: sensor, platform: adguard, translation_key: average_processing_speed, scope: all }
+    rules:
+      kind: entity
+      group: Traffic
+      discover: { domain: sensor, platform: adguard, translation_key: rules_count, scope: all }
+    update:
+      kind: entity
+      required: true
+      group: Status
+      discover: { domain: update, platform: adguard, scope: all }
   card:
     type: custom:mnml-tile-card
     entity: '[[protection]]'
