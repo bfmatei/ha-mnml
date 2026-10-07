@@ -383,3 +383,21 @@ test('Discard is offered only when the draft differs from what is stored', async
   assert.equal(discard.disabled, true);
   builder.remove();
 });
+
+test('the builder has Card, Pop-ups, Slots and YAML, and the example lives with the slots', async () => {
+  const calls: Calls = { saved: [], left: 0 };
+  const { builder, root } = await opened(
+    { name: 'room', template: structuredClone(ROOM), shipped: ROOM, conflicts: [] },
+    calls,
+  );
+  const tabs = [...root.querySelectorAll('[role="tab"]')].map((tab) => tab.textContent?.trim());
+  assert.deepEqual(tabs, ['Card', 'Pop-ups', 'Slots', 'YAML']);
+  const slots = [...root.querySelectorAll('[role="tab"]')].find(
+    (tab) => tab.textContent?.trim() === 'Slots',
+  );
+  assert.ok(slots instanceof HTMLButtonElement);
+  slots.click();
+  await builder.updateComplete;
+  assert.match(text(root), /Example values/);
+  builder.remove();
+});

@@ -74,16 +74,26 @@ function fieldOf(
   return variantFor(shape, value)?.fields[plainKey(key)];
 }
 
-const words = (rule: Value | undefined): string =>
-  (Array.isArray(rule) ? rule : [rule])
-    .map((each) => (typeof each === 'string' ? each : JSON.stringify(each)))
-    .join(', ');
+function slotsIn(rule: Value): string[] {
+  return (Array.isArray(rule) ? rule : [rule]).map((each) =>
+    typeof each === 'string' ? each : JSON.stringify(each),
+  );
+}
 
-function badgesOf(value: Record<string, Value>): string[] {
+function shown(rule: Value, set: boolean): string {
+  const slots = slotsIn(rule);
+  const verb = slots.length === 1 ? 'is' : 'are';
+  return `when ${slots.join(' and ')} ${verb} ${set ? 'set' : 'not set'}`;
+}
+
+export function badgesOf(value: Record<string, Value>): string[] {
+  const shownIf = value['if'];
+  const shownUnless = value['unless'];
+  const each = value['each'];
   return [
-    ...(value['if'] === undefined ? [] : [`if ${words(value['if'])}`]),
-    ...(value['unless'] === undefined ? [] : [`unless ${words(value['unless'])}`]),
-    ...(value['each'] === undefined ? [] : [`each ${words(value['each'])}`]),
+    ...(shownIf === undefined ? [] : [shown(shownIf, true)]),
+    ...(shownUnless === undefined ? [] : [shown(shownUnless, false)]),
+    ...(each === undefined ? [] : [`one for each of ${slotsIn(each).join(' and ')}`]),
   ];
 }
 

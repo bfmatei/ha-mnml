@@ -623,6 +623,21 @@ export const PANEL_STYLE = css`
   }
   .yaml,
   .example,
+  .example {
+    padding: 0 16px 16px;
+    max-width: 960px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .example h2 {
+    margin: 8px 0 0;
+    font-size: 18px;
+    font-weight: 500;
+  }
+  .example p {
+    margin: 0;
+  }
   .slots-tab {
     padding: 16px;
     max-width: 960px;

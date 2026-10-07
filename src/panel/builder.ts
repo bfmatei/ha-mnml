@@ -43,14 +43,13 @@ export interface BuilderHost {
   exportOne: (name: string, template: Template) => void;
 }
 
-type Tab = 'card' | 'popups' | 'slots' | 'example' | 'yaml';
+type Tab = 'card' | 'popups' | 'slots' | 'yaml';
 type Pane = 'outline' | 'preview' | 'inspector';
 
 const TABS: readonly { tab: Tab; label: string }[] = [
   { tab: 'card', label: 'Card' },
   { tab: 'popups', label: 'Pop-ups' },
   { tab: 'slots', label: 'Slots' },
-  { tab: 'example', label: 'Example' },
   { tab: 'yaml', label: 'YAML' },
 ];
 
@@ -603,34 +602,33 @@ export class MnmlBuilder extends LitElement {
   private drawWork(): TemplateResult {
     const hass = this.hass;
     if (this.tab === 'slots') {
-      return drawSlots(() => this.template, {
-        hass,
-        open: this.open,
-        areas: this.host?.areas() ?? [],
-        shipped: this.draft?.shipped,
-        update: (next, redraw): void => {
-          this.edit(next, redraw);
-        },
-        redraw: this.redraw,
-      });
-    }
-    if (this.tab === 'example') {
       const context: Context = { hass, hashes: [], open: this.open, redraw: this.redraw };
-      return html`<div class="example">
-        <p class="muted">The example fills the slots for the preview, and for the check on save.</p>
-        ${objectForm(
-          slotsShape(this.template.slots ?? {}, this.name, 'Example'),
-          {
-            get: (): Record<string, Value> => this.template.example ?? {},
-            set: (next, redraw): void => {
-              this.edit({ ...this.template, example: next }, redraw);
-            },
+      return html`${drawSlots(() => this.template, {
+          hass,
+          open: this.open,
+          areas: this.host?.areas() ?? [],
+          shipped: this.draft?.shipped,
+          update: (next, redraw): void => {
+            this.edit(next, redraw);
           },
-          context,
-          'example',
-          false,
-        )}
-      </div>`;
+          redraw: this.redraw,
+        })}
+        <div class="example">
+          <h2>Example values</h2>
+          <p class="muted">They fill the slots for the preview, and for the check on save.</p>
+          ${objectForm(
+            slotsShape(this.template.slots ?? {}, this.name, 'Example'),
+            {
+              get: (): Record<string, Value> => this.template.example ?? {},
+              set: (next, redraw): void => {
+                this.edit({ ...this.template, example: next }, redraw);
+              },
+            },
+            context,
+            'example',
+            false,
+          )}
+        </div>`;
     }
     if (this.tab === 'yaml') {
       return html`<mnml-yaml
