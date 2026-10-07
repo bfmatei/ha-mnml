@@ -1,10 +1,14 @@
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from homeassistant.config_entries import SOURCE_USER
-from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 
 from custom_components.mnml.const import DOMAIN, TITLE
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from homeassistant.core import HomeAssistant
 
 
 async def test_adding_mnml_asks_nothing(hass: HomeAssistant, www: Path, config_dir: Path) -> None:

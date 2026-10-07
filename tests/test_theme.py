@@ -1,12 +1,16 @@
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from homeassistant.config_entries import ConfigEntryState
-from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
 
 from custom_components.mnml.const import DOMAIN
 
 from .conftest import THEME, SetupMnml, Themes
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from homeassistant.core import HomeAssistant
 
 
 async def test_the_theme_is_written_and_loaded(

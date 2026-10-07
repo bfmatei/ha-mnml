@@ -1,7 +1,11 @@
-from homeassistant.core import HomeAssistant
+from typing import TYPE_CHECKING
+
 from homeassistant.helpers import issue_registry as ir
 
 from .const import DOMAIN, ISSUE_HAND_LOADED, ISSUE_SECOND_THEME, ISSUE_THEME_NOT_LOADED
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
 
 ISSUES = (ISSUE_THEME_NOT_LOADED, ISSUE_SECOND_THEME, ISSUE_HAND_LOADED)
 

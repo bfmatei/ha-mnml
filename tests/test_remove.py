@@ -1,8 +1,11 @@
-from pathlib import Path
+from typing import TYPE_CHECKING
 
-from homeassistant.core import HomeAssistant
+if TYPE_CHECKING:
+    from pathlib import Path
 
-from .conftest import SetupMnml, Themes
+    from homeassistant.core import HomeAssistant
+
+    from .conftest import SetupMnml, Themes
 
 
 async def test_removing_mnml_takes_its_theme_away(

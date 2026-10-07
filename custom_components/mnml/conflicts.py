@@ -1,9 +1,11 @@
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 
 from .const import BUNDLE, URL_BASE
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
 
 
 async def async_hand_loaded(hass: HomeAssistant) -> str | None:
@@ -14,7 +16,7 @@ async def async_hand_loaded(hass: HomeAssistant) -> str | None:
     try:
         await resources.async_get_info()
         items = resources.async_items() or []
-    except (AttributeError, TypeError, HomeAssistantError):
+    except AttributeError, TypeError, HomeAssistantError:
         return None
     for item in items:
         url = str(item.get("url", ""))

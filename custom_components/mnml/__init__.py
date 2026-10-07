@@ -1,10 +1,10 @@
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from homeassistant.components.frontend import remove_extra_js_url
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 
 from . import const
@@ -22,6 +22,9 @@ from .theme import (
     theme_target,
 )
 from .websocket import async_register
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
 
 
 @dataclass
@@ -62,7 +65,7 @@ async def async_load_store(hass: HomeAssistant) -> None:
     store = TemplateStore(hass)
     try:
         await store.async_load()
-    except (HomeAssistantError, OSError, ValueError, KeyError, TypeError, AttributeError):
+    except HomeAssistantError, OSError, ValueError, KeyError, TypeError, AttributeError:
         LOGGER.exception(
             "The templates MNML keeps could not be read; the cards draw the shipped ones"
         )

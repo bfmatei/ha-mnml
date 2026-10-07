@@ -1,13 +1,17 @@
 import hashlib
-from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 from homeassistant.components.frontend import DATA_EXTRA_MODULE_URL
 from homeassistant.config_entries import ConfigEntryState
-from homeassistant.core import HomeAssistant
-from pytest_homeassistant_custom_component.typing import ClientSessionGenerator
 
-from .conftest import SetupMnml
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from homeassistant.core import HomeAssistant
+    from pytest_homeassistant_custom_component.typing import ClientSessionGenerator
+
+    from .conftest import SetupMnml
 
 
 def expected_url(www: Path) -> str:

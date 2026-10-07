@@ -1,10 +1,14 @@
 import hashlib
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from homeassistant.components.frontend import DATA_PANELS
-from homeassistant.core import HomeAssistant
 
-from .conftest import SetupMnml
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from homeassistant.core import HomeAssistant
+
+    from .conftest import SetupMnml
 
 
 async def test_the_panel_is_in_the_sidebar_for_admins_by_its_hash(

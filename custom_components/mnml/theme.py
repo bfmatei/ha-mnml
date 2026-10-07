@@ -1,6 +1,7 @@
 import shutil
 from functools import partial
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import probatio as vol
 from homeassistant.components.frontend import (
@@ -8,12 +9,14 @@ from homeassistant.components.frontend import (
     DATA_DEFAULT_THEME,
     DATA_THEMES,
 )
-from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.util.file import write_utf8_file
 from homeassistant.util.yaml import load_yaml
 
 from .const import THEME_FILE, THEME_FOLDER, THEME_NAME
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
 
 
 def theme_target(hass: HomeAssistant) -> Path:
@@ -32,7 +35,7 @@ def write_theme(source: Path, target: Path) -> bool:
 async def async_reload_themes(hass: HomeAssistant) -> bool:
     try:
         await hass.services.async_call("frontend", "reload_themes", blocking=True)
-    except (HomeAssistantError, vol.Invalid):
+    except HomeAssistantError, vol.Invalid:
         return False
     return True
 
@@ -56,7 +59,7 @@ def other_theme_files(themes: Path) -> list[Path]:
             continue
         try:
             content = load_yaml(path)
-        except (HomeAssistantError, OSError):
+        except HomeAssistantError, OSError:
             continue
         if isinstance(content, dict) and THEME_NAME in content:
             found.append(path)

@@ -1,14 +1,17 @@
 from collections.abc import Awaitable, Callable, Iterator
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
-from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 
 from custom_components.mnml.const import DOMAIN, TITLE
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from homeassistant.core import HomeAssistant
+    from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 
 THEME = "MNML:\n  primary-color: '#123456'\n"
 INCLUDE = "frontend:\n  themes: !include_dir_merge_named themes\n"

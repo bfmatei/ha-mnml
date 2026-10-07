@@ -1,12 +1,14 @@
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.setup import async_setup_component
 
 from custom_components.mnml.const import DOMAIN
 
-from .conftest import SetupMnml
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
+
+    from .conftest import SetupMnml
 
 
 async def test_a_resource_stored_in_the_ui_raises_a_repair(

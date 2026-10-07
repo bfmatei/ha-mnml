@@ -1,17 +1,23 @@
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import pytest
 from homeassistant.config_entries import ConfigEntryState
-from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
-from pytest_homeassistant_custom_component.typing import MockHAClientWebSocket, WebSocketGenerator
 
 from custom_components.mnml import websocket
 from custom_components.mnml.frontend import async_register_frontend
 from custom_components.mnml.store import STORE, TemplateStore
 
-from .conftest import SetupMnml
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    import pytest
+    from homeassistant.core import HomeAssistant
+    from pytest_homeassistant_custom_component.typing import (
+        MockHAClientWebSocket,
+        WebSocketGenerator,
+    )
+
+    from .conftest import SetupMnml
 
 GARDEN = {"card": {"type": "custom:mnml-heading-card", "title": "Garden", "icon": "mdi:flower"}}
 CHANGE = {"op": "remove", "path": ["card", "chips?", "#lock"], "base": "0123456789abcdef"}

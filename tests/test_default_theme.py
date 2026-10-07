@@ -1,11 +1,14 @@
-from pathlib import Path
-
-from homeassistant.core import HomeAssistant
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from typing import TYPE_CHECKING
 
 from custom_components.mnml.const import CONF_DEFAULT_THEME
 
-from .conftest import SetupMnml, Themes
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from homeassistant.core import HomeAssistant
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    from .conftest import SetupMnml, Themes
 
 
 async def save_options(hass: HomeAssistant, entry: MockConfigEntry, *, on: bool) -> None:

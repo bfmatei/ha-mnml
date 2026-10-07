@@ -1,13 +1,17 @@
 import hashlib
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from homeassistant.components.frontend import add_extra_js_url
 from homeassistant.components.http import StaticPathConfig
-from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryError
 from homeassistant.util.hass_dict import HassKey
 
 from .const import BUNDLE, DOMAIN, LOADER, PANEL, THEME_FILE, URL_BASE
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from homeassistant.core import HomeAssistant
 
 SERVED: HassKey[set[str]] = HassKey(f"{DOMAIN}_served")
 BUILT = (LOADER, BUNDLE, PANEL, THEME_FILE)

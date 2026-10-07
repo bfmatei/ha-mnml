@@ -1,5 +1,4 @@
-from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.storage import Store
@@ -7,6 +6,9 @@ from homeassistant.util import dt as dt_util
 from homeassistant.util.hass_dict import HassKey
 
 from .const import DOMAIN
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 STORAGE_KEY = f"{DOMAIN}.templates"
 STORAGE_VERSION = 1
