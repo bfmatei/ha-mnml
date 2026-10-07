@@ -58,7 +58,7 @@ test('every table row fills exactly the columns its card declares', () => {
 });
 
 const SURFACE: Record<string, string> = {
-  'custom:mnml-popups-card': 'popups, type, width',
+  'custom:mnml-popups-card': 'open, popups, type, width',
   'custom:mnml-agenda-card': 'icon, sources, title, type',
   'custom:mnml-button-card': 'entity, service, type',
   'custom:mnml-car-plan-card':

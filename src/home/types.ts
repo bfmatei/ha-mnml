@@ -1,4 +1,4 @@
-import type { ClientNetwork, CustomCard } from '../contract/cards.ts';
+import type { ClientNetwork, CustomCard, PopupOpen } from '../contract/cards.ts';
 import type {
   BinarySensorId,
   ButtonId,
@@ -434,6 +434,7 @@ export interface SectionTitles {
 export interface Home {
   title: string;
   sections: SectionTitles;
+  popupOpen?: PopupOpen;
   outside?: WeatherId;
   vacation?: InputBooleanId;
   rooms: readonly Room[];

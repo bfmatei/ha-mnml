@@ -6,13 +6,13 @@ import { ifDefined } from 'lit/directives/if-defined.js';
 import { keyed } from 'lit/directives/keyed.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
-import type { Condition, Popup, PopupsCard } from '../contract/cards.ts';
+import type { Condition, Popup, PopupOpening, PopupsCard } from '../contract/cards.ts';
 import type { ChildCard } from '../ha/card-helpers.ts';
 import { visible } from '../ha/conditions.ts';
 import { field } from '../ha/field.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
 import { leave, narrow, reduced } from '../ha/motion.ts';
-import { PREBUILD_EVENT, closePopup } from '../ha/navigation.ts';
+import { PREBUILD_EVENT, closePopup, originOf, whenOrigin } from '../ha/navigation.ts';
 
 import { requireKnownKeys, schema } from './keys.ts';
 import { announced, checkPopups, onAnnounce } from './parts/popup-registry.ts';
@@ -23,15 +23,93 @@ interface Child {
   visibility: Condition[] | undefined;
 }
 
+interface Box {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+interface Place {
+  left: number;
+  width: number;
+  edge: number;
+  up: boolean;
+  maxHeight: number;
+  from: Box;
+}
+
 interface View {
   turn: number;
   label: string | undefined;
   cards: Child[];
+  opening: PopupOpening;
+  place: Place | undefined;
+  anchor: Element | undefined;
+  unfolding: boolean;
 }
 
 const ROUTE_EVENTS = ['location-changed', 'popstate', 'hashchange'] as const;
 
 export const SHEET = '(max-width: 600px)';
+const TABLET = '(max-width: 1024px)';
+const OPENINGS: readonly PopupOpening[] = ['sheet', 'dialog', 'unfold'];
+const DEFAULT_OPEN = { phone: 'sheet', tablet: 'dialog', desktop: 'dialog' } as const;
+const MARGIN = 8;
+const ORIGIN_WAIT = 600;
+const SETTLE_FRAMES = 6;
+const SETTLE_MAX = 1500;
+const UNFOLD_MIN = 420;
+const UNFOLD_MIN_WIDTH = 320;
+const UNFOLD = 300;
+const FOLD = 220;
+const TILE_RADIUS = '18px';
+const POPUP_RADIUS = '24px';
+
+function placed(from: Box): Place {
+  const width = Math.min(Math.max(from.width, UNFOLD_MIN_WIDTH), innerWidth - 2 * MARGIN);
+  const left = Math.min(Math.max(from.left, MARGIN), innerWidth - width - MARGIN);
+  const top = Math.max(from.top, MARGIN);
+  const bottom = Math.min(from.top + from.height, innerHeight - MARGIN);
+  const below = innerHeight - top - MARGIN;
+  const above = bottom - MARGIN;
+  return below < UNFOLD_MIN && above > below
+    ? { left, width, edge: innerHeight - bottom, up: true, maxHeight: above, from }
+    : { left, width, edge: top, up: false, maxHeight: below, from };
+}
+
+function folded(place: Place): string {
+  const left = Math.max(0, place.from.left - place.left);
+  const right = Math.max(0, place.width - left - place.from.width);
+  const tall = `calc(100% - ${place.from.height}px)`;
+  return place.up
+    ? `inset(${tall} ${right}px 0px ${left}px round ${TILE_RADIUS})`
+    : `inset(0px ${right}px ${tall} ${left}px round ${TILE_RADIUS})`;
+}
+
+const atLeast0 = (value: number): number => Math.max(0, value);
+
+function settled(element: Element): Promise<void> {
+  const start = performance.now();
+  return new Promise((resolve) => {
+    let last = '';
+    let still = 0;
+    const tick = (): void => {
+      const box = element.getBoundingClientRect();
+      const now = `${box.left} ${box.top} ${box.width} ${box.height}`;
+      still = now === last ? still + 1 : 0;
+      last = now;
+      if (still >= SETTLE_FRAMES || performance.now() - start > SETTLE_MAX) {
+        resolve();
+      } else {
+        requestAnimationFrame(tick);
+      }
+    };
+    requestAnimationFrame(tick);
+  });
+}
+
+const OPEN_CLIP = `inset(0px 0px 0px 0px round ${POPUP_RADIUS})`;
 
 const FADE_LEAVE = 140;
 const SHEET_LEAVE = 200;
@@ -130,25 +208,41 @@ const POPUPS_STYLE = css`
   [hidden] {
     display: none;
   }
-  @media (max-width: 600px) {
-    dialog[open] {
-      align-items: flex-end;
-    }
-    .panel {
-      width: 100%;
-      max-height: 85dvh;
-      margin-top: 0;
-      animation: mnml-sheet 220ms ease-out;
-      border-end-start-radius: 0;
-      border-end-end-radius: 0;
-      padding-bottom: calc(var(--mnml-popup-gap, 8px) + env(safe-area-inset-bottom, 0px));
-    }
+  dialog.sheet[open] {
+    align-items: flex-end;
+  }
+  .sheet .panel {
+    width: 100%;
+    max-height: 85dvh;
+    margin-top: 0;
+    animation: mnml-sheet 220ms ease-out;
+    border-end-start-radius: 0;
+    border-end-end-radius: 0;
+    padding-bottom: calc(var(--mnml-popup-gap, 8px) + env(safe-area-inset-bottom, 0px));
+  }
+  dialog.unfold[open] {
+    display: block;
+  }
+  dialog.unfold::backdrop {
+    background: rgb(0 0 0 / 0.28);
+  }
+  .unfold .panel {
+    position: absolute;
+    margin: 0;
+    animation: none;
+    box-shadow:
+      inset 0 0 0 1px
+        var(--mnml-card-edge-color, color-mix(in srgb, var(--primary-text-color) 12%, transparent)),
+      0 18px 48px rgb(0 0 0 / 0.28);
   }
 `;
 
 const SCHEMA = schema<PopupsCard>(
-  { type: true, width: true, popups: true },
-  { popups: schema<Popup>({ hash: true, cards: true }) },
+  { type: true, width: true, open: true, popups: true },
+  {
+    open: schema<NonNullable<PopupsCard['open']>>({ phone: true, tablet: true, desktop: true }),
+    popups: schema<Popup>({ hash: true, cards: true }),
+  },
 );
 
 export class MnmlPopupsCard extends LitElement {
@@ -162,6 +256,8 @@ export class MnmlPopupsCard extends LitElement {
   private config: PopupsCard | undefined;
   private current: HomeAssistant | undefined;
   private shownHash: string | undefined;
+  private landing: string | undefined;
+  private following: number | undefined;
   private fed: Child[] = [];
   private turn = 0;
   private locked: { node: HTMLElement; overflow: string }[] | undefined;
@@ -210,6 +306,27 @@ export class MnmlPopupsCard extends LitElement {
     });
   };
 
+  private readonly follow = (): void => {
+    this.following = undefined;
+    const view = this.view;
+    const from = view?.anchor;
+    if (view?.place === undefined || from?.isConnected !== true || this.leaving) {
+      return;
+    }
+    const next = placed(from.getBoundingClientRect());
+    const was = view.place;
+    if (
+      next.left !== was.left ||
+      next.width !== was.width ||
+      next.edge !== was.edge ||
+      next.up !== was.up ||
+      next.maxHeight !== was.maxHeight
+    ) {
+      this.view = { ...view, place: next };
+    }
+    this.following = requestAnimationFrame(this.follow);
+  };
+
   private readonly cancelled = (event: Event): void => {
     event.preventDefault();
     closePopup();
@@ -237,6 +354,11 @@ export class MnmlPopupsCard extends LitElement {
     }
     if (config.popups !== undefined && !Array.isArray(config.popups)) {
       throw new Error('popups must be a list');
+    }
+    for (const [device, opening] of Object.entries(config.open ?? {})) {
+      if (!OPENINGS.includes(opening)) {
+        throw new Error(`open.${device} must be one of ${OPENINGS.join(', ')}`);
+      }
     }
     checkPopups(config.popups ?? []);
     this.shut();
@@ -275,6 +397,7 @@ export class MnmlPopupsCard extends LitElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
+    this.landing = location.hash === '' ? undefined : location.hash;
     for (const name of ROUTE_EVENTS) {
       window.addEventListener(name, this.route);
     }
@@ -291,6 +414,10 @@ export class MnmlPopupsCard extends LitElement {
     window.removeEventListener(PREBUILD_EVENT, this.prepare);
     this.unsubscribe?.();
     this.unsubscribe = undefined;
+    if (this.following !== undefined) {
+      cancelAnimationFrame(this.following);
+      this.following = undefined;
+    }
     this.ready = undefined;
     this.pending.clear();
     this.shut();
@@ -302,8 +429,19 @@ export class MnmlPopupsCard extends LitElement {
       return nothing;
     }
     const [first, ...rest] = view.cards;
+    const place = view.place;
+    const panelStyle =
+      place === undefined
+        ? {}
+        : {
+            left: `${place.left}px`,
+            [place.up ? 'bottom' : 'top']: `${place.edge}px`,
+            width: `${place.width}px`,
+            'max-height': `${place.maxHeight}px`,
+            'clip-path': view.unfolding && view.cards.length === 0 ? folded(place) : undefined,
+          };
     return html`<dialog
-      class=${classMap({ leaving: this.leaving })}
+      class=${classMap({ leaving: this.leaving, [view.opening]: true })}
       style=${styleMap({ '--popup-width': this.config?.width })}
       aria-label=${ifDefined(view.label)}
       @cancel=${this.cancelled}
@@ -312,7 +450,7 @@ export class MnmlPopupsCard extends LitElement {
     >
       ${keyed(
         view.turn,
-        html`<div class="panel">
+        html`<div class="panel" style=${styleMap(panelStyle)}>
           <div class="head">${first?.card ?? nothing}</div>
           <div class="body">${rest.map((child) => child.card)}</div>
         </div>`,
@@ -360,10 +498,33 @@ export class MnmlPopupsCard extends LitElement {
     const turn = this.turn;
     const name = entry.cards[0]?.['name'];
     const label = typeof name === 'string' ? name : undefined;
+    const patient = this.landing === entry.hash;
+    this.landing = undefined;
+    const before = this.leaving ? undefined : this.view;
+    const kept =
+      before?.place !== undefined && before.anchor?.isConnected === true ? before : undefined;
+    const wanted = kept === undefined ? this.opening() : 'unfold';
+    const from =
+      kept?.anchor ??
+      (wanted === 'unfold'
+        ? (originOf(entry.hash) ??
+          (patient ? await whenOrigin(entry.hash, ORIGIN_WAIT) : undefined))
+        : undefined);
+    if (from !== undefined && patient) {
+      await settled(from);
+    }
+    if (this.turn !== turn) {
+      return;
+    }
     this.lock();
     this.leaving = false;
     this.fed = [];
-    this.view = { turn, label, cards: [] };
+    const opening = wanted === 'unfold' && from === undefined ? 'dialog' : wanted;
+    const place =
+      kept?.place ?? (from === undefined ? undefined : placed(from.getBoundingClientRect()));
+    const unfolding = kept === undefined && place !== undefined;
+    const anchor = from;
+    this.view = { turn, label, cards: [], opening, place, anchor, unfolding };
     const ready = this.ready;
     this.ready = undefined;
     const cards =
@@ -375,7 +536,30 @@ export class MnmlPopupsCard extends LitElement {
       return;
     }
     this.fed = cards;
-    this.view = { turn, label, cards };
+    this.view = { turn, label, cards, opening, place, anchor, unfolding };
+    if (place !== undefined && this.following === undefined) {
+      this.following = requestAnimationFrame(this.follow);
+    }
+    await this.updateComplete;
+    const panel = this.panel;
+    if (
+      this.turn === turn &&
+      place !== undefined &&
+      unfolding &&
+      panel !== null &&
+      panel !== undefined &&
+      !reduced()
+    ) {
+      panel.animate([{ clipPath: folded(place) }, { clipPath: OPEN_CLIP }], {
+        duration: UNFOLD,
+        easing: 'cubic-bezier(0.2, 0, 0, 1)',
+      });
+    }
+  }
+
+  private opening(): PopupOpening {
+    const device = narrow(SHEET) ? 'phone' : narrow(TABLET) ? 'tablet' : 'desktop';
+    return this.config?.open?.[device] ?? DEFAULT_OPEN[device];
   }
 
   private lock(): void {
@@ -408,15 +592,31 @@ export class MnmlPopupsCard extends LitElement {
       return;
     }
     this.leaving = true;
-    const sheet = narrow(SHEET);
-    const keyframes: Keyframe[] = sheet
-      ? [{ transform: 'translateY(0)' }, { transform: 'translateY(100%)' }]
-      : [{ opacity: 1 }, { opacity: 0, transform: 'translateY(6px)' }];
-    void leave(panel, keyframes, sheet ? SHEET_LEAVE : FADE_LEAVE).then(() => {
+    const opening = this.view.opening;
+    const place = this.view.place;
+    const anchor = this.view.anchor;
+    const back =
+      place === undefined || anchor?.isConnected !== true || place.from.width === 0
+        ? undefined
+        : this.foldTo(panel, anchor);
+    const keyframes: Keyframe[] =
+      back !== undefined
+        ? [{ clipPath: OPEN_CLIP }, { clipPath: back }]
+        : opening === 'sheet'
+          ? [{ transform: 'translateY(0)' }, { transform: 'translateY(100%)' }]
+          : [{ opacity: 1 }, { opacity: 0, transform: 'translateY(6px)' }];
+    const duration = back !== undefined ? FOLD : opening === 'sheet' ? SHEET_LEAVE : FADE_LEAVE;
+    void leave(panel, keyframes, duration).then(() => {
       if (this.turn === turn) {
         this.close();
       }
     });
+  }
+
+  private foldTo(panel: HTMLElement, anchor: Element): string {
+    const to = anchor.getBoundingClientRect();
+    const box = panel.getBoundingClientRect();
+    return `inset(${atLeast0(to.top - box.top)}px ${atLeast0(box.right - to.right)}px ${atLeast0(box.bottom - to.bottom)}px ${atLeast0(to.left - box.left)}px round ${TILE_RADIUS})`;
   }
 
   private close(): void {

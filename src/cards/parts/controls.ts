@@ -29,7 +29,7 @@ import {
 } from '../../ha/hass.ts';
 import type { HassEntity, HomeAssistant } from '../../ha/hass.ts';
 import { entityName, nameOf } from '../../ha/names.ts';
-import { navigate, prebuild } from '../../ha/navigation.ts';
+import { navigate, openedFrom, prebuild } from '../../ha/navigation.ts';
 import { UNAVAILABLE, active, matches, shown, tint, tyreBand } from '../../ha/rules.ts';
 import { colorStyle, icon, quietly, stateIcon } from '../../ha/templates.ts';
 import { requireList, requireOneOf } from '../base.ts';
@@ -183,8 +183,8 @@ function nav(control: NavControl, ctx: ControlContext): TemplateResult {
     @pointerdown=${quietly(() => {
       prebuild(control.popup);
     })}
-    @click=${quietly(() => {
-      navigate(control.popup);
+    @click=${quietly((event) => {
+      navigate(control.popup, openedFrom(event));
     })}
   >
     ${stateIcon(ctx.hass, stateObj)}

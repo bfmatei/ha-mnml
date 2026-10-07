@@ -8,7 +8,7 @@ import { formatState, stateLine } from '../ha/format.ts';
 import { hasValue, isOn, isUnavailable, numericState, stateOf } from '../ha/hass.ts';
 import type { HassEntity, HomeAssistant } from '../ha/hass.ts';
 import { cardName, nameOf } from '../ha/names.ts';
-import { navigate, prebuild } from '../ha/navigation.ts';
+import { navigate, offerOrigin, prebuild } from '../ha/navigation.ts';
 import { UNAVAILABLE } from '../ha/rules.ts';
 import { colorStyle, onPress, stateIcon } from '../ha/templates.ts';
 
@@ -181,6 +181,14 @@ export class MnmlTileCard extends MnmlCard<TileCard> {
 
   protected override readonly columns = 6;
 
+  protected override updated(): void {
+    super.updated();
+    const popup = this.config?.popup;
+    if (popup !== undefined && this.style.display !== 'none') {
+      offerOrigin(popup, this);
+    }
+  }
+
   protected schema(): KeySchema {
     return SCHEMA;
   }
@@ -201,7 +209,7 @@ export class MnmlTileCard extends MnmlCard<TileCard> {
     const parts = [name, ...found.map((problem) => problem.text)];
     const dot: Color = found.some((problem) => problem.color === 'red') ? 'red' : 'orange';
     const open = (): void => {
-      navigate(config.popup);
+      navigate(config.popup, this);
     };
     return html`<div
       class="card tile"

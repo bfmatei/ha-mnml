@@ -158,9 +158,10 @@ A template, drawn in place: `template` (required), the template's name; `area`, 
 
 Every pop-up of a dashboard, in one card anywhere on it, edited in YAML:
 
-| Key      | Is                                                                                                                                                                      |
-| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `width`  | required: the dialog's width on a wide screen, in pixels (`560px`); on a phone it is a bottom sheet                                                                     |
-| `popups` | each has a `hash` (`'#kitchen'`), the URL hash that opens it, and its `cards`, any Lovelace cards. Template cards add theirs, so a dashboard of templates leaves it out |
+| Key      | Is                                                                                                                                                                                                                                                                                                                                  |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `width`  | required: the dialog's width on a wide screen, in pixels (`560px`); on a phone it is a bottom sheet                                                                                                                                                                                                                                 |
+| `open`   | how a pop-up opens on each kind of screen: `phone` (600 px wide and less), `tablet` (up to 1024 px) and `desktop`, each `sheet` (a bottom sheet), `dialog` (centred, `width` wide) or `unfold` (out of the tile it was opened from, in that tile's place and as wide as it). Left out, a phone gets `sheet` and the others `dialog` |
+| `popups` | each has a `hash` (`'#kitchen'`), the URL hash that opens it, and its `cards`, any Lovelace cards. Template cards add theirs, so a dashboard of templates leaves it out                                                                                                                                                             |
 
 A pop-up's first card is its header, which stays in place while the rest scrolls. A card in a pop-up takes `visibility`, and the pop-up judges it: a list of state conditions, each with `condition: state`, `entity`, and either `state` or `state_not`, one state or a list. Any other condition is an error that names where it is.

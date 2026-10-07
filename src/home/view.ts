@@ -70,7 +70,7 @@ export function build(home: Home): Dashboard {
           {
             type: 'grid',
             column_span: 3,
-            cards: [{ type: 'custom:mnml-popups-card', width: '560px' }],
+            cards: [{ type: 'custom:mnml-popups-card', width: '560px', open: home.popupOpen }],
           },
         ],
       },

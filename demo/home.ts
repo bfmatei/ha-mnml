@@ -1046,6 +1046,7 @@ const CARS: readonly Car[] = [
 export const DEMO: Home = {
   title: 'Home',
   sections: SECTION_TITLES,
+  popupOpen: { tablet: 'unfold', desktop: 'unfold' },
   outside: OUTSIDE,
   vacation: VACATION,
   rooms: ROOMS,

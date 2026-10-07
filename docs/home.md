@@ -53,7 +53,7 @@ What the generator writes: one `sections` view with four sections of tiles and a
 | `#network-<key>`         | A Wi-Fi network's QR code, while the network is on                                                                                                                                  |
 | `#media`                 | Watching, requests, downloads, the upcoming releases, the library, Plex's update                                                                                                    |
 
-**How the pop-ups behave.** They open as adaptive dialogs, 560 px wide on a desktop and a sheet on a phone; second-level pop-ups have a back button. Every item follows one pattern: name, icon and state on the left, and flat buttons on the right, with the filled on / off last.
+**How the pop-ups behave.** They open as adaptive dialogs, 560 px wide on a desktop and a sheet on a phone, or as the home's `popupOpen` says for each kind of screen (`{ tablet: 'unfold', desktop: 'unfold' }` unfolds them out of their tile, in its place); second-level pop-ups have a back button. Every item follows one pattern: name, icon and state on the left, and flat buttons on the right, with the filled on / off last.
 
 **Colour.**
 

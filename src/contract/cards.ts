@@ -436,9 +436,18 @@ export interface Popup {
   cards: LovelaceCardConfig[];
 }
 
+export type PopupOpening = 'sheet' | 'dialog' | 'unfold';
+
+export interface PopupOpen {
+  phone?: PopupOpening;
+  tablet?: PopupOpening;
+  desktop?: PopupOpening;
+}
+
 export interface PopupsCard {
   type: 'custom:mnml-popups-card';
   width: `${number}px`;
+  open?: PopupOpen;
   popups?: Popup[];
 }
 

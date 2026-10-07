@@ -9,7 +9,7 @@ import { stateLine } from '../../ha/format.ts';
 import { stateOf } from '../../ha/hass.ts';
 import type { HomeAssistant } from '../../ha/hass.ts';
 import { nameOf } from '../../ha/names.ts';
-import { navigate, prebuild } from '../../ha/navigation.ts';
+import { navigate, openedFrom, prebuild } from '../../ha/navigation.ts';
 import { tint } from '../../ha/rules.ts';
 import { colorStyle, onPress, quietly, stateIcon } from '../../ha/templates.ts';
 import type { Host } from '../base.ts';
@@ -46,12 +46,14 @@ export function linkTo(popup: PopupHash): Link {
     pointerdown: quietly(() => {
       prebuild(popup);
     }),
-    click: quietly(() => {
-      navigate(popup);
+    click: quietly((event) => {
+      navigate(popup, openedFrom(event));
     }),
-    keydown: onPress(() => {
-      navigate(popup);
-    }),
+    keydown: (event) => {
+      onPress(() => {
+        navigate(popup, openedFrom(event));
+      })(event);
+    },
   };
 }
 
