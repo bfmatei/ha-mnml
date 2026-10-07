@@ -27,11 +27,11 @@ A card with a key the editor does not know, or a value it cannot hold, opens in 
 
 ## The MNML panel
 
-**MNML** in the sidebar, for admins, at `/mnml`, is where the home's templates are kept and built, and where MNML builds dashboards from the home. It is a file of its own, `mnml-cards-panel.js`, which the integration registers. Its two tabs are **Templates**, at `/mnml`, and **Dashboards**, at `/mnml/dashboards`.
+**MNML** in the sidebar, for admins, at `/mnml`, is where MNML builds dashboards from the home, and where the home's templates are kept and built. It is a file of its own, `mnml-cards-panel.js`, which the integration registers. Its two tabs are **Dashboards**, which it opens on, at `/mnml` (and `/mnml/dashboards`), and **Templates**, at `/mnml/templates`.
 
 ### Building a dashboard
 
-**Dashboards** lists the dashboards MNML built, each with its address and when it was built. A row opens the dashboard's builder; **Open** goes to the dashboard, **Undo** puts back the version the last rebuild replaced, and **Forget** stops MNML building it, leaving the dashboard in Home Assistant as it is or, with **Delete it too**, deleting it. A dashboard deleted in Home Assistant stays listed, without Open and Undo, and its builder makes it again. When the integration cannot give the list, the tab says why. With none built, the tab, and the library above its templates, offer to build one:
+**Dashboards** lists the dashboards MNML built, each with its address and when it was built. A row opens the dashboard's builder; **Open** goes to the dashboard, **Undo** puts back the version the last rebuild replaced, and **Forget** stops MNML building it, leaving the dashboard in Home Assistant as it is or, with **Delete it too**, deleting it. A dashboard deleted in Home Assistant stays listed, without Open and Undo, and its builder makes it again. When the integration cannot give the list, the tab says why. With none built, the tab offers to build one:
 
 - **Quick start** says what it makes and where, then makes it at once: a room tile for each area where the room template has something to show (a light), in the order Home Assistant lists the areas; a tile for each person; the system cards whose entities MNML finds in the home; pop-ups that unfold from their tiles on a tablet and a computer. Its address is the title after `dashboard-`, free of every dashboard and panel the home has.
 - **Step by step** opens the builder on the same choices, at `/mnml/dashboards/new`.

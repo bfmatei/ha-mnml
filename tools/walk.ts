@@ -21,7 +21,7 @@ async function settle(page: Page, ms = 1500): Promise<void> {
 }
 
 async function library(page: Page): Promise<void> {
-  await page.goto(`${env.HA_URL}/mnml`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`${env.HA_URL}/mnml/templates`, { waitUntil: 'domcontentloaded' });
   await page.locator('mnml-library .library-row').first().waitFor({ timeout: 30000 });
 }
 
@@ -96,7 +96,7 @@ async function forgetBuilt(): Promise<void> {
 }
 
 async function boardsPage(page: Page): Promise<void> {
-  await page.goto(`${env.HA_URL}/mnml/dashboards`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`${env.HA_URL}/mnml`, { waitUntil: 'domcontentloaded' });
   await page.locator('mnml-dashboards .library-head').waitFor({ timeout: 30000 });
   await settle(page);
 }

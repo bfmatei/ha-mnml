@@ -67,7 +67,8 @@ interface Route {
 
 const BASE = '/mnml';
 const NAME = /^\/templates\/([a-z0-9][a-z0-9_-]{0,63})$/;
-const BOARD = /^\/dashboards(?:\/(new|[a-z0-9]+(?:-[a-z0-9]+)+))?$/;
+const BOARD = /^(?:|\/dashboards|\/dashboards\/(new|[a-z0-9]+(?:-[a-z0-9]+)+))$/;
+const LIBRARY = '/templates';
 const NOTHING_KEPT: Kept = { own: {}, changes: {} };
 const NEW_TEMPLATE: Template = {
   description: '',
@@ -266,7 +267,7 @@ export class MnmlPanel extends LitElement {
         .toSorted((a, b) => a.label.localeCompare(b.label)),
     save: (name, entry) => this.save(name, entry),
     leave: () => {
-      this.go(BASE, true);
+      this.go(`${BASE}${LIBRARY}`, true);
     },
     history: (name) => this.chooseVersion(name),
     duplicate: (name, template) => {
@@ -304,7 +305,7 @@ export class MnmlPanel extends LitElement {
   private readonly planHost: PlanHost = {
     save: (plan, address) => this.build(plan, address),
     leave: () => {
-      this.go(`${BASE}/dashboards`);
+      this.go(BASE);
     },
   };
 
@@ -505,13 +506,6 @@ export class MnmlPanel extends LitElement {
     );
     const boards = new Set(Object.keys(waiting).flatMap((name) => from[name] ?? []));
     return html`<mnml-library
-      .start=${
-        this.built?.length === 0
-          ? () => {
-              this.go(`${BASE}/dashboards`);
-            }
-          : undefined
-      }
       .rows=${this.rows()}
       .offer=${{ templates: Object.keys(waiting).length, dashboards: boards.size }}
       .actions=${this.libraryActions}
@@ -549,7 +543,7 @@ export class MnmlPanel extends LitElement {
           type="button"
           class="action"
           @click=${() => {
-            this.go(`${BASE}/dashboards`);
+            this.go(BASE);
           }}
         >
           Back to the dashboards
@@ -568,13 +562,14 @@ export class MnmlPanel extends LitElement {
   }
 
   private drawTabs(): TemplateResult | typeof nothing {
-    if (this.path !== '' && this.path !== '/dashboards') {
+    const boards = this.path === '' || this.path === '/dashboards';
+    if (!boards && this.path !== LIBRARY) {
       return nothing;
     }
-    const tab = (label: string, path: string): TemplateResult =>
+    const tab = (label: string, path: string, active: boolean): TemplateResult =>
       html`<button
         type="button"
-        class=${this.path === path ? 'tab active' : 'tab'}
+        class=${active ? 'tab active' : 'tab'}
         @click=${() => {
           this.go(`${BASE}${path}`);
         }}
@@ -582,7 +577,7 @@ export class MnmlPanel extends LitElement {
         ${label}
       </button>`;
     return html`<div class="tabs">
-      ${tab('Templates', '')} ${tab('Dashboards', '/dashboards')}
+      ${tab('Dashboards', '', boards)} ${tab('Templates', LIBRARY, !boards)}
     </div>`;
   }
 
@@ -599,9 +594,12 @@ export class MnmlPanel extends LitElement {
     if (board !== null) {
       return this.drawBoards(board[1]);
     }
+    if (this.path === LIBRARY) {
+      return this.drawLibrary();
+    }
     const name = nameIn(this.path);
     if (name === undefined) {
-      return this.drawLibrary();
+      return this.drawBoards(undefined);
     }
     if (this.opened === undefined) {
       return html`<div class="library">
@@ -610,7 +608,7 @@ export class MnmlPanel extends LitElement {
           type="button"
           class="action"
           @click=${() => {
-            this.go(BASE);
+            this.go(`${BASE}${LIBRARY}`);
           }}
         >
           Back to the library
@@ -701,7 +699,7 @@ export class MnmlPanel extends LitElement {
     } finally {
       await this.refresh();
     }
-    this.go(`${BASE}/dashboards`, true);
+    this.go(BASE, true);
     await this.offerOpen(
       plan,
       built?.url_path ?? address,
