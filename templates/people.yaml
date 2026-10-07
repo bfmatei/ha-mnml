@@ -14,7 +14,6 @@ person:
         resting_energy: { kind: entity, required: true }
     devices:
       kind: objects
-      required: true
       group: Devices
       fields:
         key: { kind: text, required: true }
@@ -138,7 +137,6 @@ person-popup:
         resting_energy: { kind: entity, required: true }
     devices:
       kind: objects
-      required: true
       fields:
         key: { kind: text, required: true }
         name: { kind: text }
@@ -161,6 +159,7 @@ person-popup:
         entity: '[[entity]]'
         state: [{ id: part }]
       - id: heading
+        if: devices
         type: custom:mnml-heading-card
         title: Devices
         icon: mdi:cellphone-link
@@ -170,6 +169,7 @@ person-popup:
         template: device-card
         slots: { key: '[[key]]', device: '[[device]]' }
       - id: location-access
+        if: devices
         type: custom:mnml-list-card
         title: Location access
         icon: mdi:map-marker-alert

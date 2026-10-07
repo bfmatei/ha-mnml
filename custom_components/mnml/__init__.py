@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from homeassistant.components.frontend import remove_extra_js_url
 from homeassistant.config_entries import ConfigEntry
@@ -10,6 +10,7 @@ from homeassistant.exceptions import HomeAssistantError
 from . import const
 from .conflicts import async_hand_loaded
 from .const import LOGGER
+from .dashboards import DASHBOARD_STORE, DashboardStore
 from .frontend import async_register_frontend, panel_url
 from .issues import ISSUES, async_set_issue
 from .panel import async_register_panel, async_remove_panel
@@ -25,6 +26,7 @@ from .websocket import async_register
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
+    from homeassistant.util.hass_dict import HassKey
 
 
 @dataclass
@@ -38,7 +40,19 @@ type MnmlConfigEntry = ConfigEntry[MnmlData]
 
 async def async_setup_entry(hass: HomeAssistant, entry: MnmlConfigEntry) -> bool:
     if STORE not in hass.data:
-        await async_load_store(hass)
+        await async_load_into(
+            hass,
+            STORE,
+            TemplateStore(hass),
+            "The templates MNML keeps could not be read; the cards draw the shipped ones",
+        )
+    if DASHBOARD_STORE not in hass.data:
+        await async_load_into(
+            hass,
+            DASHBOARD_STORE,
+            DashboardStore(hass),
+            "The dashboards MNML built could not be read; the builder starts with none",
+        )
     async_register(hass)
     url = await async_register_frontend(hass, const.WWW)
     try:
@@ -61,16 +75,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: MnmlConfigEntry) -> bool
     return True
 
 
-async def async_load_store(hass: HomeAssistant) -> None:
-    store = TemplateStore(hass)
+class Loadable(Protocol):
+    async def async_load(self) -> None: ...
+
+
+async def async_load_into[S: Loadable](
+    hass: HomeAssistant, key: HassKey[S], store: S, failure: str
+) -> None:
     try:
         await store.async_load()
     except HomeAssistantError, OSError, ValueError, KeyError, TypeError, AttributeError:
-        LOGGER.exception(
-            "The templates MNML keeps could not be read; the cards draw the shipped ones"
-        )
+        LOGGER.exception(failure)
         return
-    hass.data[STORE] = store
+    hass.data[key] = store
 
 
 async def async_check_home(hass: HomeAssistant) -> None:

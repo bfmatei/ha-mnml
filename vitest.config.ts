@@ -8,7 +8,7 @@ export default defineConfig({
           name: 'node',
           environment: 'node',
           include: [
-            'src/{contract,templates,home,theme,build}/**/*.test.ts',
+            'src/{contract,templates,home,builder,theme,build}/**/*.test.ts',
             'tools/**/*.test.ts',
             'demo/**/*.test.ts',
           ],
