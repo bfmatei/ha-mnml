@@ -252,3 +252,30 @@ async def test_a_plan_may_give_its_sections_their_look(
             },
         )
         assert reply["error"]["code"] == "invalid_format", wrong
+
+
+async def test_a_plan_may_order_its_sections(
+    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, setup_mnml: SetupMnml
+) -> None:
+    await setup_mnml()
+    client = await hass_ws_client(hass)
+    plan = {**PLAN, "order": ["people", "rooms", "system", "garage"]}
+    saved = await call(
+        client, {"type": "mnml/dashboards/save", "url_path": "dashboard-home", "plan": plan}
+    )
+    assert saved["success"]
+    for wrong in (
+        ["rooms", "rooms"],
+        ["attic"],
+        "rooms",
+        ["rooms", "people", "garage", "system", "rooms"],
+    ):
+        reply = await call(
+            client,
+            {
+                "type": "mnml/dashboards/save",
+                "url_path": "dashboard-home",
+                "plan": {**PLAN, "order": wrong},
+            },
+        )
+        assert reply["error"]["code"] == "invalid_format", wrong

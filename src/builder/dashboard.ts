@@ -1,4 +1,4 @@
-import { lookOf } from '../contract/builder.ts';
+import { lookOf, orderOf } from '../contract/builder.ts';
 import type {
   CarChoice,
   PersonChoice,
@@ -64,6 +64,16 @@ export function dashboardOf(plan: Plan, registries: Registries, templates: Templ
   const rooms = lookOf(plan, 'rooms').template;
   const people = lookOf(plan, 'people').template;
   const cars = lookOf(plan, 'garage').template;
+  const parts: Record<SectionKey, TemplateCard[]> = {
+    rooms: plan.rooms
+      .filter((room) => Object.hasOwn(registries.areas, room.area))
+      .map((room) => roomCard(room, rooms)),
+    people: plan.people
+      .filter((person) => Object.hasOwn(registries.states, person.entity))
+      .map((person) => personCard(person, registries, people)),
+    garage: plan.cars.map((car) => carCard(car, cars)),
+    system: plan.system.map((choice) => systemCard(choice, registries, templates)),
+  };
   return {
     title: plan.title,
     views: [
@@ -74,30 +84,7 @@ export function dashboardOf(plan: Plan, registries: Registries, templates: Templ
         type: 'sections',
         max_columns: 3,
         sections: [
-          ...section(
-            plan,
-            'rooms',
-            plan.rooms
-              .filter((room) => Object.hasOwn(registries.areas, room.area))
-              .map((room) => roomCard(room, rooms)),
-          ),
-          ...section(
-            plan,
-            'people',
-            plan.people
-              .filter((person) => Object.hasOwn(registries.states, person.entity))
-              .map((person) => personCard(person, registries, people)),
-          ),
-          ...section(
-            plan,
-            'garage',
-            plan.cars.map((car) => carCard(car, cars)),
-          ),
-          ...section(
-            plan,
-            'system',
-            plan.system.map((choice) => systemCard(choice, registries, templates)),
-          ),
+          ...orderOf(plan).flatMap((key) => section(plan, key, parts[key])),
           {
             type: 'grid',
             column_span: 3,

@@ -182,3 +182,10 @@ test("a section's look names its heading and the template of its cards; a plan w
     ['my-room', 'my-room'],
   );
 });
+
+test('the sections come in the order the plan gives', () => {
+  const titles = templateCards({ ...PLAN, order: ['people', 'rooms'] })
+    .filter((card) => card.template === 'section-heading')
+    .map((card) => card.slots?.['title']);
+  assert.deepEqual(titles, ['People', 'Rooms']);
+});

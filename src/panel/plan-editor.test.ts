@@ -76,10 +76,11 @@ test('an area with no light offers no room, and one ticked comes last', async ()
 
 test('rooms move up and down, and the plan keeps the order', async () => {
   const { element, root, saved } = await editor();
-  const down = [...root.querySelectorAll<HTMLButtonElement>('[aria-label="Move down"]')];
-  assert.equal(down.length, 2);
-  assert.equal(down[1]?.disabled, true);
-  down[0]?.click();
+  const kitchen = root.querySelector<HTMLButtonElement>('[aria-label="Move Kitchen down"]');
+  const living = root.querySelector<HTMLButtonElement>('[aria-label="Move Living down"]');
+  assert.ok(kitchen && living);
+  assert.equal(living.disabled, true);
+  kitchen.click();
   await element.updateComplete;
   await save(element, root);
   assert.deepEqual(saved[0]?.[0].rooms, [{ area: 'living' }, { area: 'kitchen' }]);
@@ -264,5 +265,62 @@ test("a section offers the templates that take its rows' slots, and a new one dr
   rooms.dispatchEvent(new Event('change'));
   await save(element, root);
   assert.deepEqual(saved[0]?.[0].rooms, [{ area: 'kitchen', slots: { name: 'Cook' } }]);
+  element.remove();
+});
+
+const press = (root: ShadowRoot, label: string): void => {
+  const button = root.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`);
+  assert.ok(button, label);
+  button.click();
+};
+
+test('the sections move up and down, and the page and the plan follow', async () => {
+  const { element, root, saved } = await editor();
+  press(root, 'Move the People section up');
+  await element.updateComplete;
+  const headings = [...root.querySelectorAll('.plan-section h2')].map((heading) => text(heading));
+  assert.deepEqual(headings, ['Dashboard', 'People', 'Rooms', 'Garage', 'System', 'Pop-ups']);
+  await save(element, root);
+  assert.deepEqual(saved[0]?.[0].order, ['people', 'rooms', 'garage', 'system']);
+  press(root, 'Move the People section down');
+  await save(element, root);
+  assert.equal('order' in (saved[1]?.[0] ?? {}), false);
+  element.remove();
+});
+
+test('people, cars and system cards move within their sections', async () => {
+  const plan: Plan = {
+    ...defaultPlan(HOME, TEMPLATES),
+    cars: [
+      { key: 'sedan', slots: {} },
+      { key: 'suv', slots: {} },
+    ],
+    system: [{ template: 'home-assistant' }, { template: 'adguard' }],
+  };
+  const { element, root, saved } = await editor({ plan });
+  press(root, 'Move person.bob up');
+  press(root, 'Move suv up');
+  press(root, 'Move AdGuard Home up');
+  await save(element, root);
+  const [kept] = saved[0] ?? [];
+  assert.deepEqual(kept?.people, [{ entity: 'person.bob' }, { entity: 'person.jane' }]);
+  assert.deepEqual(
+    kept?.cars.map((car) => car.key),
+    ['suv', 'sedan'],
+  );
+  assert.deepEqual(kept?.system, [{ template: 'adguard' }, { template: 'home-assistant' }]);
+  element.remove();
+});
+
+test('a system card outside the five is listed, and kept when another changes', async () => {
+  const plan: Plan = { ...defaultPlan(HOME, TEMPLATES), system: [{ template: 'room' }] };
+  const { element, root, saved } = await editor({ plan });
+  assert.ok(root.querySelector('input[aria-label="Show room"]'));
+  const title = root.querySelector<HTMLInputElement>('input[aria-label="System title"]');
+  assert.ok(title);
+  title.value = 'Servers';
+  title.dispatchEvent(new Event('input'));
+  await save(element, root);
+  assert.deepEqual(saved[0]?.[0].system, [{ template: 'room' }]);
   element.remove();
 });

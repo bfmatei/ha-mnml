@@ -1,6 +1,6 @@
 import { parse } from 'yaml';
 
-import { SECTION_LOOKS, lookOf } from '../contract/builder.ts';
+import { SECTION_LOOKS, isOrder, lookOf } from '../contract/builder.ts';
 import type { Plan, Recipe, RecipeSection, SectionKey } from '../contract/builder.ts';
 import type { PopupOpen, PopupOpening } from '../contract/cards.ts';
 import type { MdiIcon } from '../contract/entities.ts';
@@ -89,7 +89,14 @@ export function recipeOf(plan: Plan, templates: Templates, shipped: Templates): 
         : [[name, template]];
     }),
   );
-  return { title: plan.title, icon: plan.icon, open: plan.open, sections, templates: bundled };
+  return {
+    title: plan.title,
+    icon: plan.icon,
+    open: plan.open,
+    sections,
+    ...(plan.order === undefined ? {} : { order: [...plan.order] }),
+    templates: bundled,
+  };
 }
 
 export function recipeText(recipe: Recipe): string {
@@ -219,7 +226,18 @@ export function readRecipe(text: string, shipped: Templates): Recipe {
       return refuse(`${name} is neither shipped nor in the dashboard template.`);
     }
   }
-  return { title, icon, open: openOf(inner['open']), sections: read, templates: bundled };
+  const order = inner['order'];
+  if (order !== undefined && !isOrder(order)) {
+    return refuse("The dashboard template's order is not the sections, each once.");
+  }
+  return {
+    title,
+    icon,
+    open: openOf(inner['open']),
+    sections: read,
+    ...(order === undefined ? {} : { order }),
+    templates: bundled,
+  };
 }
 
 function renamedValue(value: Value, renames: Readonly<Record<string, string>>): Value {

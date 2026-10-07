@@ -264,6 +264,12 @@ export const PANEL_STYLE = css`
     border-radius: 12px;
     background: var(--card-background-color);
   }
+  .plan-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
   .plan-section h2 {
     margin: 0;
     font-size: 18px;

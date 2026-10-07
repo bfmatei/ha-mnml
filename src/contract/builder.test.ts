@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 import { test } from 'vitest';
 
-import { isPlan } from './builder.ts';
+import { isPlan, orderOf } from './builder.ts';
 
 const PLAN = {
   title: 'Home',
@@ -50,4 +50,19 @@ test('a plan may give each section its own title, icon and template, and the sys
   assert.equal(isPlan({ ...PLAN, sections: { rooms: { template: 'My Room' } } }), false);
   assert.equal(isPlan({ ...PLAN, sections: { rooms: { title: '' } } }), false);
   assert.equal(isPlan({ ...PLAN, sections: [] }), false);
+});
+
+test('a plan may put its sections in another order, each section once', () => {
+  assert.equal(isPlan({ ...PLAN, order: ['people', 'rooms', 'system', 'garage'] }), true);
+  assert.equal(isPlan({ ...PLAN, order: ['system'] }), true);
+  assert.equal(isPlan({ ...PLAN, order: ['rooms', 'rooms'] }), false);
+  assert.equal(isPlan({ ...PLAN, order: ['attic'] }), false);
+  assert.equal(isPlan({ ...PLAN, order: 'rooms' }), false);
+  assert.deepEqual(orderOf({ order: ['system', 'people'] }), [
+    'system',
+    'people',
+    'rooms',
+    'garage',
+  ]);
+  assert.deepEqual(orderOf({}), ['rooms', 'people', 'garage', 'system']);
 });

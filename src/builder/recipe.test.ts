@@ -170,3 +170,22 @@ test('a section left empty in YAML is a section, and a templates export says wha
     /a set of templates/,
   );
 });
+
+test("a recipe keeps its sections' order, and refills it", () => {
+  const plan = {
+    ...defaultPlan(HOME, SHIPPED),
+    order: ['people', 'rooms', 'garage', 'system'] as const,
+  };
+  const recipe = recipeOf({ ...plan, order: [...plan.order] }, SHIPPED, SHIPPED);
+  assert.deepEqual(recipe.order, ['people', 'rooms', 'garage', 'system']);
+  const back = planFrom(readRecipe(recipeText(recipe), SHIPPED), HOME, SHIPPED);
+  assert.deepEqual(back.order, ['people', 'rooms', 'garage', 'system']);
+  assert.throws(
+    () =>
+      readRecipe(
+        'mnml_dashboard:\n  title: Home\n  icon: mdi:home\n  order: [rooms, rooms]\n',
+        SHIPPED,
+      ),
+    /order/,
+  );
+});
