@@ -169,7 +169,7 @@ A section's heading, the full width of the section.
 | Slot       | Kind                              | Required or default | Found by |
 | ---------- | --------------------------------- | ------------------- | -------- |
 | `title`    | text                              | required            |          |
-| `icon`     | icon                              | required            |          |
+| `icon`     | icon                              |                     |          |
 | `state`    | objects, as the card's `state`    |                     |          |
 | `controls` | objects, as the card's `controls` |                     |          |
 
@@ -179,7 +179,7 @@ A filled power toggle for an entity, lit while the entity is on.
 
 | Slot     | Kind                            | Required or default | Found by |
 | -------- | ------------------------------- | ------------------- | -------- |
-| `entity` | entity                          | required            |          |
+| `entity` | entity                          |                     |          |
 | `color`  | text                            | `'amber'`           |          |
 | `when`   | object, as the control's `when` |                     |          |
 
@@ -189,9 +189,9 @@ A coloured chip that opens a pop-up.
 
 | Slot     | Kind                            | Required or default | Found by |
 | -------- | ------------------------------- | ------------------- | -------- |
-| `entity` | entity                          | required            |          |
-| `popup`  | text                            | required            |          |
-| `color`  | text                            | required            |          |
+| `entity` | entity                          |                     |          |
+| `popup`  | text                            |                     |          |
+| `color`  | text                            |                     |          |
 | `when`   | object, as the control's `when` |                     |          |
 
 ### `while-not-off`
@@ -200,7 +200,7 @@ The visibility that shows a card while its entity is not off.
 
 | Slot     | Kind   | Required or default | Found by |
 | -------- | ------ | ------------------- | -------- |
-| `entity` | entity | required            |          |
+| `entity` | entity |                     |          |
 
 ### `batteries`
 
@@ -229,7 +229,7 @@ A list row that flags an update while it is pending.
 
 | Slot     | Kind   | Required or default | Found by |
 | -------- | ------ | ------------------- | -------- |
-| `entity` | entity | required            |          |
+| `entity` | entity |                     |          |
 
 ### `stopped-row`
 
@@ -237,7 +237,7 @@ A list row, red, shown while a service or guest is off.
 
 | Slot     | Kind   | Required or default | Found by |
 | -------- | ------ | ------------------- | -------- |
-| `entity` | entity | required            |          |
+| `entity` | entity |                     |          |
 
 ### `link-row`
 
@@ -245,7 +245,7 @@ A list row for a link speed, orange while it is not the full speed.
 
 | Slot     | Kind   | Required or default | Found by |
 | -------- | ------ | ------------------- | -------- |
-| `entity` | entity | required            |          |
+| `entity` | entity |                     |          |
 | `speed`  | text   | `'10000'`           |          |
 
 ## Devices
@@ -283,7 +283,7 @@ A diffuser with its amount, an amount slider and its power toggle.
 | Slot     | Kind   | Required or default | Found by |
 | -------- | ------ | ------------------- | -------- |
 | `entity` | entity | required            |          |
-| `amount` | entity | required            |          |
+| `amount` | entity |                     |          |
 
 ### `media-card`
 
@@ -304,7 +304,7 @@ A light's brightness, white temperature and, for a colour light, hue sliders, th
 
 | Slot     | Kind   | Required or default | Found by |
 | -------- | ------ | ------------------- | -------- |
-| `entity` | entity | required            |          |
+| `entity` | entity |                     |          |
 | `color`  | flag   |                     |          |
 
 ### `light-item`
@@ -313,7 +313,7 @@ A light as an item, with its brightness, the active scene while it is on, its sc
 
 | Slot           | Kind     | Required or default | Found by |
 | -------------- | -------- | ------------------- | -------- |
-| `entity`       | entity   | required            |          |
+| `entity`       | entity   |                     |          |
 | `strip_word`   | text     |                     |          |
 | `popup`        | text     |                     |          |
 | `scenes`       | entities |                     |          |
@@ -341,7 +341,7 @@ A room's lights pop-up, its sliders over the whole group, its scenes and every l
 | Slot              | Kind     | Required or default | Found by |
 | ----------------- | -------- | ------------------- | -------- |
 | `key`             | text     | required            |          |
-| `name`            | text     | required            |          |
+| `name`            | text     |                     |          |
 | `group`           | entity   | required            |          |
 | `color`           | flag     |                     |          |
 | `members`         | objects  |                     |          |
@@ -360,7 +360,7 @@ An AC's target temperature slider and its mode menu, blue while it runs.
 
 | Slot     | Kind   | Required or default | Found by |
 | -------- | ------ | ------------------- | -------- |
-| `entity` | entity | required            |          |
+| `entity` | entity |                     |          |
 
 ### `heating-controls`
 
@@ -368,7 +368,7 @@ A heating's target temperature slider, its preset menu when it has presets, and 
 
 | Slot     | Kind   | Required or default | Found by |
 | -------- | ------ | ------------------- | -------- |
-| `entity` | entity | required            |          |
+| `entity` | entity |                     |          |
 | `preset` | flag   |                     |          |
 
 ### `ac-item`
@@ -397,7 +397,7 @@ A room's heating pop-up, its target, its preset, its valves and their batteries.
 | Slot                  | Kind     | Required or default | Found by |
 | --------------------- | -------- | ------------------- | -------- |
 | `key`                 | text     | required            |          |
-| `name`                | text     | required            |          |
+| `name`                | text     |                     |          |
 | `entity`              | entity   | required            |          |
 | `preset`              | flag     |                     |          |
 | `thermostats`         | objects  |                     |          |
@@ -412,7 +412,7 @@ A room's AC pop-up, its target, its fan, swing and other settings, and its energ
 | Slot               | Kind   | Required or default | Found by |
 | ------------------ | ------ | ------------------- | -------- |
 | `key`              | text   | required            |          |
-| `name`             | text   | required            |          |
+| `name`             | text   |                     |          |
 | `entity`           | entity | required            |          |
 | `fan`              | flag   |                     |          |
 | `swing`            | flag   |                     |          |
@@ -434,7 +434,7 @@ A vacuum's Dock, Locate, Start and Stop buttons, each shown when it applies.
 
 | Slot     | Kind   | Required or default | Found by |
 | -------- | ------ | ------------------- | -------- |
-| `entity` | entity | required            |          |
+| `entity` | entity |                     |          |
 
 ### `vacuum-card`
 
@@ -484,7 +484,7 @@ A room's vacuum pop-up, its routines, map, details, settings, dock, maintenance 
 | Slot                               | Kind     | Required or default | Found by |
 | ---------------------------------- | -------- | ------------------- | -------- |
 | `key`                              | text     | required            |          |
-| `name`                             | text     | required            |          |
+| `name`                             | text     |                     |          |
 | `vacuum`                           | object   | required            |          |
 | `vacuum.entity`                    | entity   | required            |          |
 | `vacuum.status`                    | entity   |                     |          |
@@ -529,8 +529,8 @@ A 3D printer's Cancel, Pause, Resume and Continue buttons, each shown in the job
 
 | Slot               | Kind   | Required or default | Found by |
 | ------------------ | ------ | ------------------- | -------- |
-| `entity`           | entity | required            |          |
-| `actions`          | object | required            |          |
+| `entity`           | entity |                     |          |
+| `actions`          | object |                     |          |
 | `actions.pause`    | entity |                     |          |
 | `actions.resume`   | entity |                     |          |
 | `actions.continue` | entity |                     |          |
@@ -577,7 +577,7 @@ A room's 3D printer pop-up, its camera, print, temperatures and power.
 | Slot                            | Kind   | Required or default | Found by |
 | ------------------------------- | ------ | ------------------- | -------- |
 | `key`                           | text   | required            |          |
-| `name`                          | text   | required            |          |
+| `name`                          | text   |                     |          |
 | `printer3d`                     | object | required            |          |
 | `printer3d.entity`              | entity | required            |          |
 | `printer3d.progress`            | entity | required            |          |
@@ -616,7 +616,7 @@ A speaker's pop-up, its sound, and its TV, subwoofer and surround settings when 
 | Slot                                 | Kind   | Required or default | Found by |
 | ------------------------------------ | ------ | ------------------- | -------- |
 | `key`                                | text   | required            |          |
-| `name`                               | text   | required            |          |
+| `name`                               | text   |                     |          |
 | `speaker`                            | object | required            |          |
 | `speaker.key`                        | text   | required            |          |
 | `speaker.entity`                     | entity | required            |          |
@@ -656,7 +656,7 @@ A room's tile, its temperature and humidity, its window, door, lock and climate 
 | `window`                              | entity   |                     | domain binary_sensor, device_class window                                                                                                         |
 | `door`                                | entity   |                     | domain binary_sensor, device_class door                                                                                                           |
 | `lock`                                | entity   |                     | domain lock                                                                                                                                       |
-| `lights`                              | object   | required            | `group` domain light, platform group, then domain light; `members` one per device with domain light: `entity` domain light; `scenes` domain scene |
+| `lights`                              | object   |                     | `group` domain light, platform group, then domain light; `members` one per device with domain light: `entity` domain light; `scenes` domain scene |
 | `lights.group`                        | entity   | required            |                                                                                                                                                   |
 | `lights.color`                        | flag     |                     |                                                                                                                                                   |
 | `lights.members`                      | objects  |                     |                                                                                                                                                   |
@@ -788,7 +788,7 @@ A room's media player, opening its speaker pop-up when it is a speaker.
 
 | Slot            | Kind   | Required or default | Found by |
 | --------------- | ------ | ------------------- | -------- |
-| `key`           | text   | required            |          |
+| `key`           | text   |                     |          |
 | `member`        | object | required            |          |
 | `member.entity` | entity | required            |          |
 | `member.key`    | text   |                     |          |
@@ -807,7 +807,7 @@ A room's pop-up, its lights, climate, media and other devices, its batteries and
 | `window`                           | entity   |                     |          |
 | `door`                             | entity   |                     |          |
 | `lock`                             | entity   |                     |          |
-| `lights`                           | object   | required            |          |
+| `lights`                           | object   |                     |          |
 | `lights.group`                     | entity   | required            |          |
 | `lights.members`                   | objects  |                     |          |
 | `lights.members.entity`            | entity   |                     |          |
@@ -1006,7 +1006,7 @@ A person's device pop-up, its battery and its details.
 | Slot                   | Kind   | Required or default | Found by |
 | ---------------------- | ------ | ------------------- | -------- |
 | `key`                  | text   | required            |          |
-| `entity`               | entity | required            |          |
+| `entity`               | entity |                     |          |
 | `device`               | object | required            |          |
 | `device.key`           | text   | required            |          |
 | `device.name`          | text   |                     |          |
@@ -1035,16 +1035,16 @@ A car's tile, its fuel, and its doors, windows, alarm and tyres chips; it brings
 | `key`                        | text     | required                                                 |          |
 | `icon`                       | icon     | `'mdi:car'`                                              |          |
 | `metadata`                   | entity   | required                                                 |          |
-| `fuel`                       | entity   | required                                                 |          |
+| `fuel`                       | entity   |                                                          |          |
 | `remaining_fuel`             | entity   |                                                          |          |
 | `range`                      | entity   |                                                          |          |
-| `mileage`                    | entity   | required                                                 |          |
+| `mileage`                    | entity   |                                                          |          |
 | `service`                    | entity   |                                                          |          |
 | `battery_voltage`            | entity   |                                                          |          |
 | `coolant_temperature`        | entity   |                                                          |          |
-| `lock`                       | entity   | required                                                 |          |
-| `alarm`                      | entity   | required                                                 |          |
-| `alarm_active`               | entity   | required                                                 |          |
+| `lock`                       | entity   |                                                          |          |
+| `alarm`                      | entity   |                                                          |          |
+| `alarm_active`               | entity   |                                                          |          |
 | `doors`                      | entities | required                                                 |          |
 | `hood`                       | entity   | required                                                 |          |
 | `tailgate`                   | entity   | required                                                 |          |
@@ -1052,7 +1052,7 @@ A car's tile, its fuel, and its doors, windows, alarm and tyres chips; it brings
 | `sunroof`                    | entity   |                                                          |          |
 | `tyres`                      | entities | required                                                 |          |
 | `tyre_targets`               | entities | required                                                 |          |
-| `location`                   | entity   | required                                                 |          |
+| `location`                   | entity   |                                                          |          |
 | `lock_words`                 | object   | `{'secured':'Locked','selectivelocked':'Partly locked'}` |          |
 | `lock_words.secured`         | text     |                                                          |          |
 | `lock_words.selectivelocked` | text     |                                                          |          |
@@ -1092,16 +1092,16 @@ A car's pop-up, its security, its plan, its details and where it is.
 | `key`                        | text     | required                                                 |          |
 | `icon`                       | icon     | `'mdi:car'`                                              |          |
 | `metadata`                   | entity   | required                                                 |          |
-| `fuel`                       | entity   | required                                                 |          |
+| `fuel`                       | entity   |                                                          |          |
 | `remaining_fuel`             | entity   |                                                          |          |
 | `range`                      | entity   |                                                          |          |
-| `mileage`                    | entity   | required                                                 |          |
+| `mileage`                    | entity   |                                                          |          |
 | `service`                    | entity   |                                                          |          |
 | `battery_voltage`            | entity   |                                                          |          |
 | `coolant_temperature`        | entity   |                                                          |          |
-| `lock`                       | entity   | required                                                 |          |
-| `alarm`                      | entity   | required                                                 |          |
-| `alarm_active`               | entity   | required                                                 |          |
+| `lock`                       | entity   |                                                          |          |
+| `alarm`                      | entity   |                                                          |          |
+| `alarm_active`               | entity   |                                                          |          |
 | `doors`                      | entities | required                                                 |          |
 | `hood`                       | entity   | required                                                 |          |
 | `tailgate`                   | entity   | required                                                 |          |
@@ -1109,7 +1109,7 @@ A car's pop-up, its security, its plan, its details and where it is.
 | `sunroof`                    | entity   |                                                          |          |
 | `tyres`                      | entities | required                                                 |          |
 | `tyre_targets`               | entities | required                                                 |          |
-| `location`                   | entity   | required                                                 |          |
+| `location`                   | entity   |                                                          |          |
 | `lock_words`                 | object   | `{'secured':'Locked','selectivelocked':'Partly locked'}` |          |
 | `lock_words.secured`         | text     |                                                          |          |
 | `lock_words.selectivelocked` | text     |                                                          |          |
@@ -1131,15 +1131,15 @@ A Proxmox VE server's tile, its CPU and memory, and its guests, checks, backups 
 
 | Slot                           | Kind     | Required or default | Found by |
 | ------------------------------ | -------- | ------------------- | -------- |
-| `outlet`                       | object   | required            |          |
+| `outlet`                       | object   |                     |          |
 | `outlet.entity`                | entity   | required            |          |
 | `outlet.energy`                | object   |                     |          |
 | `outlet.energy.power`          | entity   | required            |          |
 | `outlet.energy.today`          | entity   |                     |          |
 | `outlet.energy.total`          | entity   |                     |          |
-| `cpu`                          | entity   | required            |          |
-| `memory`                       | entity   | required            |          |
-| `last_boot`                    | entity   | required            |          |
+| `cpu`                          | entity   |                     |          |
+| `memory`                       | entity   |                     |          |
+| `last_boot`                    | entity   |                     |          |
 | `uplink`                       | entity   |                     |          |
 | `temperatures`                 | object   |                     |          |
 | `temperatures.cpu`             | entity   | required            |          |
@@ -1198,15 +1198,15 @@ The server's pop-up, its notifications, stopped guests, checks, host, disks, sto
 
 | Slot                           | Kind     | Required or default | Found by |
 | ------------------------------ | -------- | ------------------- | -------- |
-| `outlet`                       | object   | required            |          |
+| `outlet`                       | object   |                     |          |
 | `outlet.entity`                | entity   | required            |          |
 | `outlet.energy`                | object   |                     |          |
 | `outlet.energy.power`          | entity   | required            |          |
 | `outlet.energy.today`          | entity   |                     |          |
 | `outlet.energy.total`          | entity   |                     |          |
-| `cpu`                          | entity   | required            |          |
-| `memory`                       | entity   | required            |          |
-| `last_boot`                    | entity   | required            |          |
+| `cpu`                          | entity   |                     |          |
+| `memory`                       | entity   |                     |          |
+| `last_boot`                    | entity   |                     |          |
 | `uplink`                       | entity   |                     |          |
 | `temperatures`                 | object   |                     |          |
 | `temperatures.cpu`             | entity   | required            |          |
@@ -1284,9 +1284,9 @@ A UniFi network's tile, its latency, and its devices, VPN and firmware chips; it
 
 | Slot                      | Kind     | Required or default                        | Found by |
 | ------------------------- | -------- | ------------------------------------------ | -------- |
-| `latency`                 | entities | required                                   |          |
+| `latency`                 | entities |                                            |          |
 | `wan`                     | entity   |                                            |          |
-| `devices`                 | entities | required                                   |          |
+| `devices`                 | entities |                                            |          |
 | `wifi`                    | objects  |                                            |          |
 | `wifi.key`                | text     | required                                   |          |
 | `wifi.enabled`            | entity   | required                                   |          |
@@ -1300,10 +1300,10 @@ A UniFi network's tile, its latency, and its devices, VPN and firmware chips; it
 | `clients.networks.name`   | text     |                                            |          |
 | `clients.networks.icon`   | icon     |                                            |          |
 | `clients.networks.subnet` | text     | required                                   |          |
-| `router`                  | object   | required                                   |          |
+| `router`                  | object   |                                            |          |
 | `router.cpu`              | entity   | required                                   |          |
 | `router.temperature`      | entity   | required                                   |          |
-| `firmware`                | entities | required                                   |          |
+| `firmware`                | entities |                                            |          |
 | `device_up`               | texts    | `['connected','upgrading','provisioning']` |          |
 
 Brings `network-popup`, `wifi-popup` (one per wifi).
@@ -1326,9 +1326,9 @@ The network's pop-up, its internet, devices, router, VPN, Wi-Fi networks, client
 
 | Slot                      | Kind     | Required or default                        | Found by |
 | ------------------------- | -------- | ------------------------------------------ | -------- |
-| `latency`                 | entities | required                                   |          |
+| `latency`                 | entities |                                            |          |
 | `wan`                     | entity   |                                            |          |
-| `devices`                 | entities | required                                   |          |
+| `devices`                 | entities |                                            |          |
 | `wifi`                    | objects  |                                            |          |
 | `wifi.key`                | text     | required                                   |          |
 | `wifi.enabled`            | entity   | required                                   |          |
@@ -1342,10 +1342,10 @@ The network's pop-up, its internet, devices, router, VPN, Wi-Fi networks, client
 | `clients.networks.name`   | text     |                                            |          |
 | `clients.networks.icon`   | icon     |                                            |          |
 | `clients.networks.subnet` | text     | required                                   |          |
-| `router`                  | object   | required                                   |          |
+| `router`                  | object   |                                            |          |
 | `router.cpu`              | entity   | required                                   |          |
 | `router.temperature`      | entity   | required                                   |          |
-| `firmware`                | entities | required                                   |          |
+| `firmware`                | entities |                                            |          |
 | `device_up`               | texts    | `['connected','upgrading','provisioning']` |          |
 
 ### `wifi-popup`
@@ -1371,12 +1371,12 @@ An AdGuard Home tile, its block ratio and speed, its update chip and its protect
 | Slot         | Kind   | Required or default | Found by                                                                                     |
 | ------------ | ------ | ------------------- | -------------------------------------------------------------------------------------------- |
 | `protection` | entity | required            | domain switch, platform adguard, translation_key protection in the whole home                |
-| `queries`    | entity | required            | domain sensor, platform adguard, translation_key dns_queries in the whole home               |
-| `blocked`    | entity | required            | domain sensor, platform adguard, translation_key dns_queries_blocked in the whole home       |
-| `ratio`      | entity | required            | domain sensor, platform adguard, translation_key dns_queries_blocked_ratio in the whole home |
-| `speed`      | entity | required            | domain sensor, platform adguard, translation_key average_processing_speed in the whole home  |
+| `queries`    | entity |                     | domain sensor, platform adguard, translation_key dns_queries in the whole home               |
+| `blocked`    | entity |                     | domain sensor, platform adguard, translation_key dns_queries_blocked in the whole home       |
+| `ratio`      | entity |                     | domain sensor, platform adguard, translation_key dns_queries_blocked_ratio in the whole home |
+| `speed`      | entity |                     | domain sensor, platform adguard, translation_key average_processing_speed in the whole home  |
 | `rules`      | entity |                     | domain sensor, platform adguard, translation_key rules_count in the whole home               |
-| `update`     | entity | required            | domain update, platform adguard in the whole home                                            |
+| `update`     | entity |                     | domain update, platform adguard in the whole home                                            |
 
 Brings `adguard-popup`.
 
@@ -1387,12 +1387,12 @@ AdGuard Home's pop-up, its queries, blocklists and update.
 | Slot         | Kind   | Required or default | Found by |
 | ------------ | ------ | ------------------- | -------- |
 | `protection` | entity | required            |          |
-| `queries`    | entity | required            |          |
-| `blocked`    | entity | required            |          |
-| `ratio`      | entity | required            |          |
-| `speed`      | entity | required            |          |
+| `queries`    | entity |                     |          |
+| `blocked`    | entity |                     |          |
+| `ratio`      | entity |                     |          |
+| `speed`      | entity |                     |          |
 | `rules`      | entity |                     |          |
-| `update`     | entity | required            |          |
+| `update`     | entity |                     |          |
 
 ## Home Assistant
 
@@ -1404,10 +1404,10 @@ Home Assistant's tile, its memory and free disk, and its services, updates and f
 
 | Slot                     | Kind     | Required or default | Found by                                                                                                                                                             |
 | ------------------------ | -------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `cpu`                    | entity   | required            | domain sensor, platform systemmonitor, translation_key processor_use in the whole home                                                                               |
-| `memory`                 | entity   | required            | domain sensor, platform systemmonitor, translation_key memory_use_percent in the whole home                                                                          |
-| `disk_free`              | entity   | required            | domain sensor, platform hassio, translation_key disk_free in the whole home, then domain sensor, platform systemmonitor, translation_key disk_free in the whole home |
-| `disk_used`              | entity   | required            | domain sensor, platform hassio, translation_key disk_used in the whole home, then domain sensor, platform systemmonitor, translation_key disk_use in the whole home  |
+| `cpu`                    | entity   |                     | domain sensor, platform systemmonitor, translation_key processor_use in the whole home                                                                               |
+| `memory`                 | entity   |                     | domain sensor, platform systemmonitor, translation_key memory_use_percent in the whole home                                                                          |
+| `disk_free`              | entity   |                     | domain sensor, platform hassio, translation_key disk_free in the whole home, then domain sensor, platform systemmonitor, translation_key disk_free in the whole home |
+| `disk_used`              | entity   |                     | domain sensor, platform hassio, translation_key disk_used in the whole home, then domain sensor, platform systemmonitor, translation_key disk_use in the whole home  |
 | `services`               | entities |                     |                                                                                                                                                                      |
 | `updates`                | entities |                     | domain update, platform hassio in the whole home                                                                                                                     |
 | `firmware`               | entities |                     |                                                                                                                                                                      |
@@ -1424,10 +1424,10 @@ Home Assistant's pop-up, its resources, services, updates, its own firmware and 
 
 | Slot                     | Kind     | Required or default | Found by                                                                                            |
 | ------------------------ | -------- | ------------------- | --------------------------------------------------------------------------------------------------- |
-| `cpu`                    | entity   | required            |                                                                                                     |
-| `memory`                 | entity   | required            |                                                                                                     |
-| `disk_free`              | entity   | required            |                                                                                                     |
-| `disk_used`              | entity   | required            |                                                                                                     |
+| `cpu`                    | entity   |                     |                                                                                                     |
+| `memory`                 | entity   |                     |                                                                                                     |
+| `disk_free`              | entity   |                     |                                                                                                     |
+| `disk_used`              | entity   |                     |                                                                                                     |
 | `services`               | entities |                     |                                                                                                     |
 | `updates`                | entities |                     |                                                                                                     |
 | `firmware`               | entities |                     |                                                                                                     |

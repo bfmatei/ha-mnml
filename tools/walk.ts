@@ -273,7 +273,7 @@ check(
   `the quick start's dashboard draws no error card${quickErrors.length === 0 ? '' : `: ${quickErrors.join(' | ')}`}`,
 );
 const quickRooms = await roomsIn('dashboard-home');
-check(quickRooms > 0, `the quick start has the rooms with lights (${quickRooms})`);
+check(quickRooms > 0, `the quick start has the rooms it finds something in (${quickRooms})`);
 
 await boardsPage(page);
 check(

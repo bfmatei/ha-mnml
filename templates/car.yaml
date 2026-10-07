@@ -18,23 +18,17 @@ car:
         group: Basics,
         help: "The sensor whose attributes hold the car's make and model.",
       }
-    fuel: { kind: entity, required: true, group: Fuel, help: 'The fuel level.' }
+    fuel: { kind: entity, group: Fuel, help: 'The fuel level.' }
     remaining_fuel: { kind: entity, group: Fuel, label: 'Remaining fuel' }
     range: { kind: entity, group: Fuel }
-    mileage: { kind: entity, required: true, group: Status, help: 'The distance driven.' }
+    mileage: { kind: entity, group: Status, help: 'The distance driven.' }
     service: { kind: entity, group: Status }
     battery_voltage: { kind: entity, group: Status, label: 'Battery voltage' }
     coolant_temperature: { kind: entity, group: Status, label: 'Coolant temperature' }
-    lock: { kind: entity, required: true, group: Locks, help: "The car's lock state." }
-    alarm: { kind: entity, required: true, group: Locks, help: "The alarm's arming state." }
+    lock: { kind: entity, group: Locks, help: "The car's lock state." }
+    alarm: { kind: entity, group: Locks, help: "The alarm's arming state." }
     alarm_active:
-      {
-        kind: entity,
-        required: true,
-        group: Locks,
-        label: 'Alarm sounding',
-        help: 'On while the alarm sounds.',
-      }
+      { kind: entity, group: Locks, label: 'Alarm sounding', help: 'On while the alarm sounds.' }
     doors:
       { kind: entities, required: true, group: Openings, help: 'One per door, open or closed.' }
     hood: { kind: entity, required: true, group: Openings, help: 'The hood, open or closed.' }
@@ -52,7 +46,7 @@ car:
         label: 'Tyre targets',
         help: "Each tyre's target pressure, in the order of the tyres.",
       }
-    location: { kind: entity, required: true, group: Basics, help: "The car's device tracker." }
+    location: { kind: entity, group: Basics, help: "The car's device tracker." }
     lock_words:
       label: 'Lock words'
       kind: object
@@ -95,7 +89,7 @@ car:
     label: device
     icon: '[[icon]]'
     popup: '#car-[[key]]'
-    state: [{ id: fuel, entity: '[[fuel]]', icon: true }]
+    state: [{ id: fuel, if: fuel, entity: '[[fuel]]', icon: true }]
     chips:
       - id: doors
         type: status
@@ -243,16 +237,16 @@ car-popup:
     key: { kind: text, required: true }
     icon: { kind: icon, default: mdi:car }
     metadata: { kind: entity, required: true }
-    fuel: { kind: entity, required: true }
+    fuel: { kind: entity }
     remaining_fuel: { kind: entity }
     range: { kind: entity }
-    mileage: { kind: entity, required: true }
+    mileage: { kind: entity }
     service: { kind: entity }
     battery_voltage: { kind: entity }
     coolant_temperature: { kind: entity }
-    lock: { kind: entity, required: true }
-    alarm: { kind: entity, required: true }
-    alarm_active: { kind: entity, required: true }
+    lock: { kind: entity }
+    alarm: { kind: entity }
+    alarm_active: { kind: entity }
     doors: { kind: entities, required: true }
     hood: { kind: entity, required: true }
     tailgate: { kind: entity, required: true }
@@ -260,7 +254,7 @@ car-popup:
     sunroof: { kind: entity }
     tyres: { kind: entities, required: true }
     tyre_targets: { kind: entities, required: true }
-    location: { kind: entity, required: true }
+    location: { kind: entity }
     lock_words:
       kind: object
       default: { secured: Locked, selectivelocked: Partly locked }
@@ -292,16 +286,19 @@ car-popup:
         icon: mdi:shield-car
         rows:
           - id: lock
+            if: lock
             entity: '[[lock]]'
             words: '[[lock_words]]'
             color: red
             when: { is: '[[unlocked]]' }
           - id: alarm
+            if: alarm
             entity: '[[alarm]]'
             words: '[[alarm_words]]'
             color: amber
             when: { not: '[[disarmed]]' }
           - id: alarm_active
+            if: alarm_active
             entity: '[[alarm_active]]'
             name: Alarm
             flag: true
@@ -325,6 +322,7 @@ car-popup:
         icon: mdi:information-outline
         rows:
           - id: fuel
+            if: fuel
             entity: '[[fuel]]'
           - id: remaining_fuel
             if: remaining_fuel
@@ -333,6 +331,7 @@ car-popup:
             if: range
             entity: '[[range]]'
           - id: mileage
+            if: mileage
             entity: '[[mileage]]'
           - id: service
             if: service

@@ -38,3 +38,21 @@ test('docs/templates.md names every shipped template, its slots and their fields
   }
   assert.deepEqual(missing, []);
 });
+
+test('docs/templates.md marks a slot required exactly when its template requires it', () => {
+  const doc = readFileSync(resolve(import.meta.dirname, '../../docs/templates.md'), 'utf8');
+  const wrong: string[] = [];
+  for (const [name, template] of Object.entries(SHIPPED)) {
+    const start = doc.indexOf(`### \`${name}\``);
+    const end = doc.indexOf('\n### ', start + 1);
+    const section = doc.slice(start, end === -1 ? undefined : end);
+    for (const [slot, spec] of Object.entries(template.slots ?? {})) {
+      const row = section.split('\n').find((line) => line.startsWith(`| \`${slot}\` `));
+      const said = (row?.split('|')[3] ?? '').trim() === 'required';
+      if (row !== undefined && said !== (spec.required === true)) {
+        wrong.push(`${name}.${slot}`);
+      }
+    }
+  }
+  assert.deepEqual(wrong, []);
+});

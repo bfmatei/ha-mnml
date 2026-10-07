@@ -217,9 +217,9 @@ test('once the store has answered, a mistake in an explicit instance is thrown, 
     configure(card, {
       type: 'custom:mnml-template-card',
       template: 'section-heading',
-      slots: { title: 'Rooms' },
+      slots: { icon: 'mdi:floor-plan' },
     });
-  }, /section-heading: the slot icon is required/);
+  }, /section-heading: the slot title is required/);
 });
 
 test('a card given hass but never attached does not follow saves', async () => {

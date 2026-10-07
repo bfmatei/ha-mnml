@@ -38,14 +38,15 @@ diffuser-card:
   description: A diffuser with its amount, an amount slider and its power toggle.
   slots:
     entity: { kind: entity, required: true }
-    amount: { kind: entity, required: true }
+    amount: { kind: entity }
   card:
     type: custom:mnml-entity-card
     entity: '[[entity]]'
     color: amber
-    state: [{ id: part }, { id: amount, entity: '[[amount]]' }]
+    state: [{ id: part }, { id: amount, if: amount, entity: '[[amount]]' }]
     controls:
       - id: slider
+        if: amount
         type: slider
         entity: '[[amount]]'
         slider: value

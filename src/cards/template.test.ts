@@ -80,9 +80,9 @@ test('a configuration mistake is thrown, so Home Assistant shows an error card',
     configure(card, {
       type: 'custom:mnml-template-card',
       template: 'section-heading',
-      slots: { title: 'Rooms' },
+      slots: { icon: 'mdi:floor-plan' },
     });
-  }, /section-heading: the slot icon is required/);
+  }, /section-heading: the slot title is required/);
   assert.throws(() => {
     configure(card, { type: 'custom:mnml-template-card', templat: 'x' });
   }, /unknown key: templat/);
@@ -95,7 +95,7 @@ test('an area instance expands on the registries, again only when they are repla
     type: 'custom:mnml-template-card',
     template: 'section-heading',
     area: 'living',
-    slots: { title: 'Living' },
+    slots: { icon: 'mdi:sofa' },
   });
   document.body.append(card);
   const hass = { states: {}, ...REGISTRIES };
@@ -105,9 +105,9 @@ test('an area instance expands on the registries, again only when they are repla
   assert.equal(
     built[0]?.['type'],
     'error',
-    'icon is required and section-heading does not discover it',
+    'title is required and section-heading does not discover it',
   );
-  assert.match(String(built[0]?.['error']), /section-heading: the slot icon is required/);
+  assert.match(String(built[0]?.['error']), /section-heading: the slot title is required/);
   card.hass = hassOf({ ...hass, states: { 'light.a': {} } });
   await settle();
   assert.equal(built.length, 1, 'a state change does not expand again');

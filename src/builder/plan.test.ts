@@ -27,7 +27,7 @@ test('the default plan has every person, and pop-ups that unfold on tablet and d
   assert.equal(isPlan(plan), true);
 });
 
-test('the default plan has each system template whose required slots discovery fills', () => {
+test('the default plan has each system template that draws, and whose entities discovery finds some of', () => {
   assert.deepEqual(defaultPlan(HOME, TEMPLATES).system, []);
   const adguard: Template = {
     slots: {
