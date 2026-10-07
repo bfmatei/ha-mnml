@@ -64,6 +64,7 @@ test('the library lists shipped, customised, own and conflicting templates, with
     OWNER,
     kept,
     new Map([['room', { cards: 9, dashboards: ['A', 'B'] }]]),
+    {},
   );
   assert.deepEqual(
     rows.map((row) => [row.name, row.status, row.family]),

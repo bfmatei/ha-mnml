@@ -122,9 +122,12 @@ page.on('pageerror', (error) => {
 });
 
 await library(page);
+const tilesListed = await page.locator('mnml-library .library-row').count();
+await page.locator('mnml-library').getByRole('checkbox', { name: 'Pop-ups and parts' }).check();
+await settle(page, 500);
 check(
-  (await page.locator('mnml-library .library-row').count()) > 10,
-  'the library lists the templates',
+  tilesListed >= 9 && (await page.locator('mnml-library .library-row').count()) > 40,
+  `the library lists the tiles (${tilesListed}), and every template with Pop-ups and parts`,
 );
 
 await page.goto(`${env.HA_URL}/mnml/templates/room`, { waitUntil: 'domcontentloaded' });

@@ -18,6 +18,7 @@ import { onShared, sharedTemplates } from '../store/store.ts';
 import { applyChanges, isChange } from '../templates/changes.ts';
 import type { Registries } from '../templates/discover.ts';
 import { OWNER } from '../templates/families.ts';
+import { rolesOf } from '../templates/roles.ts';
 
 import { MnmlBuilder, storedAs } from './builder.ts';
 import type { BuilderHost, Entry } from './builder.ts';
@@ -493,7 +494,13 @@ export class MnmlPanel extends LitElement {
   }
 
   private rows(): Row[] {
-    return rowsOf(this.shipped ?? {}, OWNER, this.kept ?? NOTHING_KEPT, usesOf(this.dashboards));
+    return rowsOf(
+      this.shipped ?? {},
+      OWNER,
+      this.kept ?? NOTHING_KEPT,
+      usesOf(this.dashboards),
+      rolesOf(this.resolved()),
+    );
   }
 
   private drawLibrary(): TemplateResult {

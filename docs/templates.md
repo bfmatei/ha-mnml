@@ -144,6 +144,16 @@ The template card expands its template in the browser, once the store has answer
 
 Templates are part of MNML's public interface. A new template, a new optional slot, or a change in what a template draws is a minor release; a renamed or removed template or slot, or a slot whose meaning changes, is a major one.
 
+## Roles
+
+A template is one of three, by how it is used, which MNML works out and nothing declares:
+
+- **A tile** is placed on a dashboard: no other template uses it. The shipped ones are `room`, `person`, `car`, `proxmox-server`, `unifi-network`, `adguard`, `home-assistant`, `media-server` and `section-heading`.
+- **A pop-up** is a card with a `hash` and no `type`, which a tile brings.
+- **A part** is used inside another template, by `template:`.
+
+The home's own templates count, so a template of the home that uses a shipped tile makes it a part. The library and the template card's gallery show the tiles first, and the pop-ups and parts on request.
+
 ## The shipped templates
 
 Each template's slots and the rules that find them. A slot without a rule is set by hand. A field's row reads `slot.field`, and for an `objects` slot names the field of each element. A slot passed whole to a card's or a control's key takes that key's shape, in [keys.md](keys.md).

@@ -133,6 +133,13 @@ export const EDITOR_STYLE = css`
   .problem {
     color: var(--error-color);
   }
+  .fold {
+    justify-content: flex-start;
+    margin: 12px 0 0;
+    color: var(--primary-color);
+    font-size: 14px;
+    font-weight: 500;
+  }
   .gallery {
     display: flex;
     flex-direction: column;

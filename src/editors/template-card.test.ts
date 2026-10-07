@@ -171,10 +171,22 @@ async function again(opened: Opened): Promise<void> {
   await settle();
 }
 
-test('without a template, the gallery lists the shipped templates by family, and a filter narrows it', async () => {
+test('without a template, the gallery lists the tiles by family, and folds the pop-ups and parts', async () => {
   const { root } = await open({ type: 'custom:mnml-template-card', template: '' });
   assert.ok(labelled(root, 'Use section-heading'));
+  assert.ok(labelled(root, 'Use room'));
+  assert.equal(labelled(root, 'Use light-card'), undefined);
+  const fold = [...root.querySelectorAll('button')].find((each) =>
+    /^Pop-ups and parts \(\d+\)$/.test(text(each)),
+  );
+  assert.ok(fold);
+  fold.click();
+  await settle();
   assert.ok(labelled(root, 'Use light-card'));
+});
+
+test('a filter narrows the gallery and looks among the pop-ups and parts too', async () => {
+  const { root } = await open({ type: 'custom:mnml-template-card', template: '' });
   const filter = labelled(root, 'Filter the templates');
   assert.ok(filter instanceof HTMLInputElement);
   filter.value = 'vacuum';
@@ -247,6 +259,11 @@ test('choosing another template keeps the layout and visibility of the card', as
     visibility: [{ condition: 'screen', media_query: '(min-width: 0px)' }],
   });
   await click(labelled(root, 'Change the template'));
+  await click(
+    [...root.querySelectorAll<HTMLElement>('button')].find((each) =>
+      text(each).startsWith('Pop-ups and parts'),
+    ),
+  );
   await click(labelled(root, 'Use vacuum-card'));
   const config = lastConfig(dispatched);
   assert.equal(config['template'], 'vacuum-card');

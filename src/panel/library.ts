@@ -2,6 +2,7 @@ import { html, LitElement } from 'lit';
 import type { TemplateResult } from 'lit';
 import { property, state } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
+import { live } from 'lit/directives/live.js';
 
 import { rowMenu } from '../editors/row-menu.ts';
 import { field } from '../ha/field.ts';
@@ -30,6 +31,16 @@ export interface Offer {
 
 type Filter = 'all' | Status;
 
+const EVERYTHING = 'mnml-library-everything';
+
+function remembered(): boolean {
+  try {
+    return localStorage.getItem(EVERYTHING) === 'yes';
+  } catch {
+    return false;
+  }
+}
+
 const FILTERS: readonly { filter: Filter; label: string }[] = [
   { filter: 'all', label: 'All' },
   { filter: 'shipped', label: 'Shipped' },
@@ -56,8 +67,9 @@ export class MnmlLibrary extends LitElement {
   @property({ attribute: false }) actions: LibraryActions | undefined;
   @state() private text = '';
   @state() private filter: Filter = 'all';
+  @state() private everything = remembered();
 
-  private visible(): Row[] {
+  private matching(): Row[] {
     const words = this.text.toLowerCase().split(/\s+/).filter(Boolean);
     return this.rows.filter(
       (row) =>
@@ -66,6 +78,41 @@ export class MnmlLibrary extends LitElement {
           `${row.name} ${row.description} ${row.family ?? ''}`.toLowerCase().includes(word),
         ),
     );
+  }
+
+  private visible(): Row[] {
+    return this.matching().filter((row) => this.everything || row.role === 'tile');
+  }
+
+  private show(everything: boolean): void {
+    this.everything = everything;
+    try {
+      localStorage.setItem(EVERYTHING, everything ? 'yes' : 'no');
+    } catch {}
+  }
+
+  private drawHidden(rows: readonly Row[]): TemplateResult | string {
+    if (this.everything) {
+      return '';
+    }
+    const hidden = this.matching().length - rows.length;
+    if (hidden === 0) {
+      return '';
+    }
+    return rows.length === 0
+      ? html`<p class="muted">
+          Only pop-ups and parts match.
+          <button
+            type="button"
+            class="action"
+            @click=${() => {
+              this.show(true);
+            }}
+          >
+            Show them
+          </button>
+        </p>`
+      : html`<p class="muted">and ${hidden} pop-ups and parts</p>`;
   }
 
   private drawRow(row: Row, actions: LibraryActions): TemplateResult {
@@ -204,11 +251,21 @@ export class MnmlLibrary extends LitElement {
         }}
       />
       <div class="chips">
+        <label class="switch">
+          <input
+            type="checkbox"
+            aria-label="Pop-ups and parts"
+            .checked=${live(this.everything)}
+            @change=${(event: Event) => {
+              this.show(field(event.target, 'checked') === true);
+            }}
+          />
+          <span>Pop-ups and parts</span>
+        </label>
         ${FILTERS.map(({ filter, label }) => {
+          const listed = this.rows.filter((row) => this.everything || row.role === 'tile');
           const count =
-            filter === 'all'
-              ? this.rows.length
-              : this.rows.filter((row) => row.status === filter).length;
+            filter === 'all' ? listed.length : listed.filter((row) => row.status === filter).length;
           return count === 0 && filter !== 'all'
             ? ''
             : html`<button
@@ -230,10 +287,13 @@ export class MnmlLibrary extends LitElement {
           actions === undefined
             ? ''
             : rows.length === 0
-              ? html`<p class="muted">No template matches.</p>`
+              ? this.matching().length === 0
+                ? html`<p class="muted">No template matches.</p>`
+                : ''
               : rows.map((row) => this.drawRow(row, actions))
         }
       </div>
+      ${this.drawHidden(rows)}
     </div>`;
   }
 }
