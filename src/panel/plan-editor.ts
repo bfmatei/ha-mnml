@@ -226,30 +226,6 @@ function withOrder(plan: Plan, order: readonly SectionKey[]): Plan {
     : { ...rest, order: [...order] };
 }
 
-function moves(
-  label: string,
-  index: number,
-  count: number,
-  move: (by: number) => void,
-): TemplateResult {
-  return html`${iconButton(
-    'mdi:arrow-up',
-    `Move ${label} up`,
-    () => {
-      move(-1);
-    },
-    index === 0,
-  )}
-  ${iconButton(
-    'mdi:arrow-down',
-    `Move ${label} down`,
-    () => {
-      move(1);
-    },
-    index === count - 1,
-  )}`;
-}
-
 export class MnmlPlanEditor extends LitElement {
   static override styles = PANEL_STYLE;
 
@@ -586,9 +562,14 @@ export class MnmlPlanEditor extends LitElement {
                 );
               },
             )}
-            ${moves(registries.areas[room.area]?.name ?? room.area, index, chosen.length, (by) => {
-              this.change({ rooms: moved(chosen, index, by) });
-            })}
+            ${this.moves(
+              registries.areas[room.area]?.name ?? room.area,
+              index,
+              chosen.length,
+              (by) => {
+                this.change({ rooms: moved(chosen, index, by) });
+              },
+            )}
           </span>
         </div>`,
       )}
@@ -657,7 +638,7 @@ export class MnmlPlanEditor extends LitElement {
                 },
               );
             })}
-            ${moves(nameOf(choice.entity), index, chosen.length, (by) => {
+            ${this.moves(nameOf(choice.entity), index, chosen.length, (by) => {
               this.change({ people: moved(chosen, index, by) });
             })}
           </span>
@@ -707,7 +688,7 @@ export class MnmlPlanEditor extends LitElement {
         (car, index) => html`<div class="plan-row">
           ${this.drawTile(carCard(car, look.cars))}
           <span class="row-actions">
-            ${moves(car.key, index, plan.cars.length, (by) => {
+            ${this.moves(car.key, index, plan.cars.length, (by) => {
               this.change({ cars: moved(plan.cars, index, by) });
             })}
             ${iconButton('mdi:tune-variant', `Customize ${car.key}`, () => {
@@ -789,7 +770,7 @@ export class MnmlPlanEditor extends LitElement {
             this.keepSystem(plan, registries, choice),
           );
         })}
-        ${moves(label, index, plan.system.length, (by) => {
+        ${this.moves(label, index, plan.system.length, (by) => {
           this.change({ system: moved(plan.system, index, by) });
         })}
       </span>
@@ -851,6 +832,44 @@ export class MnmlPlanEditor extends LitElement {
     </section>`;
   }
 
+  private moves(
+    label: string,
+    index: number,
+    count: number,
+    move: (by: number) => void,
+  ): TemplateResult {
+    const moving = (by: number): void => {
+      move(by);
+      void this.updateComplete.then(() => {
+        const ways = by < 0 ? ['up', 'down'] : ['down', 'up'];
+        ways
+          .map((way) =>
+            this.renderRoot.querySelector<HTMLButtonElement>(
+              `button[aria-label="Move ${label} ${way}"]`,
+            ),
+          )
+          .find((button) => button !== null && !button.disabled)
+          ?.focus();
+      });
+    };
+    return html`${iconButton(
+      'mdi:arrow-up',
+      `Move ${label} up`,
+      () => {
+        moving(-1);
+      },
+      index === 0,
+    )}
+    ${iconButton(
+      'mdi:arrow-down',
+      `Move ${label} down`,
+      () => {
+        moving(1);
+      },
+      index === count - 1,
+    )}`;
+  }
+
   private drawHeading(plan: Plan, key: SectionKey): TemplateResult {
     const order = orderOf(plan);
     const index = order.indexOf(key);
@@ -858,10 +877,11 @@ export class MnmlPlanEditor extends LitElement {
     return html`<div class="plan-heading">
       <h2>${name}</h2>
       <span class="row-actions">
-        ${moves(`the ${name} section`, index, order.length, (by) => {
+        ${this.moves(`the ${name} section`, index, order.length, (by) => {
           const draft = this.draft;
           if (draft !== undefined) {
             this.draft = withOrder(draft, moved(order, index, by));
+            this.problem = undefined;
           }
         })}
       </span>

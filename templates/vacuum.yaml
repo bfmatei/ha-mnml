@@ -133,7 +133,7 @@ vacuum-popup:
   description: A room's vacuum pop-up, its routines, map, details, settings, dock, maintenance and totals.
   slots:
     key: { kind: text, required: true }
-    name: { kind: text }
+    name: { kind: text, required: true }
     vacuum:
       kind: object
       required: true

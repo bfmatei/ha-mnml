@@ -200,3 +200,25 @@ test('without an area, only the rules over the whole home find anything', () => 
     ],
   });
 });
+
+test('an object slot whose required field nothing fills is not found, even when other fields are', () => {
+  const lighty: Template = {
+    slots: {
+      lights: {
+        kind: 'object',
+        fields: { group: { kind: 'entity', required: true }, scenes: { kind: 'entities' } },
+        discover: { fields: { group: { domain: 'light' }, scenes: { domain: 'scene' } } },
+      },
+    },
+    card: { type: 'x' },
+  };
+  const registries: Registries = {
+    ...R,
+    entities: {
+      ...R.entities,
+      'scene.kitchen_relax': { entity_id: 'scene.kitchen_relax', area_id: 'kitchen' },
+    },
+  };
+  assert.deepEqual(discover(lighty, 'kitchen', registries), {});
+  assert.deepEqual(discover(lighty, 'living', registries), { lights: { group: 'light.lamp' } });
+});

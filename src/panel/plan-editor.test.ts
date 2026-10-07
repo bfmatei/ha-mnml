@@ -82,6 +82,7 @@ test('rooms move up and down, and the plan keeps the order', async () => {
   assert.equal(living.disabled, true);
   kitchen.click();
   await element.updateComplete;
+  assert.equal(root.activeElement?.getAttribute('aria-label'), 'Move Kitchen up');
   await save(element, root);
   assert.deepEqual(saved[0]?.[0].rooms, [{ area: 'living' }, { area: 'kitchen' }]);
   element.remove();
@@ -285,6 +286,23 @@ test('the sections move up and down, and the page and the plan follow', async ()
   press(root, 'Move the People section down');
   await save(element, root);
   assert.equal('order' in (saved[1]?.[0] ?? {}), false);
+  element.remove();
+});
+
+test('a section moved clears the problem line and keeps the focus on its button', async () => {
+  const { element, root } = await editor({ taken: ['dashboard-home'] });
+  await save(element, root);
+  assert.match(text(control(root, '.problem-line')), /is taken/);
+  const down = labelled(root, 'Move the People section down');
+  down.focus();
+  down.click();
+  await element.updateComplete;
+  assert.equal(root.querySelector('.problem-line'), null);
+  assert.equal(root.activeElement?.getAttribute('aria-label'), 'Move the People section down');
+  labelled(root, 'Move the People section down').click();
+  await element.updateComplete;
+  const up = labelled(root, 'Move the People section up');
+  assert.equal(root.activeElement, up);
   element.remove();
 });
 

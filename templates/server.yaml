@@ -114,6 +114,7 @@ proxmox-server:
         icon: true
     chips:
       - id: status
+        if: guest_statuses
         type: status
         name: Guests
         icon: mdi:server-network
@@ -121,6 +122,7 @@ proxmox-server:
           [
             {
               id: guest-statuses,
+              if: guest_statuses,
               entities: ['[[guest_statuses]]'],
               label: device,
               color: red,

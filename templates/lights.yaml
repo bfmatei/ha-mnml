@@ -1,7 +1,7 @@
 light-controls:
   description: A light's brightness, white temperature and, for a colour light, hue sliders, then its power toggle.
   slots:
-    entity: { kind: entity }
+    entity: { kind: entity, required: true }
     color: { kind: flag }
   card:
     - id: brightness
@@ -38,7 +38,7 @@ light-controls:
 light-item:
   description: A light as an item, with its brightness, the active scene while it is on, its scenes and its sliders.
   slots:
-    entity: { kind: entity }
+    entity: { kind: entity, required: true }
     strip_word: { kind: text }
     popup: { kind: text }
     scenes: { kind: entities }
@@ -113,7 +113,7 @@ lights-popup:
   description: A room's lights pop-up, its sliders over the whole group, its scenes and every light.
   slots:
     key: { kind: text, required: true }
-    name: { kind: text }
+    name: { kind: text, required: true }
     group: { kind: entity, required: true }
     color: { kind: flag }
     members:

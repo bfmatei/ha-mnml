@@ -466,3 +466,27 @@ test('a look cleared and left empty in Simple shows its value again', async () =
   assert.equal(input.value, 'Hall');
   builder.remove();
 });
+
+test("a save the integration refuses says the integration's reason", async () => {
+  const calls: Calls = { saved: [], left: 0 };
+  const { builder, root } = await opened(
+    {
+      name: 'hall',
+      template: structuredClone(ROOM),
+      shipped: undefined,
+      conflicts: [],
+      fresh: true,
+    },
+    calls,
+  );
+  builder.host = {
+    ...host(calls),
+    save: () =>
+      Promise.reject({ code: 'too_large', message: 'a template is at most 262144 bytes' }),
+  };
+  pressed(root, 'Save');
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await builder.updateComplete;
+  assert.match(text(root), /Not saved: a template is at most 262144 bytes/);
+  builder.remove();
+});

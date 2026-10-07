@@ -294,7 +294,7 @@ function drawLook(
       aria-label=${label}
       data-path=${where}
       .hass=${hass}
-      .value=${look.value}
+      .value=${live(look.value)}
       @value-changed=${(event: Event) => {
         const value = field(field(event, 'detail'), 'value');
         actions.look(look, typeof value === 'string' ? value : '');

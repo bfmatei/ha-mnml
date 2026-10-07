@@ -52,9 +52,10 @@ unifi-network:
     name: Network
     icon: mdi:router-network
     popup: '#network'
-    state: [{ id: latency-0, entity: '[[latency.0]]', icon: true }]
+    state: [{ id: latency-0, if: latency, entity: '[[latency.0]]', icon: true }]
     chips:
       - id: devices
+        if: devices
         type: status
         name: Devices
         icon: mdi:lan
@@ -62,6 +63,7 @@ unifi-network:
           [
             {
               id: devices,
+              if: devices,
               entities: ['[[devices]]'],
               label: device,
               color: red,
@@ -73,13 +75,23 @@ unifi-network:
         type: status
         name: VPN
         icon: mdi:vpn
-        rules: [{ id: vpn, entities: ['[[vpn]]'], label: device, color: red, is: ['off'] }]
+        rules: [{ id: vpn, if: vpn, entities: ['[[vpn]]'], label: device, color: red, is: ['off'] }]
       - id: firmware
+        if: firmware
         type: status
         name: Firmware
         icon: mdi:memory
         rules:
-          [{ id: firmware, entities: ['[[firmware]]'], label: device, color: amber, is: ['on'] }]
+          [
+            {
+              id: firmware,
+              if: firmware,
+              entities: ['[[firmware]]'],
+              label: device,
+              color: amber,
+              is: ['on'],
+            },
+          ]
     grid_options: { columns: 12 }
   popups:
     - id: network-popup
@@ -169,7 +181,7 @@ network-popup:
         type: custom:mnml-header-card
         name: Network
         icon: mdi:router-network
-        state: [{ id: latency-0, entity: '[[latency.0]]', icon: true }]
+        state: [{ id: latency-0, if: latency, entity: '[[latency.0]]', icon: true }]
       - id: internet
         type: custom:mnml-list-card
         title: Internet

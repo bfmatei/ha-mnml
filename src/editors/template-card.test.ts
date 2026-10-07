@@ -814,12 +814,12 @@ function sceneHass(): Record<string, unknown> {
   };
 }
 
-test('a required field nothing fills inside a slot found in part is named, and its panel open', async () => {
+test('an object discovery finds only in part is not found, and the slot it fills is named as needed', async () => {
   const { root } = await openWith(
     { type: 'custom:mnml-template-card', template: 'lighty', area: 'living' },
     sceneHass(),
   );
-  assert.equal(text(root.querySelector('.found')), 'Found in Living: Lights');
+  assert.equal(text(root.querySelector('.found')), 'Nothing found in Living');
   assert.equal(text(root.querySelector('.needs')), 'Needs: Lights');
   assert.ok(Object.values(panelHeads(root)).includes('true'));
 });

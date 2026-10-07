@@ -72,17 +72,39 @@ home-assistant:
         icon: true
     chips:
       - id: services
+        if: services
         type: status
         name: Services
         icon: mdi:lan-connect
         rules:
-          [{ id: services, entities: ['[[services]]'], label: device, color: red, is: ['off'] }]
+          [
+            {
+              id: services,
+              if: services,
+              entities: ['[[services]]'],
+              label: device,
+              color: red,
+              is: ['off'],
+            },
+          ]
       - id: updates
+        if: updates
         type: status
         name: Updates
         icon: mdi:package-up
-        rules: [{ id: updates, entities: ['[[updates]]'], label: device, color: amber, is: ['on'] }]
+        rules:
+          [
+            {
+              id: updates,
+              if: updates,
+              entities: ['[[updates]]'],
+              label: device,
+              color: amber,
+              is: ['on'],
+            },
+          ]
       - id: firmware
+        if: all_firmware
         type: status
         name: Firmware
         icon: mdi:memory
@@ -90,6 +112,7 @@ home-assistant:
           [
             {
               id: all-firmware,
+              if: all_firmware,
               entities: ['[[all_firmware]]'],
               label: device,
               color: amber,

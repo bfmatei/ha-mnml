@@ -11,6 +11,7 @@ import type { Context } from '../editors/draw.ts';
 import { rowMenu } from '../editors/row-menu.ts';
 import { slotsShape } from '../editors/slots.ts';
 import { EDITOR_STYLE } from '../editors/style.ts';
+import { field } from '../ha/field.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
 import { icon } from '../ha/templates.ts';
 import { applyChanges, changesOf, nodeHash } from '../templates/changes.ts';
@@ -328,7 +329,8 @@ export class MnmlBuilder extends LitElement {
       this.clashes = [];
       this.problem = undefined;
     } catch (error) {
-      this.problem = `Not saved: ${error instanceof Error ? error.message : String(error)}`;
+      const said = field(error, 'message');
+      this.problem = `Not saved: ${typeof said === 'string' ? said : String(error)}`;
     } finally {
       this.saving = false;
     }

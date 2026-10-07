@@ -123,3 +123,15 @@ test("without the Supervisor, Home Assistant's disk comes from System Monitor", 
   assert.equal(found['disk_free'], 'sensor.system_monitor_disk_free');
   assert.equal(found['disk_used'], 'sensor.system_monitor_disk_use');
 });
+
+test('a system card is offered only when its tile shows something, not for a firmware update alone', () => {
+  const home = withEntities(HOME, [['update.plug_firmware', 'matter', undefined]]);
+  const firmware: Registries = {
+    ...home,
+    states: {
+      ...home.states,
+      'update.plug_firmware': { attributes: { device_class: 'firmware' } },
+    },
+  };
+  assert.deepEqual(defaultPlan(firmware, TEMPLATES).system, []);
+});

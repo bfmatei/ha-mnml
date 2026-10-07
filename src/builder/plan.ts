@@ -1,6 +1,7 @@
 import { SECTION_LOOKS, SYSTEM_TEMPLATES, isPersonId } from '../contract/builder.ts';
 import type { Plan, Recipe, SectionKey, SectionLook } from '../contract/builder.ts';
 import type { PersonId } from '../contract/entities.ts';
+import { isMapping } from '../contract/templates.ts';
 import type { Instance, Templates, Value } from '../contract/templates.ts';
 import { discover } from '../templates/discover.ts';
 import type { Registries } from '../templates/discover.ts';
@@ -38,10 +39,19 @@ export function systemFills(registries: Registries, templates: Templates, name: 
     return false;
   }
   const found = discover(template, undefined, registries);
-  return (
-    Object.values(found).some((value) => filled(value)) &&
-    draws(templates, { template: name }, found)
-  );
+  if (!Object.values(found).some((value) => filled(value))) {
+    return false;
+  }
+  try {
+    const card = expand(templates, { template: name }, found).card;
+    const state = isMapping(card) ? card['state'] : undefined;
+    return (
+      isMapping(card) &&
+      (typeof card['entity'] === 'string' || (Array.isArray(state) && state.length > 0))
+    );
+  } catch {
+    return false;
+  }
 }
 
 export function peopleIn(registries: Registries): PersonId[] {

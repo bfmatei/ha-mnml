@@ -97,3 +97,18 @@ test('a template that draws a control, such as a chip, is a part and has no prev
   );
   assert.equal(drawsCard({ card: { type: 'toggle', entity: '[[entity]]' } }), false);
 });
+
+test('a preview prefers an area where discovery finds more than the required slots', () => {
+  const roomish: Template = {
+    slots: {
+      key: { kind: 'text', required: true, discover: 'area.id' },
+      lamp: { kind: 'entity', discover: { domain: 'light' } },
+    },
+    card: { type: 'custom:mnml-heading-card', title: '[[key]]', icon: 'mdi:sofa' },
+  };
+  assert.deepEqual(previewConfig('roomish', roomish, home as never), {
+    type: 'custom:mnml-template-card',
+    template: 'roomish',
+    area: 'den',
+  });
+});

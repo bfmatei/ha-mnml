@@ -97,6 +97,7 @@ car:
         icon: mdi:car-door
         rules:
           - id: lock
+            if: lock
             entities: ['[[lock]]']
             words: '[[lock_words]]'
             color: red
@@ -115,15 +116,18 @@ car:
             color: orange
             is: '[[open_states]]'
       - id: alarm
+        if: [alarm_active, alarm]
         type: status
         name: Alarm
         icon: mdi:shield-car
         rules:
           - id: alarm-active
+            if: alarm_active
             entities: ['[[alarm_active]]']
             color: red
             is: ['on']
           - id: alarm
+            if: alarm
             entities: ['[[alarm]]']
             words: '[[alarm_words]]'
             color: amber
@@ -344,10 +348,12 @@ car-popup:
             if: coolant_temperature
             entity: '[[coolant_temperature]]'
       - id: heading
+        if: location
         type: custom:mnml-heading-card
         title: Location
         icon: mdi:map-marker
       - id: map
+        if: location
         type: map
         entities: ['[[location]]']
         aspect_ratio: '3:1'

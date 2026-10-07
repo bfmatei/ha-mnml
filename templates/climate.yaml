@@ -26,7 +26,7 @@ ac-controls:
 heating-controls:
   description: A heating's target temperature slider, its preset menu when it has presets, and its power toggle, orange while it runs.
   slots:
-    entity: { kind: entity }
+    entity: { kind: entity, required: true }
     preset: { kind: flag }
   card:
     - id: slider
@@ -111,7 +111,7 @@ heating-popup:
   description: A room's heating pop-up, its target, its preset, its valves and their batteries.
   slots:
     key: { kind: text, required: true }
-    name: { kind: text }
+    name: { kind: text, required: true }
     entity: { kind: entity, required: true }
     preset: { kind: flag }
     thermostats:
@@ -181,7 +181,7 @@ ac-popup:
   description: A room's AC pop-up, its target, its fan, swing and other settings, and its energy.
   slots:
     key: { kind: text, required: true }
-    name: { kind: text }
+    name: { kind: text, required: true }
     entity: { kind: entity, required: true }
     fan: { kind: flag }
     swing: { kind: flag }
