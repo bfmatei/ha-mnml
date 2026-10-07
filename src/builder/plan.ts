@@ -16,15 +16,19 @@ function draws(templates: Templates, instance: Instance, found: Record<string, V
   }
 }
 
-export function roomShows(registries: Registries, templates: Templates, area: string): boolean {
-  const room = templates['room'];
+export function roomShows(
+  registries: Registries,
+  templates: Templates,
+  area: string,
+  template = 'room',
+): boolean {
+  const room = templates[template];
   if (room === undefined) {
     return false;
   }
   const found = discover(room, area, registries);
   return (
-    Object.keys(found).some((slot) => !NAMING.has(slot)) &&
-    draws(templates, { template: 'room' }, found)
+    Object.keys(found).some((slot) => !NAMING.has(slot)) && draws(templates, { template }, found)
   );
 }
 

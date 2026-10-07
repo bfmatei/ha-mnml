@@ -6,8 +6,14 @@ import { live } from 'lit/directives/live.js';
 import { carFrom, personFrom, roomFrom, systemFrom } from '../builder/customized.ts';
 import { carCard, personCard, roomCard, systemCard } from '../builder/dashboard.ts';
 import { peopleIn, roomShows, systemFills } from '../builder/plan.ts';
-import { SYSTEM_TEMPLATES, isPlan } from '../contract/builder.ts';
-import type { PersonChoice, Plan, SystemChoice } from '../contract/builder.ts';
+import { SECTION_LOOKS, SYSTEM_TEMPLATES, isPlan, lookOf } from '../contract/builder.ts';
+import type {
+  PersonChoice,
+  Plan,
+  SectionKey,
+  SectionLook,
+  SystemChoice,
+} from '../contract/builder.ts';
 import type { PopupOpen, PopupOpening, TemplateCard } from '../contract/cards.ts';
 import type { MdiIcon, PersonId } from '../contract/entities.ts';
 import { isMapping } from '../contract/templates.ts';
@@ -18,6 +24,7 @@ import { icon } from '../ha/templates.ts';
 import { discover } from '../templates/discover.ts';
 import type { Registries } from '../templates/discover.ts';
 import { expand, toValue } from '../templates/expand.ts';
+import { rolesOf } from '../templates/roles.ts';
 
 import { customize } from './customize.ts';
 import { PANEL_STYLE } from './style.ts';
@@ -118,6 +125,36 @@ function moved<T>(list: readonly T[], from: number, by: number): T[] {
     next.splice(to, 0, item);
   }
   return next;
+}
+
+function templatesOf(plan: Plan): { rooms: string; people: string; cars: string } {
+  return {
+    rooms: lookOf(plan, 'rooms').template ?? 'room',
+    people: lookOf(plan, 'people').template ?? 'person',
+    cars: lookOf(plan, 'garage').template ?? 'car',
+  };
+}
+
+function withLook(
+  plan: Plan,
+  key: SectionKey,
+  change: Partial<Record<keyof SectionLook, string>>,
+): Plan['sections'] {
+  const fallback = SECTION_LOOKS[key];
+  const merged: Partial<Record<keyof SectionLook, string>> = { ...plan.sections?.[key], ...change };
+  const title = merged.title;
+  const icon = merged.icon === fallback.icon ? undefined : merged.icon;
+  const template = merged.template === fallback.template ? undefined : merged.template;
+  const look: SectionLook = {
+    ...(title === undefined || title === '' ? {} : { title }),
+    ...(icon === undefined || !isIcon(icon) ? {} : { icon }),
+    ...(template === undefined || template === '' ? {} : { template }),
+  };
+  const others = Object.fromEntries(
+    Object.entries(plan.sections ?? {}).filter(([section]) => section !== key),
+  );
+  const sections = Object.keys(look).length === 0 ? others : { ...others, [key]: look };
+  return Object.keys(sections).length === 0 ? undefined : sections;
 }
 
 function withSystem(chosen: readonly SystemChoice[], choice: SystemChoice): SystemChoice[] {
@@ -336,13 +373,72 @@ export class MnmlPlanEditor extends LitElement {
     </section>`;
   }
 
+  private drawLook(plan: Plan, key: SectionKey): TemplateResult {
+    const fallback = SECTION_LOOKS[key];
+    const given = plan.sections?.[key];
+    const name = fallback.title;
+    const tiles = Object.entries(rolesOf(this.templates))
+      .filter(([, role]) => role === 'tile')
+      .map(([template]) => template)
+      .toSorted();
+    const current = lookOf(plan, key).template;
+    const change = (next: Partial<Record<keyof SectionLook, string>>): void => {
+      const draft = this.draft;
+      if (draft !== undefined) {
+        this.draft = { ...draft, sections: withLook(draft, key, next) };
+        this.problem = undefined;
+      }
+    };
+    return html`<div class="plan-look">
+      <input
+        class="fact-input"
+        aria-label=${`${name} title`}
+        placeholder=${fallback.title}
+        .value=${live(given?.title ?? '')}
+        @input=${(event: Event) => {
+          change({ title: text(event).trim() });
+        }}
+      />
+      <input
+        class="fact-input"
+        aria-label=${`${name} icon`}
+        placeholder=${fallback.icon}
+        .value=${live(given?.icon ?? '')}
+        @change=${(event: Event) => {
+          change({ icon: text(event).trim() });
+        }}
+      />
+      ${
+        current === undefined
+          ? nothing
+          : html`<select
+              class="area-picker"
+              aria-label=${`${name} template`}
+              .value=${live(current)}
+              @change=${(event: Event) => {
+                change({ template: text(event) });
+              }}
+            >
+              ${(tiles.includes(current) ? tiles : [current, ...tiles]).map(
+                (template) =>
+                  html`<option value=${template} ?selected=${template === current}>
+                    ${template}
+                  </option>`,
+              )}
+            </select>`
+      }
+    </div>`;
+  }
+
   private drawRooms(plan: Plan, registries: Registries): TemplateResult {
+    const look = templatesOf(plan);
     const chosen = plan.rooms.filter((room) => Object.hasOwn(registries.areas, room.area));
     const others = Object.values(registries.areas).filter(
       (area) => !chosen.some((room) => room.area === area.area_id),
     );
     return html`<section class="plan-section">
       <h2>Rooms</h2>
+      ${this.drawLook(plan, 'rooms')}
       <p class="muted">Each area with a light gets a room tile. Tick the ones to show, in order.</p>
       ${chosen.map(
         (room, index) => html`<div class="plan-row">
@@ -354,7 +450,7 @@ export class MnmlPlanEditor extends LitElement {
               this.change({ rooms: plan.rooms.filter((each) => each !== room) });
             }}
           />
-          ${this.drawTile(roomCard(room))}
+          ${this.drawTile(roomCard(room, look.rooms))}
           <span class="row-actions">
             ${iconButton(
               'mdi:tune-variant',
@@ -362,8 +458,8 @@ export class MnmlPlanEditor extends LitElement {
               () => {
                 this.edit(
                   `Customize ${registries.areas[room.area]?.name ?? room.area}`,
-                  'room',
-                  roomCard(room),
+                  look.rooms,
+                  roomCard(room, look.rooms),
                   (config) => {
                     this.change({
                       rooms: chosen.map((each) => (each === room ? roomFrom(room, config) : each)),
@@ -392,8 +488,8 @@ export class MnmlPlanEditor extends LitElement {
         </div>`,
       )}
       ${others.map((area) => {
-        const shows = this.remembered(`room:${area.area_id}`, () =>
-          roomShows(registries, this.templates, area.area_id),
+        const shows = this.remembered(`room:${look.rooms}:${area.area_id}`, () =>
+          roomShows(registries, this.templates, area.area_id, look.rooms),
         );
         return html`<div class="plan-row off">
           <input
@@ -415,9 +511,11 @@ export class MnmlPlanEditor extends LitElement {
   }
 
   private drawPeople(plan: Plan, registries: Registries): TemplateResult {
+    const look = templatesOf(plan);
     const people = peopleIn(registries);
     return html`<section class="plan-section">
       <h2>People</h2>
+      ${this.drawLook(plan, 'people')}
       ${
         people.length === 0
           ? html`<p class="muted">Home Assistant has no people yet.</p>`
@@ -443,7 +541,7 @@ export class MnmlPlanEditor extends LitElement {
                     ? html`<span class="plan-words"
                         >${typeof name === 'string' ? name : entity}</span
                       >`
-                    : html`${this.drawTile(personCard(choice, registries))}
+                    : html`${this.drawTile(personCard(choice, registries, look.people))}
                         <span class="row-actions">
                           ${iconButton(
                             'mdi:tune-variant',
@@ -451,8 +549,8 @@ export class MnmlPlanEditor extends LitElement {
                             () => {
                               this.edit(
                                 `Customize ${typeof name === 'string' ? name : entity}`,
-                                'person',
-                                personCard(choice, registries),
+                                look.people,
+                                personCard(choice, registries, look.people),
                                 (config) => {
                                   this.change({
                                     people: plan.people.map((each) =>
@@ -484,9 +582,15 @@ export class MnmlPlanEditor extends LitElement {
   }
 
   private drawGarage(plan: Plan): TemplateResult {
-    const blank: TemplateCard = { type: 'custom:mnml-template-card', template: 'car', slots: {} };
+    const look = templatesOf(plan);
+    const blank: TemplateCard = {
+      type: 'custom:mnml-template-card',
+      template: look.cars,
+      slots: {},
+    };
     return html`<section class="plan-section">
       <h2>Garage</h2>
+      ${this.drawLook(plan, 'garage')}
       ${
         plan.cars.length === 0
           ? html`<p class="muted">A car's entities are chosen when it is added.</p>`
@@ -494,13 +598,13 @@ export class MnmlPlanEditor extends LitElement {
       }
       ${plan.cars.map(
         (car) => html`<div class="plan-row">
-          ${this.drawTile(carCard(car))}
+          ${this.drawTile(carCard(car, look.cars))}
           <span class="row-actions">
             ${iconButton('mdi:tune-variant', `Customize ${car.key}`, () => {
               this.edit(
                 `Customize ${car.key}`,
-                'car',
-                carCard(car),
+                look.cars,
+                carCard(car, look.cars),
                 (config) => {
                   const next = carFrom(config);
                   if (next !== undefined) {
@@ -523,7 +627,7 @@ export class MnmlPlanEditor extends LitElement {
           @click=${() => {
             this.edit(
               'A car',
-              'car',
+              look.cars,
               blank,
               (config) => {
                 const car = carFrom(config);
@@ -615,6 +719,7 @@ export class MnmlPlanEditor extends LitElement {
   private drawSystem(plan: Plan, registries: Registries): TemplateResult {
     return html`<section class="plan-section">
       <h2>System</h2>
+      ${this.drawLook(plan, 'system')}
       ${SYSTEM_TEMPLATES.map((name) => this.drawSystemRow(plan, registries, name))}
     </section>`;
   }

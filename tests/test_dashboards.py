@@ -213,3 +213,42 @@ async def test_the_dashboards_survive_a_restart(
     await setup_mnml()
     client = await hass_ws_client(hass)
     assert (await listed(client))["dashboard-home"]["plan"] == PLAN
+
+
+async def test_a_plan_may_give_its_sections_their_look(
+    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, setup_mnml: SetupMnml
+) -> None:
+    await setup_mnml()
+    client = await hass_ws_client(hass)
+    sections = {
+        "rooms": {"title": "Spaces", "icon": "mdi:home-floor-1", "template": "my-room"},
+        "people": {"template": "person"},
+        "garage": {"title": "Cars"},
+        "system": {"title": "Servers", "icon": "mdi:server"},
+    }
+    saved = await call(
+        client,
+        {
+            "type": "mnml/dashboards/save",
+            "url_path": "dashboard-home",
+            "plan": {**PLAN, "sections": sections},
+        },
+    )
+    assert saved["success"]
+    assert (await listed(client))["dashboard-home"]["plan"]["sections"] == sections
+    for wrong in (
+        {"system": {"template": "home-assistant"}},
+        {"attic": {"title": "Attic"}},
+        {"rooms": {"icon": "floor"}},
+        {"rooms": {"template": "My Room"}},
+        {"rooms": {"title": ""}},
+    ):
+        reply = await call(
+            client,
+            {
+                "type": "mnml/dashboards/save",
+                "url_path": "dashboard-home",
+                "plan": {**PLAN, "sections": wrong},
+            },
+        )
+        assert reply["error"]["code"] == "invalid_format", wrong

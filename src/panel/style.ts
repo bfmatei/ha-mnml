@@ -299,6 +299,15 @@ export const PANEL_STYLE = css`
   .plan-row.off .plan-words > span:first-child {
     color: var(--secondary-text-color);
   }
+  .plan-look {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .plan-look .fact-input {
+    flex: 1;
+    min-width: 140px;
+  }
   .plan-field {
     display: flex;
     align-items: center;

@@ -37,7 +37,7 @@ A card with a key the editor does not know, or a value it cannot hold, opens in 
 - **Quick start** says what it makes and where, then makes it at once: a room tile for each area where the room template has something to show (a light), in the order Home Assistant lists the areas; a tile for each person; the system cards whose entities MNML finds in the home; pop-ups that unfold from their tiles on a tablet and a computer. Its address is the title after `dashboard-`, free of every dashboard and panel the home has.
 - **Step by step** opens the builder on the same choices, at `/mnml/dashboards/new`.
 
-**The builder** is one page, a section for each part of the dashboard:
+**The builder** is one page, a section for each part of the dashboard. Each of Rooms, People, Garage and System has, under its name, the title and the icon of its heading on the dashboard, and for all but System the template its cards are drawn with, among the tiles ([Roles](templates.md#roles)): a template of the home's own, such as a copy of `room` with changes, draws every room. Left empty, they are what the builder uses otherwise (Rooms, `mdi:floor-plan`, `room`; People, `mdi:account-group`, `person`; Garage, `mdi:garage`, `car`; System, `mdi:server-network`).
 
 - **Dashboard**: its title and icon, and for a new one its address: lower case letters and digits, with at least one `-` between them, as Home Assistant asks of a dashboard's address, and at most 64 long.
 - **Rooms**: each area, ticked to show it, its tile drawn live, and moved up and down. An area where the room template has nothing to show cannot be ticked, and says so.

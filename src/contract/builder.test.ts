@@ -34,3 +34,20 @@ test('a plan with a missing or malformed part is refused', () => {
   assert.equal(isPlan({ ...PLAN, open: { phone: 'drawer' } }), false);
   assert.equal(isPlan(null), false);
 });
+
+test('a plan may give each section its own title, icon and template, and the system section no template', () => {
+  const sections = {
+    rooms: { title: 'Spaces', icon: 'mdi:home-floor-1', template: 'my-room' },
+    people: { template: 'person' },
+    garage: { title: 'Cars' },
+    system: { title: 'Servers', icon: 'mdi:server' },
+  };
+  assert.equal(isPlan({ ...PLAN, sections }), true);
+  assert.equal(isPlan({ ...PLAN, sections: {} }), true);
+  assert.equal(isPlan({ ...PLAN, sections: { system: { template: 'home-assistant' } } }), false);
+  assert.equal(isPlan({ ...PLAN, sections: { attic: { title: 'Attic' } } }), false);
+  assert.equal(isPlan({ ...PLAN, sections: { rooms: { icon: 'floor' } } }), false);
+  assert.equal(isPlan({ ...PLAN, sections: { rooms: { template: 'My Room' } } }), false);
+  assert.equal(isPlan({ ...PLAN, sections: { rooms: { title: '' } } }), false);
+  assert.equal(isPlan({ ...PLAN, sections: [] }), false);
+});

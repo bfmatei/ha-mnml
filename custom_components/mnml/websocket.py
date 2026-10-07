@@ -88,10 +88,21 @@ CHANGES = vol.Schema({vol.Required("kind"): "changes", vol.Required("changes"): 
 URL_PATH = vol.All(str, vol.Match(r"\A[a-z0-9]+(?:-[a-z0-9]+)+\Z"), vol.Length(max=64))
 TEXT = vol.All(str, vol.Length(min=1))
 OPENING = vol.In(["sheet", "dialog", "unfold"])
+ICON = vol.All(str, vol.Match(r"\Amdi:[a-z0-9-]+\Z"))
+LOOK = {vol.Optional("title"): TEXT, vol.Optional("icon"): ICON}
+SECTIONS = vol.Schema(
+    {
+        **{
+            vol.Optional(key): vol.Schema({**LOOK, vol.Optional("template"): NAME})
+            for key in ("rooms", "people", "garage")
+        },
+        vol.Optional("system"): vol.Schema(LOOK),
+    }
+)
 PLAN = vol.Schema(
     {
         vol.Required("title"): TEXT,
-        vol.Required("icon"): vol.All(str, vol.Match(r"\Amdi:[a-z0-9-]+\Z")),
+        vol.Required("icon"): ICON,
         vol.Required("rooms"): [
             vol.Schema({vol.Required("area"): TEXT, vol.Optional("slots"): dict})
         ],
@@ -112,6 +123,7 @@ PLAN = vol.Schema(
         vol.Required("open"): vol.Schema(
             {vol.Optional(device): OPENING for device in ("phone", "tablet", "desktop")}
         ),
+        vol.Optional("sections"): SECTIONS,
     }
 )
 PREVIOUS = vol.Schema({vol.Required("plan"): PLAN, vol.Required("config"): dict})

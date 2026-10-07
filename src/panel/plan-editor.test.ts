@@ -88,7 +88,9 @@ test('rooms move up and down, and the plan keeps the order', async () => {
 test('a person unticked and a pop-up opening chosen reach the saved plan, with the address', async () => {
   const { element, root, saved } = await editor();
   labelled(root, 'Show person.bob').dispatchEvent(new Event('change'));
-  const phone = [...root.querySelectorAll('select')][0];
+  const phone = [...root.querySelectorAll('select')].find((each) =>
+    text(each.closest('label')).startsWith('On a phone'),
+  );
   assert.ok(phone);
   phone.value = 'unfold';
   phone.dispatchEvent(new Event('change'));
@@ -138,7 +140,7 @@ test('an icon that is not mdi: and a name is refused, and a title is trimmed', a
 
 test('a dashboard MNML built is rebuilt at its own address, which is not asked', async () => {
   const { element, root, saved } = await editor({ fresh: false });
-  assert.equal(root.querySelectorAll('input.fact-input').length, 2);
+  assert.equal(root.querySelector('.plan-section')?.querySelectorAll('input.fact-input').length, 2);
   await save(element, root);
   assert.equal(saved[0]?.[1], 'dashboard-home');
   element.remove();
@@ -178,5 +180,33 @@ test('an address Home Assistant would refuse, with _ or longer than 64, is refus
   await refused('my_home-x');
   await refused(`dashboard-${'x'.repeat(60)}`);
   assert.deepEqual(saved, []);
+  element.remove();
+});
+
+test('each section takes a title, an icon and a template, and its rows follow the template', async () => {
+  const room = TEMPLATES['room'];
+  assert.ok(room);
+  const { element, root, saved } = await editor();
+  element.templates = { ...TEMPLATES, 'my-room': structuredClone(room) };
+  await element.updateComplete;
+  const title = root.querySelector<HTMLInputElement>('input[aria-label="Rooms title"]');
+  const chosen = root.querySelector<HTMLSelectElement>('select[aria-label="Rooms template"]');
+  assert.ok(title && chosen);
+  assert.ok([...chosen.options].some((option) => option.value === 'my-room'));
+  assert.equal(
+    [...chosen.options].some((option) => option.value === 'light-card'),
+    false,
+  );
+  title.value = 'Spaces';
+  title.dispatchEvent(new Event('input'));
+  chosen.value = 'my-room';
+  chosen.dispatchEvent(new Event('change'));
+  await element.updateComplete;
+  const tile = [...root.querySelectorAll('mnml-live-card')].find(
+    (card) => Reflect.get(Reflect.get(card, 'config') ?? {}, 'area') === 'kitchen',
+  );
+  assert.equal(Reflect.get(Reflect.get(tile ?? {}, 'config') ?? {}, 'template'), 'my-room');
+  await save(element, root);
+  assert.deepEqual(saved[0]?.[0].sections, { rooms: { title: 'Spaces', template: 'my-room' } });
   element.remove();
 });
