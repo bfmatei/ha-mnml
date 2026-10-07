@@ -109,3 +109,11 @@ test('a dashboard deleted in Home Assistant says so, and has no Open', async () 
   assert.equal(root.querySelector('[aria-label="Open Home"]'), null);
   element.remove();
 });
+
+test('a dashboard deleted in Home Assistant offers no Undo, which would have nothing to put back', async () => {
+  const element = new MnmlDashboards();
+  element.rows = [{ built: { ...BUILT, previous: { plan: PLAN, config: {} } }, board: undefined }];
+  const root = await mounted(element);
+  assert.equal(root.querySelector('[aria-label="Undo the last rebuild of Home"]'), null);
+  element.remove();
+});

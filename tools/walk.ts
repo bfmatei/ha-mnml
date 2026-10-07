@@ -281,7 +281,7 @@ check(
   'Done with nothing changed closes it',
 );
 await page.locator('mnml-plan-editor input.fact-input').first().fill('Walk home');
-await page.locator('mnml-plan-editor input[type="checkbox"]:checked').first().uncheck();
+await page.locator('mnml-plan-editor').getByRole('checkbox', { name: 'Show Kitchen' }).click();
 await page.locator('mnml-plan-editor').getByRole('button', { name: 'Rebuild' }).click();
 await dialogButton(page, 'Rebuild').click();
 await dialogButton(page, 'Cancel').click();

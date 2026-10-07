@@ -67,7 +67,7 @@ interface Route {
 
 const BASE = '/mnml';
 const NAME = /^\/templates\/([a-z0-9][a-z0-9_-]{0,63})$/;
-const BOARD = /^\/dashboards(?:\/(new|[a-z0-9_]+(?:-[a-z0-9_]+)+))?$/;
+const BOARD = /^\/dashboards(?:\/(new|[a-z0-9]+(?:-[a-z0-9]+)+))?$/;
 const NOTHING_KEPT: Kept = { own: {}, changes: {} };
 const NEW_TEMPLATE: Template = {
   description: '',
@@ -151,6 +151,7 @@ export class MnmlPanel extends LitElement {
   @state() private shipped: Templates | undefined;
   @state() private dashboards: Dashboard[] = [];
   @state() private built: Built[] | undefined;
+  @state() private builtFailure: string | undefined;
   @state() private boards: Board[] = [];
   @state() private newPlan: Plan | undefined;
   @state() private failure: string | undefined;
@@ -159,6 +160,7 @@ export class MnmlPanel extends LitElement {
     : '';
   @state() private opened: Draft | undefined;
   @query('mnml-builder') private builder: MnmlBuilder | null | undefined;
+  @query('mnml-plan-editor') private planEditor: MnmlPlanEditor | null | undefined;
   private current: HomeAssistant | undefined;
   private started = false;
   private unlisten: (() => void) | undefined;
@@ -173,6 +175,9 @@ export class MnmlPanel extends LitElement {
     this.current = hass;
     if (this.builder !== null && this.builder !== undefined) {
       this.builder.hass = hass;
+    }
+    if (this.planEditor !== null && this.planEditor !== undefined) {
+      this.planEditor.hass = hass;
     }
     if (!this.started) {
       this.started = true;
@@ -363,13 +368,13 @@ export class MnmlPanel extends LitElement {
   }
 
   private async readBuilt(): Promise<void> {
-    let listed: unknown;
     try {
-      listed = await this.call({ type: 'mnml/dashboards/list' });
-    } catch {
-      listed = undefined;
+      this.built = builtOf(await this.call({ type: 'mnml/dashboards/list' }));
+      this.builtFailure = undefined;
+    } catch (error) {
+      this.built = undefined;
+      this.builtFailure = message(error);
     }
-    this.built = builtOf(listed);
   }
 
   private async refresh(): Promise<void> {
@@ -515,6 +520,13 @@ export class MnmlPanel extends LitElement {
 
   private drawBoards(at: string | undefined): TemplateResult {
     const built = this.built;
+    if (this.builtFailure !== undefined) {
+      return html`<div class="problem">
+        ${icon('mdi:alert-circle-outline')}<span
+          >MNML cannot read the dashboards it built: ${this.builtFailure}</span
+        >
+      </div>`;
+    }
     if (built === undefined) {
       return html`<p class="muted loading">Reading the dashboards...</p>`;
     }
@@ -659,8 +671,11 @@ export class MnmlPanel extends LitElement {
     if (!sure) {
       return;
     }
-    await makeDashboard(this.send, address, plan, dashboardOf(plan, registries, templates));
-    await this.refresh();
+    try {
+      await makeDashboard(this.send, address, plan, dashboardOf(plan, registries, templates));
+    } finally {
+      await this.refresh();
+    }
     await this.offerOpen(plan, address, `${plan.title} is ready`);
   }
 
@@ -668,21 +683,24 @@ export class MnmlPanel extends LitElement {
     const at = BOARD.exec(this.path)?.[1];
     const built = this.built?.find((each) => each.url_path === at);
     const config = dashboardOf(plan, this.registries(), this.resolved());
-    if (built === undefined) {
-      await makeDashboard(this.send, address, plan, config);
-    } else {
-      const sure = await confirmIt(
+    if (
+      built !== undefined &&
+      !(await confirmIt(
         this.renderRoot,
         `Rebuild ${built.plan.title}?`,
         'MNML replaces its cards, with any change made to them by hand. Undo brings back the version this replaces.',
         'Rebuild',
-      );
-      if (!sure) {
-        return;
-      }
-      await rebuildDashboard(this.send, built, this.boardOf(built), plan, config);
+      ))
+    ) {
+      return;
     }
-    await this.refresh();
+    try {
+      await (built === undefined
+        ? makeDashboard(this.send, address, plan, config)
+        : rebuildDashboard(this.send, built, this.boardOf(built), plan, config));
+    } finally {
+      await this.refresh();
+    }
     this.go(`${BASE}/dashboards`, true);
     await this.offerOpen(
       plan,
@@ -706,8 +724,11 @@ export class MnmlPanel extends LitElement {
     if (!sure) {
       return;
     }
-    await undoDashboard(this.send, built, board);
-    await this.refresh();
+    try {
+      await undoDashboard(this.send, built, board);
+    } finally {
+      await this.refresh();
+    }
   }
 
   private async forget(built: Built): Promise<void> {

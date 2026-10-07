@@ -89,22 +89,50 @@ export function boardsOf(listed: unknown): Board[] {
   });
 }
 
-export async function makeDashboard(
+async function created(
+  call: Call,
+  url_path: string,
+  plan: Plan,
+  config: object,
+  undo: () => Promise<unknown>,
+): Promise<void> {
+  await call({ type: 'mnml/dashboards/save', url_path, plan });
+  try {
+    await call({
+      type: 'lovelace/dashboards/create',
+      url_path,
+      title: plan.title,
+      icon: plan.icon,
+      show_in_sidebar: true,
+      require_admin: false,
+    });
+  } catch (error) {
+    await undo().catch(() => undefined);
+    throw error;
+  }
+  await call({ type: 'lovelace/config/save', url_path, config });
+}
+
+export function makeDashboard(
   call: Call,
   url_path: string,
   plan: Plan,
   config: object,
 ): Promise<void> {
-  await call({
-    type: 'lovelace/dashboards/create',
-    url_path,
-    title: plan.title,
-    icon: plan.icon,
-    show_in_sidebar: true,
-    require_admin: false,
-  });
-  await call({ type: 'lovelace/config/save', url_path, config });
-  await call({ type: 'mnml/dashboards/save', url_path, plan });
+  return created(call, url_path, plan, config, () =>
+    call({ type: 'mnml/dashboards/delete', url_path }),
+  );
+}
+
+async function cardsOf(call: Call, url_path: string): Promise<unknown> {
+  try {
+    return await call({ type: 'lovelace/config', url_path });
+  } catch (error) {
+    if (field(error, 'code') === 'config_not_found') {
+      return undefined;
+    }
+    throw error;
+  }
 }
 
 async function retitle(call: Call, board: Board, plan: Plan): Promise<void> {
@@ -127,18 +155,20 @@ export async function rebuildDashboard(
 ): Promise<void> {
   const url_path = built.url_path;
   if (board === undefined) {
-    await makeDashboard(call, url_path, plan, config);
+    await created(call, url_path, plan, config, () =>
+      call({ type: 'mnml/dashboards/save', url_path, plan: built.plan }),
+    );
     return;
   }
-  const before = await call({ type: 'lovelace/config', url_path }).catch(() => undefined);
-  await call({ type: 'lovelace/config/save', url_path, config });
-  await retitle(call, board, plan);
+  const before = await cardsOf(call, url_path);
   await call({
     type: 'mnml/dashboards/save',
     url_path,
     plan,
     ...(isMapping(before) ? { previous: { plan: built.plan, config: before } } : {}),
   });
+  await call({ type: 'lovelace/config/save', url_path, config });
+  await retitle(call, board, plan);
 }
 
 export async function undoDashboard(call: Call, built: Built, board: Board): Promise<void> {

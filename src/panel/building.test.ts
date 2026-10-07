@@ -32,6 +32,7 @@ const BOARD: Board = {
   title: 'Home',
   icon: 'mdi:home-variant',
 };
+const EMPTY = Object.assign(new Error('No config found.'), { code: 'config_not_found' });
 const BUILT: Built = {
   url_path: 'dashboard-home',
   plan: PLAN,
@@ -55,6 +56,7 @@ function recorder(answers: Record<string, unknown> = {}): {
 }
 
 test("a new dashboard's address is its title after dashboard-, free of every taken one", () => {
+  assert.equal(addressFor('My_home', new Set()), 'dashboard-my-home');
   assert.equal(addressFor('Home', new Set()), 'dashboard-home');
   assert.equal(addressFor('Our flat!', new Set()), 'dashboard-our-flat');
   assert.equal(addressFor('Home', new Set(['dashboard-home'])), 'dashboard-home-2');
@@ -103,10 +105,11 @@ test("Home Assistant's dashboards are read by their address, with their id, titl
   );
 });
 
-test('making a dashboard creates it in Home Assistant, saves its cards, then keeps its plan', async () => {
+test('making a dashboard keeps its plan first, then creates it in Home Assistant and saves its cards', async () => {
   const { call, sent } = recorder();
   await makeDashboard(call, 'dashboard-home', PLAN, CONFIG);
   assert.deepEqual(sent, [
+    { type: 'mnml/dashboards/save', url_path: 'dashboard-home', plan: PLAN },
     {
       type: 'lovelace/dashboards/create',
       url_path: 'dashboard-home',
@@ -116,16 +119,39 @@ test('making a dashboard creates it in Home Assistant, saves its cards, then kee
       require_admin: false,
     },
     { type: 'lovelace/config/save', url_path: 'dashboard-home', config: CONFIG },
-    { type: 'mnml/dashboards/save', url_path: 'dashboard-home', plan: PLAN },
   ]);
 });
 
-test('a rebuild keeps the cards it replaces, by hand or not, and their plan', async () => {
+test('a dashboard Home Assistant refuses to create is not kept', async () => {
+  const { call, sent } = recorder({ 'lovelace/dashboards/create': new Error('invalid slug') });
+  await assert.rejects(makeDashboard(call, 'dashboard-home', PLAN, CONFIG), /invalid slug/);
+  assert.deepEqual(
+    sent.map((message) => message['type']),
+    ['mnml/dashboards/save', 'lovelace/dashboards/create', 'mnml/dashboards/delete'],
+  );
+});
+
+test('a plan MNML refuses to keep makes no dashboard', async () => {
+  const { call, sent } = recorder({ 'mnml/dashboards/save': new Error('too_many') });
+  await assert.rejects(makeDashboard(call, 'dashboard-home', PLAN, CONFIG), /too_many/);
+  assert.deepEqual(
+    sent.map((message) => message['type']),
+    ['mnml/dashboards/save'],
+  );
+});
+
+test('a rebuild keeps the cards it replaces, by hand or not, and their plan, before it replaces them', async () => {
   const { call, sent } = recorder({ 'lovelace/config': BEFORE });
   const plan: Plan = { ...PLAN, title: 'Our flat', icon: 'mdi:home-city' };
   await rebuildDashboard(call, BUILT, BOARD, plan, CONFIG);
   assert.deepEqual(sent, [
     { type: 'lovelace/config', url_path: 'dashboard-home' },
+    {
+      type: 'mnml/dashboards/save',
+      url_path: 'dashboard-home',
+      plan,
+      previous: { plan: PLAN, config: BEFORE },
+    },
     { type: 'lovelace/config/save', url_path: 'dashboard-home', config: CONFIG },
     {
       type: 'lovelace/dashboards/update',
@@ -133,13 +159,28 @@ test('a rebuild keeps the cards it replaces, by hand or not, and their plan', as
       title: 'Our flat',
       icon: 'mdi:home-city',
     },
-    {
-      type: 'mnml/dashboards/save',
-      url_path: 'dashboard-home',
-      plan,
-      previous: { plan: PLAN, config: BEFORE },
-    },
   ]);
+});
+
+test('a rebuild that cannot read the cards it would replace replaces nothing', async () => {
+  const { call, sent } = recorder({ 'lovelace/config': new Error('Connection lost') });
+  await assert.rejects(rebuildDashboard(call, BUILT, BOARD, PLAN, CONFIG), /Connection lost/);
+  assert.deepEqual(
+    sent.map((message) => message['type']),
+    ['lovelace/config'],
+  );
+});
+
+test('a rebuild MNML refuses to keep leaves the cards as they are', async () => {
+  const { call, sent } = recorder({
+    'lovelace/config': BEFORE,
+    'mnml/dashboards/save': new Error('too_large'),
+  });
+  await assert.rejects(rebuildDashboard(call, BUILT, BOARD, PLAN, CONFIG), /too_large/);
+  assert.deepEqual(
+    sent.map((message) => message['type']),
+    ['lovelace/config', 'mnml/dashboards/save'],
+  );
 });
 
 test('a rebuild with the same title and icon leaves the dashboard entry alone', async () => {
@@ -147,18 +188,19 @@ test('a rebuild with the same title and icon leaves the dashboard entry alone', 
   await rebuildDashboard(call, BUILT, BOARD, PLAN, CONFIG);
   assert.deepEqual(
     sent.map((message) => message['type']),
-    ['lovelace/config', 'lovelace/config/save', 'mnml/dashboards/save'],
+    ['lovelace/config', 'mnml/dashboards/save', 'lovelace/config/save'],
   );
 });
 
 test('a rebuild of a dashboard with no cards yet keeps nothing to undo', async () => {
-  const { call, sent } = recorder({ 'lovelace/config': new Error('No config found.') });
+  const { call, sent } = recorder({ 'lovelace/config': EMPTY });
   await rebuildDashboard(call, BUILT, BOARD, PLAN, CONFIG);
-  assert.deepEqual(sent.at(-1), {
+  assert.deepEqual(sent[1], {
     type: 'mnml/dashboards/save',
     url_path: 'dashboard-home',
     plan: PLAN,
   });
+  assert.equal(sent.length, 3);
 });
 
 test('a rebuild of a dashboard deleted in Home Assistant makes it again', async () => {
@@ -166,8 +208,19 @@ test('a rebuild of a dashboard deleted in Home Assistant makes it again', async 
   await rebuildDashboard(call, BUILT, undefined, PLAN, CONFIG);
   assert.deepEqual(
     sent.map((message) => message['type']),
-    ['lovelace/dashboards/create', 'lovelace/config/save', 'mnml/dashboards/save'],
+    ['mnml/dashboards/save', 'lovelace/dashboards/create', 'lovelace/config/save'],
   );
+});
+
+test('a dashboard made again that Home Assistant refuses keeps its plan as it was', async () => {
+  const { call, sent } = recorder({ 'lovelace/dashboards/create': new Error('taken') });
+  const plan: Plan = { ...PLAN, title: 'Our flat' };
+  await assert.rejects(rebuildDashboard(call, BUILT, undefined, plan, CONFIG), /taken/);
+  assert.deepEqual(sent.at(-1), {
+    type: 'mnml/dashboards/save',
+    url_path: 'dashboard-home',
+    plan: PLAN,
+  });
 });
 
 test('an undo puts the replaced cards, title and icon back, and lets the kept version go', async () => {

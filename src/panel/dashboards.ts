@@ -95,7 +95,7 @@ export class MnmlDashboards extends LitElement {
       <span class="row-actions">
         ${board === undefined ? nothing : button('mdi:open-in-new', `Open ${title}`, () => actions?.open(built))}
         ${
-          built.previous === undefined
+          built.previous === undefined || board === undefined
             ? nothing
             : button('mdi:undo', `Undo the last rebuild of ${title}`, () => actions?.undo(built))
         }

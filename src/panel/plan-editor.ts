@@ -29,7 +29,8 @@ export interface PlanHost {
 
 type Device = keyof PopupOpen;
 
-const ADDRESS = /^[a-z0-9_]+(?:-[a-z0-9_]+)+$/;
+const ADDRESS = /^[a-z0-9]+(?:-[a-z0-9]+)+$/;
+const LONGEST = 64;
 const ICON = /^mdi:[a-z0-9-]+$/;
 const DEVICES: readonly { device: Device; label: string; otherwise: string }[] = [
   { device: 'phone', label: 'On a phone', otherwise: 'a sheet' },
@@ -194,8 +195,8 @@ export class MnmlPlanEditor extends LitElement {
     if (!isIcon(this.iconText)) {
       return 'An icon is mdi: and its name, such as mdi:home-variant.';
     }
-    if (this.fresh && !ADDRESS.test(this.where)) {
-      return 'An address is lower case letters, digits and _, with at least one - between them, such as dashboard-home.';
+    if (this.fresh && (!ADDRESS.test(this.where) || this.where.length > LONGEST)) {
+      return `An address is lower case letters and digits, with at least one - between them, such as dashboard-home, and at most ${LONGEST} long.`;
     }
     if (this.fresh && this.taken.has(this.where)) {
       return `/${this.where} is taken.`;
@@ -347,7 +348,7 @@ export class MnmlPlanEditor extends LitElement {
         (room, index) => html`<div class="plan-row">
           <input
             type="checkbox"
-            checked
+            .checked=${live(true)}
             aria-label=${`Show ${registries.areas[room.area]?.name ?? room.area}`}
             @change=${() => {
               this.change({ rooms: plan.rooms.filter((each) => each !== room) });
@@ -397,6 +398,7 @@ export class MnmlPlanEditor extends LitElement {
         return html`<div class="plan-row off">
           <input
             type="checkbox"
+            .checked=${live(false)}
             aria-label=${`Show ${area.name}`}
             ?disabled=${!shows}
             @change=${() => {
