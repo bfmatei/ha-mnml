@@ -10,7 +10,7 @@ async def async_register_panel(hass: HomeAssistant, url: str) -> None:
         frontend_url_path=PANEL_PATH,
         webcomponent_name=PANEL_ELEMENT,
         sidebar_title=TITLE,
-        sidebar_icon="mdi:view-dashboard-edit",
+        sidebar_icon="mnml:mnml",
         module_url=url,
         require_admin=True,
         config={},

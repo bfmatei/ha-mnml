@@ -19,6 +19,7 @@ async def test_the_panel_is_in_the_sidebar_for_admins_by_its_hash(
     digest = hashlib.sha256((www / "mnml-cards-panel.js").read_bytes()).hexdigest()[:8]
     assert panel.require_admin is True
     assert panel.sidebar_title == "MNML"
+    assert panel.sidebar_icon == "mnml:mnml"
     config = panel.config
     assert config is not None
     custom = config["_panel_custom"]
