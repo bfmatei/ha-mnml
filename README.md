@@ -86,6 +86,8 @@ Slots and their discovery rules are set as sentences ("Find the first sensor wit
 
 ![The template library](docs/screenshots/panel-library.png)
 
+![The Simple tab of the template builder](docs/screenshots/panel-simple.png)
+
 ![The builder](docs/screenshots/panel-builder.png)
 
 A change to a shipped template is kept as changes laid over it, so a release that improves the template still reaches the parts you left alone; the builder marks a change a release has since touched. The integration keeps everything in `.storage/mnml.templates`, with the last ten versions of each template, and every open dashboard follows a save at once. When two places have the same name, the first wins:
