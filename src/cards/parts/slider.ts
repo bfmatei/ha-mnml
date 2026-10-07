@@ -273,6 +273,7 @@ export const OVERLAY_STYLE = css`
     z-index: 1;
     display: flex;
     align-items: center;
+    gap: 8px;
     padding: 8px;
     background: var(--card-background-color);
   }
@@ -541,12 +542,23 @@ export function openSliderOverlay(
   };
   render(
     html`<mnml-slider
-      .spec=${spec}
-      .label=${label}
-      .color=${color}
-      .owner=${host}
-      .interacted=${schedule}
-    ></mnml-slider>`,
+        .spec=${spec}
+        .label=${label}
+        .color=${color}
+        .owner=${host}
+        .interacted=${schedule}
+      ></mnml-slider>
+      <button
+        type="button"
+        class="control"
+        aria-label="Close"
+        title="Close"
+        @click=${() => {
+          close(true);
+        }}
+      >
+        ${icon('mdi:close')}
+      </button>`,
     overlay,
   );
   overlay.addEventListener('click', (event) => {

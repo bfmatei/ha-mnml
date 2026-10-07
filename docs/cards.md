@@ -170,7 +170,7 @@ Kind by kind, while the entity is `unavailable`:
 ## Controls, sliders and menus
 
 - **Controls** (`parts/controls.ts`): `renderControls()` draws a lane. `colorStyle()` (`src/ha/templates.ts`) sets `--m-color` to `var(--<color>-color)`, which the `colored` class reads; `tint()` picks the colour from the rule, or orange for an unavailable entity. A toggle also says `aria-pressed` from the rule.
-- **Sliders** (`parts/slider.ts`): a slider button opens its slider, an `mnml-slider` element, as an overlay over the card; the slider card draws the same element in place. The overlay closes 3 s after the last touch or on a tap outside.
+- **Sliders** (`parts/slider.ts`): a slider button opens its slider, an `mnml-slider` element, as an overlay over the card; the slider card draws the same element in place. The overlay closes on its X, the round close button after the slider, which gives the focus back to the slider button, 3 s after the last touch, or on a tap outside.
   - A drag sets the value when it ends.
   - The keyboard uses the arrow keys, Home and End, and commits 500 ms after the last key, or at once when the slider closes before then.
 - **Menus** (`parts/menu.ts`) are popovers built with the browser's popover API. `sceneChoice()` turns a `scenes` list into options named and iconed by the scene entities, each calling `scene.turn_on`. Its current option is the scene whose name is the state of the `active_scene` select.

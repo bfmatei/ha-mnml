@@ -5,7 +5,7 @@ import { test } from 'vitest';
 import type { HassEntity, HomeAssistant } from '../../ha/hass.ts';
 import { define, mounted } from '../../test/render.ts';
 
-import { MnmlSlider, sliderSpec } from './slider.ts';
+import { MnmlSlider, openSliderOverlay, sliderSpec } from './slider.ts';
 
 interface Call {
   service: string;
@@ -148,4 +148,43 @@ test('a value set by key is sent even when the slider closes before the pause en
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.deepEqual(calls, [{ service: 'light.turn_on', data: { brightness_pct: 51 } }]);
   assert.equal(released, 1, 'and the card is not left held');
+});
+
+test('the slider opened from a control closes on its X, giving the focus back to the control', async () => {
+  const { hass } = recorder();
+  const spec = sliderSpec(hass, 'light.a', entity('on', { brightness: 128 }), 'brightness');
+  assert.ok(spec);
+  define('mnml-slider', MnmlSlider);
+  const card = document.createElement('div');
+  document.body.append(card);
+  const root = card.attachShadow({ mode: 'open' });
+  const surface = document.createElement('div');
+  const opener = document.createElement('button');
+  surface.append(opener);
+  root.append(surface);
+  opener.focus();
+  let held = 0;
+  let released = 0;
+  openSliderOverlay(surface, spec, { icon: 'mdi:brightness-6', name: 'Brightness' }, undefined, {
+    hass,
+    hold: () => {
+      held += 1;
+      return () => {
+        released += 1;
+      };
+    },
+    register: () => () => {},
+    notify: () => {},
+  });
+  const overlay = surface.querySelector('.overlay');
+  assert.ok(overlay, 'the slider opens over the row');
+  const close = overlay.lastElementChild;
+  assert.ok(close instanceof HTMLButtonElement, 'the X comes last, after the slider');
+  assert.equal(close.getAttribute('aria-label'), 'Close');
+  assert.ok(close.classList.contains('control'));
+  close.click();
+  assert.equal(surface.querySelector('.overlay'), null);
+  assert.equal([held, released].join(), '1,1', 'and the card is not left held');
+  assert.equal(root.activeElement, opener);
+  card.remove();
 });
