@@ -3,18 +3,23 @@ import type { PropertyValues, TemplateResult } from 'lit';
 import { property, state } from 'lit/decorators.js';
 import { live } from 'lit/directives/live.js';
 
+import { carFrom, personFrom, roomFrom, systemFrom } from '../builder/customized.ts';
 import { carCard, personCard, roomCard, systemCard } from '../builder/dashboard.ts';
 import { peopleIn, roomShows, systemFills } from '../builder/plan.ts';
 import { SYSTEM_TEMPLATES, isPlan } from '../contract/builder.ts';
-import type { PersonChoice, Plan } from '../contract/builder.ts';
-import type { PopupOpen, PopupOpening } from '../contract/cards.ts';
+import type { PersonChoice, Plan, SystemChoice } from '../contract/builder.ts';
+import type { PopupOpen, PopupOpening, TemplateCard } from '../contract/cards.ts';
 import type { MdiIcon, PersonId } from '../contract/entities.ts';
-import type { Templates } from '../contract/templates.ts';
+import { isMapping } from '../contract/templates.ts';
+import type { Templates, Value } from '../contract/templates.ts';
 import { field } from '../ha/field.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
 import { icon } from '../ha/templates.ts';
+import { discover } from '../templates/discover.ts';
 import type { Registries } from '../templates/discover.ts';
+import { expand, toValue } from '../templates/expand.ts';
 
+import { customize } from './customize.ts';
 import { PANEL_STYLE } from './style.ts';
 
 export interface PlanHost {
@@ -55,6 +60,32 @@ function registriesOf(hass: HomeAssistant | undefined): Registries {
 
 const isIcon = (value: string): value is MdiIcon => ICON.test(value);
 
+const message = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
+
+function asConfig(card: TemplateCard): Record<string, Value> {
+  const value = toValue(card);
+  return isMapping(value) ? value : {};
+}
+
+function iconButton(
+  name: MdiIcon,
+  label: string,
+  run: () => void,
+  disabled = false,
+): TemplateResult {
+  return html`<button
+    type="button"
+    class="icon-button"
+    aria-label=${label}
+    title=${label}
+    ?disabled=${disabled}
+    @click=${run}
+  >
+    ${icon(name)}
+  </button>`;
+}
+
 function withOpening(
   open: PopupOpen,
   device: Device,
@@ -86,6 +117,12 @@ function moved<T>(list: readonly T[], from: number, by: number): T[] {
     next.splice(to, 0, item);
   }
   return next;
+}
+
+function withSystem(chosen: readonly SystemChoice[], choice: SystemChoice): SystemChoice[] {
+  return SYSTEM_TEMPLATES.flatMap((name) =>
+    name === choice.template ? [choice] : chosen.filter((each) => each.template === name),
+  );
 }
 
 function withPerson(
@@ -164,6 +201,56 @@ export class MnmlPlanEditor extends LitElement {
       return `/${this.where} is taken.`;
     }
     return isPlan(plan) ? undefined : 'Something in this dashboard is not what MNML keeps.';
+  }
+
+  private problemOf(template: string, config: Record<string, Value>): string | undefined {
+    if (config['template'] !== template) {
+      return `This card is drawn by the ${template} template: pick it again under Change.`;
+    }
+    const found = this.templates[template];
+    if (found === undefined) {
+      return `${template} is not a template MNML knows.`;
+    }
+    const area = typeof config['area'] === 'string' ? config['area'] : undefined;
+    const slots = isMapping(config['slots']) ? config['slots'] : undefined;
+    try {
+      const expanded = expand(
+        this.templates,
+        { template, slots: slots ?? {} },
+        area !== undefined || slots === undefined
+          ? discover(found, area, registriesOf(this.hass))
+          : {},
+      );
+      return expanded.missing === undefined
+        ? undefined
+        : `It waits for ${expanded.missing.join(', ')}.`;
+    } catch (error) {
+      return message(error);
+    }
+  }
+
+  private edit(
+    title: string,
+    template: string,
+    card: TemplateCard,
+    apply: (config: Record<string, Value>) => void,
+    also: (config: Record<string, Value>) => string | undefined = () => undefined,
+  ): void {
+    customize(
+      this.renderRoot,
+      this.hass,
+      title,
+      asConfig(card),
+      (config) => this.problemOf(template, config) ?? also(config),
+    )
+      .then((config) => {
+        if (config !== undefined) {
+          apply(config);
+        }
+      })
+      .catch((error: unknown) => {
+        this.problem = message(error);
+      });
   }
 
   private async save(): Promise<void> {
@@ -268,30 +355,38 @@ export class MnmlPlanEditor extends LitElement {
           />
           ${this.drawTile(roomCard(room))}
           <span class="row-actions">
-            <button
-              type="button"
-              class="icon-button"
-              aria-label="Move up"
-              title="Move up"
-              ?disabled=${index === 0}
-              @click=${() => {
+            ${iconButton(
+              'mdi:tune-variant',
+              `Customize ${registries.areas[room.area]?.name ?? room.area}`,
+              () => {
+                this.edit(
+                  `Customize ${registries.areas[room.area]?.name ?? room.area}`,
+                  'room',
+                  roomCard(room),
+                  (config) => {
+                    this.change({
+                      rooms: chosen.map((each) => (each === room ? roomFrom(room, config) : each)),
+                    });
+                  },
+                );
+              },
+            )}
+            ${iconButton(
+              'mdi:arrow-up',
+              'Move up',
+              () => {
                 this.change({ rooms: moved(chosen, index, -1) });
-              }}
-            >
-              ${icon('mdi:arrow-up')}
-            </button>
-            <button
-              type="button"
-              class="icon-button"
-              aria-label="Move down"
-              title="Move down"
-              ?disabled=${index === chosen.length - 1}
-              @click=${() => {
+              },
+              index === 0,
+            )}
+            ${iconButton(
+              'mdi:arrow-down',
+              'Move down',
+              () => {
                 this.change({ rooms: moved(chosen, index, 1) });
-              }}
-            >
-              ${icon('mdi:arrow-down')}
-            </button>
+              },
+              index === chosen.length - 1,
+            )}
           </span>
         </div>`,
       )}
@@ -346,7 +441,29 @@ export class MnmlPlanEditor extends LitElement {
                     ? html`<span class="plan-words"
                         >${typeof name === 'string' ? name : entity}</span
                       >`
-                    : this.drawTile(personCard(choice, registries))
+                    : html`${this.drawTile(personCard(choice, registries))}
+                        <span class="row-actions">
+                          ${iconButton(
+                            'mdi:tune-variant',
+                            `Customize ${typeof name === 'string' ? name : entity}`,
+                            () => {
+                              this.edit(
+                                `Customize ${typeof name === 'string' ? name : entity}`,
+                                'person',
+                                personCard(choice, registries),
+                                (config) => {
+                                  this.change({
+                                    people: plan.people.map((each) =>
+                                      each === choice
+                                        ? personFrom(choice, config, registries)
+                                        : each,
+                                    ),
+                                  });
+                                },
+                              );
+                            },
+                          )}
+                        </span>`
                 }
               </div>`;
             })
@@ -354,77 +471,149 @@ export class MnmlPlanEditor extends LitElement {
     </section>`;
   }
 
-  private drawGarage(plan: Plan): TemplateResult | typeof nothing {
-    if (plan.cars.length === 0) {
-      return nothing;
+  private carProblem(plan: Plan, config: Record<string, Value>, was?: string): string | undefined {
+    const car = carFrom(config);
+    if (car === undefined) {
+      return 'A car needs a key: lower case letters, digits, - and _, such as sedan.';
     }
+    return car.key !== was && plan.cars.some((each) => each.key === car.key)
+      ? `Another car has the key ${car.key}.`
+      : undefined;
+  }
+
+  private drawGarage(plan: Plan): TemplateResult {
+    const blank: TemplateCard = { type: 'custom:mnml-template-card', template: 'car', slots: {} };
     return html`<section class="plan-section">
       <h2>Garage</h2>
+      ${
+        plan.cars.length === 0
+          ? html`<p class="muted">A car's entities are chosen when it is added.</p>`
+          : nothing
+      }
       ${plan.cars.map(
         (car) => html`<div class="plan-row">
           ${this.drawTile(carCard(car))}
           <span class="row-actions">
-            <button
-              type="button"
-              class="icon-button"
-              aria-label=${`Remove ${car.key}`}
-              title=${`Remove ${car.key}`}
-              @click=${() => {
-                this.change({ cars: plan.cars.filter((each) => each !== car) });
-              }}
-            >
-              ${icon('mdi:delete-outline')}
-            </button>
+            ${iconButton('mdi:tune-variant', `Customize ${car.key}`, () => {
+              this.edit(
+                `Customize ${car.key}`,
+                'car',
+                carCard(car),
+                (config) => {
+                  const next = carFrom(config);
+                  if (next !== undefined) {
+                    this.change({ cars: plan.cars.map((each) => (each === car ? next : each)) });
+                  }
+                },
+                (config) => this.carProblem(plan, config, car.key),
+              );
+            })}
+            ${iconButton('mdi:delete-outline', `Remove ${car.key}`, () => {
+              this.change({ cars: plan.cars.filter((each) => each !== car) });
+            })}
           </span>
         </div>`,
       )}
+      <div>
+        <button
+          type="button"
+          class="action"
+          @click=${() => {
+            this.edit(
+              'A car',
+              'car',
+              blank,
+              (config) => {
+                const car = carFrom(config);
+                if (car !== undefined) {
+                  this.change({ cars: [...plan.cars, car] });
+                }
+              },
+              (config) => this.carProblem(plan, config),
+            );
+          }}
+        >
+          ${icon('mdi:car-side')}<span>Add a car</span>
+        </button>
+      </div>
     </section>`;
+  }
+
+  private drawSystemRow(plan: Plan, registries: Registries, name: string): TemplateResult {
+    const choice = plan.system.find((each) => each.template === name);
+    const fills =
+      choice?.slots !== undefined ||
+      this.remembered(`system:${name}`, () => systemFills(registries, this.templates, name));
+    const label = SYSTEM_NAMES[name] ?? name;
+    const keep = (from: SystemChoice) => (config: Record<string, Value>) => {
+      this.change({
+        system: withSystem(plan.system, systemFrom(from, config, registries, this.templates)),
+      });
+    };
+    return html`<div class=${choice === undefined ? 'plan-row off' : 'plan-row'}>
+      <input
+        type="checkbox"
+        aria-label=${`Show ${label}`}
+        .checked=${live(choice !== undefined)}
+        ?disabled=${!fills && choice === undefined}
+        @change=${() => {
+          this.change({
+            system:
+              choice === undefined
+                ? withSystem(plan.system, { template: name })
+                : plan.system.filter((each) => each !== choice),
+          });
+        }}
+      />
+      ${
+        choice === undefined
+          ? html`<span class="plan-words">
+                <span>${label}</span>
+                ${
+                  fills
+                    ? nothing
+                    : html`<span class="muted"
+                        >MNML does not find all its entities in this home.</span
+                      >`
+                }
+              </span>
+              ${
+                fills
+                  ? nothing
+                  : html`<button
+                      type="button"
+                      class="action"
+                      @click=${() => {
+                        this.edit(
+                          label,
+                          name,
+                          systemCard({ template: name }, registries, this.templates),
+                          keep({ template: name }),
+                        );
+                      }}
+                    >
+                      Choose its entities
+                    </button>`
+              }`
+          : html`${this.drawTile(systemCard(choice, registries, this.templates))}
+              <span class="row-actions">
+                ${iconButton('mdi:tune-variant', `Customize ${label}`, () => {
+                  this.edit(
+                    `Customize ${label}`,
+                    name,
+                    systemCard(choice, registries, this.templates),
+                    keep(choice),
+                  );
+                })}
+              </span>`
+      }
+    </div>`;
   }
 
   private drawSystem(plan: Plan, registries: Registries): TemplateResult {
     return html`<section class="plan-section">
       <h2>System</h2>
-      ${SYSTEM_TEMPLATES.map((name) => {
-        const choice = plan.system.find((each) => each.template === name);
-        const fills =
-          choice?.slots !== undefined ||
-          this.remembered(`system:${name}`, () => systemFills(registries, this.templates, name));
-        const label = SYSTEM_NAMES[name] ?? name;
-        return html`<div class=${choice === undefined ? 'plan-row off' : 'plan-row'}>
-          <input
-            type="checkbox"
-            aria-label=${`Show ${label}`}
-            .checked=${live(choice !== undefined)}
-            ?disabled=${!fills && choice === undefined}
-            @change=${() => {
-              this.change({
-                system:
-                  choice === undefined
-                    ? SYSTEM_TEMPLATES.flatMap((each) =>
-                        each === name
-                          ? [{ template: name }]
-                          : plan.system.filter((kept) => kept.template === each),
-                      )
-                    : plan.system.filter((each) => each !== choice),
-              });
-            }}
-          />
-          ${
-            choice === undefined
-              ? html`<span class="plan-words">
-                  <span>${label}</span>
-                  ${
-                    fills
-                      ? nothing
-                      : html`<span class="muted"
-                          >MNML does not find its entities in this home.</span
-                        >`
-                  }
-                </span>`
-              : this.drawTile(systemCard(choice, registries, this.templates))
-          }
-        </div>`;
-      })}
+      ${SYSTEM_TEMPLATES.map((name) => this.drawSystemRow(plan, registries, name))}
     </section>`;
   }
 

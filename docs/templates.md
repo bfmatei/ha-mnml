@@ -1358,15 +1358,15 @@ From `templates/adguard.yaml`.
 
 An AdGuard Home tile, its block ratio and speed, its update chip and its protection toggle; it brings its pop-up.
 
-| Slot         | Kind   | Required or default | Found by |
-| ------------ | ------ | ------------------- | -------- |
-| `protection` | entity | required            |          |
-| `queries`    | entity | required            |          |
-| `blocked`    | entity | required            |          |
-| `ratio`      | entity | required            |          |
-| `speed`      | entity | required            |          |
-| `rules`      | entity |                     |          |
-| `update`     | entity | required            |          |
+| Slot         | Kind   | Required or default | Found by                                                                                     |
+| ------------ | ------ | ------------------- | -------------------------------------------------------------------------------------------- |
+| `protection` | entity | required            | domain switch, platform adguard, translation_key protection in the whole home                |
+| `queries`    | entity | required            | domain sensor, platform adguard, translation_key dns_queries in the whole home               |
+| `blocked`    | entity | required            | domain sensor, platform adguard, translation_key dns_queries_blocked in the whole home       |
+| `ratio`      | entity | required            | domain sensor, platform adguard, translation_key dns_queries_blocked_ratio in the whole home |
+| `speed`      | entity | required            | domain sensor, platform adguard, translation_key average_processing_speed in the whole home  |
+| `rules`      | entity |                     | domain sensor, platform adguard, translation_key rules_count in the whole home               |
+| `update`     | entity | required            | domain update, platform adguard in the whole home                                            |
 
 Brings `adguard-popup`.
 
@@ -1392,19 +1392,19 @@ From `templates/home-assistant.yaml`.
 
 Home Assistant's tile, its memory and free disk, and its services, updates and firmware chips; it brings its pop-up, with each room's firmware.
 
-| Slot                     | Kind     | Required or default | Found by                                                                                            |
-| ------------------------ | -------- | ------------------- | --------------------------------------------------------------------------------------------------- |
-| `cpu`                    | entity   | required            |                                                                                                     |
-| `memory`                 | entity   | required            |                                                                                                     |
-| `disk_free`              | entity   | required            |                                                                                                     |
-| `disk_used`              | entity   | required            |                                                                                                     |
-| `services`               | entities |                     |                                                                                                     |
-| `updates`                | entities |                     |                                                                                                     |
-| `firmware`               | entities |                     |                                                                                                     |
-| `all_firmware`           | entities |                     | domain update, device_class firmware in the whole home                                              |
-| `room_firmware`          | objects  |                     | one per area in the whole home: `name` `area.name`; `firmware` domain update, device_class firmware |
-| `room_firmware.name`     | text     | required            |                                                                                                     |
-| `room_firmware.firmware` | entities |                     |                                                                                                     |
+| Slot                     | Kind     | Required or default | Found by                                                                                                                                                             |
+| ------------------------ | -------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cpu`                    | entity   | required            | domain sensor, platform systemmonitor, translation_key processor_use in the whole home                                                                               |
+| `memory`                 | entity   | required            | domain sensor, platform systemmonitor, translation_key memory_use_percent in the whole home                                                                          |
+| `disk_free`              | entity   | required            | domain sensor, platform hassio, translation_key disk_free in the whole home, then domain sensor, platform systemmonitor, translation_key disk_free in the whole home |
+| `disk_used`              | entity   | required            | domain sensor, platform hassio, translation_key disk_used in the whole home, then domain sensor, platform systemmonitor, translation_key disk_use in the whole home  |
+| `services`               | entities |                     |                                                                                                                                                                      |
+| `updates`                | entities |                     | domain update, platform hassio in the whole home                                                                                                                     |
+| `firmware`               | entities |                     |                                                                                                                                                                      |
+| `all_firmware`           | entities |                     | domain update, device_class firmware in the whole home                                                                                                               |
+| `room_firmware`          | objects  |                     | one per area in the whole home: `name` `area.name`; `firmware` domain update, device_class firmware                                                                  |
+| `room_firmware.name`     | text     | required            |                                                                                                                                                                      |
+| `room_firmware.firmware` | entities |                     |                                                                                                                                                                      |
 
 Brings `system-popup`.
 

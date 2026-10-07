@@ -1,12 +1,38 @@
 home-assistant:
   description: Home Assistant's tile, its memory and free disk, and its services, updates and firmware chips; it brings its pop-up, with each room's firmware.
   slots:
-    cpu: { kind: entity, required: true, label: CPU, group: Load }
-    memory: { kind: entity, required: true, group: Load }
-    disk_free: { kind: entity, required: true, group: Load }
-    disk_used: { kind: entity, required: true, group: Load }
+    cpu:
+      kind: entity
+      required: true
+      label: CPU
+      group: Load
+      discover:
+        { domain: sensor, platform: systemmonitor, translation_key: processor_use, scope: all }
+    memory:
+      kind: entity
+      required: true
+      group: Load
+      discover:
+        { domain: sensor, platform: systemmonitor, translation_key: memory_use_percent, scope: all }
+    disk_free:
+      kind: entity
+      required: true
+      group: Load
+      discover:
+        - { domain: sensor, platform: hassio, translation_key: disk_free, scope: all }
+        - { domain: sensor, platform: systemmonitor, translation_key: disk_free, scope: all }
+    disk_used:
+      kind: entity
+      required: true
+      group: Load
+      discover:
+        - { domain: sensor, platform: hassio, translation_key: disk_used, scope: all }
+        - { domain: sensor, platform: systemmonitor, translation_key: disk_use, scope: all }
     services: { kind: entities, group: Updates }
-    updates: { kind: entities, group: Updates }
+    updates:
+      kind: entities
+      group: Updates
+      discover: { domain: update, platform: hassio, scope: all }
     firmware: { kind: entities, group: Updates }
     all_firmware:
       {
