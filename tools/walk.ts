@@ -1,5 +1,7 @@
 import type { Page } from 'playwright';
 
+import { readTemplates } from '../src/templates/shipped.ts';
+
 import { VIEWPORTS, errorCards, launch, signedIn } from './browser.ts';
 import { readEnv } from './env.ts';
 import { connect } from './socket.ts';
@@ -372,6 +374,93 @@ check(
   `a dashboard made from the shared template draws its rooms with no error card${remadeErrors.length === 0 ? '' : `: ${remadeErrors.join(' | ')}`}`,
 );
 await forgetBuilt();
+
+async function keepTemplate(name: string, description: string): Promise<void> {
+  const session = await connect(env);
+  try {
+    const room = readTemplates()['room'];
+    await session.call({
+      type: 'mnml/templates/save',
+      name,
+      entry: { kind: 'own', template: { ...room, description } },
+    });
+  } finally {
+    session.close();
+  }
+}
+
+async function dropTemplates(names: readonly string[]): Promise<void> {
+  const session = await connect(env);
+  try {
+    for (const name of names) {
+      await session.call({ type: 'mnml/templates/delete', name }).catch(() => undefined);
+    }
+  } finally {
+    session.close();
+  }
+}
+
+async function roomTemplatesIn(url_path: string): Promise<string[]> {
+  const session = await connect(env);
+  try {
+    const config = await session.call<{
+      views: { sections: { cards: { template?: string; area?: string }[] }[] }[];
+    }>({ type: 'lovelace/config', url_path });
+    return config.views
+      .flatMap((view) => view.sections)
+      .flatMap((section) => section.cards)
+      .filter((card) => card.area !== undefined)
+      .map((card) => card.template ?? '');
+  } finally {
+    session.close();
+  }
+}
+
+await dropTemplates(['walk-room', 'walk-room-2']);
+try {
+  await keepTemplate('walk-room', 'The walk room, as shared.');
+  await boardsPage(page);
+  await page.locator('mnml-dashboards').getByRole('button', { name: 'Quick start' }).click();
+  await dialogButton(page, 'Make it').click();
+  await dialogButton(page, 'Cancel').click();
+  await settle(page);
+  await page.locator('mnml-dashboards').getByRole('button', { name: 'Edit Home' }).click();
+  await page.locator('mnml-plan-editor .plan-section').first().waitFor({ timeout: 30000 });
+  await page
+    .locator('mnml-plan-editor select[aria-label="Rooms template"]')
+    .selectOption('walk-room');
+  await page.locator('mnml-plan-editor').getByRole('button', { name: 'Rebuild' }).click();
+  await dialogButton(page, 'Rebuild').click();
+  await dialogButton(page, 'Cancel').click();
+  await settle(page);
+  await page.locator('mnml-dashboards').getByRole('button', { name: 'Share Home' }).click();
+  const bundling = await page
+    .locator('dialog.dialog textarea[aria-label="The dashboard template"]')
+    .inputValue();
+  await dialogButton(page, 'Cancel').click();
+  check(bundling.includes('walk-room:'), 'Share bundles the own template the rooms are drawn with');
+  await keepTemplate('walk-room', 'The walk room, changed here.');
+  await forgetBuilt();
+  await boardsPage(page);
+  await page.locator('mnml-dashboards').getByRole('button', { name: 'From a template' }).click();
+  await page
+    .locator('dialog.dialog textarea[aria-label="A dashboard template in YAML"]')
+    .fill(bundling);
+  await dialogButton(page, 'Next').click();
+  await dialogButton(page, 'Open in the builder').click();
+  await page.locator('mnml-plan-editor .plan-section').first().waitFor({ timeout: 30000 });
+  await page.locator('mnml-plan-editor').getByRole('button', { name: 'Create' }).click();
+  await dialogButton(page, 'Cancel').click();
+  await settle(page);
+  const brought = await roomTemplatesIn('dashboard-home');
+  check(
+    brought.length > 0 && brought.every((template) => template === 'walk-room-2'),
+    `a template brought in beside the home's own draws the rooms under its new name (${brought.join(', ')})`,
+  );
+} finally {
+  await forgetBuilt();
+  await dropTemplates(['walk-room', 'walk-room-2']);
+}
 
 check(
   errors.length === 0,

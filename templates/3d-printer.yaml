@@ -1,7 +1,7 @@
 3d-printer-actions:
   description: A 3D printer's Cancel, Pause, Resume and Continue buttons, each shown in the job state it applies to.
   slots:
-    entity: { kind: entity }
+    entity: { kind: entity, required: true }
     actions:
       kind: object
       fields:
@@ -137,7 +137,7 @@
   description: A room's 3D printer pop-up, its camera, print, temperatures and power.
   slots:
     key: { kind: text, required: true }
-    name: { kind: text }
+    name: { kind: text, required: true }
     printer3d:
       kind: object
       required: true

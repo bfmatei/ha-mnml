@@ -132,11 +132,22 @@ export function previewConfig(
       entities: hass.entities,
       states: hass.states,
     };
-    for (const area of Object.values(hass.areas)) {
+    const fitting = Object.values(hass.areas).flatMap((area) => {
       const found = discover(template, area.area_id, registries);
-      if (required.every(([slot]) => filled(found[slot]))) {
-        return { type: TEMPLATE_CARD, template: name, area: area.area_id };
-      }
+      return required.every(([slot]) => filled(found[slot]))
+        ? [
+            {
+              area: area.area_id,
+              more: Object.keys(found).some(
+                (slot) => !required.some(([name]) => name === slot) && filled(found[slot]),
+              ),
+            },
+          ]
+        : [];
+    });
+    const chosen = fitting.find((each) => each.more) ?? fitting[0];
+    if (chosen !== undefined) {
+      return { type: TEMPLATE_CARD, template: name, area: chosen.area };
     }
   }
   if (template.example !== undefined) {

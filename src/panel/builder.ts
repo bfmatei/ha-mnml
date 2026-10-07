@@ -11,6 +11,7 @@ import type { Context } from '../editors/draw.ts';
 import { rowMenu } from '../editors/row-menu.ts';
 import { slotsShape } from '../editors/slots.ts';
 import { EDITOR_STYLE } from '../editors/style.ts';
+import { field } from '../ha/field.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
 import { icon } from '../ha/templates.ts';
 import { applyChanges, changesOf, nodeHash } from '../templates/changes.ts';
@@ -328,7 +329,8 @@ export class MnmlBuilder extends LitElement {
       this.clashes = [];
       this.problem = undefined;
     } catch (error) {
-      this.problem = `Not saved: ${error instanceof Error ? error.message : String(error)}`;
+      const said = field(error, 'message');
+      this.problem = `Not saved: ${typeof said === 'string' ? said : String(error)}`;
     } finally {
       this.saving = false;
     }
@@ -620,24 +622,30 @@ export class MnmlBuilder extends LitElement {
     const shipped = this.draft?.shipped;
     return html`<div class=${classMap({ 'simple-work': true, narrow: this.narrow })}>
       <div class="pane">
-        ${drawSimple(simpleOf(this.template, shipped, this.kept), {
-          toggle: (row, on): void => {
-            const where = row.path.join('/');
-            if (on) {
-              const back = switchedOn(this.template, shipped, row.path, this.kept.get(where));
-              this.kept.delete(where);
-              this.replace(back);
-              return;
-            }
-            this.kept.set(where, keptPart(this.template, row.path));
-            this.replace(switchedOff(this.template, row.path));
-          },
-          look: (look, value): void => {
-            if (value !== '') {
+        ${drawSimple(
+          simpleOf(this.template, shipped, this.kept),
+          {
+            toggle: (row, on): void => {
+              const where = row.path.join('/');
+              if (on) {
+                const back = switchedOn(this.template, shipped, row.path, this.kept.get(where));
+                this.kept.delete(where);
+                this.replace(back);
+                return;
+              }
+              this.kept.set(where, keptPart(this.template, row.path));
+              this.replace(switchedOff(this.template, row.path));
+            },
+            look: (look, value): void => {
+              if (value === '') {
+                this.requestUpdate();
+                return;
+              }
               this.replace(withValue(this.template, look.path, value));
-            }
+            },
           },
-        })}
+          this.hass,
+        )}
       </div>
       <div class="pane preview-pane">${this.drawPreview()}</div>
     </div>`;

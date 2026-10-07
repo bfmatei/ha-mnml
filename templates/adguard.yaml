@@ -60,10 +60,21 @@ adguard:
         icon: true
     chips:
       - id: status
+        if: update
         type: status
         name: Update
         icon: mdi:package-up
-        rules: [{ id: update, entities: ['[[update]]'], label: device, color: amber, is: ['on'] }]
+        rules:
+          [
+            {
+              id: update,
+              if: update,
+              entities: ['[[update]]'],
+              label: device,
+              color: amber,
+              is: ['on'],
+            },
+          ]
       - id: toggle
         type: toggle
         entity: '[[protection]]'

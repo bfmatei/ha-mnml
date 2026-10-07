@@ -208,3 +208,62 @@ test('every path into an object slot names one of its declared fields', () => {
   }
   assert.deepEqual(stray, []);
 });
+
+function emptyLists(value: unknown, path = '', found: string[] = []): string[] {
+  if (Array.isArray(value)) {
+    for (const [index, item] of value.entries()) {
+      emptyLists(item, `${path}[${index}]`, found);
+    }
+  } else if (typeof value === 'object' && value !== null) {
+    for (const [key, inner] of Object.entries(value)) {
+      if (key === 'entities' && Array.isArray(inner) && inner.length === 0) {
+        found.push(`${path}.${key}`);
+      }
+      emptyLists(inner, `${path}.${key}`, found);
+    }
+  }
+  return found;
+}
+
+test('every shipped template, with each optional slot left out, draws cards that accept their configuration, and nothing watching no entity', () => {
+  const broken: string[] = [];
+  for (const [name, template] of Object.entries(SHIPPED)) {
+    const example = template.example ?? {};
+    for (const [slot, spec] of Object.entries(template.slots ?? {})) {
+      if (spec.required === true || example[slot] === undefined) {
+        continue;
+      }
+      const slots = Object.fromEntries(Object.entries(example).filter(([key]) => key !== slot));
+      const { card, popups } = expand(SHIPPED, { template: name, slots });
+      for (const where of emptyLists([card, popups])) {
+        broken.push(`${name} without ${slot}: ${where} is empty`);
+      }
+      for (const config of cards([card, popups])) {
+        const tag = String(config['type']).slice('custom:'.length);
+        const Card = customElements.get(tag) as unknown as (new () => Configurable) | undefined;
+        if (Card === undefined) {
+          broken.push(`${name} without ${slot}: ${tag} is no card`);
+          continue;
+        }
+        try {
+          new Card().setConfig(config);
+        } catch (error) {
+          broken.push(
+            `${name} without ${slot}: ${tag}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      }
+    }
+  }
+  assert.deepEqual(broken, []);
+});
+
+test("a room's pop-up without lights has no Lights heading", () => {
+  const room = SHIPPED['room'];
+  assert.ok(room);
+  const slots = Object.fromEntries(
+    Object.entries(room.example ?? {}).filter(([slot]) => slot !== 'lights'),
+  );
+  const { popups } = expand(SHIPPED, { template: 'room', slots });
+  assert.equal(JSON.stringify(popups).includes('"title":"Lights"'), false);
+});

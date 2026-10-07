@@ -96,6 +96,12 @@ function areaValue(rule: AreaValue, within: Within, registries: Registries): Val
   return values[rule] ?? undefined;
 }
 
+function lacking(object: Record<string, Value>, fields: Record<string, SlotSpec>): boolean {
+  return Object.entries(fields).some(
+    ([field, spec]) => spec.required === true && !filled(object[field]),
+  );
+}
+
 function deviceName(id: string, registries: Registries): string {
   const device = registries.devices[id];
   return device?.name_by_user ?? device?.name ?? id;
@@ -146,7 +152,7 @@ function objectsOf(
         found ||= typeof fieldRule !== 'string' && filled(value);
       }
     }
-    if (found) {
+    if (found && !lacking(object, fields)) {
       objects.push(object);
     }
   }
@@ -190,7 +196,7 @@ function valueOf(
         object[field] = value;
       }
     }
-    return Object.keys(object).length > 0 ? object : undefined;
+    return Object.keys(object).length > 0 && !lacking(object, fields) ? object : undefined;
   }
   const found = entitiesWithin(rule.scope === 'all' ? {} : within, registries).filter((entry) =>
     matches(entry, rule, registries),

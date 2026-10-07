@@ -28,6 +28,7 @@ import { discover } from '../templates/discover.ts';
 import type { Registries } from '../templates/discover.ts';
 import { expand, toValue } from '../templates/expand.ts';
 import { rolesOf } from '../templates/roles.ts';
+import type { Role } from '../templates/roles.ts';
 
 import { customize } from './customize.ts';
 import { PANEL_STYLE } from './style.ts';
@@ -64,8 +65,10 @@ function registriesOf(hass: HomeAssistant | undefined): Registries {
 
 const isIcon = (value: string): value is MdiIcon => ICON.test(value);
 
-const message = (error: unknown): string =>
-  error instanceof Error ? error.message : String(error);
+const message = (error: unknown): string => {
+  const said = field(error, 'message');
+  return typeof said === 'string' ? said : String(error);
+};
 
 function asConfig(card: TemplateCard): Record<string, Value> {
   const value = toValue(card);
@@ -223,30 +226,6 @@ function withOrder(plan: Plan, order: readonly SectionKey[]): Plan {
     : { ...rest, order: [...order] };
 }
 
-function moves(
-  label: string,
-  index: number,
-  count: number,
-  move: (by: number) => void,
-): TemplateResult {
-  return html`${iconButton(
-    'mdi:arrow-up',
-    `Move ${label} up`,
-    () => {
-      move(-1);
-    },
-    index === 0,
-  )}
-  ${iconButton(
-    'mdi:arrow-down',
-    `Move ${label} down`,
-    () => {
-      move(1);
-    },
-    index === count - 1,
-  )}`;
-}
-
 export class MnmlPlanEditor extends LitElement {
   static override styles = PANEL_STYLE;
 
@@ -263,6 +242,10 @@ export class MnmlPlanEditor extends LitElement {
   @state() private problem: string | undefined;
   @state() private saving = false;
   private readonly found = new Map<string, boolean>();
+  private known: { templates: Templates | undefined; roles: Readonly<Record<string, Role>> } = {
+    templates: undefined,
+    roles: {},
+  };
   private seen: readonly unknown[] = [];
 
   protected override willUpdate(changed: PropertyValues<this>): void {
@@ -279,6 +262,13 @@ export class MnmlPlanEditor extends LitElement {
     if (changed.has('address')) {
       this.where = this.address;
     }
+  }
+
+  private roles(): Readonly<Record<string, Role>> {
+    if (this.known.templates !== this.templates) {
+      this.known = { templates: this.templates, roles: rolesOf(this.templates) };
+    }
+    return this.known.roles;
   }
 
   private remembered(key: string, find: () => boolean): boolean {
@@ -385,7 +375,7 @@ export class MnmlPlanEditor extends LitElement {
     try {
       await host.save(tidy, this.where);
     } catch (error) {
-      this.problem = error instanceof Error ? error.message : String(error);
+      this.problem = message(error);
     } finally {
       this.saving = false;
     }
@@ -467,7 +457,7 @@ export class MnmlPlanEditor extends LitElement {
         : key === 'garage'
           ? ['key']
           : [];
-    const tiles = Object.entries(rolesOf(this.templates))
+    const tiles = Object.entries(this.roles())
       .filter(
         ([template, role]) =>
           role === 'tile' &&
@@ -572,9 +562,14 @@ export class MnmlPlanEditor extends LitElement {
                 );
               },
             )}
-            ${moves(registries.areas[room.area]?.name ?? room.area, index, chosen.length, (by) => {
-              this.change({ rooms: moved(chosen, index, by) });
-            })}
+            ${this.moves(
+              registries.areas[room.area]?.name ?? room.area,
+              index,
+              chosen.length,
+              (by) => {
+                this.change({ rooms: moved(chosen, index, by) });
+              },
+            )}
           </span>
         </div>`,
       )}
@@ -643,7 +638,7 @@ export class MnmlPlanEditor extends LitElement {
                 },
               );
             })}
-            ${moves(nameOf(choice.entity), index, chosen.length, (by) => {
+            ${this.moves(nameOf(choice.entity), index, chosen.length, (by) => {
               this.change({ people: moved(chosen, index, by) });
             })}
           </span>
@@ -693,7 +688,7 @@ export class MnmlPlanEditor extends LitElement {
         (car, index) => html`<div class="plan-row">
           ${this.drawTile(carCard(car, look.cars))}
           <span class="row-actions">
-            ${moves(car.key, index, plan.cars.length, (by) => {
+            ${this.moves(car.key, index, plan.cars.length, (by) => {
               this.change({ cars: moved(plan.cars, index, by) });
             })}
             ${iconButton('mdi:tune-variant', `Customize ${car.key}`, () => {
@@ -775,7 +770,7 @@ export class MnmlPlanEditor extends LitElement {
             this.keepSystem(plan, registries, choice),
           );
         })}
-        ${moves(label, index, plan.system.length, (by) => {
+        ${this.moves(label, index, plan.system.length, (by) => {
           this.change({ system: moved(plan.system, index, by) });
         })}
       </span>
@@ -837,6 +832,44 @@ export class MnmlPlanEditor extends LitElement {
     </section>`;
   }
 
+  private moves(
+    label: string,
+    index: number,
+    count: number,
+    move: (by: number) => void,
+  ): TemplateResult {
+    const moving = (by: number): void => {
+      move(by);
+      void this.updateComplete.then(() => {
+        const ways = by < 0 ? ['up', 'down'] : ['down', 'up'];
+        ways
+          .map((way) =>
+            this.renderRoot.querySelector<HTMLButtonElement>(
+              `button[aria-label="Move ${label} ${way}"]`,
+            ),
+          )
+          .find((button) => button !== null && !button.disabled)
+          ?.focus();
+      });
+    };
+    return html`${iconButton(
+      'mdi:arrow-up',
+      `Move ${label} up`,
+      () => {
+        moving(-1);
+      },
+      index === 0,
+    )}
+    ${iconButton(
+      'mdi:arrow-down',
+      `Move ${label} down`,
+      () => {
+        moving(1);
+      },
+      index === count - 1,
+    )}`;
+  }
+
   private drawHeading(plan: Plan, key: SectionKey): TemplateResult {
     const order = orderOf(plan);
     const index = order.indexOf(key);
@@ -844,10 +877,11 @@ export class MnmlPlanEditor extends LitElement {
     return html`<div class="plan-heading">
       <h2>${name}</h2>
       <span class="row-actions">
-        ${moves(`the ${name} section`, index, order.length, (by) => {
+        ${this.moves(`the ${name} section`, index, order.length, (by) => {
           const draft = this.draft;
           if (draft !== undefined) {
             this.draft = withOrder(draft, moved(order, index, by));
+            this.problem = undefined;
           }
         })}
       </span>

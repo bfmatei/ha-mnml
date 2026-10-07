@@ -2,7 +2,7 @@ section-heading:
   description: A section's heading, the full width of the section.
   slots:
     title: { kind: text, required: true, help: "The heading's text." }
-    icon: { kind: icon, help: "The heading's icon." }
+    icon: { kind: icon, required: true, help: "The heading's icon." }
     state: { kind: objects }
     controls: { kind: objects }
   card:
@@ -19,7 +19,7 @@ section-heading:
 power:
   description: A filled power toggle for an entity, lit while the entity is on.
   slots:
-    entity: { kind: entity }
+    entity: { kind: entity, required: true }
     color: { kind: text, default: amber }
     when: { kind: object }
   card:
@@ -35,9 +35,9 @@ power:
 nav-chip:
   description: A coloured chip that opens a pop-up.
   slots:
-    entity: { kind: entity }
-    popup: { kind: text }
-    color: { kind: text }
+    entity: { kind: entity, required: true }
+    popup: { kind: text, required: true }
+    color: { kind: text, required: true }
     when: { kind: object }
   card:
     type: nav
@@ -120,7 +120,7 @@ energy-table:
 pending-row:
   description: A list row that flags an update while it is pending.
   slots:
-    entity: { kind: entity }
+    entity: { kind: entity, required: true }
   card:
     entity: '[[entity]]'
     label: device
@@ -132,7 +132,7 @@ pending-row:
 stopped-row:
   description: A list row, red, shown while a service or guest is off.
   slots:
-    entity: { kind: entity }
+    entity: { kind: entity, required: true }
   card:
     entity: '[[entity]]'
     label: device
@@ -144,7 +144,7 @@ stopped-row:
 link-row:
   description: A list row for a link speed, orange while it is not the full speed.
   slots:
-    entity: { kind: entity }
+    entity: { kind: entity, required: true }
     speed: { kind: text, default: '10000' }
   card:
     entity: '[[entity]]'

@@ -2,7 +2,7 @@ speaker-popup:
   description: A speaker's pop-up, its sound, and its TV, subwoofer and surround settings when it has them.
   slots:
     key: { kind: text, required: true }
-    name: { kind: text }
+    name: { kind: text, required: true }
     speaker:
       kind: object
       required: true

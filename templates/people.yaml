@@ -47,15 +47,26 @@ person:
     state: [{ id: part }]
     chips:
       - id: driving
+        if: activities
         type: status
         name: Driving
         icon: mdi:steering
-        rules: [{ id: activities, entities: ['[[activities]]'], color: amber, is: [automotive] }]
+        rules:
+          [
+            {
+              id: activities,
+              if: activities,
+              entities: ['[[activities]]'],
+              color: amber,
+              is: [automotive],
+            },
+          ]
       - id: do-not-disturb
+        if: focuses
         type: status
         name: Do not disturb
         icon: mdi:moon-waning-crescent
-        rules: [{ id: focuses, entities: ['[[focuses]]'], color: amber, is: ['on'] }]
+        rules: [{ id: focuses, if: focuses, entities: ['[[focuses]]'], color: amber, is: ['on'] }]
     problems: { batteries: '[[batteries]]' }
     grid_options: { columns: 12 }
   popups:

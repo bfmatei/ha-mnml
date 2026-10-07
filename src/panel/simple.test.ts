@@ -5,8 +5,9 @@ import { test } from 'vitest';
 import { isMapping } from '../contract/templates.ts';
 import type { Template } from '../contract/templates.ts';
 import { readTemplates } from '../templates/shipped.ts';
+import { drawn } from '../test/render.ts';
 
-import { keptPart, simpleOf, switchedOff, switchedOn } from './simple.ts';
+import { drawSimple, keptPart, simpleOf, switchedOff, switchedOn } from './simple.ts';
 import { valueAt, withValue } from './tree.ts';
 
 const SHIPPED = readTemplates();
@@ -131,4 +132,32 @@ test('a list with every part switched off keeps a switch for each', () => {
     own.map((row) => [row.path.at(-1), row.on]),
     [['#first', false]],
   );
+});
+
+test("a look keeps the shipped value it started from, so a colour outside the cards' four stays offered", () => {
+  const path = ['card', 'chips', '#wind'];
+  const recoloured = withValue(TILE, [...path, 'color'], 'red');
+  const look = simpleOf(recoloured, TILE)
+    .find((row) => row.path.at(-1) === '#wind')
+    ?.looks.find((each) => each.key === 'color');
+  assert.deepEqual(look, {
+    path: [...path, 'color'],
+    key: 'color',
+    value: 'red',
+    original: 'teal',
+  });
+  const box = drawn(
+    drawSimple(simpleOf(recoloured, TILE), { toggle: () => undefined, look: () => undefined }),
+  );
+  const select = box.querySelector<HTMLSelectElement>('select[data-path="card/chips/#wind/color"]');
+  assert.ok(select);
+  assert.ok([...select.options].some((option) => option.value === 'teal'));
+});
+
+test("the Simple tab's note links to the card editor, where a card's own values are set", () => {
+  const box = drawn(
+    drawSimple(simpleOf(TILE, TILE), { toggle: () => undefined, look: () => undefined }),
+  );
+  const link = box.querySelector('a');
+  assert.match(link?.getAttribute('href') ?? '', /editors\.md#the-template-cards-editor$/);
 });

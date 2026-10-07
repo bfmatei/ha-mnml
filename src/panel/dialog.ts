@@ -12,7 +12,7 @@ export interface Choice<T> {
 export function ask<T>(
   root: ParentNode,
   title: string,
-  body: TemplateResult,
+  body: TemplateResult | ((redraw: () => void) => TemplateResult),
   choices: readonly Choice<T>[],
   check?: (value: T) => string | undefined,
 ): Promise<T | undefined> {
@@ -28,7 +28,8 @@ export function ask<T>(
   const draw = (): void => {
     render(
       html`<h2>${title}</h2>
-        ${body} ${problem === undefined ? nothing : html`<p class="problem-line">${problem}</p>`}
+        ${typeof body === 'function' ? body(draw) : body}
+        ${problem === undefined ? nothing : html`<p class="problem-line">${problem}</p>`}
         <div class="dialog-actions">
           <button
             type="button"

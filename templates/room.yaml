@@ -399,7 +399,7 @@ room:
 room-media-card:
   description: A room's media player, opening its speaker pop-up when it is a speaker.
   slots:
-    key: { kind: text }
+    key: { kind: text, required: true }
     member:
       kind: object
       required: true
@@ -611,6 +611,7 @@ room-popup:
             entity: '[[door]]'
             color: orange
       - id: heading
+        if: lights.group
         type: custom:mnml-heading-card
         title: Lights
         icon: mdi:lightbulb-group

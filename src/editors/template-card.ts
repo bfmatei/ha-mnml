@@ -386,6 +386,7 @@ export class MnmlTemplateCardEditor extends LitElement {
     }
     this.values = undefined;
     this.pendingArea = false;
+    this.open.clear();
     const start = previewConfig(name, template, this.hass);
     const layout = Object.fromEntries(
       Object.entries(this.config).filter(([key]) => !PICKED.has(key)),

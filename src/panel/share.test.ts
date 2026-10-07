@@ -8,7 +8,7 @@ import type { Recipe } from '../contract/builder.ts';
 import type { Template } from '../contract/templates.ts';
 import { readTemplates } from '../templates/shipped.ts';
 
-import { bringing, broughtIn, previewOf, settled, summary } from './share.ts';
+import { bringing, broughtIn, previewOf, previewPlan, settled, summary } from './share.ts';
 import { planImport } from './transfer.ts';
 
 const SHIPPED = readTemplates();
@@ -107,4 +107,33 @@ test('templates brought in beside the home ones are saved with the names inside 
   assert.deepEqual(Object.keys(saved).toSorted(), ['my-room', 'room-chip-2']);
   assert.ok(JSON.stringify(saved['my-room']).includes('"template":"room-chip-2"'));
   assert.equal(brought.recipe.sections.rooms?.template, 'my-room');
+});
+
+test("the preview follows the choices: a template skipped is this home's in what it makes", () => {
+  const room = SHIPPED['room'];
+  assert.ok(room);
+  const ours: Template = {
+    slots: { key: { kind: 'text', required: true, discover: 'area.id' } },
+    card: { type: 'custom:mnml-heading-card', title: 'Ours', icon: 'mdi:star' },
+  };
+  const recipe: Recipe = {
+    ...RECIPE,
+    sections: { rooms: { template: 'my-room' } },
+    templates: { 'my-room': structuredClone(room) },
+  };
+  const resolved = { ...SHIPPED, 'my-room': ours };
+  const incoming = planImport(
+    recipe.templates,
+    SHIPPED,
+    { own: { 'my-room': ours }, changes: {} },
+    resolved,
+  );
+  const { offered, choices } = bringing(incoming);
+  const taken = new Set(['my-room']);
+  assert.equal(previewPlan(recipe, offered, choices, taken, HOME, resolved).rooms.length, 2);
+  assert.equal(
+    previewPlan(recipe, offered, { ...choices, 'my-room': 'skip' }, taken, HOME, resolved).rooms
+      .length,
+    0,
+  );
 });

@@ -82,6 +82,7 @@ test('rooms move up and down, and the plan keeps the order', async () => {
   assert.equal(living.disabled, true);
   kitchen.click();
   await element.updateComplete;
+  assert.equal(root.activeElement?.getAttribute('aria-label'), 'Move Kitchen up');
   await save(element, root);
   assert.deepEqual(saved[0]?.[0].rooms, [{ area: 'living' }, { area: 'kitchen' }]);
   element.remove();
@@ -288,6 +289,23 @@ test('the sections move up and down, and the page and the plan follow', async ()
   element.remove();
 });
 
+test('a section moved clears the problem line and keeps the focus on its button', async () => {
+  const { element, root } = await editor({ taken: ['dashboard-home'] });
+  await save(element, root);
+  assert.match(text(control(root, '.problem-line')), /is taken/);
+  const down = labelled(root, 'Move the People section down');
+  down.focus();
+  down.click();
+  await element.updateComplete;
+  assert.equal(root.querySelector('.problem-line'), null);
+  assert.equal(root.activeElement?.getAttribute('aria-label'), 'Move the People section down');
+  labelled(root, 'Move the People section down').click();
+  await element.updateComplete;
+  const up = labelled(root, 'Move the People section up');
+  assert.equal(root.activeElement, up);
+  element.remove();
+});
+
 test('people, cars and system cards move within their sections', async () => {
   const plan: Plan = {
     ...defaultPlan(HOME, TEMPLATES),
@@ -322,5 +340,16 @@ test('a system card outside the five is listed, and kept when another changes', 
   title.dispatchEvent(new Event('input'));
   await save(element, root);
   assert.deepEqual(saved[0]?.[0].system, [{ template: 'room' }]);
+  element.remove();
+});
+
+test("a save Home Assistant refuses says Home Assistant's reason", async () => {
+  const { element, root } = await editor();
+  element.host = {
+    save: () => Promise.reject({ code: 'invalid_format', message: 'expected a dictionary' }),
+    leave: () => undefined,
+  };
+  await save(element, root);
+  assert.equal(text(control(root, '.problem-line')), 'expected a dictionary');
   element.remove();
 });

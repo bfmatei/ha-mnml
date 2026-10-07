@@ -169,7 +169,7 @@ A section's heading, the full width of the section.
 | Slot       | Kind                              | Required or default | Found by |
 | ---------- | --------------------------------- | ------------------- | -------- |
 | `title`    | text                              | required            |          |
-| `icon`     | icon                              |                     |          |
+| `icon`     | icon                              | required            |          |
 | `state`    | objects, as the card's `state`    |                     |          |
 | `controls` | objects, as the card's `controls` |                     |          |
 
@@ -179,7 +179,7 @@ A filled power toggle for an entity, lit while the entity is on.
 
 | Slot     | Kind                            | Required or default | Found by |
 | -------- | ------------------------------- | ------------------- | -------- |
-| `entity` | entity                          |                     |          |
+| `entity` | entity                          | required            |          |
 | `color`  | text                            | `'amber'`           |          |
 | `when`   | object, as the control's `when` |                     |          |
 
@@ -189,9 +189,9 @@ A coloured chip that opens a pop-up.
 
 | Slot     | Kind                            | Required or default | Found by |
 | -------- | ------------------------------- | ------------------- | -------- |
-| `entity` | entity                          |                     |          |
-| `popup`  | text                            |                     |          |
-| `color`  | text                            |                     |          |
+| `entity` | entity                          | required            |          |
+| `popup`  | text                            | required            |          |
+| `color`  | text                            | required            |          |
 | `when`   | object, as the control's `when` |                     |          |
 
 ### `while-not-off`
@@ -229,7 +229,7 @@ A list row that flags an update while it is pending.
 
 | Slot     | Kind   | Required or default | Found by |
 | -------- | ------ | ------------------- | -------- |
-| `entity` | entity |                     |          |
+| `entity` | entity | required            |          |
 
 ### `stopped-row`
 
@@ -237,7 +237,7 @@ A list row, red, shown while a service or guest is off.
 
 | Slot     | Kind   | Required or default | Found by |
 | -------- | ------ | ------------------- | -------- |
-| `entity` | entity |                     |          |
+| `entity` | entity | required            |          |
 
 ### `link-row`
 
@@ -245,7 +245,7 @@ A list row for a link speed, orange while it is not the full speed.
 
 | Slot     | Kind   | Required or default | Found by |
 | -------- | ------ | ------------------- | -------- |
-| `entity` | entity |                     |          |
+| `entity` | entity | required            |          |
 | `speed`  | text   | `'10000'`           |          |
 
 ## Devices
@@ -304,7 +304,7 @@ A light's brightness, white temperature and, for a colour light, hue sliders, th
 
 | Slot     | Kind   | Required or default | Found by |
 | -------- | ------ | ------------------- | -------- |
-| `entity` | entity |                     |          |
+| `entity` | entity | required            |          |
 | `color`  | flag   |                     |          |
 
 ### `light-item`
@@ -313,7 +313,7 @@ A light as an item, with its brightness, the active scene while it is on, its sc
 
 | Slot           | Kind     | Required or default | Found by |
 | -------------- | -------- | ------------------- | -------- |
-| `entity`       | entity   |                     |          |
+| `entity`       | entity   | required            |          |
 | `strip_word`   | text     |                     |          |
 | `popup`        | text     |                     |          |
 | `scenes`       | entities |                     |          |
@@ -341,7 +341,7 @@ A room's lights pop-up, its sliders over the whole group, its scenes and every l
 | Slot              | Kind     | Required or default | Found by |
 | ----------------- | -------- | ------------------- | -------- |
 | `key`             | text     | required            |          |
-| `name`            | text     |                     |          |
+| `name`            | text     | required            |          |
 | `group`           | entity   | required            |          |
 | `color`           | flag     |                     |          |
 | `members`         | objects  |                     |          |
@@ -368,7 +368,7 @@ A heating's target temperature slider, its preset menu when it has presets, and 
 
 | Slot     | Kind   | Required or default | Found by |
 | -------- | ------ | ------------------- | -------- |
-| `entity` | entity |                     |          |
+| `entity` | entity | required            |          |
 | `preset` | flag   |                     |          |
 
 ### `ac-item`
@@ -397,7 +397,7 @@ A room's heating pop-up, its target, its preset, its valves and their batteries.
 | Slot                  | Kind     | Required or default | Found by |
 | --------------------- | -------- | ------------------- | -------- |
 | `key`                 | text     | required            |          |
-| `name`                | text     |                     |          |
+| `name`                | text     | required            |          |
 | `entity`              | entity   | required            |          |
 | `preset`              | flag     |                     |          |
 | `thermostats`         | objects  |                     |          |
@@ -412,7 +412,7 @@ A room's AC pop-up, its target, its fan, swing and other settings, and its energ
 | Slot               | Kind   | Required or default | Found by |
 | ------------------ | ------ | ------------------- | -------- |
 | `key`              | text   | required            |          |
-| `name`             | text   |                     |          |
+| `name`             | text   | required            |          |
 | `entity`           | entity | required            |          |
 | `fan`              | flag   |                     |          |
 | `swing`            | flag   |                     |          |
@@ -484,7 +484,7 @@ A room's vacuum pop-up, its routines, map, details, settings, dock, maintenance 
 | Slot                               | Kind     | Required or default | Found by |
 | ---------------------------------- | -------- | ------------------- | -------- |
 | `key`                              | text     | required            |          |
-| `name`                             | text     |                     |          |
+| `name`                             | text     | required            |          |
 | `vacuum`                           | object   | required            |          |
 | `vacuum.entity`                    | entity   | required            |          |
 | `vacuum.status`                    | entity   |                     |          |
@@ -529,7 +529,7 @@ A 3D printer's Cancel, Pause, Resume and Continue buttons, each shown in the job
 
 | Slot               | Kind   | Required or default | Found by |
 | ------------------ | ------ | ------------------- | -------- |
-| `entity`           | entity |                     |          |
+| `entity`           | entity | required            |          |
 | `actions`          | object |                     |          |
 | `actions.pause`    | entity |                     |          |
 | `actions.resume`   | entity |                     |          |
@@ -577,7 +577,7 @@ A room's 3D printer pop-up, its camera, print, temperatures and power.
 | Slot                            | Kind   | Required or default | Found by |
 | ------------------------------- | ------ | ------------------- | -------- |
 | `key`                           | text   | required            |          |
-| `name`                          | text   |                     |          |
+| `name`                          | text   | required            |          |
 | `printer3d`                     | object | required            |          |
 | `printer3d.entity`              | entity | required            |          |
 | `printer3d.progress`            | entity | required            |          |
@@ -616,7 +616,7 @@ A speaker's pop-up, its sound, and its TV, subwoofer and surround settings when 
 | Slot                                 | Kind   | Required or default | Found by |
 | ------------------------------------ | ------ | ------------------- | -------- |
 | `key`                                | text   | required            |          |
-| `name`                               | text   |                     |          |
+| `name`                               | text   | required            |          |
 | `speaker`                            | object | required            |          |
 | `speaker.key`                        | text   | required            |          |
 | `speaker.entity`                     | entity | required            |          |
@@ -788,7 +788,7 @@ A room's media player, opening its speaker pop-up when it is a speaker.
 
 | Slot            | Kind   | Required or default | Found by |
 | --------------- | ------ | ------------------- | -------- |
-| `key`           | text   |                     |          |
+| `key`           | text   | required            |          |
 | `member`        | object | required            |          |
 | `member.entity` | entity | required            |          |
 | `member.key`    | text   |                     |          |

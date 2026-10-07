@@ -447,3 +447,46 @@ test('a colour chosen in Simple changes the draft', async () => {
   assert.equal(saveOff(root), false);
   builder.remove();
 });
+
+test('a look cleared and left empty in Simple shows its value again', async () => {
+  const calls: Calls = { saved: [], left: 0 };
+  const named: Template = {
+    ...structuredClone(ROOM),
+    card: { ...(structuredClone(ROOM).card as object), name: 'Hall' },
+  };
+  const { builder, root } = await opened(
+    { name: 'hall', template: named, shipped: undefined, conflicts: [] },
+    calls,
+  );
+  const input = root.querySelector<HTMLInputElement>('input[data-path="card/name"]');
+  assert.ok(input);
+  input.value = '';
+  input.dispatchEvent(new Event('change'));
+  await builder.updateComplete;
+  assert.equal(input.value, 'Hall');
+  builder.remove();
+});
+
+test("a save the integration refuses says the integration's reason", async () => {
+  const calls: Calls = { saved: [], left: 0 };
+  const { builder, root } = await opened(
+    {
+      name: 'hall',
+      template: structuredClone(ROOM),
+      shipped: undefined,
+      conflicts: [],
+      fresh: true,
+    },
+    calls,
+  );
+  builder.host = {
+    ...host(calls),
+    save: () =>
+      Promise.reject({ code: 'too_large', message: 'a template is at most 262144 bytes' }),
+  };
+  pressed(root, 'Save');
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await builder.updateComplete;
+  assert.match(text(root), /Not saved: a template is at most 262144 bytes/);
+  builder.remove();
+});

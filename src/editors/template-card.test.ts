@@ -814,12 +814,12 @@ function sceneHass(): Record<string, unknown> {
   };
 }
 
-test('a required field nothing fills inside a slot found in part is named, and its panel open', async () => {
+test('an object discovery finds only in part is not found, and the slot it fills is named as needed', async () => {
   const { root } = await openWith(
     { type: 'custom:mnml-template-card', template: 'lighty', area: 'living' },
     sceneHass(),
   );
-  assert.equal(text(root.querySelector('.found')), 'Found in Living: Lights');
+  assert.equal(text(root.querySelector('.found')), 'Nothing found in Living');
   assert.equal(text(root.querySelector('.needs')), 'Needs: Lights');
   assert.ok(Object.values(panelHeads(root)).includes('true'));
 });
@@ -830,4 +830,25 @@ test('a template that finds nothing anywhere says nothing about what it found', 
     sceneHass(),
   );
   assert.equal(root.querySelector('.found'), null);
+});
+
+test('another template picked starts with its own folds, not the ones opened on the last', async () => {
+  const store = fakeStore();
+  store.kept = own({
+    'room-like': ROOM_LIKE,
+    'basic-two': {
+      description: 'Basics again.',
+      slots: {
+        first: { kind: 'text', group: 'Other' },
+        label: { kind: 'text', discover: 'area.name', group: 'Basics' },
+      },
+      card: { type: 'custom:mnml-heading-card', title: '[[label]]', icon: 'mdi:star' },
+    },
+  });
+  const { root } = await openWith({ ...MINE, area: 'living' }, { ...roomHass(), ...store.hass });
+  await click(labelled(root, 'Change what it found'));
+  assert.equal(panelHeads(root)['Basics'], 'true');
+  await click(labelled(root, 'Change the template'));
+  await click(labelled(root, 'Use basic-two'));
+  assert.equal(panelHeads(root)['Basics'], 'false');
 });
