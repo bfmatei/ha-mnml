@@ -138,3 +138,35 @@ test('a bundled template brought in under another name is the name its recipe us
   assert.deepEqual(Object.keys(renamed.templates).toSorted(), ['my-fragment-2', 'my-room-2']);
   assert.ok(JSON.stringify(renamed.templates['my-room-2']).includes('"template":"my-fragment-2"'));
 });
+
+test('a default section template brought in beside the home one is the name its section uses', () => {
+  const recipe = { ...DEFAULT_RECIPE, sections: { rooms: {}, people: {} } };
+  const renamed = renamedRecipe(recipe, { room: 'room-2' });
+  assert.equal(renamed.sections.rooms?.template, 'room-2');
+  assert.equal(renamed.sections.people?.template, undefined);
+});
+
+test('a dashboard template is refused when a template it needs, inside another, is nowhere, or a template is no card', () => {
+  const base = 'mnml_dashboard:\n  title: Home\n  icon: mdi:home\n  open: {}\n';
+  const nested = `${base}  sections:\n    rooms: { template: mine }\n  templates:\n    mine:\n      card: { type: custom:mnml-tile-card }\n      popups: [{ id: a, template: missing-fragment }]\n`;
+  assert.throws(
+    () => readRecipe(nested, SHIPPED),
+    /missing-fragment is neither shipped nor in the dashboard template/,
+  );
+  const broken = `${base}  sections:\n    rooms: {}\n  templates:\n    mine: { card: 5 }\n`;
+  assert.throws(
+    () => readRecipe(broken, SHIPPED),
+    /mine in the dashboard template is not a template/,
+  );
+});
+
+test('a section left empty in YAML is a section, and a templates export says what it is', () => {
+  const base = 'mnml_dashboard:\n  title: Home\n  icon: mdi:home\n  open: {}\n';
+  assert.deepEqual(readRecipe(`${base}  sections:\n    people:\n`, SHIPPED).sections, {
+    people: {},
+  });
+  assert.throws(
+    () => readRecipe('mnml_templates:\n  garden:\n    card: { type: x }\n', SHIPPED),
+    /a set of templates/,
+  );
+});

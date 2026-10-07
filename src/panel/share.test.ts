@@ -8,7 +8,7 @@ import type { Recipe } from '../contract/builder.ts';
 import type { Template } from '../contract/templates.ts';
 import { readTemplates } from '../templates/shipped.ts';
 
-import { previewOf, settled, summary } from './share.ts';
+import { bringing, broughtIn, previewOf, settled, summary } from './share.ts';
 import { planImport } from './transfer.ts';
 
 const SHIPPED = readTemplates();
@@ -56,4 +56,55 @@ test('a template brought in beside one of the same name is renamed, and the reci
   assert.equal(both.save[0]?.name, 'mine-2');
   const kept = settled(plan, { mine: 'skip' }, new Set(['mine']));
   assert.deepEqual(kept, { save: [], renames: {} });
+});
+
+test('a template that would change one of the home, or a shipped one, is asked about, keeping both by default', () => {
+  const room = SHIPPED['room'];
+  const heading = SHIPPED['section-heading'];
+  assert.ok(room && heading);
+  const incoming = planImport(
+    {
+      room: { ...room, description: 'Theirs.' },
+      'section-heading': { ...heading, description: 'Theirs.' },
+      mine: MINE,
+    },
+    SHIPPED,
+    { own: {}, changes: {} },
+    SHIPPED,
+  );
+  const { offered, choices, alone } = bringing(incoming);
+  assert.deepEqual(
+    offered.map((each) => [each.name, each.clash]),
+    [
+      ['room', true],
+      ['section-heading', true],
+      ['mine', false],
+    ],
+  );
+  assert.deepEqual(choices, { room: 'both', 'section-heading': 'skip' });
+  assert.deepEqual([...alone], ['section-heading']);
+});
+
+test('templates brought in beside the home ones are saved with the names inside them renamed too', () => {
+  const chip: Template = { card: { type: 'indicator', name: 'Theirs' } };
+  const room: Template = {
+    card: { type: 'custom:mnml-tile-card', chips: [{ id: 'c', template: 'room-chip', slots: {} }] },
+  };
+  const recipe: Recipe = {
+    ...RECIPE,
+    sections: { rooms: { template: 'my-room' } },
+    templates: { 'my-room': room, 'room-chip': chip },
+  };
+  const incoming = planImport(
+    recipe.templates,
+    SHIPPED,
+    { own: { 'room-chip': { card: { type: 'indicator', name: 'Ours' } } }, changes: {} },
+    { ...SHIPPED, 'room-chip': { card: { type: 'indicator', name: 'Ours' } } },
+  );
+  const { offered, choices } = bringing(incoming);
+  const brought = broughtIn(recipe, offered, choices, new Set(['room-chip']));
+  const saved = Object.fromEntries(brought.save.map((each) => [each.name, each.template]));
+  assert.deepEqual(Object.keys(saved).toSorted(), ['my-room', 'room-chip-2']);
+  assert.ok(JSON.stringify(saved['my-room']).includes('"template":"room-chip-2"'));
+  assert.equal(brought.recipe.sections.rooms?.template, 'my-room');
 });

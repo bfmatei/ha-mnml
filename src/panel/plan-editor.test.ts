@@ -5,6 +5,7 @@ import { test } from 'vitest';
 import { HOME } from '../builder/fixture.ts';
 import { defaultPlan } from '../builder/plan.ts';
 import type { Plan } from '../contract/builder.ts';
+import type { Template } from '../contract/templates.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
 import { readTemplates } from '../templates/shipped.ts';
 import { define, mounted, text } from '../test/render.ts';
@@ -208,5 +209,60 @@ test('each section takes a title, an icon and a template, and its rows follow th
   assert.equal(Reflect.get(Reflect.get(tile ?? {}, 'config') ?? {}, 'template'), 'my-room');
   await save(element, root);
   assert.deepEqual(saved[0]?.[0].sections, { rooms: { title: 'Spaces', template: 'my-room' } });
+  element.remove();
+});
+
+test("a section's title keeps what is typed, and is trimmed when saved", async () => {
+  const { element, root, saved } = await editor();
+  const title = root.querySelector<HTMLInputElement>('input[aria-label="Rooms title"]');
+  assert.ok(title);
+  title.value = 'Living ';
+  title.dispatchEvent(new Event('input'));
+  await element.updateComplete;
+  assert.equal(title.value, 'Living ');
+  title.value = 'Living room ';
+  title.dispatchEvent(new Event('input'));
+  await save(element, root);
+  assert.deepEqual(saved[0]?.[0].sections, { rooms: { title: 'Living room' } });
+  title.value = '   ';
+  title.dispatchEvent(new Event('input'));
+  await save(element, root);
+  assert.equal(saved[1]?.[0].sections, undefined);
+  element.remove();
+});
+
+test("a section offers the templates that take its rows' slots, and a new one drops the slots it lacks", async () => {
+  const room = TEMPLATES['room'];
+  assert.ok(room);
+  const tiny = {
+    description: 'A small room.',
+    slots: {
+      key: { kind: 'text', required: true, discover: 'area.id' },
+      name: { kind: 'text', required: true, discover: 'area.name' },
+      lights: room.slots?.['lights'] ?? { kind: 'object' },
+    },
+    card: room.card,
+  } satisfies Template;
+  const plan: Plan = {
+    ...defaultPlan(HOME, TEMPLATES),
+    rooms: [{ area: 'kitchen', slots: { name: 'Cook', temperature: 'sensor.x' } }],
+  };
+  const { element, root, saved } = await editor({ plan });
+  element.templates = { ...TEMPLATES, tiny };
+  await element.updateComplete;
+  const options = (label: string): string[] =>
+    [
+      ...(root.querySelector<HTMLSelectElement>(`select[aria-label="${label}"]`)?.options ?? []),
+    ].map((option) => option.value);
+  assert.ok(options('People template').includes('person'));
+  assert.equal(options('People template').includes('room'), false);
+  assert.ok(options('Garage template').includes('car'));
+  assert.equal(options('Garage template').includes('section-heading'), false);
+  const rooms = root.querySelector<HTMLSelectElement>('select[aria-label="Rooms template"]');
+  assert.ok(rooms);
+  rooms.value = 'tiny';
+  rooms.dispatchEvent(new Event('change'));
+  await save(element, root);
+  assert.deepEqual(saved[0]?.[0].rooms, [{ area: 'kitchen', slots: { name: 'Cook' } }]);
   element.remove();
 });

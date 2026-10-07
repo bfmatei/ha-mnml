@@ -4,7 +4,7 @@ import { property, query, state } from 'lit/decorators.js';
 
 import { dashboardOf } from '../builder/dashboard.ts';
 import { defaultPlan, planFrom } from '../builder/plan.ts';
-import { readRecipe, recipeOf, recipeText, renamedRecipe } from '../builder/recipe.ts';
+import { readRecipe, recipeOf, recipeText } from '../builder/recipe.ts';
 import type { Plan, Recipe } from '../contract/builder.ts';
 import { isTemplate } from '../contract/templates.ts';
 import type { Template, Templates } from '../contract/templates.ts';
@@ -47,7 +47,7 @@ import { loadLovelace } from './lovelace.ts';
 import { MnmlPlanEditor } from './plan-editor.ts';
 import type { PlanHost } from './plan-editor.ts';
 import { MnmlPreview } from './preview.ts';
-import { previewOf, settled, summary } from './share.ts';
+import { bringing, broughtIn, previewOf, summary } from './share.ts';
 import { PAGE_STYLE, PANEL_STYLE } from './style.ts';
 import {
   dashboardTemplates,
@@ -731,15 +731,18 @@ export class MnmlPanel extends LitElement {
   private async share(built: Built): Promise<void> {
     const text = recipeText(recipeOf(built.plan, this.resolved(), this.shipped ?? {}));
     const choices: Option<'copy' | 'download'>[] = [
-      { label: 'Copy', value: 'copy' },
+      ...(window.isSecureContext && 'clipboard' in navigator
+        ? [{ label: 'Copy', value: 'copy' } as const]
+        : []),
       { label: 'Download', value: 'download', primary: true },
     ];
     const choice = await ask(
       this.renderRoot,
       `Share ${built.plan.title}`,
       html`<p class="muted">
-          Its layout, its sections' looks and every template of yours it uses. No area, person or
-          entity of this home is in it; a template's example goes with it as it is.
+          Its layout, its sections' looks and every template of yours it uses. Its layout names no
+          area, person or entity of this home; the templates go whole, and a template's example may
+          name this home's entities.
         </p>
         <textarea
           class="yaml-text"
@@ -804,7 +807,7 @@ export class MnmlPanel extends LitElement {
       this.kept ?? NOTHING_KEPT,
       this.resolved(),
     );
-    const choices: Record<string, Choice> = {};
+    const { offered, choices, alone } = bringing(incoming);
     const looked = planFrom(recipe, this.registries(), { ...this.resolved(), ...recipe.templates });
     const open = await ask(
       this.renderRoot,
@@ -813,21 +816,24 @@ export class MnmlPanel extends LitElement {
         ${
           incoming.length === 0
             ? nothing
-            : html`<p class="muted">It brings these templates:</p>
-                ${this.fatesOf(incoming, choices)}`
+            : html`<p class="muted">
+                  It brings these templates. Replacing one changes it on every dashboard of this
+                  home; keeping both brings this one in beside it, under a new name.
+                </p>
+                ${this.fatesOf(offered, choices, [], alone)}`
         }`,
       [{ label: 'Open in the builder', value: true, primary: true }],
     );
     if (open !== true) {
       return;
     }
-    const { save, renames } = settled(incoming, choices, this.taken());
-    await Promise.all(save.map((each) => this.save(each.name, entryFor(each, shipped))));
+    const brought = broughtIn(recipe, offered, choices, this.taken());
+    await Promise.all(brought.save.map((each) => this.save(each.name, entryFor(each, shipped))));
     const templates = {
       ...this.resolved(),
-      ...Object.fromEntries(save.map((each) => [each.name, each.template])),
+      ...Object.fromEntries(brought.save.map((each) => [each.name, each.template])),
     };
-    this.newPlan = planFrom(renamedRecipe(recipe, renames), this.registries(), templates);
+    this.newPlan = planFrom(brought.recipe, this.registries(), templates);
     this.go(`${BASE}/dashboards/new`);
   }
 
@@ -942,6 +948,7 @@ export class MnmlPanel extends LitElement {
     plan: readonly Incoming[],
     choices: Record<string, Choice>,
     differ: readonly string[] = [],
+    alone: ReadonlySet<string> = new Set(),
   ): TemplateResult {
     return html`<div class="import-plan">
       ${plan.map(
@@ -972,9 +979,22 @@ export class MnmlPanel extends LitElement {
                         value === 'both' ? 'both' : value === 'skip' ? 'skip' : 'replace';
                     }}
                   >
-                    <option value="replace">Replace the one MNML keeps</option>
-                    <option value="both">Keep both, this one under a new name</option>
-                    <option value="skip">Skip it</option>
+                    <option
+                      value="replace"
+                      ?selected=${(choices[incoming.name] ?? 'replace') === 'replace'}
+                    >
+                      Replace the one MNML keeps
+                    </option>
+                    ${
+                      alone.has(incoming.name)
+                        ? nothing
+                        : html`<option value="both" ?selected=${choices[incoming.name] === 'both'}>
+                            Keep both, this one under a new name
+                          </option>`
+                    }
+                    <option value="skip" ?selected=${choices[incoming.name] === 'skip'}>
+                      Skip it
+                    </option>
                   </select>`
                 : nothing
             }

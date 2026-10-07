@@ -1,3 +1,4 @@
+import { renamedRecipe } from '../builder/recipe.ts';
 import { SYSTEM_NAMES, SYSTEM_TEMPLATES } from '../contract/builder.ts';
 import type { Plan, Recipe } from '../contract/builder.ts';
 
@@ -64,4 +65,45 @@ export function settled(
     }
   }
   return { save, renames };
+}
+
+const HEADING = 'section-heading';
+
+export function bringing(incoming: readonly Incoming[]): {
+  offered: Incoming[];
+  choices: Record<string, Choice>;
+  alone: ReadonlySet<string>;
+} {
+  const choices: Record<string, Choice> = {};
+  const alone = new Set<string>();
+  const offered: Incoming[] = [];
+  for (const each of incoming) {
+    if (each.fate !== 'changes' && !each.clash) {
+      offered.push(each);
+      continue;
+    }
+    if (each.name === HEADING) {
+      alone.add(each.name);
+      choices[each.name] = 'skip';
+    } else {
+      choices[each.name] = 'both';
+    }
+    offered.push({ ...each, clash: true });
+  }
+  return { offered, choices, alone };
+}
+
+export function broughtIn(
+  recipe: Recipe,
+  offered: readonly Incoming[],
+  choices: Readonly<Record<string, Choice>>,
+  taken: ReadonlySet<string>,
+): { save: Incoming[]; recipe: Recipe } {
+  const { save, renames } = settled(offered, choices, taken);
+  const renamed = renamedRecipe(recipe, renames);
+  const renamedSave: Incoming[] = [];
+  for (const each of save) {
+    renamedSave.push({ ...each, template: renamed.templates[each.name] ?? each.template });
+  }
+  return { save: renamedSave, recipe: renamed };
 }
