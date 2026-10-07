@@ -334,7 +334,7 @@ test('a new hass reaches the forms and the preview without drawing the builder a
   builder.remove();
 });
 
-test('another draft opens on its card, not on the tab the last one was left on', async () => {
+test('another draft opens on Simple, not on the tab the last one was left on', async () => {
   const calls: Calls = { saved: [], left: 0 };
   const { builder, root } = await opened(
     { name: 'room', template: structuredClone(ROOM), shipped: ROOM, conflicts: [] },
@@ -355,7 +355,7 @@ test('another draft opens on its card, not on the tab the last one was left on',
   };
   await builder.updateComplete;
   const active = root.querySelector('[role="tab"][aria-selected="true"]');
-  assert.equal(active?.textContent?.trim(), 'Card');
+  assert.equal(active?.textContent?.trim(), 'Simple');
   builder.remove();
 });
 
@@ -384,14 +384,14 @@ test('Discard is offered only when the draft differs from what is stored', async
   builder.remove();
 });
 
-test('the builder has Card, Pop-ups, Slots and YAML, and the example lives with the slots', async () => {
+test('the builder has Simple, Card, Pop-ups, Slots and YAML, and the example lives with the slots', async () => {
   const calls: Calls = { saved: [], left: 0 };
   const { builder, root } = await opened(
     { name: 'room', template: structuredClone(ROOM), shipped: ROOM, conflicts: [] },
     calls,
   );
   const tabs = [...root.querySelectorAll('[role="tab"]')].map((tab) => tab.textContent?.trim());
-  assert.deepEqual(tabs, ['Card', 'Pop-ups', 'Slots', 'YAML']);
+  assert.deepEqual(tabs, ['Simple', 'Card', 'Pop-ups', 'Slots', 'YAML']);
   const slots = [...root.querySelectorAll('[role="tab"]')].find(
     (tab) => tab.textContent?.trim() === 'Slots',
   );
@@ -399,5 +399,51 @@ test('the builder has Card, Pop-ups, Slots and YAML, and the example lives with 
   slots.click();
   await builder.updateComplete;
   assert.match(text(root), /Example values/);
+  builder.remove();
+});
+
+const saveOff = (root: ShadowRoot): boolean => {
+  const save = root.querySelector('button[aria-label="Save"]');
+  assert.ok(save instanceof HTMLButtonElement);
+  return save.disabled;
+};
+
+test('Simple switches a part off and on again, and the template is back as it was', async () => {
+  const calls: Calls = { saved: [], left: 0 };
+  const { builder, root } = await opened(
+    { name: 'room', template: structuredClone(ROOM), shipped: ROOM, conflicts: [] },
+    calls,
+  );
+  const lock = root.querySelector('input[type="checkbox"][data-path="card/chips?/#lock"]');
+  assert.ok(lock instanceof HTMLInputElement);
+  assert.equal(lock.checked, true);
+  assert.equal(saveOff(root), true);
+  lock.checked = false;
+  lock.dispatchEvent(new Event('change'));
+  await builder.updateComplete;
+  assert.equal(saveOff(root), false);
+  const again = root.querySelector('input[type="checkbox"][data-path="card/chips?/#lock"]');
+  assert.ok(again instanceof HTMLInputElement);
+  assert.equal(again.checked, false);
+  again.checked = true;
+  again.dispatchEvent(new Event('change'));
+  await builder.updateComplete;
+  assert.equal(saveOff(root), true);
+  builder.remove();
+});
+
+test('a colour chosen in Simple changes the draft', async () => {
+  const calls: Calls = { saved: [], left: 0 };
+  const { builder, root } = await opened(
+    { name: 'room', template: structuredClone(ROOM), shipped: ROOM, conflicts: [] },
+    calls,
+  );
+  const colour = root.querySelector('select[data-path="card/chips?/#window/color"]');
+  assert.ok(colour instanceof HTMLSelectElement);
+  assert.equal(colour.value, 'orange');
+  colour.value = 'red';
+  colour.dispatchEvent(new Event('change'));
+  await builder.updateComplete;
+  assert.equal(saveOff(root), false);
   builder.remove();
 });

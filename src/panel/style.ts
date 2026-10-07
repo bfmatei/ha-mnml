@@ -623,6 +623,62 @@ export const PANEL_STYLE = css`
   }
   .yaml,
   .example,
+  .simple-work {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .simple-work.narrow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .simple {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 16px;
+  }
+  .simple > p {
+    margin: 0 0 8px;
+  }
+  .simple-group {
+    margin: 8px 0 0;
+    padding-left: calc(var(--depth, 0) * 20px - 20px);
+    color: var(--secondary-text-color);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .simple-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-height: 36px;
+    padding-left: calc(var(--depth, 0) * 20px - 20px);
+  }
+  .simple-row input[type='checkbox'] {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    accent-color: var(--primary-color);
+  }
+  .simple-spacer {
+    width: 18px;
+  }
+  .simple-row.off .simple-words > span:first-child {
+    color: var(--secondary-text-color);
+    text-decoration: line-through;
+  }
+  .simple-words {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 160px;
+  }
+  .simple-look {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
   .example {
     padding: 0 16px 16px;
     max-width: 960px;

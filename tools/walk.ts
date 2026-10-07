@@ -132,6 +132,27 @@ check(
 
 await page.goto(`${env.HA_URL}/mnml/templates/room`, { waitUntil: 'domcontentloaded' });
 await page.locator('mnml-builder .builder-head').waitFor({ timeout: 30000 });
+await page.locator('mnml-builder .simple-row').first().waitFor({ timeout: 30000 });
+const lockChip = page.locator('mnml-builder input[type="checkbox"][data-path="card/chips?/#lock"]');
+check(
+  (await lockChip.count()) === 1 && (await lockChip.isChecked()),
+  'the room opens on Simple, its lock chip switched on',
+);
+await lockChip.uncheck();
+await settle(page, 500);
+check(
+  (await page.locator('mnml-builder').getByRole('button', { name: 'Save' }).isEnabled()) &&
+    !(await lockChip.isChecked()),
+  'switching the lock chip off is a change to save',
+);
+await lockChip.check();
+await settle(page, 500);
+check(
+  !(await page.locator('mnml-builder').getByRole('button', { name: 'Save' }).isEnabled()),
+  'switching it on again is no change at all',
+);
+await page.locator('mnml-builder').getByRole('tab', { name: 'Card' }).click();
+await settle(page, 500);
 await settle(page, 3000);
 check((await builderProblem(page)) === undefined, 'room opens without a problem');
 check(
