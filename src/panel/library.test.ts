@@ -78,3 +78,23 @@ test('a search that matches only pop-ups or parts says so, and offers to show th
   assert.deepEqual(names(root), ['power']);
   element.remove();
 });
+
+test("the home's own, customised and conflicted pop-ups and parts stay listed with the switch off", async () => {
+  try {
+    localStorage.removeItem('mnml-library-everything');
+  } catch {}
+  const element = new MnmlLibrary();
+  element.rows = [
+    row('room', 'tile'),
+    { ...row('my-popup', 'popup'), status: 'own', family: undefined },
+    { ...row('power', 'part'), status: 'customised', changes: 1 },
+    { ...row('room-popup', 'popup'), status: 'conflict', changes: 1 },
+    row('light-card', 'part'),
+  ];
+  element.actions = ACTIONS;
+  const root = await mounted(element);
+  assert.deepEqual(names(root), ['room', 'my-popup', 'power', 'room-popup']);
+  assert.match(text(root), /and 1 pop-ups and parts/);
+  assert.match(text(root), /Conflicts 1/);
+  element.remove();
+});

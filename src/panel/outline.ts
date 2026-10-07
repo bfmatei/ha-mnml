@@ -82,8 +82,10 @@ function slotsIn(rule: Value): string[] {
 
 function shown(rule: Value, set: boolean): string {
   const slots = slotsIn(rule);
-  const verb = slots.length === 1 ? 'is' : 'are';
-  return `when ${slots.join(' and ')} ${verb} ${set ? 'set' : 'not set'}`;
+  if (set) {
+    return `when ${slots.join(' or ')} is set`;
+  }
+  return `when ${slots.join(' and ')} ${slots.length === 1 ? 'is' : 'are'} not set`;
 }
 
 export function badgesOf(value: Record<string, Value>): string[] {

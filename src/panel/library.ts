@@ -80,8 +80,12 @@ export class MnmlLibrary extends LitElement {
     );
   }
 
+  private listed(row: Row): boolean {
+    return this.everything || row.role === 'tile' || row.status !== 'shipped';
+  }
+
   private visible(): Row[] {
-    return this.matching().filter((row) => this.everything || row.role === 'tile');
+    return this.matching().filter((row) => this.listed(row));
   }
 
   private show(everything: boolean): void {
@@ -263,7 +267,7 @@ export class MnmlLibrary extends LitElement {
           <span>Pop-ups and parts</span>
         </label>
         ${FILTERS.map(({ filter, label }) => {
-          const listed = this.rows.filter((row) => this.everything || row.role === 'tile');
+          const listed = this.rows.filter((row) => this.listed(row));
           const count =
             filter === 'all' ? listed.length : listed.filter((row) => row.status === filter).length;
           return count === 0 && filter !== 'all'

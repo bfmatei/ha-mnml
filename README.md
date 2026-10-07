@@ -74,7 +74,9 @@ slots:
 
 ## Your own templates
 
-The **MNML** panel in Home Assistant's sidebar, for admins, keeps the home's templates. Its library lists every template, shipped, customised and the home's own, with where each is used. A template opens in a builder:
+The **MNML** panel in Home Assistant's sidebar, for admins, keeps the home's templates. Its library lists the tiles, the templates you place on a dashboard, and with **Pop-ups and parts** every other one too, shipped, customised and the home's own, with where each is used. A template opens in a builder:
+
+- **Simple**, where it opens: each part with a switch, and its colour, icon and name, beside the live preview;
 
 - the outline of its card and pop-ups;
 - a live preview, on the example or on any area;

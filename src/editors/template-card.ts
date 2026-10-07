@@ -72,6 +72,17 @@ const HOME: [Source, string, string] = [
   'The template finds what it needs anywhere in your home.',
 ];
 
+function lacks(spec: SlotSpec, value: Value | undefined): boolean {
+  if (!filled(value)) {
+    return spec.required === true;
+  }
+  return (
+    spec.kind === 'object' &&
+    isMapping(value) &&
+    Object.entries(spec.fields ?? {}).some(([field, inner]) => lacks(inner, value[field]))
+  );
+}
+
 export class MnmlTemplateCardEditor extends LitElement {
   static override styles: CSSResultGroup = [BASE_STYLE, CONTROL_STYLE, EDITOR_STYLE];
 
@@ -451,10 +462,13 @@ export class MnmlTemplateCardEditor extends LitElement {
     };
     const context = this.drawing();
     const groups = groupsOf(slots);
-    const finds = origin.source !== 'yourself' && (origin.source === 'home' || origin.where !== '');
+    const finds =
+      origin.source !== 'yourself' &&
+      (origin.source === 'home' || origin.where !== '') &&
+      Object.values(slots).some((spec) => spec.discover !== undefined);
     const missing = new Set(
       Object.entries(slots)
-        .filter(([slotName, spec]) => spec.required === true && !filled(slot.get()[slotName]))
+        .filter(([slotName, spec]) => lacks(spec, slot.get()[slotName]))
         .map(([slotName]) => slotName),
     );
     return html`<div class="object">

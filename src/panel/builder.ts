@@ -24,6 +24,8 @@ import { drawOutline, groupOf, partOf } from './outline.ts';
 import type { Group, OutlineActions, Part, Starter } from './outline.ts';
 import { trialOf, tryDraft } from './preview.ts';
 import type { Area, Trial } from './preview.ts';
+import { drawSimple, keptPart, simpleOf, switchedOff, switchedOn } from './simple.ts';
+import type { KeptPart } from './simple.ts';
 import { drawSlots } from './slots-tab.ts';
 import { PANEL_STYLE } from './style.ts';
 import { adoptIds, inserted, moved, uniqueId, valueAt, withValue } from './tree.ts';
@@ -43,10 +45,11 @@ export interface BuilderHost {
   exportOne: (name: string, template: Template) => void;
 }
 
-type Tab = 'card' | 'popups' | 'slots' | 'yaml';
+type Tab = 'simple' | 'card' | 'popups' | 'slots' | 'yaml';
 type Pane = 'outline' | 'preview' | 'inspector';
 
 const TABS: readonly { tab: Tab; label: string }[] = [
+  { tab: 'simple', label: 'Simple' },
   { tab: 'card', label: 'Card' },
   { tab: 'popups', label: 'Pop-ups' },
   { tab: 'slots', label: 'Slots' },
@@ -167,7 +170,7 @@ export class MnmlBuilder extends LitElement {
   @property({ attribute: false }) narrow = false;
   @state() private template: Template = EMPTY;
   @state() private shown: Template = EMPTY;
-  @state() private tab: Tab = 'card';
+  @state() private tab: Tab = 'simple';
   @state() private pane: Pane = 'outline';
   @state() private selected = 'card';
   @state() private area: string | undefined;
@@ -180,6 +183,7 @@ export class MnmlBuilder extends LitElement {
   private unsaved = false;
   private clashes: readonly Clash[] = [];
   private readonly open = new Map<string, boolean>();
+  private readonly kept = new Map<string, KeptPart>();
   private previewTimer: ReturnType<typeof setTimeout> | undefined;
   private trial: (() => Trial) | undefined;
   private changes: Change[] | undefined;
@@ -238,7 +242,8 @@ export class MnmlBuilder extends LitElement {
       this.undos = [];
       this.redos = [];
       this.problem = undefined;
-      this.tab = 'card';
+      this.tab = 'simple';
+      this.kept.clear();
       this.pane = 'outline';
       this.selected = 'card';
       this.area = undefined;
@@ -599,8 +604,50 @@ export class MnmlBuilder extends LitElement {
     this.requestUpdate();
   };
 
+  private drawPreview(): TemplateResult {
+    return html`<mnml-preview
+      .hass=${this.hass}
+      .trial=${this.trial}
+      .areas=${this.host?.areas() ?? []}
+      .area=${this.area}
+      .choose=${(area: string | undefined) => {
+        this.area = area;
+      }}
+    ></mnml-preview>`;
+  }
+
+  private drawSimpleTab(): TemplateResult {
+    const shipped = this.draft?.shipped;
+    return html`<div class=${classMap({ 'simple-work': true, narrow: this.narrow })}>
+      <div class="pane">
+        ${drawSimple(simpleOf(this.template, shipped, this.kept), {
+          toggle: (row, on): void => {
+            const where = row.path.join('/');
+            if (on) {
+              const back = switchedOn(this.template, shipped, row.path, this.kept.get(where));
+              this.kept.delete(where);
+              this.replace(back);
+              return;
+            }
+            this.kept.set(where, keptPart(this.template, row.path));
+            this.replace(switchedOff(this.template, row.path));
+          },
+          look: (look, value): void => {
+            if (value !== '') {
+              this.replace(withValue(this.template, look.path, value));
+            }
+          },
+        })}
+      </div>
+      <div class="pane preview-pane">${this.drawPreview()}</div>
+    </div>`;
+  }
+
   private drawWork(): TemplateResult {
     const hass = this.hass;
+    if (this.tab === 'simple') {
+      return this.drawSimpleTab();
+    }
     if (this.tab === 'slots') {
       const context: Context = { hass, hashes: [], open: this.open, redraw: this.redraw };
       return html`${drawSlots(() => this.template, {
@@ -644,17 +691,7 @@ export class MnmlBuilder extends LitElement {
       class=${classMap({ work: true, narrow: this.narrow, [`show-${this.pane}`]: this.narrow })}
     >
       <div class="pane outline-pane">${drawOutline(root, this.outlineActions())}</div>
-      <div class="pane preview-pane">
-        <mnml-preview
-          .hass=${hass}
-          .trial=${this.trial}
-          .areas=${this.host?.areas() ?? []}
-          .area=${this.area}
-          .choose=${(area: string | undefined) => {
-            this.area = area;
-          }}
-        ></mnml-preview>
-      </div>
+      <div class="pane preview-pane">${this.drawPreview()}</div>
       <div class="pane inspector-pane">
         ${drawInspector(this.selectedPart(root), {
           hass,
