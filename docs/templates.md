@@ -1411,6 +1411,9 @@ Home Assistant's tile, its memory and free disk, and its services, updates and f
 | `services`               | entities |                     |                                                                                                                                                                      |
 | `updates`                | entities |                     | domain update, platform hassio in the whole home                                                                                                                     |
 | `firmware`               | entities |                     |                                                                                                                                                                      |
+| `backups`                | object   |                     |                                                                                                                                                                      |
+| `backups.last`           | entity   | required            |                                                                                                                                                                      |
+| `backups.attempted`      | entity   |                     |                                                                                                                                                                      |
 | `all_firmware`           | entities |                     | domain update, device_class firmware in the whole home                                                                                                               |
 | `room_firmware`          | objects  |                     | one per area in the whole home: `name` `area.name`; `firmware` domain update, device_class firmware                                                                  |
 | `room_firmware.name`     | text     | required            |                                                                                                                                                                      |
@@ -1420,7 +1423,7 @@ Brings `system-popup`.
 
 ### `system-popup`
 
-Home Assistant's pop-up, its resources, services, updates, its own firmware and each room's.
+Home Assistant's pop-up, its resources, backups, services, updates, its own firmware and each room's.
 
 | Slot                     | Kind     | Required or default | Found by                                                                                            |
 | ------------------------ | -------- | ------------------- | --------------------------------------------------------------------------------------------------- |
@@ -1431,6 +1434,9 @@ Home Assistant's pop-up, its resources, services, updates, its own firmware and 
 | `services`               | entities |                     |                                                                                                     |
 | `updates`                | entities |                     |                                                                                                     |
 | `firmware`               | entities |                     |                                                                                                     |
+| `backups`                | object   |                     |                                                                                                     |
+| `backups.last`           | entity   | required            |                                                                                                     |
+| `backups.attempted`      | entity   |                     |                                                                                                     |
 | `all_firmware`           | entities |                     | domain update, device_class firmware in the whole home                                              |
 | `room_firmware`          | objects  |                     | one per area in the whole home: `name` `area.name`; `firmware` domain update, device_class firmware |
 | `room_firmware.name`     | text     | required            |                                                                                                     |

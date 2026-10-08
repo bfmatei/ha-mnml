@@ -112,6 +112,8 @@ const BY_SUFFIX: [string, Reading][] = [
   ['_pool_health', { state: 'ONLINE' }],
   ['_last_run', { state: ago(3), device_class: 'timestamp' }],
   ['_last_backup', { state: ago(5), device_class: 'timestamp' }],
+  ['_last_successful_automatic_backup', { state: ago(9), device_class: 'timestamp' }],
+  ['_last_attempted_automatic_backup', { state: ago(9), device_class: 'timestamp' }],
   ['_last_boot', { state: ago(170), device_class: 'timestamp' }],
   ['_last_clean_end', { state: ago(20), device_class: 'timestamp' }],
   ['_print_start', { state: ago(2), device_class: 'timestamp' }],

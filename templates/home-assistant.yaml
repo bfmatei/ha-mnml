@@ -36,6 +36,12 @@ home-assistant:
       group: Updates
       discover: { domain: update, platform: hassio, scope: all }
     firmware: { kind: entities, group: Updates }
+    backups:
+      kind: object
+      group: Updates
+      fields:
+        last: { kind: entity, required: true }
+        attempted: { kind: entity }
     all_firmware:
       {
         label: 'All firmware',
@@ -131,6 +137,7 @@ home-assistant:
         services: '[[services]]'
         updates: '[[updates]]'
         firmware: '[[firmware]]'
+        backups: '[[backups]]'
         all_firmware: '[[all_firmware]]'
         room_firmware: '[[room_firmware]]'
   example: &home_assistant
@@ -141,11 +148,14 @@ home-assistant:
     services: [binary_sensor.matter_server]
     updates: [update.home_assistant_core]
     firmware: [update.zigbee_firmware]
+    backups:
+      last: sensor.backup_last_successful_automatic_backup
+      attempted: sensor.backup_last_attempted_automatic_backup
     all_firmware: [update.zigbee_firmware, update.kitchen_plug_firmware]
     room_firmware: [{ name: Kitchen, firmware: [update.kitchen_plug_firmware] }]
 
 system-popup:
-  description: Home Assistant's pop-up, its resources, services, updates, its own firmware and each room's.
+  description: Home Assistant's pop-up, its resources, backups, services, updates, its own firmware and each room's.
   slots:
     cpu: { kind: entity }
     memory: { kind: entity }
@@ -154,6 +164,11 @@ system-popup:
     services: { kind: entities }
     updates: { kind: entities }
     firmware: { kind: entities }
+    backups:
+      kind: object
+      fields:
+        last: { kind: entity, required: true }
+        attempted: { kind: entity }
     all_firmware:
       { kind: entities, discover: { domain: update, device_class: firmware, scope: all } }
     room_firmware:
@@ -201,6 +216,19 @@ system-popup:
           - id: disk_free
             if: disk_free
             entity: '[[disk_free]]'
+      - id: backups
+        if: backups
+        type: custom:mnml-list-card
+        title: Backups
+        icon: mdi:cloud-upload-outline
+        rows:
+          - id: backups-last
+            entity: '[[backups.last]]'
+            relative: true
+          - id: backups-attempted
+            if: backups.attempted
+            entity: '[[backups.attempted]]'
+            relative: true
       - id: services
         type: custom:mnml-list-card
         title: Services

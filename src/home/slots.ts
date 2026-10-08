@@ -156,6 +156,7 @@ export function systemSlots(system: System, rooms: readonly Room[]): Record<stri
     services: system.services,
     updates: system.updates,
     firmware: system.firmware,
+    backups: system.backups,
     all_firmware: [...system.firmware, ...rooms.flatMap((room) => room.firmware ?? [])],
     room_firmware: rooms.flatMap((room) =>
       room.firmware === undefined ? [] : [{ name: room.name, firmware: room.firmware }],
