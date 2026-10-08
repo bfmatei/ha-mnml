@@ -40,6 +40,10 @@ const SYSTEM: System = {
     'update.infrastructure_home_assistant_connect_zbt_2_firmware',
     'update.infrastructure_server_outlet_firmware',
   ],
+  backups: {
+    last: 'sensor.infrastructure_backup_last_successful_automatic_backup',
+    attempted: 'sensor.infrastructure_backup_last_attempted_automatic_backup',
+  },
   proxmox: {
     outlet: {
       entity: 'switch.infrastructure_server_outlet',

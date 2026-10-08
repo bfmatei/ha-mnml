@@ -271,6 +271,11 @@ export interface Guest {
   disk?: GuestDisk;
 }
 
+export interface SystemBackups {
+  last: SensorId;
+  attempted?: SensorId;
+}
+
 export interface ServerBackups {
   last: SensorId;
   problem: BinarySensorId;
@@ -396,6 +401,7 @@ export interface System {
   services: BinarySensorId[];
   updates: UpdateId[];
   firmware: UpdateId[];
+  backups?: SystemBackups;
   proxmox?: Proxmox;
   adguard?: Adguard;
   network?: Network;
