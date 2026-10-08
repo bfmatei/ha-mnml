@@ -511,13 +511,13 @@ The tile has Home Assistant's memory percentage and free disk under it. Home Ass
 | Updates  | Amber while any core, add-on or integration `update` entity is on      |
 | Firmware | Amber while any device `update` entity is on, the rooms' included      |
 
-| Section   | Contents                                                                                                                                                                         |
-| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Resources | The virtual machine's CPU, its memory as a bar, and the disk used and free                                                                                                       |
-| Backups   | The last successful automatic backup, and the last one attempted, both as relative times: they differ while the latest backup failed. The section is drawn when `backups` is set |
-| Services  | One red row per `services` entry, named by its device and shown only while it is not running (`stopped-row`)                                                                     |
-| Updates   | One flag row per `update` entity, shown while on (`pending-row`)                                                                                                                 |
-| Firmware  | The same for the devices outside any room; then one list per room, such as "Bedroom firmware", from the room's `firmware`                                                        |
+| Section   | Contents                                                                                                                                                                                                              |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Resources | The virtual machine's CPU, its memory as a bar, and the disk used and free                                                                                                                                            |
+| Backups   | The last successful automatic backup, and the last one attempted, both as relative times: they differ while the latest backup failed; and a red row while `problem` is on. The section is drawn when `backups` is set |
+| Services  | One red row per `services` entry, named by its device and shown only while it is not running (`stopped-row`)                                                                                                          |
+| Updates   | One flag row per `update` entity, shown while on (`pending-row`)                                                                                                                                                      |
+| Firmware  | The same for the devices outside any room; then one list per room, such as "Bedroom firmware", from the room's `firmware`                                                                                             |
 
 ### AdGuard, `#adguard`
 

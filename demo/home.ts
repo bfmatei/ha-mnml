@@ -43,6 +43,7 @@ const SYSTEM: System = {
   backups: {
     last: 'sensor.infrastructure_backup_last_successful_automatic_backup',
     attempted: 'sensor.infrastructure_backup_last_attempted_automatic_backup',
+    problem: 'binary_sensor.infrastructure_backup_problem',
   },
   proxmox: {
     outlet: {
