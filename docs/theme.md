@@ -8,7 +8,7 @@
 
 - **The font** is the system stack.
 - **Cards** have an 18 px radius, and no border or shadow of the theme's own. The cards draw their 1 px hairline themselves.
-- **Pop-ups** have a 24 px radius.
+- **Pop-ups** have an 18 px radius, the cards', so a pop-up that unfolds in a tile's place keeps its corners.
 
 **Two palettes under `modes`.** HA switches between them with the operating system when a profile's dark mode is set to Auto. They are [Monokai Pro](https://monokai.pro)'s: Filter Spectrum in the dark, Monokai Pro Light in the light.
 

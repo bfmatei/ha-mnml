@@ -64,7 +64,7 @@ const UNFOLD_MIN_WIDTH = 320;
 const UNFOLD = 300;
 const FOLD = 220;
 const TILE_RADIUS = '18px';
-const POPUP_RADIUS = '24px';
+const POPUP_RADIUS = '18px';
 
 function placed(from: Box): Place {
   const width = Math.min(Math.max(from.width, UNFOLD_MIN_WIDTH), innerWidth - 2 * MARGIN);
@@ -182,7 +182,7 @@ const POPUPS_STYLE = css`
     min-height: 0;
     margin-top: 32px;
     padding: var(--mnml-popup-gap, 8px);
-    border-radius: var(--mnml-popup-border-radius, 24px);
+    border-radius: var(--mnml-popup-border-radius, 18px);
     background: var(--mnml-popup-background-color, var(--primary-background-color));
     display: flex;
     flex-direction: column;

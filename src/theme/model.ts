@@ -39,7 +39,7 @@ export const THEME: Theme = {
   name: 'MNML',
   font: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif',
   cardRadius: 18,
-  popupRadius: 24,
+  popupRadius: 18,
   cardGap: 8,
   primaryRamp: {
     '05': '#1b1109',

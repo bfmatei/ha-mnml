@@ -62,17 +62,17 @@ Each is at least as strong as the theme's divider colour. The hairline is on `.c
 | Menu row                       | 36 px                                                                       |
 | Header back / close            | 40 px rounds in the card colour                                             |
 
-| Radius         | Where                                                                                                                         |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| The card's own | `--ha-card-border-radius`, 18 px in the theme. Also the slider cards                                                          |
-| 24 px          | The pop-up (`mnml-popup-border-radius`). Under 600 px its bottom corners square off, so it reads as a sheet                   |
-| 16 px          | The tile's Lights strip                                                                                                       |
-| 14 px          | A menu                                                                                                                        |
-| 12 px          | A control, a slider track, and the tile's light button: a rounded square that reads as tappable, unlike the room's round pill |
-| 10 px          | A menu row                                                                                                                    |
-| 8 px           | A list row's reset button                                                                                                     |
-| 2 px           | A bar, a slider marker                                                                                                        |
-| `50%`          | A pill                                                                                                                        |
+| Radius         | Where                                                                                                                          |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| The card's own | `--ha-card-border-radius`, 18 px in the theme. Also the slider cards                                                           |
+| 18 px          | The pop-up (`mnml-popup-border-radius`), as the card's own. Under 600 px its bottom corners square off, so it reads as a sheet |
+| 16 px          | The tile's Lights strip                                                                                                        |
+| 14 px          | A menu                                                                                                                         |
+| 12 px          | A control, a slider track, and the tile's light button: a rounded square that reads as tappable, unlike the room's round pill  |
+| 10 px          | A menu row                                                                                                                     |
+| 8 px           | A list row's reset button                                                                                                      |
+| 2 px           | A bar, a slider marker                                                                                                         |
+| `50%`          | A pill                                                                                                                         |
 
 | Icon  | Where                                                                                    |
 | ----- | ---------------------------------------------------------------------------------------- |
