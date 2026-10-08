@@ -122,7 +122,7 @@ Every card is in Home Assistant's card picker (**Add card**, **By card**, then s
 ## The theme
 
 - **Two palettes,** under `modes`, so one theme follows the light and dark setting of each profile; set dark mode to **Auto** to follow the operating system.
-- **Shape.** Cards have an 18 px radius and no border or shadow of the theme's own; pop-ups a 24 px radius.
+- **Shape.** Cards have an 18 px radius and no border or shadow of the theme's own; pop-ups the same.
 - **The font** is the system stack.
 - **Contrast it can prove.** Every accent reads at 4.5:1 or better as text on a card, every icon at 3:1 on its surface, and the build refuses to write a theme where one claim stops holding.
 - **The cards' variables:** the pill colour, the card edge, and the pop-up's background, radius and gap. The cards work without them, under any theme; with them they look as designed.
