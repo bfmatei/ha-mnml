@@ -42,6 +42,7 @@ home-assistant:
       fields:
         last: { kind: entity, required: true }
         attempted: { kind: entity }
+        problem: { kind: entity }
     all_firmware:
       {
         label: 'All firmware',
@@ -151,6 +152,7 @@ home-assistant:
     backups:
       last: sensor.backup_last_successful_automatic_backup
       attempted: sensor.backup_last_attempted_automatic_backup
+      problem: binary_sensor.backup_problem
     all_firmware: [update.zigbee_firmware, update.kitchen_plug_firmware]
     room_firmware: [{ name: Kitchen, firmware: [update.kitchen_plug_firmware] }]
 
@@ -169,6 +171,7 @@ system-popup:
       fields:
         last: { kind: entity, required: true }
         attempted: { kind: entity }
+        problem: { kind: entity }
     all_firmware:
       { kind: entities, discover: { domain: update, device_class: firmware, scope: all } }
     room_firmware:
@@ -229,6 +232,11 @@ system-popup:
             if: backups.attempted
             entity: '[[backups.attempted]]'
             relative: true
+          - id: backups-problem
+            if: backups.problem
+            entity: '[[backups.problem]]'
+            color: red
+            show: { is: ['on'] }
       - id: services
         type: custom:mnml-list-card
         title: Services

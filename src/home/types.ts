@@ -274,6 +274,7 @@ export interface Guest {
 export interface SystemBackups {
   last: SensorId;
   attempted?: SensorId;
+  problem?: BinarySensorId;
 }
 
 export interface ServerBackups {

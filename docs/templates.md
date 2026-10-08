@@ -1414,6 +1414,7 @@ Home Assistant's tile, its memory and free disk, and its services, updates and f
 | `backups`                | object   |                     |                                                                                                                                                                      |
 | `backups.last`           | entity   | required            |                                                                                                                                                                      |
 | `backups.attempted`      | entity   |                     |                                                                                                                                                                      |
+| `backups.problem`        | entity   |                     |                                                                                                                                                                      |
 | `all_firmware`           | entities |                     | domain update, device_class firmware in the whole home                                                                                                               |
 | `room_firmware`          | objects  |                     | one per area in the whole home: `name` `area.name`; `firmware` domain update, device_class firmware                                                                  |
 | `room_firmware.name`     | text     | required            |                                                                                                                                                                      |
@@ -1437,6 +1438,7 @@ Home Assistant's pop-up, its resources, backups, services, updates, its own firm
 | `backups`                | object   |                     |                                                                                                     |
 | `backups.last`           | entity   | required            |                                                                                                     |
 | `backups.attempted`      | entity   |                     |                                                                                                     |
+| `backups.problem`        | entity   |                     |                                                                                                     |
 | `all_firmware`           | entities |                     | domain update, device_class firmware in the whole home                                              |
 | `room_firmware`          | objects  |                     | one per area in the whole home: `name` `area.name`; `firmware` domain update, device_class firmware |
 | `room_firmware.name`     | text     | required            |                                                                                                     |
