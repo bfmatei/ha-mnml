@@ -42,18 +42,26 @@ const existing = new Set(
     (area) => area.area_id,
   ),
 );
-const registered = new Set(
-  (await call<{ entity_id: string }[]>({ type: 'config/entity_registry/list' })).map(
-    (entry) => entry.entity_id,
-  ),
-);
+const entries = await call<{ entity_id: string; device_id: string | null }[]>({
+  type: 'config/entity_registry/list',
+});
+const registered = new Set(entries.map((entry) => entry.entity_id));
+const deviceOf = new Map(entries.map((entry) => [entry.entity_id, entry.device_id]));
 for (const [id, area] of Object.entries(AREAS)) {
   if (!existing.has(id)) {
     await call({ type: 'config/area_registry/create', name: area.name, icon: area.icon });
   }
   const placed = area.entities.filter((entity) => registered.has(entity));
   for (const entity of placed) {
-    await call({ type: 'config/entity_registry/update', entity_id: entity, area_id: id });
+    const device = deviceOf.get(entity);
+    try {
+      await call({ type: 'config/entity_registry/update', entity_id: entity, area_id: id });
+    } catch (error) {
+      if (device === null || device === undefined) {
+        throw error;
+      }
+      await call({ type: 'config/device_registry/update', device_id: device, area_id: id });
+    }
   }
   const skipped = area.entities.filter((entity) => !registered.has(entity));
   console.log(

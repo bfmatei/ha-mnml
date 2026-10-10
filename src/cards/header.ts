@@ -35,9 +35,19 @@ const HEADER_STYLE = css`
     width: 40px;
     height: 40px;
     margin-top: 8px;
-    border-radius: 50%;
-    background: var(--card-background-color);
+    border-radius: 12px;
+    background: var(--m-card);
+    -webkit-backdrop-filter: var(--mnml-card-backdrop-filter, none);
+    backdrop-filter: var(--mnml-card-backdrop-filter, none);
+    --round-shadow:
+      inset 0 0 0 1px var(--m-edge), inset 0 1px 0 var(--mnml-card-highlight-color, transparent),
+      var(--m-shadow);
+    box-shadow: var(--round-shadow);
     color: var(--primary-text-color);
+  }
+  .header .round:not(.inert):hover {
+    background-image: linear-gradient(var(--m-hover), var(--m-hover));
+    box-shadow: var(--round-shadow);
   }
   .header .round ha-icon {
     --mdc-icon-size: 22px;

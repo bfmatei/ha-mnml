@@ -46,7 +46,7 @@ What the generator writes: one `sections` view with four sections of tiles and a
 | `#person-<key>`          | Devices, and location permissions that aren't "always"                                                                                                                              |
 | `#person-<key>-<device>` | The battery, and the companion app's details                                                                                                                                        |
 | `#system`                | Resources, services, updates, firmware (the system's, then one list per room)                                                                                                       |
-| `#proxmox`               | Notifications, stopped guests, daily checks, the host, disks, storage, energy, the guests table, guest disks, backups                                                               |
+| `#proxmox`               | Notifications, stopped guests, daily checks, the host, disks, storage, energy, the guests table, backups                                                                            |
 | `#proxmox-notifications` | Every message Proxmox sent, newest first, one card each with its title, its source (Proxmox VE, PBS or the guest) and a clear button; a tap shows the text; Clear all in the header |
 | `#adguard`               | Queries, the update; the protection toggle in the header                                                                                                                            |
 | `#network`               | Internet, devices, the router, the VPN, the Wi-Fi networks, the clients per network, folded but for Other, firmware                                                                 |
@@ -76,7 +76,7 @@ Every threshold has two stages, so a slow drift and a fault don't look alike. Th
 
 ## Layout
 
-- **One view.** It is a `sections` view with `max_columns: 3`. Four titled sections come first, each `column_span: 3`: Rooms, People, Garage, Infrastructure. The titles are `mnml-heading-card`s with `grid_options.columns: full`, from the home's `sections`. Last comes an untitled section holding the pop-up shell.
+- **One view.** It is a `sections` view with `max_columns: 3`. Four titled sections come first, each `column_span: 3`: Rooms, People, Garage, Infrastructure, or in the order of the home's `order` (a list of `rooms`, `people`, `garage` and `infrastructure`, each once), which `problems()` checks. The titles are `mnml-heading-card`s with `grid_options.columns: full`, from the home's `sections`. Last comes an untitled section holding the pop-up shell.
 - **Section headings.** A heading has its title and icon at the left, and a trailing group (`.trail`) at the right with a state line, controls, or both. Rooms shows the outdoor temperature there, and People the vacation toggle, each when the home names its entity (`outside`, `vacation`). A folding list's heading ends in a chevron after its summary, and the whole heading is the tap target; folded, the heading stands alone, with no surface under it.
 - **Tile width.** Every tile writes `grid_options: { columns: 12 }` over MNML's default of half a section, so each takes 12 grid columns. The Garage and the Infrastructure keep the rhythm of the Rooms: at three columns, three infrastructure tiles fill a row and the other two take the next.
   - Each view column is twelve grid columns, so a section is 36 wide when three columns fit and 24 when two do.
@@ -117,7 +117,7 @@ An item (`mnml-entity-card`) is every card in a pop-up that stands for an entity
 | The 3D printer | Its job buttons while a job runs, then the outlet's power button while none does (`3d-printer-actions`, `3d-printer-card`)                                                                                                                                                                                                         |
 | The vacuum     | Dock while not docked or Locate while docked, then Start while not cleaning or Stop (`vacuum.stop`) while cleaning (`vacuum-actions`)                                                                                                                                                                                              |
 
-A slider button opens its slider as an overlay over the card.
+A slider button opens its slider as an overlay over the card; on a tile's Lights row, over that row alone, so the tile's own header stays.
 
 ## Lists
 
@@ -127,7 +127,7 @@ Every read-only section is one `mnml-list-card`. The card's title is drawn above
 
 - **Rows** are a grid, 32 px each: the state icon, the name, a 72 px bar column when any row has `bar`, and the value right-aligned in tabular figures.
 - **A long value is cut, not the name.** A value takes at most half the row (`VALUE_SHARE`, of the list's width), and what doesn't fit ends in an ellipsis, so a file name never squeezes the names beside it. A bar and a long value don't share a list: on a phone the two leave the names no room.
-- **With `headers`** the list is a table. A 24 px header row sits in the secondary colour; the first header spans the icon and name columns, and the rest are right-aligned over theirs. Each row gives one cell per entity of `values`, showing "—" where an entity has no value. `headers` therefore has one entry more than `values`.
+- **With `headers`** the list is a table. A 24 px header row sits in the secondary colour; the first header spans the icon and name columns, and the rest are right-aligned over theirs. Each row gives one cell per entity of `values`, showing "—" where an entity has no value. `headers` therefore has one entry more than `values`. A row with `of` in a table shows its last value as a share of that entity, orange over `high` and red over `critical_high`.
 - **Hiding.** A row is hidden while its entity has no value or its `show` rule fails, and it leaves no gap. A card whose rows are all hidden renders nothing, title included, and takes no space: the pop-up leaves no gap for it.
 - **Lowest first** (`lowest_first`) orders the rows by their number, ascending, a row without one last; in the model's order otherwise. A table keeps its order.
 
@@ -136,7 +136,7 @@ Every read-only section is one `mnml-list-card`. The card's title is drawn above
 - **It needs you while a row is orange or red:** a threshold crossed, an orange or red `color` rule holding, a warning shown, or a value unavailable. Amber, such as an outlet that is on, doesn't count. So the rule is the colouring the list already does, and adds no threshold.
 - **A tap on the heading** folds or unfolds it, and holds until the page reloads, whatever the rows do; then each list starts from its rule again.
 - **The summary** sits at the heading's right, folded or not. `summary: 'lowest'` or `'highest'` is that row's value as the row shows it, a share as a share: "Lowest 65%". `summary: { sum: n }` adds up a table's values column `n` under its header, "Today 0.1 kWh", and shows nothing when the column mixes units.
-- **What folds:** Batteries, in the rooms and the heating pop-ups; Energy, in the rooms, the ACs, the 3D printer and the server; the server's Storage and Guest disks; the vacuum's Maintenance and Totals; and the Network pop-up's clients, network by network. Everything that shows only while it needs you (Stopped, Updates, Firmware) and the short readings (Host, Internet, Queries) don't fold.
+- **What folds:** Batteries, in the rooms and the heating pop-ups; Energy, in the rooms, the ACs, the 3D printer and the server; the server's Storage; the vacuum's Maintenance and Totals; and the Network pop-up's clients, network by network. Everything that shows only while it needs you (Stopped, Updates, Firmware) and the short readings (Host, Internet, Queries) don't fold.
 
 **Row semantics.** A row carries the section's meaning through the fields of `ListRow` and nothing else:
 
@@ -476,8 +476,7 @@ The tile and its pop-up are named "Server" after the machine they show; Proxmox 
 | Disks         | `proxmox-popup`: the ZFS pool's health, red while not `ONLINE`; the disks failing SMART, red while not 0; and the lowest life left among the disks that report one, as a bar, orange under `disk_life_low` and red under `disk_life_critical`                                                                           |
 | Storage       | Each storage as a bar, named by its device. It folds, summed up by the fullest                                                                                                                                                                                                                                          |
 | Energy        | The outlet's meter; its wattage and energy are here rather than in Host, so the reading is in one place. It sits with the host, whose outlet it meters                                                                                                                                                                  |
-| Guests        | `proxmox-popup`: every guest, named by its device, with its CPU and memory. The row's icon is the guest's running state                                                                                                                                                                                                 |
-| Guest disks   | `proxmox-popup`: each container's disk used, as a share of its size, named by its device; orange over `disk_high`, red over `disk_full`. Proxmox reports no disk use for a VM, so only the containers have a row. It folds, summed up by the fullest, and opens while a disk is orange or red                           |
+| Guests        | `proxmox-popup`: every guest, named by its device, with its CPU, its memory and, for a container, its disk used as a share of its size: orange over `disk_high`, red over `disk_full`. Proxmox reports no disk use for a VM, which shows a dash. The row's icon is the guest's running state                            |
 | Backups       | The last backup, as a relative time, a red row while it reports a problem, and the off-site bucket's size: orange over `bucket_high` and red over `bucket_full`                                                                                                                                                         |
 
 ### Notifications, `#proxmox-notifications`

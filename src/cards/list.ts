@@ -258,6 +258,23 @@ function tableCell(hass: HomeAssistant, stateObj: HassEntity | undefined): Templ
   return cell('value', hasValue(stateObj) ? formatState(hass, stateObj) : DASH);
 }
 
+function shareCell(
+  hass: HomeAssistant,
+  row: ListRow,
+  stateObj: HassEntity | undefined,
+): TemplateResult {
+  if (stateObj === undefined || isUnavailable(stateObj) || !hasValue(stateObj)) {
+    return tableCell(hass, stateObj);
+  }
+  const number = rowNumber(hass, row, stateObj);
+  const color = above(row.critical_high, number)
+    ? 'red'
+    : above(row.high, number)
+      ? 'orange'
+      : undefined;
+  return cell('value', share(hass, number), color);
+}
+
 function resetCell(hass: HomeAssistant, row: ListRow, host: Host): TemplateResult {
   const id = row.reset;
   if (id === undefined) {
@@ -322,7 +339,15 @@ function renderRow(
     return {
       row,
       stateObj,
-      cells: [iconCell, label, ...values.map((value) => tableCell(hass, value))],
+      cells: [
+        iconCell,
+        label,
+        ...values.map((value, index) =>
+          row.of !== undefined && index === columns - 1
+            ? shareCell(hass, row, value)
+            : tableCell(hass, value),
+        ),
+      ],
       number: undefined,
       color,
     };

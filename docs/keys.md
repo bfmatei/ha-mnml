@@ -47,7 +47,7 @@ A list of controls, each with a `type`:
 | `tyres`     | `tyres`, `targets` (four sensors each), `low_share`, `warn_share` |                                                              |
 | `scenes`    | `scenes` (scene entities), `name`, `icon`                         | `active_scene` (a select whose state names the active scene) |
 
-- Every control takes `show`. `primary: true` fills the control, the one filled control of its card.
+- Every control takes `show`. `primary: true` marks the control as the card's main one: brighter than the others, and filled in a tile chip.
 - A `status` control's `rules` are tried in order, and the first that any of its `entities` matches colours it. Each rule has `entities`, `color` and `is` or `not`, and may add `label: device` and `words` for the tooltip.
 - Four sensors are listed front left, front right, rear left, rear right. A tyre is orange under `warn_share` of its target and red under `low_share`.
 - The slider kinds are `brightness`, `color_temp` and `hue` for a light, `temperature` for a climate unit, `value` for a `number` or `input_number`, and `volume` for a media player.
@@ -78,21 +78,21 @@ Rows under a heading: `rows` (required), with `title` and `icon` for the heading
 
 A row has `entity` (required), and:
 
-| Key                     | Does                                                                            |
-| ----------------------- | ------------------------------------------------------------------------------- |
-| `name`, `label: device` | names the row, or names it after its device                                     |
-| `strip`                 | removes a suffix from the name                                                  |
-| `words`                 | words the raw states: `{ 'on': Open, 'off': Closed }`                           |
-| `relative`              | prints a timestamp as a relative time                                           |
-| `zero_when_empty`       | reads a total with no value yet as 0 in its unit, uncoloured                    |
-| `flag`                  | prints no value: the row is the signal, shown by `show` and coloured by `color` |
-| `bar`                   | draws a bar of the value, out of 100                                            |
-| `of`                    | prints the value as a share of another entity in the same unit                  |
-| `low`, `critical`       | orange under `low`, red under `critical`, in the entity's unit                  |
-| `high`, `critical_high` | orange over `high`, red over `critical_high`                                    |
-| `reset`                 | a `button` entity, pressed by a reset button at the end of the row              |
-| `color`, `when`, `show` | the row's colour and whether it is shown                                        |
-| `values`                | in a table, the entities of the value columns                                   |
+| Key                     | Does                                                                                             |
+| ----------------------- | ------------------------------------------------------------------------------------------------ |
+| `name`, `label: device` | names the row, or names it after its device                                                      |
+| `strip`                 | removes a suffix from the name                                                                   |
+| `words`                 | words the raw states: `{ 'on': Open, 'off': Closed }`                                            |
+| `relative`              | prints a timestamp as a relative time                                                            |
+| `zero_when_empty`       | reads a total with no value yet as 0 in its unit, uncoloured                                     |
+| `flag`                  | prints no value: the row is the signal, shown by `show` and coloured by `color`                  |
+| `bar`                   | draws a bar of the value, out of 100                                                             |
+| `of`                    | prints the value as a share of another entity in the same unit; in a table, the row's last value |
+| `low`, `critical`       | orange under `low`, red under `critical`, in the entity's unit                                   |
+| `high`, `critical_high` | orange over `high`, red over `critical_high`                                                     |
+| `reset`                 | a `button` entity, pressed by a reset button at the end of the row                               |
+| `color`, `when`, `show` | the row's colour and whether it is shown                                                         |
+| `values`                | in a table, the entities of the value columns                                                    |
 
 ### `mnml-agenda-card`
 

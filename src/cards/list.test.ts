@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import { test } from 'vitest';
+import { test, vi } from 'vitest';
 
 import { define, mounted, text } from '../test/render.ts';
 
@@ -111,6 +111,29 @@ test('a folding list is folded while no row needs you, its heading kept', async 
   assert.equal(heading(out)?.querySelector('.chevron')?.getAttribute('aria-expanded'), 'false');
 });
 
+test('unfolding a list scrolls it into view, and folding it does not', async () => {
+  const shown = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => undefined);
+  const out = await paint(BATTERIES, HEALTHY);
+  const chevron = heading(out)?.querySelector<HTMLElement>('.chevron');
+  chevron?.click();
+  await vi.waitFor(() => {
+    assert.equal(shown.mock.calls.length, 1);
+  });
+  assert.equal(shown.mock.contexts[0] instanceof HTMLElement, true);
+  assert.equal(
+    shown.mock.contexts[0] instanceof HTMLElement &&
+      shown.mock.contexts[0].classList.contains('section'),
+    true,
+  );
+  assert.deepEqual(shown.mock.calls[0]?.[0], { block: 'nearest', behavior: 'instant' });
+  heading(out)?.querySelector<HTMLElement>('.chevron')?.click();
+  await new Promise((resolve) => {
+    setTimeout(resolve, 100);
+  });
+  assert.equal(shown.mock.calls.length, 1);
+  shown.mockRestore();
+});
+
 test('it unfolds by itself while a row is orange or red', async () => {
   const painted = await Promise.all(
     ['15', '3'].map(async (level) => ({
@@ -197,6 +220,47 @@ test('a table sums up a column under its header, in the same unit only', async (
   assert.equal(text(heading(same)?.querySelector('.state')), 'Today 1.35 kWh');
   const mixed = await paint(config, { ...states, 'sensor.t2': ['1100', 'Wh'] });
   assert.equal(heading(mixed)?.querySelector('.state'), null, 'mixed units');
+});
+
+test('a table row with of shows its last value as a share of it, coloured past high and critical_high', async () => {
+  const config = {
+    type: 'custom:mnml-list-card',
+    title: 'Guests',
+    headers: ['Guest', 'CPU', 'Disk'],
+    rows: ['a', 'b', 'c', 'd'].map((id) => ({
+      entity: `sensor.${id}`,
+      values: [`sensor.${id}_cpu`, `sensor.${id}_disk`],
+      of: 'sensor.size',
+      high: 80,
+      critical_high: 90,
+    })),
+  };
+  const states: States = {
+    'sensor.a': ['on'],
+    'sensor.b': ['on'],
+    'sensor.c': ['on'],
+    'sensor.d': ['on'],
+    'sensor.size': ['10', 'GiB'],
+    'sensor.a_cpu': ['4', '%'],
+    'sensor.b_cpu': ['4', '%'],
+    'sensor.c_cpu': ['4', '%'],
+    'sensor.d_cpu': ['4', '%'],
+    'sensor.a_disk': ['5', 'GiB'],
+    'sensor.b_disk': ['8.5', 'GiB'],
+    'sensor.c_disk': ['9.5', 'GiB'],
+  };
+  const out = await paint(config, states);
+  const cells = valueCells(out, '.grid.table').slice(2);
+  assert.deepEqual(
+    cells.map((node) => text(node)),
+    ['4 %', '50%', '4 %', '85%', '4 %', '95%', '4 %', '—'],
+  );
+  assert.deepEqual(
+    cells
+      .filter((_, index) => index % 2 === 1)
+      .map((node) => node.style.getPropertyValue('--m-color')),
+    ['', 'var(--orange-color)', 'var(--red-color)', ''],
+  );
 });
 
 test('a table unfolds while one of its values is unavailable', async () => {

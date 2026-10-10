@@ -133,7 +133,7 @@ function slider(control: SliderControl, ctx: ControlContext): TemplateResult {
     const spec = hasValue(stateObj)
       ? sliderSpec(hass, control.entity, stateObj, control.slider)
       : undefined;
-    const surface = anchorOf(event)?.closest('.card, .heading');
+    const surface = anchorOf(event)?.closest('.tile > .row, .card, .heading');
     if (spec !== undefined && surface instanceof HTMLElement) {
       openSliderOverlay(surface, spec, control, control.color, ctx.host);
     }

@@ -4,9 +4,11 @@ import { test } from 'vitest';
 
 import { define, mounted, text } from '../test/render.ts';
 
+import { MnmlSlider } from './parts/slider.ts';
 import { MnmlTileCard } from './tile.ts';
 
 define('mnml-tile-card', MnmlTileCard);
+define('mnml-slider', MnmlSlider);
 
 const JANE = {
   entity_id: 'person.jane',
@@ -166,4 +168,44 @@ test('each state part keeps its text in a box of its own, so a narrow tile can c
       .map((part) => text(part.querySelector('.value'))),
     ['home', 'Here'],
   );
+});
+
+test('the slider of the lights row opens over that row, and not over the whole tile', async () => {
+  const light = {
+    entity_id: 'light.a',
+    state: 'on',
+    attributes: { friendly_name: 'A', brightness: 128, supported_color_modes: ['brightness'] },
+  };
+  const out = await paint(
+    {
+      type: 'custom:mnml-tile-card',
+      entity: 'person.jane',
+      popup: '#jane',
+      item: {
+        entity: 'light.a',
+        controls: [
+          {
+            type: 'slider',
+            entity: 'light.a',
+            slider: 'brightness',
+            name: 'Brightness',
+            icon: 'mdi:brightness-6',
+          },
+        ],
+      },
+    },
+    {
+      ...HASS,
+      states: { ...HASS.states, 'light.a': light },
+      formatEntityAttributeValue: (_stateObj: unknown, _name: string, value: unknown): string =>
+        String(value),
+    },
+  );
+  const row = out.querySelector('.tile > .row');
+  assert.ok(row, 'the lights row');
+  const button = row.querySelector<HTMLButtonElement>('button.control');
+  assert.ok(button);
+  button.click();
+  assert.equal(row.querySelector('.overlay')?.parentElement, row, 'in the row');
+  assert.equal(out.querySelector('.tile > .overlay'), null, 'not over the tile');
 });

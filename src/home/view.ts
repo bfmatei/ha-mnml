@@ -5,7 +5,14 @@ import { toValue } from '../templates/expand.ts';
 import { SHIPPED } from '../templates/shipped.ts';
 
 import { headingSlots, personSlots, proxmoxSlots, roomSlots, snake, systemSlots } from './slots.ts';
-import type { Card, Dashboard, Home } from './types.ts';
+import type { Card, Dashboard, Home, SectionName } from './types.ts';
+
+export const SECTION_NAMES: readonly SectionName[] = [
+  'rooms',
+  'people',
+  'garage',
+  'infrastructure',
+];
 
 function instance(template: string, slots: Record<string, Value>): TemplateCard {
   return { type: 'custom:mnml-template-card', template, slots };
@@ -53,6 +60,8 @@ export function build(home: Home): Dashboard {
     ...(media ? [instance('media-server', snake(media))] : []),
   ];
 
+  const parts: Record<SectionName, Card[]> = { rooms, people, garage, infrastructure };
+
   return {
     title: home.title,
     views: [
@@ -63,10 +72,11 @@ export function build(home: Home): Dashboard {
         type: 'sections',
         max_columns: 3,
         sections: [
-          { type: 'grid', column_span: 3, cards: rooms },
-          { type: 'grid', column_span: 3, cards: people },
-          { type: 'grid', column_span: 3, cards: garage },
-          { type: 'grid', column_span: 3, cards: infrastructure },
+          ...(home.order ?? SECTION_NAMES).map((name) => ({
+            type: 'grid' as const,
+            column_span: 3,
+            cards: parts[name],
+          })),
           {
             type: 'grid',
             column_span: 3,

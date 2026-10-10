@@ -3,6 +3,7 @@ import type { TemplateResult } from 'lit';
 import { classMap } from 'lit/directives/class-map.js';
 
 import type { MdiIcon } from '../../contract/entities.ts';
+import { reduced } from '../../ha/motion.ts';
 import { icon, quietly } from '../../ha/templates.ts';
 
 export const SECTION_STYLE = css`
@@ -62,8 +63,23 @@ export function heading(
   trail: TemplateResult | typeof nothing = nothing,
   fold?: Fold,
 ): TemplateResult {
-  const toggle = (): void => {
-    fold?.chosen(!fold.open);
+  const toggle = (event: Event): void => {
+    if (fold === undefined) {
+      return;
+    }
+    const opening = !fold.open;
+    const shown =
+      opening && event.currentTarget instanceof Element
+        ? event.currentTarget.closest('.section')
+        : null;
+    fold.chosen(opening);
+    if (shown !== null) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          shown.scrollIntoView({ block: 'nearest', behavior: reduced() ? 'instant' : 'smooth' });
+        });
+      });
+    }
   };
   return html`<div
     class=${classMap({ heading: true, fold: fold !== undefined })}

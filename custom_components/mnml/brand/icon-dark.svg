@@ -1,7 +1,48 @@
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" role="img" xmlns="http://www.w3.org/2000/svg">
-  <rect width="1024" height="1024" rx="38.5" fill="#191919"/>
+  <defs>
+    <linearGradient id="base" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#15163a"/>
+      <stop offset="1" stop-color="#2a1030"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".30"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity=".07"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".55"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity=".08"/>
+    </linearGradient>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="70"/>
+    </filter>
+    <filter id="lift" x="-20%" y="-40%" width="140%" height="190%">
+      <feDropShadow dx="0" dy="34" stdDeviation="38" flood-color="#10082a" flood-opacity=".45"/>
+    </filter>
+    <filter id="inset" x="-6%" y="-30%" width="112%" height="160%">
+      <feComponentTransfer in="SourceAlpha"><feFuncA type="table" tableValues="1 0"/></feComponentTransfer>
+      <feGaussianBlur stdDeviation="9"/>
+      <feOffset dy="10" result="shade"/>
+      <feFlood flood-color="#10082a" flood-opacity=".55"/>
+      <feComposite in2="shade" operator="in"/>
+      <feComposite in2="SourceAlpha" operator="in"/>
+    </filter>
+    <clipPath id="tile"><rect width="1024" height="1024" rx="228"/></clipPath>
+  </defs>
+  <g clip-path="url(#tile)">
+    <rect width="1024" height="1024" fill="url(#base)"/>
+    <g filter="url(#soft)">
+    <circle cx="260" cy="250" r="330" fill="#6f63d9" opacity="0.95"/>
+    <circle cx="800" cy="300" r="290" fill="#2f95b3" opacity="0.8"/>
+    <circle cx="300" cy="820" r="320" fill="#c0447c" opacity="0.85"/>
+    <circle cx="820" cy="800" r="230" fill="#2a9a80" opacity="0.55"/>
+    </g>
+  </g>
+  <rect x="64" y="351" width="896" height="322" rx="90" fill="url(#glass)" filter="url(#lift)"/>
+  <rect x="65.5" y="352.5" width="893" height="319" rx="88.5" fill="none" stroke="url(#rim)" stroke-width="3"/>
+  <rect x="116" y="406" width="792" height="218" rx="42" fill="#ffffff" fill-opacity=".16"/>
+  <rect x="116" y="403" width="792" height="218" rx="42" fill="#000000" fill-opacity=".30"/>
+  <rect x="116" y="403" width="792" height="218" rx="42" fill="#000" filter="url(#inset)"/>
   <g transform="translate(105.49 392.75) scale(1.06)">
-    <path d="M0 0H767V225H0ZM12.5 12.5V212.5H754.5V12.5Z" fill="#f7f1ff" fill-rule="evenodd"/>
     <path d="M62.5 162.5 L62.5 62.5 L88.5 62.5 L132.5 104.2 L176.5 62.5 L202.5 62.5 L202.5 162.5 L180.5 162.5 L180.5 87.2 L132.5 132.8 L84.5 87.2 L84.5 162.5ZM250.5 162.5 L250.5 62.5 L277.5 62.5 L368.5 139.6 L368.5 62.5 L390.5 62.5 L390.5 162.5 L363.5 162.5 L272.5 85.4 L272.5 162.5ZM438.5 162.5 L438.5 62.5 L464.5 62.5 L508.5 104.2 L552.5 62.5 L578.5 62.5 L578.5 162.5 L556.5 162.5 L556.5 87.2 L508.5 132.8 L460.5 87.2 L460.5 162.5Z" fill="#f7f1ff"/>
     <path d="M620.5 62.5 L704.5 62.5 L704.5 162.5 L682.5 162.5 L682.5 83 L620.5 83Z" fill="#fce566"/>
   </g>

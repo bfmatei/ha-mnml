@@ -24,8 +24,35 @@ async function demo(browser: Browser, size: BrowserContextOptions, dark: boolean
   return opened;
 }
 
+async function useGlass(glass: boolean): Promise<void> {
+  const headers = { authorization: `Bearer ${env.HA_TOKEN}`, 'content-type': 'application/json' };
+  const listed = await fetch(`${env.HA_URL}/api/config/config_entries/entry?domain=mnml`, {
+    headers,
+  });
+  const [entry] = (await listed.json()) as { entry_id: string }[];
+  if (entry === undefined) {
+    throw new Error('MNML has no entry in the demo');
+  }
+  const flow = await fetch(`${env.HA_URL}/api/config/config_entries/options/flow`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ handler: entry.entry_id }),
+  });
+  const { flow_id } = (await flow.json()) as { flow_id: string };
+  const saved = await fetch(`${env.HA_URL}/api/config/config_entries/options/flow/${flow_id}`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ glass, default_theme: false }),
+  });
+  if (!saved.ok) {
+    throw new Error(`setting the design answered ${saved.status}: ${await saved.text()}`);
+  }
+  await new Promise((done) => setTimeout(done, 4000));
+}
+
 mkdirSync(OUT, { recursive: true });
 const browser = await launch();
+await useGlass(true);
 for (const [name, size] of Object.entries(VIEWPORTS)) {
   for (const dark of [false, true]) {
     const { context, page } = await demo(browser, size, dark);
@@ -66,4 +93,25 @@ for (const [name, size] of Object.entries(VIEWPORTS)) {
     await context.close();
   }
 }
+{
+  const { context, page } = await signedIn(browser, env, VIEWPORTS.desktop);
+  await page.goto(`${env.HA_URL}/config/integrations/integration/mnml`, {
+    waitUntil: 'domcontentloaded',
+  });
+  await page.waitForTimeout(5000);
+  await page.getByRole('button', { name: /^(Configure|Options)$/ }).click();
+  await page.waitForTimeout(3000);
+  await page.getByRole('dialog').screenshot({ path: `${OUT}/options.png` });
+  console.log(`${OUT}/options.png`);
+  await context.close();
+}
+await useGlass(false);
+for (const dark of [false, true]) {
+  const { context, page } = await demo(browser, VIEWPORTS.desktop, dark);
+  const look = `flat-desktop-${dark ? 'dark' : 'light'}`;
+  await page.screenshot({ path: `${OUT}/${look}.png`, fullPage: true });
+  console.log(`${OUT}/${look}.png`);
+  await context.close();
+}
+await useGlass(true);
 await browser.close();

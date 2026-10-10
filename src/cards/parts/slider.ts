@@ -35,10 +35,11 @@ export interface SliderLabel {
 const SLIDER_STYLE = css`
   .slider {
     position: relative;
-    height: 40px;
+    height: var(--m-slider-height, 40px);
     border-radius: 12px;
     overflow: hidden;
     background: var(--m-pill);
+    box-shadow: var(--m-well);
     touch-action: none;
     user-select: none;
     -webkit-user-select: none;
@@ -109,8 +110,11 @@ const SLIDER_STYLE = css`
   }
   .slider.full {
     height: 56px;
-    border-radius: var(--ha-card-border-radius, 18px);
-    background: var(--card-background-color);
+    border-radius: var(--ha-card-border-radius, 22px);
+    background: var(--mnml-card-background-color, var(--card-background-color));
+    -webkit-backdrop-filter: var(--mnml-card-backdrop-filter, none);
+    backdrop-filter: var(--mnml-card-backdrop-filter, none);
+    box-shadow: var(--mnml-card-shadow, none);
   }
   .slider.full.gradient {
     background: var(--gradient);
@@ -125,8 +129,10 @@ const SLIDER_STYLE = css`
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    box-shadow: inset 0 0 0 1px
-      var(--mnml-card-edge-color, color-mix(in srgb, var(--primary-text-color) 12%, transparent));
+    box-shadow:
+      inset 0 0 0 1px
+        var(--mnml-card-edge-color, color-mix(in srgb, var(--primary-text-color) 12%, transparent)),
+      inset 0 1px 0 var(--mnml-card-highlight-color, transparent);
     pointer-events: none;
   }
   @media (prefers-contrast: more) {
@@ -275,7 +281,10 @@ export const OVERLAY_STYLE = css`
     align-items: center;
     gap: 8px;
     padding: 8px;
-    background: var(--card-background-color);
+    border-radius: inherit;
+    background: var(--mnml-overlay-background-color, var(--card-background-color));
+    -webkit-backdrop-filter: var(--mnml-card-backdrop-filter, none);
+    backdrop-filter: var(--mnml-card-backdrop-filter, none);
   }
   .overlay mnml-slider {
     flex: 1;

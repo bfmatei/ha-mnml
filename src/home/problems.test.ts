@@ -19,6 +19,21 @@ test('a room keyed like a fixed pop-up is a duplicate hash', () => {
   assert.ok(problems(home).some((problem) => problem.includes('#system')));
 });
 
+test('an order that skips or repeats a section is named', () => {
+  assert.deepEqual(
+    problems({ ...DEMO, order: ['rooms', 'garage', 'infrastructure', 'people'] }),
+    [],
+  );
+  for (const order of [
+    ['rooms', 'garage', 'infrastructure'],
+    ['rooms', 'rooms', 'garage', 'infrastructure'],
+  ] as const) {
+    assert.ok(
+      problems({ ...DEMO, order }).some((problem) => problem.startsWith('order must list')),
+    );
+  }
+});
+
 test('a key that is not a URL fragment is named', () => {
   const [first, ...rest] = DEMO.rooms;
   assert.ok(first);

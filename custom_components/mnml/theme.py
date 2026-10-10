@@ -13,7 +13,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.util.file import write_utf8_file
 from homeassistant.util.yaml import load_yaml
 
-from .const import THEME_FILE, THEME_FOLDER, THEME_NAME
+from .const import THEME_FILE, THEME_FLAT_FILE, THEME_FOLDER, THEME_NAME
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -40,9 +40,10 @@ async def async_reload_themes(hass: HomeAssistant) -> bool:
     return True
 
 
-async def async_install_theme(hass: HomeAssistant, www: Path) -> bool:
+async def async_install_theme(hass: HomeAssistant, www: Path, *, glass: bool) -> bool:
     target = theme_target(hass)
-    written = await hass.async_add_executor_job(write_theme, www / THEME_FILE, target)
+    source = www / (THEME_FILE if glass else THEME_FLAT_FILE)
+    written = await hass.async_add_executor_job(write_theme, source, target)
     reloaded = await async_reload_themes(hass) if written else True
     loaded = reloaded and THEME_NAME in hass.data.get(DATA_THEMES, {})
     if not loaded:

@@ -68,9 +68,10 @@ async def test_an_install_without_the_built_frontend_fails_setup_and_says_what_i
 ) -> None:
     (www / "mnml-cards.js").unlink()
     (www / "mnml.yaml").unlink()
+    (www / "mnml-flat.yaml").unlink()
     entry = await setup_mnml()
     assert entry.state is ConfigEntryState.SETUP_ERROR
-    assert "mnml-cards.js, mnml.yaml missing" in str(entry.reason)
+    assert "mnml-cards.js, mnml.yaml, mnml-flat.yaml missing" in str(entry.reason)
     assert mnml_urls(hass) == []
 
 

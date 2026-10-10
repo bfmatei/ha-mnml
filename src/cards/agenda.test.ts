@@ -220,6 +220,41 @@ test('Next adds the next week with something, skipping empty ones however far, a
   ]);
 });
 
+test('Next scrolls the buttons under the week it adds into view, so the week is too', async () => {
+  const shown: Element[] = [];
+  const spy = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(function scroll(
+    this: Element,
+  ) {
+    shown.push(this);
+  });
+  const card = await mount({ calls: [], states: LIVE });
+  await press(card, 'Next');
+  await settled();
+  await vi.waitFor(() => {
+    assert.equal(shown.filter((node) => node.getRootNode() === card.shadowRoot).length, 1);
+  });
+  const mine = shown.filter((node) => node.getRootNode() === card.shadowRoot);
+  assert.ok(mine[0]?.classList.contains('more'));
+  spy.mockRestore();
+});
+
+test('a Next that finds nothing scrolls the buttons into view under the Nothing until note', async () => {
+  const shown: Element[] = [];
+  const spy = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(function scroll(
+    this: Element,
+  ) {
+    shown.push(this);
+  });
+  const card = await mount({ calls: [], states: LIVE }, {});
+  await press(card, 'Next');
+  await settled();
+  await vi.waitFor(() => {
+    assert.equal(shown.filter((node) => node.getRootNode() === card.shadowRoot).length, 1);
+  });
+  assert.ok(shown.at(-1)?.classList.contains('more'));
+  spy.mockRestore();
+});
+
 test('nothing in a year says until when, and Next searches the year after', async () => {
   const fake: Fake = { calls: [], states: LIVE };
   const card = await mount(fake, {

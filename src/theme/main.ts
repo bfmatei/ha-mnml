@@ -3,21 +3,29 @@ import { join, resolve } from 'node:path';
 
 import { renderTheme } from './build.ts';
 import { assertContrast } from './contrast.ts';
-import { THEME } from './model.ts';
+import { THEMES } from './model.ts';
+
+const FILES = { glass: 'mnml.yaml', flat: 'mnml-flat.yaml' } as const;
 
 const [out = 'out'] = process.argv.slice(2);
-const failures = assertContrast(THEME);
-for (const failure of failures) {
-  console.error(failure);
+const dir = resolve(process.cwd(), out);
+let failed = 0;
+for (const [design, theme] of Object.entries(THEMES)) {
+  const failures = assertContrast(theme);
+  for (const failure of failures) {
+    console.error(`${design}: ${failure}`);
+  }
+  failed += failures.length;
 }
-if (failures.length > 0) {
-  console.error(`${failures.length} of the theme's contrast claims do not hold`);
+if (failed > 0) {
+  console.error(`${failed} of the themes' contrast claims do not hold`);
   process.exitCode = 1;
 } else {
-  const dir = resolve(process.cwd(), out);
-  const file = join(dir, 'mnml.yaml');
-  const text = renderTheme();
   mkdirSync(dir, { recursive: true });
-  writeFileSync(file, text, 'utf8');
-  console.log(`wrote ${file} (${text.split('\n').length - 1} lines)`);
+  for (const [design, theme] of Object.entries(THEMES)) {
+    const file = join(dir, FILES[theme.design]);
+    const text = renderTheme(theme);
+    writeFileSync(file, text, 'utf8');
+    console.log(`wrote ${file} (${design}, ${text.split('\n').length - 1} lines)`);
+  }
 }

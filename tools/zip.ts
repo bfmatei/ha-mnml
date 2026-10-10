@@ -3,7 +3,13 @@ import { existsSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const ZIP = resolve('mnml.zip');
-const BUILT = ['mnml-cards-loader.js', 'mnml-cards.js', 'mnml-cards-panel.js', 'mnml.yaml'];
+const BUILT = [
+  'mnml-cards-loader.js',
+  'mnml-cards.js',
+  'mnml-cards-panel.js',
+  'mnml.yaml',
+  'mnml-flat.yaml',
+];
 if (BUILT.some((name) => !existsSync(`custom_components/mnml/www/${name}`))) {
   throw new Error('custom_components/mnml/www/ is not built: run pnpm build first');
 }
