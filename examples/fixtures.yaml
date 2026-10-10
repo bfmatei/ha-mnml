@@ -8,6 +8,16 @@ template:
             {{ [{'name': 'Laptop', 'ipAddress': '10.1.10.5', 'type': 'WIRELESS'},
                 {'name': 'NAS', 'ipAddress': '10.1.50.2', 'type': 'WIRED'},
                 {'name': '', 'ipAddress': '10.1.10.9', 'type': 'VPN'}] }}
+      - name: Fixture report
+        unique_id: fixture_report
+        state: '2'
+        attributes:
+          details: |-
+            2 failed:
+              ha: 22 names in sentence case
+                   sensor.fixture_a: "Fixture A", expected "Fixture a"
+                   ... 4 more
+              media: 14 Jellyfin answers over HTTPS
       - name: Fixture steps
         unique_id: fixture_steps
         unit_of_measurement: steps

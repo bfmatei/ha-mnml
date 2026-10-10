@@ -57,6 +57,7 @@ proxmox-server:
       group: Health
       fields:
         failed: { kind: entity, required: true }
+        warnings: { kind: entity }
         last_run: { kind: entity, required: true }
         overdue: { kind: entity, required: true }
     notifications:
@@ -131,6 +132,11 @@ proxmox-server:
           - id: checks-failed
             entities: ['[[checks.failed]]']
             color: red
+            not: ['0', unknown, unavailable]
+          - id: checks-warnings
+            if: checks.warnings
+            entities: ['[[checks.warnings]]']
+            color: orange
             not: ['0', unknown, unavailable]
           - id: checks-overdue
             entities: ['[[checks.overdue]]']
@@ -244,6 +250,7 @@ proxmox-popup:
       kind: object
       fields:
         failed: { kind: entity, required: true }
+        warnings: { kind: entity }
         last_run: { kind: entity, required: true }
         overdue: { kind: entity, required: true }
     notifications:
@@ -322,6 +329,11 @@ proxmox-popup:
             entity: '[[checks.failed]]'
             color: red
             when: { not: ['0'] }
+          - id: checks-warnings
+            if: checks.warnings
+            entity: '[[checks.warnings]]'
+            color: orange
+            when: { not: ['0'] }
           - id: checks-last_run
             entity: '[[checks.last_run]]'
             relative: true
@@ -330,6 +342,13 @@ proxmox-popup:
             flag: true
             color: orange
             show: { is: ['on'] }
+      - id: checks-failures
+        if: checks
+        type: custom:mnml-report-card
+        entity: '[[checks.failed]]'
+        title: Check details
+        icon: mdi:clipboard-alert-outline
+        colors: { warnings: orange }
       - id: host
         type: custom:mnml-list-card
         title: Host

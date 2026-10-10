@@ -312,6 +312,14 @@ export interface ClientsCard {
   fold?: true;
 }
 
+export interface ReportCard {
+  type: 'custom:mnml-report-card';
+  entity: SensorId;
+  title?: string;
+  icon?: MdiIcon;
+  colors?: Record<string, Color>;
+}
+
 export interface ButtonCard {
   type: 'custom:mnml-button-card';
   entity: ButtonId;
@@ -464,6 +472,7 @@ export type CustomCard =
   | AgendaCard
   | MessagesCard
   | ClientsCard
+  | ReportCard
   | ButtonCard
   | SelectCard
   | SliderCard

@@ -145,6 +145,7 @@ const SYSTEM: System = {
     },
     checks: {
       failed: 'sensor.infrastructure_server_checks_failed',
+      warnings: 'sensor.infrastructure_server_checks_warnings',
       lastRun: 'sensor.infrastructure_server_checks_last_run',
       overdue: 'binary_sensor.infrastructure_server_checks_overdue',
     },
@@ -229,6 +230,7 @@ const SYSTEM: System = {
   },
   media: {
     streams: 'sensor.infrastructure_plex',
+    moreStreams: ['sensor.infrastructure_jellyfin'],
     update: 'update.infrastructure_plex_update',
     requests: {
       pending: 'sensor.infrastructure_seerr_pending_requests',

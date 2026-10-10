@@ -22,6 +22,7 @@ const COLUMNS: Record<string, number> = {
   'mnml-agenda-card': 12,
   'mnml-messages-card': 12,
   'mnml-clients-card': 12,
+  'mnml-report-card': 12,
   'mnml-button-card': 6,
   'mnml-select-card': 6,
   'mnml-slider-card': 6,

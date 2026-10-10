@@ -1163,6 +1163,7 @@ A Proxmox VE server's tile, its CPU and memory, and its guests, checks, backups 
 | `backups.bucket`               | entity   |                     |          |
 | `checks`                       | object   |                     |          |
 | `checks.failed`                | entity   | required            |          |
+| `checks.warnings`              | entity   |                     |          |
 | `checks.last_run`              | entity   | required            |          |
 | `checks.overdue`               | entity   | required            |          |
 | `notifications`                | object   |                     |          |
@@ -1227,6 +1228,7 @@ The server's pop-up, its notifications, stopped guests, checks, host, disks, sto
 | `backups.bucket`               | entity   |                     |          |
 | `checks`                       | object   |                     |          |
 | `checks.failed`                | entity   | required            |          |
+| `checks.warnings`              | entity   |                     |          |
 | `checks.last_run`              | entity   | required            |          |
 | `checks.overdue`               | entity   | required            |          |
 | `notifications`                | object   |                     |          |
@@ -1444,28 +1446,29 @@ From `templates/media.yaml`.
 
 ### `media-server`
 
-A media server's tile, what is being watched, and its requests, downloads, health and update chips; it brings its pop-up. The parts are Plex, Seerr, Radarr and Sonarr.
+A media server's tile, what is being watched, and its requests, downloads, health and update chips; it brings its pop-up. The parts are Plex, Jellyfin, Seerr, Radarr and Sonarr; `streams` is the main server's count and `more_streams` the others', such as Jellyfin's `watching` sensor beside Plex's.
 
-| Slot                  | Kind   | Required or default             | Found by |
-| --------------------- | ------ | ------------------------------- | -------- |
-| `streams`             | entity | required                        |          |
-| `update`              | entity |                                 |          |
-| `requests`            | object |                                 |          |
-| `requests.pending`    | entity | required                        |          |
-| `requests.processing` | entity | required                        |          |
-| `movies`              | object |                                 |          |
-| `movies.queue`        | entity | required                        |          |
-| `movies.count`        | entity | required                        |          |
-| `movies.health`       | entity |                                 |          |
-| `movies.space`        | entity |                                 |          |
-| `movies.calendar`     | entity |                                 |          |
-| `shows`               | object |                                 |          |
-| `shows.queue`         | entity | required                        |          |
-| `shows.count`         | entity | required                        |          |
-| `shows.wanted`        | entity |                                 |          |
-| `shows.upcoming`      | entity |                                 |          |
-| `shows.calendar`      | entity |                                 |          |
-| `none`                | texts  | `['0','unknown','unavailable']` |          |
+| Slot                  | Kind     | Required or default             | Found by |
+| --------------------- | -------- | ------------------------------- | -------- |
+| `streams`             | entity   | required                        |          |
+| `more_streams`        | entities |                                 |          |
+| `update`              | entity   |                                 |          |
+| `requests`            | object   |                                 |          |
+| `requests.pending`    | entity   | required                        |          |
+| `requests.processing` | entity   | required                        |          |
+| `movies`              | object   |                                 |          |
+| `movies.queue`        | entity   | required                        |          |
+| `movies.count`        | entity   | required                        |          |
+| `movies.health`       | entity   |                                 |          |
+| `movies.space`        | entity   |                                 |          |
+| `movies.calendar`     | entity   |                                 |          |
+| `shows`               | object   |                                 |          |
+| `shows.queue`         | entity   | required                        |          |
+| `shows.count`         | entity   | required                        |          |
+| `shows.wanted`        | entity   |                                 |          |
+| `shows.upcoming`      | entity   |                                 |          |
+| `shows.calendar`      | entity   |                                 |          |
+| `none`                | texts    | `['0','unknown','unavailable']` |          |
 
 Brings `media-popup`.
 
@@ -1473,22 +1476,23 @@ Brings `media-popup`.
 
 The media server's pop-up, what is being watched, its requests, downloads, upcoming releases, library and update.
 
-| Slot                  | Kind   | Required or default | Found by |
-| --------------------- | ------ | ------------------- | -------- |
-| `streams`             | entity | required            |          |
-| `update`              | entity |                     |          |
-| `requests`            | object |                     |          |
-| `requests.pending`    | entity | required            |          |
-| `requests.processing` | entity | required            |          |
-| `movies`              | object |                     |          |
-| `movies.queue`        | entity | required            |          |
-| `movies.count`        | entity | required            |          |
-| `movies.health`       | entity |                     |          |
-| `movies.space`        | entity |                     |          |
-| `movies.calendar`     | entity |                     |          |
-| `shows`               | object |                     |          |
-| `shows.queue`         | entity | required            |          |
-| `shows.count`         | entity | required            |          |
-| `shows.wanted`        | entity |                     |          |
-| `shows.upcoming`      | entity |                     |          |
-| `shows.calendar`      | entity |                     |          |
+| Slot                  | Kind     | Required or default | Found by |
+| --------------------- | -------- | ------------------- | -------- |
+| `streams`             | entity   | required            |          |
+| `more_streams`        | entities |                     |          |
+| `update`              | entity   |                     |          |
+| `requests`            | object   |                     |          |
+| `requests.pending`    | entity   | required            |          |
+| `requests.processing` | entity   | required            |          |
+| `movies`              | object   |                     |          |
+| `movies.queue`        | entity   | required            |          |
+| `movies.count`        | entity   | required            |          |
+| `movies.health`       | entity   |                     |          |
+| `movies.space`        | entity   |                     |          |
+| `movies.calendar`     | entity   |                     |          |
+| `shows`               | object   |                     |          |
+| `shows.queue`         | entity   | required            |          |
+| `shows.count`         | entity   | required            |          |
+| `shows.wanted`        | entity   |                     |          |
+| `shows.upcoming`      | entity   |                     |          |
+| `shows.calendar`      | entity   |                     |          |

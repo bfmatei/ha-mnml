@@ -106,6 +106,10 @@ Upcoming calendar events by week. `sources` (required): each has `entity`, a cal
 
 `entity` (required), a sensor whose `data` attribute lists the clients, and `networks` (required): each has `name`, `icon` and `subnet` (`10.0.0.0/24`). `attribute` reads another attribute than `data`, and `fields` maps another source's field names (`name`, `ip_address`, `type`). `names` is a sensor of reverse lookups, and `fold` folds each network to its heading ([Data](data.md#the-clients-card)).
 
+### `mnml-report-card`
+
+`entity` (required), a sensor whose `details` attribute holds a text report, `title` and `icon` for the heading, and `colors`, a colour for each kind of headline (`{ warnings: orange }`; red otherwise). The card is not drawn while the report has no entries. [Data](data.md#the-report-card) has the format.
+
 ### `mnml-button-card`
 
 `entity` and `service` (required): a button that calls the service on the entity.

@@ -36,6 +36,7 @@ export const STUBS: Readonly<Record<string, Stub>> = {
     entity: first(hass, ['sensor'], 'sensor.example'),
     networks: [{ name: 'Home', icon: 'mdi:lan', subnet: '192.168.1.0/24' }],
   }),
+  'mnml-report-card': (hass) => ({ entity: first(hass, ['sensor'], 'sensor.example') }),
   'mnml-button-card': (hass) => ({
     entity: first(hass, ['button'], 'button.example'),
     service: 'button.press',

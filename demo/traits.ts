@@ -1754,6 +1754,11 @@ export const TRAITS: Record<string, Trait> = {
     unit: 'watching',
     reading: '0',
   },
+  'sensor.infrastructure_jellyfin': {
+    icon: 'mdi:play-network-outline',
+    name: 'Jellyfin',
+    reading: '0',
+  },
   'sensor.infrastructure_proxmox_notifications': {
     icon: 'mdi:bell-outline',
     name: 'Notifications',
@@ -1839,6 +1844,11 @@ export const TRAITS: Record<string, Trait> = {
     unit: 'GB',
     device_class: 'data_size',
     reading: '10.35',
+  },
+  'sensor.infrastructure_server_checks_warnings': {
+    icon: 'mdi:clipboard-alert-outline',
+    name: 'Checks warnings',
+    reading: '0',
   },
   'sensor.infrastructure_server_checks_failed': {
     icon: 'mdi:clipboard-check-outline',

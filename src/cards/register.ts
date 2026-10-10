@@ -11,6 +11,7 @@ import { MnmlMediaCard } from './media.ts';
 import { MnmlMessagesCard } from './messages.ts';
 import { MnmlSlider } from './parts/slider.ts';
 import { MnmlPopupsCard } from './popups.ts';
+import { MnmlReportCard } from './report.ts';
 import { MnmlSelectCard } from './select.ts';
 import { MnmlSliderCard } from './slider.ts';
 import { STUBS } from './stubs.ts';
@@ -89,6 +90,14 @@ const CARDS: readonly Entry[] = [
     card: MnmlClientsCard,
     name: 'MNML Clients',
     description: 'Connected clients grouped by network',
+    preview: false,
+    editor: CARD_EDITOR,
+  },
+  {
+    tag: 'mnml-report-card',
+    card: MnmlReportCard,
+    name: 'MNML Report',
+    description: 'The lines of a text attribute, each with the details under it',
     preview: false,
     editor: CARD_EDITOR,
   },

@@ -296,6 +296,7 @@ export interface ServerDisks {
 
 export interface ServerChecks {
   failed: SensorId;
+  warnings?: SensorId;
   lastRun: SensorId;
   overdue: BinarySensorId;
 }
@@ -388,6 +389,7 @@ export interface Shows {
 
 export interface MediaServer {
   streams: SensorId;
+  moreStreams?: SensorId[];
   update?: UpdateId;
   requests?: MediaRequests;
   movies?: Movies;
