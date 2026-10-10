@@ -1,4 +1,4 @@
-import type { Palette, Theme } from './model.ts';
+import type { Palette, Theme, Tint } from './model.ts';
 
 interface Claim {
   what: string;
@@ -27,6 +27,131 @@ function ratio(fore: string, back: string): number {
   return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
 }
 
+function mix(front: Tint, back: string): string {
+  const top = Number.parseInt(front.color.slice(1), 16);
+  const bottom = Number.parseInt(back.slice(1), 16);
+  const part = (shift: number): string =>
+    Math.round(front.alpha * ((top >> shift) & 255) + (1 - front.alpha) * ((bottom >> shift) & 255))
+      .toString(16)
+      .padStart(2, '0');
+  return `#${part(16)}${part(8)}${part(0)}`;
+}
+
+function backdrops(palette: Palette): [string, string][] {
+  const { base, glows } = palette.material;
+  const behind: [string, string][] = [
+    ['page', palette.page],
+    [`the ${base.from} start of the base`, base.from],
+    [`the ${base.to} end of the base`, base.to],
+  ];
+  for (const glow of glows) {
+    behind.push([`the ${glow.color} glow over the start`, mix(glow, base.from)]);
+    behind.push([`the ${glow.color} glow over the end`, mix(glow, base.to)]);
+  }
+  return behind;
+}
+
+function materialClaims(mode: string, palette: Palette): Claim[] {
+  const { material } = palette;
+  const accents = {
+    red: palette.red,
+    orange: palette.orange,
+    yellow: palette.yellow,
+    green: palette.green,
+    blue: palette.blue,
+  };
+  const icons: Record<string, Palette['red']> = { ...accents, purple: palette.purple };
+  const claims: Claim[] = [];
+  for (const [where, behind] of backdrops(palette)) {
+    const card = mix(material.card, behind);
+    const pill = mix(material.pill, card);
+    const raised = mix(material.raised, mix(material.pill, card));
+    const well = mix(material.section, card);
+    const lifted = mix(material.raised, well);
+    claims.push(
+      { what: `${mode}: text on a card over ${where}`, fore: palette.text, back: card, least: 7 },
+      {
+        what: `${mode}: a state line on a card over ${where}`,
+        fore: palette.dimmed,
+        back: card,
+        least: 4.5,
+      },
+      {
+        what: `${mode}: text on a section of a pop-up over ${where}`,
+        fore: palette.text,
+        back: well,
+        least: 7,
+      },
+      {
+        what: `${mode}: a state line on a section of a pop-up over ${where}`,
+        fore: palette.dimmed,
+        back: well,
+        least: 4.5,
+      },
+      {
+        what: `${mode}: an icon on a pill in a section of a pop-up over ${where}`,
+        fore: palette.icon,
+        back: lifted,
+        least: 3,
+      },
+      { what: `${mode}: a heading over ${where}`, fore: palette.dimmed, back: behind, least: 4.5 },
+      {
+        what: `${mode}: an icon on a pill over ${where}`,
+        fore: palette.icon,
+        back: pill,
+        least: 3,
+      },
+      {
+        what: `${mode}: an icon on a raised pill over ${where}`,
+        fore: palette.icon,
+        back: raised,
+        least: 3,
+      },
+      {
+        what: `${mode}: the focus ring on a card over ${where}`,
+        fore: palette.yellow,
+        back: card,
+        least: 3,
+      },
+    );
+    for (const [name, hex] of Object.entries(accents)) {
+      claims.push({
+        what: `${mode}: ${name} as a value on a section of a pop-up over ${where}`,
+        fore: hex,
+        back: well,
+        least: 4.5,
+      });
+      claims.push({
+        what: `${mode}: ${name} as a value on a card over ${where}`,
+        fore: hex,
+        back: card,
+        least: 4.5,
+      });
+    }
+    for (const [name, hex] of Object.entries(icons)) {
+      claims.push({
+        what: `${mode}: ${name} as an icon on a tinted pill in a section of a pop-up over ${where}`,
+        fore: hex,
+        back: mix({ color: hex, alpha: 0.16 }, lifted),
+        least: 3,
+      });
+      claims.push({
+        what: `${mode}: ${name} as an icon on a tinted pill over ${where}`,
+        fore: hex,
+        back: mix({ color: hex, alpha: 0.16 }, pill),
+        least: 3,
+      });
+      claims.push({
+        what: `${mode}: ${name} as an icon on a pill over ${where}`,
+        fore: hex,
+        back: pill,
+        least: 3,
+      });
+    }
+  }
+  return claims;
+}
+
 function paletteClaims(mode: string, palette: Palette): Claim[] {
   const accents = {
     red: palette.red,
@@ -35,19 +160,13 @@ function paletteClaims(mode: string, palette: Palette): Claim[] {
     green: palette.green,
     blue: palette.blue,
   };
-  const surfaces = { page: palette.page, card: palette.card, pill: palette.pill };
+  const surfaces = { page: palette.page, card: palette.card };
   return [
     ...Object.entries(accents).map(([name, hex]) => ({
       what: `${mode}: ${name} as a value on the card`,
       fore: hex,
       back: palette.card,
       least: 4.5,
-    })),
-    ...Object.entries({ ...accents, purple: palette.purple }).map(([name, hex]) => ({
-      what: `${mode}: ${name} as an icon on the pill`,
-      fore: hex,
-      back: palette.pill,
-      least: 3,
     })),
     ...Object.entries(surfaces).map(([name, hex]) => ({
       what: `${mode}: an icon on the ${name}`,
@@ -90,18 +209,6 @@ function paletteClaims(mode: string, palette: Palette): Claim[] {
       fore: palette.yellow,
       back: palette.card,
       least: 3,
-    },
-    {
-      what: `${mode}: the card edge against the card, at least as strong as the divider`,
-      fore: palette.edge,
-      back: palette.card,
-      least: ratio(palette.divider, palette.card),
-    },
-    {
-      what: `${mode}: the card edge against the page, at least as strong as the divider`,
-      fore: palette.edge,
-      back: palette.page,
-      least: ratio(palette.divider, palette.page),
     },
   ];
 }
@@ -153,6 +260,8 @@ export function assertContrast(theme: Theme): string[] {
   const claims = [
     ...paletteClaims('light', theme.light),
     ...paletteClaims('dark', theme.dark),
+    ...materialClaims('light', theme.light),
+    ...materialClaims('dark', theme.dark),
     ...rampClaims(theme),
   ];
   return claims

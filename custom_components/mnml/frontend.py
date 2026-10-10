@@ -6,7 +6,7 @@ from homeassistant.components.http import StaticPathConfig
 from homeassistant.exceptions import ConfigEntryError
 from homeassistant.util.hass_dict import HassKey
 
-from .const import BUNDLE, DOMAIN, LOADER, PANEL, THEME_FILE, URL_BASE
+from .const import BUNDLE, DOMAIN, LOADER, PANEL, THEME_FILE, THEME_FLAT_FILE, URL_BASE
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
 
 SERVED: HassKey[set[str]] = HassKey(f"{DOMAIN}_served")
-BUILT = (LOADER, BUNDLE, PANEL, THEME_FILE)
+BUILT = (LOADER, BUNDLE, PANEL, THEME_FILE, THEME_FLAT_FILE)
 
 
 def loader_url(www: Path) -> str:

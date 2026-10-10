@@ -1172,9 +1172,6 @@ A Proxmox VE server's tile, its CPU and memory, and its guests, checks, backups 
 | `notifications.sources.source` | text     |                     |          |
 | `notifications.sources.name`   | text     |                     |          |
 | `guest_statuses`               | entities |                     |          |
-| `guest_disks`                  | objects  |                     |          |
-| `guest_disks.used`             | entity   | required            |          |
-| `guest_disks.size`             | entity   |                     |          |
 | `message_sources`              | objects  |                     |          |
 | `message_sources.source`       | text     |                     |          |
 | `message_sources.name`         | text     |                     |          |
@@ -1239,9 +1236,6 @@ The server's pop-up, its notifications, stopped guests, checks, host, disks, sto
 | `notifications.sources.source` | text     |                     |          |
 | `notifications.sources.name`   | text     |                     |          |
 | `guest_statuses`               | entities |                     |          |
-| `guest_disks`                  | objects  |                     |          |
-| `guest_disks.used`             | entity   | required            |          |
-| `guest_disks.size`             | entity   |                     |          |
 | `message_sources`              | objects  |                     |          |
 | `message_sources.source`       | text     |                     |          |
 | `message_sources.name`         | text     |                     |          |

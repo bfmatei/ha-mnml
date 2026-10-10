@@ -3,8 +3,10 @@ import assert from 'node:assert/strict';
 import { test } from 'vitest';
 
 import { assertContrast } from './contrast.ts';
-import { THEME } from './model.ts';
+import { THEMES } from './model.ts';
 
-test('the theme meets every contrast claim its documentation makes', () => {
-  assert.deepEqual(assertContrast(THEME), []);
-});
+for (const theme of Object.values(THEMES)) {
+  test(`the ${theme.design} theme meets every contrast claim its documentation makes`, () => {
+    assert.deepEqual(assertContrast(theme), []);
+  });
+}

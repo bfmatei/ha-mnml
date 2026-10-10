@@ -3,7 +3,15 @@
     "step": {
       "user": {
         "title": "MNML",
-        "description": "Adds MNML's cards, their editors and the MNML theme to Home Assistant."
+        "description": "Adds MNML's cards, their editors and the MNML theme to Home Assistant. Both options can be changed later in the integration's options.",
+        "data": {
+          "glass": "Use the glass design",
+          "default_theme": "Use MNML as the default theme"
+        },
+        "data_description": {
+          "glass": "Translucent, blurred cards over a soft background. Turned off, MNML installs its flat design: the same look, with opaque cards.",
+          "default_theme": "For everyone who has not picked a theme in their profile, in light and dark mode."
+        }
       }
     },
     "abort": {
@@ -15,9 +23,11 @@
       "init": {
         "title": "MNML",
         "data": {
+          "glass": "Use the glass design",
           "default_theme": "Use MNML as the default theme"
         },
         "data_description": {
+          "glass": "Translucent, blurred cards over a soft background. Turned off, MNML installs its flat design: the same look, with opaque cards.",
           "default_theme": "For everyone who has not picked a theme in their profile, in light and dark mode."
         }
       }

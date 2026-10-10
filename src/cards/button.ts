@@ -35,7 +35,7 @@ const BUTTON_STYLE = css`
   }
   @media (hover: hover) {
     .card.button:hover {
-      box-shadow: inset 0 0 0 999px var(--m-hover);
+      background-image: linear-gradient(var(--m-hover), var(--m-hover));
     }
   }
 `;

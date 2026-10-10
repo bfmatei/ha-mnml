@@ -1,6 +1,10 @@
 import { render } from 'lit';
 import type { LitElement, TemplateResult } from 'lit';
 
+if (!Reflect.has(Element.prototype, 'scrollIntoView')) {
+  Element.prototype.scrollIntoView = (): void => undefined;
+}
+
 export function define(tag: string, made: CustomElementConstructor): void {
   if (customElements.get(tag) === undefined) {
     customElements.define(tag, made);

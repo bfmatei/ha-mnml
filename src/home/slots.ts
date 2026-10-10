@@ -134,9 +134,6 @@ export function proxmoxSlots(proxmox: Proxmox): Record<string, Value> {
     ...snake(proxmox),
     ...record({
       guest_statuses: proxmox.guests.map((guest) => guest.status),
-      guest_disks: proxmox.guests.flatMap((guest) =>
-        guest.disk === undefined ? [] : [guest.disk],
-      ),
       message_sources: [
         ...(proxmox.notifications?.sources ?? []),
         ...proxmox.guests.flatMap(({ host, status }) =>

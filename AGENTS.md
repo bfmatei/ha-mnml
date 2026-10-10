@@ -24,7 +24,7 @@ pnpm install && uv sync   # once: the Node and the Python tools
 pnpm check                # oxfmt, oxlint (lint + type check), markdownlint, knip, ruff, mypy, hassfest (Docker), the tests
 pnpm fix                  # the part ids, oxfmt, oxlint --fix, markdownlint --fix, ruff --fix, ruff format
 pnpm test                 # vitest, then pytest
-pnpm build                # custom_components/mnml/www/: the cards, the loader, the editors, the panel, the template families and mnml.yaml
+pnpm build                # custom_components/mnml/www/: the cards, the loader, the editors, the panel, the template families and the two themes, mnml.yaml and mnml-flat.yaml
 pnpm zip                  # mnml.zip, the release, after pnpm build
 pnpm demo                 # the throwaway Home Assistant at http://localhost:8124, running the integration from this tree
 pnpm look                 # every card, template, editor, pop-up and the panel on the throwaway, in both themes, phone and desktop
@@ -45,7 +45,7 @@ pnpm icons                # custom_components/mnml/brand/: the PNG icons from ic
 | `src/editors/`, `src/panel/`   | The card editors and their description vocabulary; the MNML panel                                                                                                                                         | [docs/editors.md](docs/editors.md), [docs/templates.md](docs/templates.md)         |
 | `src/templates/`, `templates/` | The template engine and discovery; the shipped templates, one YAML file per family                                                                                                                        | [docs/templates.md](docs/templates.md)                                             |
 | `src/home/`, `demo/`           | The home generator (`Home`, `build`, `drawn`, `problems`); the demo home, Joe's and Jane's, and its entities                                                                                              | [docs/home.md](docs/home.md)                                                       |
-| `src/theme/`                   | The theme: `model.ts` (`THEME`, the only file a change to the theme edits), `theme.ts` (onto Home Assistant's and the cards' variables), `contrast.ts` (every contrast claim), `build.ts`                 | [docs/theme.md](docs/theme.md)                                                     |
+| `src/theme/`                   | The theme: `model.ts` (`GLASS` and `FLAT`, the only file a change to the themes edits), `theme.ts` (onto Home Assistant's and the cards' variables), `contrast.ts` (every contrast claim), `build.ts`     | [docs/theme.md](docs/theme.md)                                                     |
 | `src/build/`                   | The bundle: one rolldown build of the cards, the loader, the editors and the panel                                                                                                                        | [docs/architecture.md](docs/architecture.md)                                       |
 | `src/test/`, `tests/`          | The jsdom helpers and the fake Home Assistant; the Python tests, on `pytest-homeassistant-custom-component`. The TypeScript tests sit beside their code                                                   | [docs/architecture.md](docs/architecture.md#tests)                                 |
 | `examples/`, `tools/`          | One of every card, and the throwaway Home Assistant that shows them and the demo, with its look and walk passes                                                                                           | [docs/architecture.md](docs/architecture.md#the-throwaway-home-assistant)          |
@@ -67,7 +67,7 @@ pnpm icons                # custom_components/mnml/brand/: the PNG icons from ic
 - **Order properties by meaning, never alphabetically:** `type`, then the subject, then what it does, then the look, then conditions, then children. A `Room` runs identity, sensors, subsystems; a `Palette` runs surfaces, greys, accents.
 - **A threshold that is a share says so in its name:** `low_share` and `tyre_warn_share` are ratios of a target, while a list row's `low` is a value in the entity's unit.
 - **Union variants list the same properties** in the same order, with `never` for the ones they exclude. So the set reads as a grid, and no object can satisfy two variants.
-- **Colour is a theme variable,** and it colours an icon or text, never a surface. [docs/design.md](docs/design.md#colour) lists the exceptions. Every `--mnml-*` variable a card reads has a fallback, so the cards work under any theme.
+- **Colour is a theme variable,** and it colours an icon or text, and tints the pill behind its icon, never another surface. [docs/design.md](docs/design.md#colour) lists the exceptions. Every `--mnml-*` variable a card reads has a fallback, so the cards work under any theme.
 - **The theme.** Every colour is a `Hex`, because Home Assistant derives the `--rgb-*` variants from hex values only. A palette change comes with its claims: when a colour moves, fix the claim or the colour; the build won't let them disagree.
 - **Lit, as Home Assistant writes it.**
   - A card extends `MnmlCard<C>`; an editor or panel part extends `LitElement`. `register.ts`, `editors/main.ts` and `panel/main.ts` define the elements, guarded by `customElements.get()`; no `@customElement`.

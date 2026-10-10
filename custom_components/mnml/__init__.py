@@ -33,6 +33,7 @@ if TYPE_CHECKING:
 class MnmlData:
     url: str
     default_theme: bool
+    glass: bool
 
 
 type MnmlConfigEntry = ConfigEntry[MnmlData]
@@ -60,8 +61,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: MnmlConfigEntry) -> bool
     except Exception:
         remove_extra_js_url(hass, url)
         raise
+    glass = bool(entry.options.get(const.CONF_GLASS, True))
     try:
-        await async_check_home(hass)
+        await async_check_home(hass, glass=glass)
     except Exception:
         remove_extra_js_url(hass, url)
         async_remove_panel(hass)
@@ -69,7 +71,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: MnmlConfigEntry) -> bool
     entry.async_on_unload(partial(remove_extra_js_url, hass, url))
     entry.async_on_unload(partial(async_remove_panel, hass))
     entry.runtime_data = MnmlData(
-        url=url, default_theme=bool(entry.options.get(const.CONF_DEFAULT_THEME, False))
+        url=url,
+        default_theme=bool(entry.options.get(const.CONF_DEFAULT_THEME, False)),
+        glass=glass,
     )
     entry.async_on_unload(entry.add_update_listener(async_options_updated))
     return True
@@ -90,8 +94,8 @@ async def async_load_into[S: Loadable](
     hass.data[key] = store
 
 
-async def async_check_home(hass: HomeAssistant) -> None:
-    loaded = await async_install_theme(hass, const.WWW)
+async def async_check_home(hass: HomeAssistant, *, glass: bool) -> None:
+    loaded = await async_install_theme(hass, const.WWW, glass=glass)
     others = await hass.async_add_executor_job(other_theme_files, Path(hass.config.path("themes")))
     hand = await async_hand_loaded(hass)
     async_set_issue(
@@ -112,6 +116,10 @@ async def async_check_home(hass: HomeAssistant) -> None:
 
 
 async def async_options_updated(hass: HomeAssistant, entry: MnmlConfigEntry) -> None:
+    glass = bool(entry.options.get(const.CONF_GLASS, True))
+    if glass != entry.runtime_data.glass:
+        await async_check_home(hass, glass=glass)
+        entry.runtime_data.glass = glass
     on = bool(entry.options.get(const.CONF_DEFAULT_THEME, False))
     if on != entry.runtime_data.default_theme:
         await async_apply_default(hass, on=on)

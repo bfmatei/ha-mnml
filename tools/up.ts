@@ -6,8 +6,7 @@ import type { Env } from './env.ts';
 import { readEnv } from './env.ts';
 import { connect } from './socket.ts';
 
-const NAME = 'mnml-ha';
-const PORT = 8124;
+const [NAME = 'mnml-ha', PORT = '8124'] = process.argv.slice(2);
 const IMAGE = 'ghcr.io/home-assistant/home-assistant:beta';
 const URL = `http://localhost:${PORT}`;
 const OWNER = { name: 'Demo', username: 'demo', password: 'demo' };

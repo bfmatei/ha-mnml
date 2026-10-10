@@ -438,9 +438,12 @@ export interface SectionTitles {
   infrastructure: string;
 }
 
+export type SectionName = keyof SectionTitles;
+
 export interface Home {
   title: string;
   sections: SectionTitles;
+  order?: readonly SectionName[];
   popupOpen?: PopupOpen;
   outside?: WeatherId;
   vacation?: InputBooleanId;

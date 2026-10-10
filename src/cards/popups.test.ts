@@ -29,7 +29,7 @@ HTMLElement.prototype.animate = function animate(): Animation {
   finishing.push(() => {
     resolve(undefined);
   });
-  return { finished: promise } as unknown as Animation;
+  return { finished: promise, cancel: () => undefined } as unknown as Animation;
 };
 
 function allowMotion(): () => void {
@@ -193,6 +193,24 @@ test('it opens the pop-up whose hash is current, and only that one', async () =>
   assert.equal(head?.children.length, 1, 'the header sits outside the scrolling area');
   assert.equal(body?.className, 'body');
   assert.equal(body?.children.length, 1, 'and everything else inside it');
+});
+
+test('the body says there is more to scroll to until it has been scrolled to the end', async () => {
+  const { router, shadow } = await mount('');
+  router.hass = hassOf({});
+  await routed(router, '#bathroom');
+  const body = slotsOf(shadow)[1];
+  const panel = shadow.querySelector<HTMLElement>('.panel');
+  assert.ok(body instanceof HTMLElement && panel);
+  assert.ok(!panel.classList.contains('more'), 'content that fits has nothing below');
+  sized(body, 1000, 500);
+  body.dispatchEvent(new Event('scroll'));
+  await router.updateComplete;
+  assert.ok(panel.classList.contains('more'));
+  body.scrollTop = 500;
+  body.dispatchEvent(new Event('scroll'));
+  await router.updateComplete;
+  assert.ok(!panel.classList.contains('more'), 'at the end there is nothing below');
 });
 
 test('routing from one pop-up to another leaves only the new one mounted', async () => {
@@ -398,6 +416,103 @@ test('with motion allowed, the dialog goes only once it has animated out', async
   assert.equal(shadow.querySelector('dialog'), null, 'gone once the animation finished');
 });
 
+test('a pop-up opened from another keeps the panel, and swaps what is in it once the old has slid out', async () => {
+  const finish = allowMotion();
+  const { router, shadow } = await mount('#bathroom');
+  await settle();
+  finish();
+  const panel = shadow.querySelector('.panel');
+  assert.ok(panel);
+  assert.equal(mountedCards(shadow), 2);
+  setHash('#bathroom-lights');
+  fireRoute('location-changed');
+  await settle();
+  assert.equal(mountedCards(shadow), 2, 'the old content is still there while it slides out');
+  finish();
+  await settle();
+  await router.updateComplete;
+  assert.equal(shadow.querySelector('.panel'), panel, 'in the same panel');
+  assert.equal(mountedCards(shadow), 1, 'now with only the new pop-up own card');
+});
+
+function touch(panel: HTMLElement, type: string, y: number, time: number): void {
+  const event = new MouseEvent(type, { bubbles: true, composed: true, clientY: y });
+  Object.defineProperties(event, {
+    pointerType: { value: 'touch' },
+    pointerId: { value: 1 },
+    isPrimary: { value: true },
+    timeStamp: { value: time },
+  });
+  panel.dispatchEvent(event);
+}
+
+async function swipable(): Promise<{
+  router: MnmlPopupsCard;
+  shadow: ShadowRoot;
+  panel: HTMLElement;
+  finish: () => void;
+}> {
+  const finish = allowMotion();
+  const { router, shadow } = await mount('#bathroom');
+  await settle();
+  const panel = shadow.querySelector<HTMLElement>('.panel');
+  assert.ok(panel);
+  panel.setPointerCapture = () => undefined;
+  panel.getBoundingClientRect = () => new DOMRect(0, 0, 400, 500);
+  return { router, shadow, panel, finish };
+}
+
+test('a swipe down from the top of the pop-up closes it, after it has slid out', async () => {
+  const { router, shadow, panel, finish } = await swipable();
+  touch(panel, 'pointerdown', 20, 0);
+  touch(panel, 'pointermove', 60, 40);
+  touch(panel, 'pointermove', 150, 90);
+  assert.equal(panel.style.transform, 'translateY(130px)', 'the panel follows the finger');
+  touch(panel, 'pointerup', 150, 100);
+  assert.equal(location.hash, '', 'the address is clear at once');
+  await router.updateComplete;
+  assert.ok(shadow.querySelector('dialog')?.classList.contains('leaving'));
+  finish();
+  await settle();
+  await router.updateComplete;
+  assert.equal(shadow.querySelector('dialog'), null, 'gone once it has slid out');
+});
+
+test('a short, slow swipe springs back and leaves the pop-up open', async () => {
+  const { router, shadow, panel, finish } = await swipable();
+  touch(panel, 'pointerdown', 20, 0);
+  touch(panel, 'pointermove', 40, 400);
+  touch(panel, 'pointermove', 70, 800);
+  touch(panel, 'pointerup', 70, 1000);
+  await router.updateComplete;
+  finish();
+  assert.equal(location.hash, '#bathroom');
+  assert.equal(panel.style.transform, '', 'back in place');
+  assert.ok(shadow.querySelector('dialog')?.open);
+});
+
+test('a drag that starts low in the pop-up, or with a mouse, or upward, does not swipe', async () => {
+  const { panel } = await swipable();
+  touch(panel, 'pointerdown', 300, 0);
+  touch(panel, 'pointermove', 400, 50);
+  assert.equal(panel.style.transform, '', 'below the top');
+  touch(panel, 'pointerup', 400, 60);
+  touch(panel, 'pointerdown', 20, 100);
+  touch(panel, 'pointermove', -30, 150);
+  touch(panel, 'pointermove', 100, 200);
+  assert.equal(panel.style.transform, '', 'up first');
+  touch(panel, 'pointerup', 100, 210);
+  const mouse = new MouseEvent('pointerdown', { bubbles: true, composed: true, clientY: 20 });
+  Object.defineProperties(mouse, {
+    pointerType: { value: 'mouse' },
+    pointerId: { value: 2 },
+    isPrimary: { value: true },
+  });
+  panel.dispatchEvent(mouse);
+  touch(panel, 'pointermove', 200, 300);
+  assert.equal(panel.style.transform, '', 'a mouse never swipes');
+});
+
 test('with motion reduced, it goes at once', async () => {
   const { router, shadow } = await mount('#bathroom');
   await settle();
@@ -513,6 +628,9 @@ test('routing from one pop-up to another keeps the dialog, so its backdrop does 
   const first = shadow.querySelector('dialog');
   assert.ok(first);
   await routed(router, '#bathroom-lights');
+  finish();
+  await settle();
+  await router.updateComplete;
   const dialogs = shadow.querySelectorAll('dialog');
   assert.equal(dialogs.length, 1, 'one dialog, never one leaving under one arriving');
   assert.equal(dialogs[0], first, 'the same dialog, its backdrop untouched');
@@ -603,6 +721,53 @@ test('a pop-up unfolding from a tile near the bottom grows up from the bottom of
   assert.equal(panel?.style.top, '');
   assert.equal(panel?.style.bottom, '56px', 'level with the bottom of the tile');
   tile.remove();
+});
+
+test('a pop-up unfolding from a tile too low on the page scrolls the page until the tile has room below it', async () => {
+  const page = scrollable();
+  const tile = document.createElement('div');
+  page.append(tile);
+  document.body.append(page);
+  const scrolled: ScrollToOptions[] = [];
+  page.scrollBy = (options?: ScrollToOptions | number) => {
+    if (typeof options === 'object') {
+      scrolled.push(options);
+      const top = 400 - (options.top ?? 0);
+      tile.getBoundingClientRect = () => new DOMRect(400, top, 360, 64);
+    }
+  };
+  tile.getBoundingClientRect = () => new DOMRect(400, 400, 360, 64);
+  const shadow = await openedAs({ ...CONFIG, open: { desktop: 'unfold' } }, desktop, tile);
+  await vi.waitFor(() => {
+    assert.ok(shadow.querySelector('.panel'));
+  });
+  assert.equal(scrolled.length, 1);
+  assert.equal(
+    scrolled[0]?.top,
+    420 - (innerHeight - 400 - 8),
+    'by what the panel lacks below the tile',
+  );
+  assert.equal(
+    shadow.querySelector<HTMLElement>('.panel')?.style.bottom,
+    '',
+    'so it grows down, not up',
+  );
+  page.remove();
+});
+
+test('a pop-up unfolding from a tile with room below it does not scroll the page', async () => {
+  const page = scrollable();
+  const tile = document.createElement('div');
+  page.append(tile);
+  document.body.append(page);
+  const scrolled: unknown[] = [];
+  page.scrollBy = (options?: ScrollToOptions | number) => {
+    scrolled.push(options);
+  };
+  tile.getBoundingClientRect = () => new DOMRect(400, 100, 360, 64);
+  await openedAs({ ...CONFIG, open: { desktop: 'unfold' } }, desktop, tile);
+  assert.equal(scrolled.length, 0);
+  page.remove();
 });
 
 test('an opening that is not sheet, dialog or unfold is refused', () => {

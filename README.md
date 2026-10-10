@@ -1,6 +1,6 @@
 # MNML
 
-A minimal card set for Home Assistant, with its editors, its templates and its theme, in one integration. Flat cards on one hairline edge, colour only where something needs you, and pop-ups that open by the URL hash, so the back button and a shared link both work.
+A minimal card set for Home Assistant, with its editors, its templates and its theme, in one integration. One design in two materials to pick from: frosted glass, with translucent cards over a soft background, or a flat one, the same shapes in opaque colours. Colour only where something needs you, and pop-ups that open by the URL hash, so the back button and a shared link both work.
 
 ![The demo home on a desktop, light and dark](docs/screenshots/desktop.png)
 
@@ -10,7 +10,7 @@ A minimal card set for Home Assistant, with its editors, its templates and its t
 - **Pop-ups** for everything a tile opens, drawn by one `custom:mnml-popups-card` on the dashboard and opened by hash (`#living`, `#living-lights`). They are dialogs on a desktop and sheets on a phone, and moving from one to another keeps the backdrop still.
 - **Templates** for whole tiles and their pop-ups: a room, a person, a car, a server, the network, AdGuard Home, Home Assistant and a media server. Place one by area and it finds its own entities, or spell its slots by hand, or write your own.
 - **A dashboard builder** in the MNML panel, which makes a whole dashboard from your home in one click, or step by step, and rebuilds it when the home changes.
-- **A theme**, light and dark, that the cards are designed for, installed with them. The cards also work under any other.
+- **Two materials,** chosen when you add the integration and changed any time in its options: **glass** and **flat**, two MNML themes of one design. The cards work under any other theme, in the flat material.
 - **A home generator** for those who keep their dashboard in code: describe the home once, typed, and get the whole dashboard.
 
 ## Screenshots
@@ -27,7 +27,11 @@ A minimal card set for Home Assistant, with its editors, its templates and its t
 | -------------------------------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------ |
 | ![The server pop-up](docs/screenshots/popup-proxmox.png) | ![The 3D printer pop-up](docs/screenshots/popup-office-3d-printer.png) | ![The media server pop-up](docs/screenshots/popup-media.png) |
 
-Every screenshot is of the demo home, Joe's and Jane's, on a throwaway Home Assistant; `pnpm screenshots` takes them again, and joins the desktop's light and dark into the one at the top, light above the diagonal and dark below it.
+### The flat material
+
+![The demo home in the flat material, light and dark](docs/screenshots/flat-desktop.png)
+
+Every screenshot is of the demo home, Joe's and Jane's, on a throwaway Home Assistant; `pnpm screenshots` takes them again, in the glass design and then in the flat one, and joins each desktop's light and dark into one, light above the diagonal and dark below it.
 
 ## Install
 
@@ -37,7 +41,14 @@ MNML is a Home Assistant integration. It brings the cards, their editors, the sh
 
 **By hand:** unpack `mnml.zip` from a release into `config/custom_components/mnml/`, and restart Home Assistant.
 
-Then add **MNML** in Settings, Devices & services. Pick **MNML** as the theme in your profile, or turn on **Use MNML as the default theme** in the integration's options.
+Then add **MNML** in Settings, Devices & services. The setup asks for two things, which the integration's options change later:
+
+- **Use the glass design.** On, MNML installs its glass theme: translucent, blurred cards over a soft gradient. Off, it installs the flat one: the same design, with opaque cards on a hairline edge and no blur. Either way, the theme is named MNML.
+- **Use MNML as the default theme,** for everyone who has not picked a theme in their profile, in light and dark mode.
+
+![The integration's options: the glass design and the default theme](docs/screenshots/options.png)
+
+Otherwise pick **MNML** as the theme in your profile. Under another theme the cards keep the same shapes in that theme's colours, opaque, since the glass is made of the MNML theme's variables.
 
 The theme lives in `config/themes/mnml-integration/`, which the integration owns and rewrites on each update. Home Assistant must load themes from `config/themes/` (`frontend: themes: !include_dir_merge_named themes`, as its default configuration does); when it does not, the integration takes its theme away again and a repair says what to change. A repair also says so when a dashboard resource still loads MNML Cards by hand, or another theme is named MNML.
 
@@ -121,11 +132,12 @@ Every card is in Home Assistant's card picker (**Add card**, **By card**, then s
 
 ## The theme
 
+- **Two materials,** chosen when you add the integration and changed any time in its options: **glass** and **flat**, two MNML themes of one design. The cards work under any other theme, in the flat material.
 - **Two palettes,** under `modes`, so one theme follows the light and dark setting of each profile; set dark mode to **Auto** to follow the operating system.
-- **Shape.** Cards have an 18 px radius and no border or shadow of the theme's own; pop-ups the same.
+- **Shape.** Cards have a 22 px radius and no border of the theme's own; pop-ups the same.
 - **The font** is the system stack.
 - **Contrast it can prove.** Every accent reads at 4.5:1 or better as text on a card, every icon at 3:1 on its surface, and the build refuses to write a theme where one claim stops holding.
-- **The cards' variables:** the pill colour, the card edge, and the pop-up's background, radius and gap. The cards work without them, under any theme; with them they look as designed.
+- **The cards' variables:** the pill colour and its raised variant, the card's fill, blur, edge, highlight and shadow, the recess of a button, and the pop-up's background, section colour, blur, scrim, shadow, radius and gap. The cards work without them, under any theme, as the flat design; the glass theme sets them all, .
 
 [The theme](docs/theme.md) has the mapping onto Home Assistant's variables, and every contrast claim.
 

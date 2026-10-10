@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 
 THEME = "MNML:\n  primary-color: '#123456'\n"
+FLAT_THEME = "MNML:\n  primary-color: '#654321'\n"
 INCLUDE = "frontend:\n  themes: !include_dir_merge_named themes\n"
 
 type SetupMnml = Callable[..., Awaitable[MockConfigEntry]]
@@ -43,6 +44,7 @@ def www(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         "customElements.define('mnml-panel', class {});\n", encoding="utf-8"
     )
     (folder / "mnml.yaml").write_text(THEME, encoding="utf-8")
+    (folder / "mnml-flat.yaml").write_text(FLAT_THEME, encoding="utf-8")
     monkeypatch.setattr("custom_components.mnml.const.WWW", folder)
     return folder
 

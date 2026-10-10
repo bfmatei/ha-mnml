@@ -87,6 +87,10 @@ export function navigate(hash: PopupHash, from?: Element): void {
   locationChanged(false);
 }
 
+export function popupDepth(): number {
+  return depth();
+}
+
 export function closePopup(): void {
   const opened = depth();
   if (opened > 0) {

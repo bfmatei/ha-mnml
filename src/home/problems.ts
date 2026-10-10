@@ -5,7 +5,7 @@ import { SHIPPED } from '../templates/shipped.ts';
 
 import { personSlots, proxmoxSlots, roomSlots, snake, systemSlots } from './slots.ts';
 import type { Home } from './types.ts';
-import { drawn } from './view.ts';
+import { SECTION_NAMES, drawn } from './view.ts';
 
 type Json = Record<string, unknown>;
 
@@ -112,6 +112,18 @@ function subnetProblems(home: Home): string[] {
     .map(({ name, subnet }) => `${name}: ${subnet} is no IPv4 subnet`);
 }
 
+function orderProblems(home: Home): string[] {
+  if (home.order === undefined) {
+    return [];
+  }
+  const wrong = SECTION_NAMES.filter(
+    (name) => home.order?.filter((listed) => listed === name).length !== 1,
+  );
+  return wrong.length === 0 && home.order.length === SECTION_NAMES.length
+    ? []
+    : [`order must list each of ${SECTION_NAMES.join(', ')} once`];
+}
+
 function drawable(check: () => string[]): string[] {
   try {
     return check();
@@ -128,5 +140,6 @@ export function problems(home: Home): string[] {
     ...drawable(() => [...hashProblems(drawn(home)), ...producible(home)]),
     ...keyProblems(home),
     ...subnetProblems(home),
+    ...orderProblems(home),
   ];
 }

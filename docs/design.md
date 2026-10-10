@@ -2,26 +2,43 @@
 
 The visual system of the cards: surfaces, sizes, colour, feedback and motion. For how each card behaves, see [How the cards work](cards.md).
 
+## One design, two materials
+
+The cards have one design, and the theme gives it a material.
+
+- **Glass** is the design in translucent surfaces: every card is the card colour at 60 to 62 % over a blurred backdrop, with a highlight along its top and a soft shadow.
+- **Flat** is the same design in opaque ones: the card colour as it is, on a hairline edge, with no blur, no backdrop and no shadow of its own.
+
+The two are the two MNML themes, which set the same variables to other values, and the integration installs one by its **Use the glass design** option ([The theme](theme.md)). The shapes, the type and the layout are in the cards' styles and do not depend on it. Under any other theme the variables are missing and each has a fallback, which draws the flat material in that theme's colours.
+
 ## Principles
 
-- **Flat.** Every card is a surface in the card colour. Its hairline edge is the only line in the design.
-- **One filled control per card.** Everything else has no background.
-- **A state colours an icon, never a surface.**
+- **One row, everywhere.** An item is a rounded rectangle with a square icon tile and generous padding, in a tile's Lights strip and in a pop-up alike. Its buttons have no background: the primary one is only brighter.
+- **Cards are raised, what sits in them is recessed.** A pill, a chip, the tile's Lights strip and a slider track are wells (`mnml-button-shadow`); an item's icon tile is a light fill in it, like a segmented control's thumb.
+- **A state colours an icon, and tints the pill behind it.** No other surface takes a state colour.
 - **Headings, not separators.** A heading sits above a card, never inside one.
 - **Nothing idle.** Empty space is fine. A pill or text that carries no information is a defect.
-- **Any theme.** The cards use theme variables only, so any theme renders them. The MNML theme, which the integration installs, sets the values they are designed for ([The theme](theme.md)).
+- **Any theme.** The cards use theme variables only, so any theme renders them. The MNML themes set the values they are designed for ([The theme](theme.md)).
 
 ## The cards' own variables
 
-Besides Home Assistant's variables, the cards read five of their own, each with a fallback. The MNML theme sets all five. `BASE_STYLE`'s `:host` holds the colours several styles share as custom properties, which every card's styles read: `--m-pill` and `--m-edge`, from the first two variables or their fallbacks; `--m-edge-strong`, the edge under `prefers-contrast: more`; and `--m-hover`, the hover wash.
+Besides Home Assistant's variables, the cards read eighteen of their own, each with a fallback. The MNML theme sets all eighteen. `BASE_STYLE`'s `:host` holds the colours several styles share as custom properties, which every card's styles read: `--m-pill` and `--m-edge`, from the first two variables or their fallbacks; `--m-edge-strong`, the edge under `prefers-contrast: more`; and `--m-hover`, the hover wash.
 
-| Variable                      | Read by                                                                         | Without the theme                                                                                                          |
-| ----------------------------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `mnml-pill-color`             | pills, filled controls, slider tracks                                           | an 8 % mix of the text colour (`--m-pill`)                                                                                 |
-| `mnml-card-edge-color`        | every card's hairline                                                           | a 12 % mix of the text colour (`--m-edge`). Right in the dark palette, too weak in the light one, so the theme spells both |
-| `mnml-popup-background-color` | the pop-up shell                                                                | `--primary-background-color`                                                                                               |
-| `mnml-popup-border-radius`    | the pop-up shell                                                                | a fallback radius                                                                                                          |
-| `mnml-popup-gap`              | the pop-up shell, and the gap between the clients and messages cards' own cards | a fallback gap                                                                                                             |
+| Variable                      | Read by                                                                         | Without the theme                          |
+| ----------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------ |
+| `mnml-pill-color`             | pills, filled controls, slider tracks                                           | an 8 % mix of the text colour (`--m-pill`) |
+| `mnml-card-background-color`  | every card's surface (`--m-card`)                                               | `--card-background-color`                  |
+| `mnml-card-backdrop-filter`   | every card's blur of what is behind it                                          | none: the card is opaque                   |
+| `mnml-card-edge-color`        | every card's hairline                                                           | a 12 % mix of the text colour (`--m-edge`) |
+| `mnml-card-highlight-color`   | the 1 px light line along a card's top edge                                     | none                                       |
+| `mnml-popup-background-color` | the pop-up shell: a card's fill                                                 | `--primary-background-color`               |
+| `mnml-popup-section-color`    | the cards inside a pop-up: the trays it holds                                   | the pill colour                            |
+| `mnml-popup-backdrop-filter`  | the pop-up shell's blur                                                         | none                                       |
+| `mnml-popup-scrim-color`      | the dimming behind a pop-up                                                     | `rgb(0 0 0 / 0.55)`                        |
+| `mnml-popup-scrim-filter`     | the blur of the page behind a pop-up                                            | none                                       |
+| `mnml-popup-shadow`           | the pop-up shell's elevation                                                    | none                                       |
+| `mnml-popup-border-radius`    | the pop-up shell                                                                | a fallback radius                          |
+| `mnml-popup-gap`              | the pop-up shell, and the gap between the clients and messages cards' own cards | a fallback gap                             |
 
 ## Layout
 
@@ -30,77 +47,69 @@ Besides Home Assistant's variables, the cards read five of their own, each with 
 
 ## Surfaces and the hairline
 
-**The edge.** Each card draws a 1 px inset hairline in the theme's `edge` colour (`--m-edge`: `--mnml-card-edge-color`, or a 12 % mix of the text colour without it).
+**The glass.** In the glass material a card is the card colour at 60 to 62 % over what is behind it, which the theme blurs (`--mnml-card-backdrop-filter`) and saturates. What is behind it is the view's own background (`lovelace-background`, fixed, so the page moves over it): a diagonal gradient under five large, soft glows in different hues, so every card picks up a little of the colour behind it and nothing in it has an edge. A pop-up is a card of the same material, larger, with a deeper shadow. What it holds is recessed, as a card's contents are: its cards are trays in the pop-up's own section colour (`--mnml-popup-section-color`) with the recess (`--mnml-button-shadow`) and no rim, shadow or blur of their own, and the pills and filled controls in them are the light fills of the Lights strip's thumbs. The page behind a pop-up is veiled and blurred (`--mnml-popup-scrim-color`, `--mnml-popup-scrim-filter`): a light veil in the light palette, a dark one in the dark.
+
+**The edge.** In both designs, each card draws a 1 px inset hairline (`--m-edge`: `--mnml-card-edge-color`, or a 12 % mix of the text colour without it), and a 1 px highlight along its top (`--mnml-card-highlight-color`).
 
 - **Why it exists.** The card is the tap target, and without an edge you can't see the boundary of what you are pressing.
 - **Why it is `::after`.** Drawn there, a hover wash cannot replace it.
-- **Why it comes from the theme.** No single percentage serves both palettes. In dark, the edge is the lightest of page, card and edge, so it gains contrast against the page. In light, it sits four points of L\* below the page, so it loses contrast there.
+- **Why it comes from the theme.** The right strength depends on the palette and on the glass behind it.
 
-| Palette | Against the card | Against the page |
-| ------- | ---------------- | ---------------- |
-| Light   | 1.78:1           | 1.58:1           |
-| Dark    | 1.43:1           | 1.58:1           |
-
-Each is at least as strong as the theme's divider colour. The hairline is on `.card` and on the full-width slider card, except a gradient slider, where it measures 1.0:1 and does nothing. It is never on a pill or a control.
+The hairline is on `.card` and on the full-width slider card, except a gradient slider, where it does nothing. It is never on a pill or a control.
 
 ## Sizes
 
-| Element                        | Size                                                                        |
-| ------------------------------ | --------------------------------------------------------------------------- |
-| Item row                       | 56 px                                                                       |
-| Pill (an item's icon)          | 40 px round                                                                 |
-| Name / state line              | 15 px semibold / 13 px in the secondary colour, one line (`ROW_STYLE`)      |
-| Control                        | 36 px button, 20 px icon (`CONTROL_STYLE`)                                  |
-| Heading                        | 36 px, 14 px semibold in the secondary colour, 18 px icon (`HEADING_STYLE`) |
-| Heading to its card            | 8 px, as the pop-up shell spaces its cards                                  |
-| List row / table header row    | 32 px / 24 px, the header in 12 px text                                     |
-| List bar column / reset button | 72 px / 28 px                                                               |
-| Tile's Lights row              | 44 px, in the pill colour; its icon a 36 px pill in the card colour         |
-| Problems dot                   | 12 px, ringed by 2 px of the card colour                                    |
-| Slider track / slider card     | 40 px / 56 px                                                               |
-| Client row                     | 40 px: the name over its 12 px FQDN, the IP right-aligned                   |
-| Menu row                       | 36 px                                                                       |
-| Header back / close            | 40 px rounds in the card colour                                             |
+| Element                        | Size                                                                                                |
+| ------------------------------ | --------------------------------------------------------------------------------------------------- |
+| Item row                       | 56 px                                                                                               |
+| Pill (an icon's tile)          | 40 px, a 12 px rounded square                                                                       |
+| Name / state line              | 16 px semibold, tracked slightly tighter / 13 px in the secondary colour, one line (`ROW_STYLE`)    |
+| Control                        | 36 px button, 20 px icon (`CONTROL_STYLE`)                                                          |
+| Heading                        | 36 px, 12 px semibold capitals tracked 0.07em in the secondary colour, 16 px icon (`HEADING_STYLE`) |
+| Heading to its card            | 8 px, as the pop-up shell spaces its cards                                                          |
+| List row / table header row    | 32 px / 24 px, the header in 12 px text                                                             |
+| List bar column / reset button | 72 px / 28 px                                                                                       |
+| Tile's Lights row              | 56 px, as any item row, in the pill colour; its icon tile 40 px in the raised colour                |
+| Problems dot                   | 12 px, ringed by 2 px of the card colour                                                            |
+| Slider track / slider card     | 40 px / 56 px                                                                                       |
+| Client row                     | 40 px: the name over its 12 px FQDN, the IP right-aligned                                           |
+| Menu row                       | 36 px                                                                                               |
+| Header back / close            | 40 px rounded squares in the card colour                                                            |
 
 | Radius         | Where                                                                                                                          |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| The card's own | `--ha-card-border-radius`, 18 px in the theme. Also the slider cards                                                           |
-| 18 px          | The pop-up (`mnml-popup-border-radius`), as the card's own. Under 600 px its bottom corners square off, so it reads as a sheet |
-| 16 px          | The tile's Lights strip                                                                                                        |
+| The card's own | `--ha-card-border-radius`, 22 px in both themes and as the fallback. Also the slider cards                                     |
+| 22 px          | The pop-up (`mnml-popup-border-radius`), as the card's own. Under 600 px its bottom corners square off, so it reads as a sheet |
+| 14 px          | The tile's Lights strip, and a card inside a pop-up                                                                            |
 | 14 px          | A menu                                                                                                                         |
-| 12 px          | A control, a slider track, and the tile's light button: a rounded square that reads as tappable, unlike the room's round pill  |
+| 12 px          | A control, a slider track, and every pill: rounded squares                                                                     |
 | 10 px          | A menu row                                                                                                                     |
 | 8 px           | A list row's reset button                                                                                                      |
 | 2 px           | A bar, a slider marker                                                                                                         |
-| `50%`          | A pill                                                                                                                         |
 
 | Icon  | Where                                                                                    |
 | ----- | ---------------------------------------------------------------------------------------- |
 | 22 px | In a pill, in a header round                                                             |
 | 20 px | In a control, in a slider label, in a menu row, in a list row, in the tile's Lights pill |
-| 18 px | In a heading                                                                             |
-| 16 px | On a reset button, in a heading's state line                                             |
+| 16 px | On a reset button, in a heading, in a heading's state line                               |
 | 15 px | In a state line, matched to its 13 px text                                               |
 
 **The state line** is one line. Its items are separated by `•`, each preceded by its entity's state icon when `icon: true`. Only in a tile may it wrap, so that a phone shows both of a car's values. Text that overflows is cut with an ellipsis, never scrolled.
 
 ## Controls
 
-**One filled primary per card**:
+**One primary per card.** It is in the primary text colour while the others are secondary, a button in a row has no background, and a tile chip is a well pressed into the card, the pill colour with a soft inner shadow along its top and a light lip along its bottom:
 
 - the power button (the `power` fragment, `primary: true`);
 - the AC's HVAC mode button;
 - the vacuum's Start / Stop;
 - the media card's play / pause.
 
-Everything else has no background, with two exceptions:
-
-- **A tile's chips** sit on the pill colour, as status badges.
-- **The tile's Lights row** is a strip in the pill colour. The light button and the power button on it are filled in the card colour instead.
+Everything else has no background, with one exception: **a tile's chips** sit on the pill colour, as status badges.
 
 ## Colour
 
-**Colour is a variable, never a literal, and it colours an icon or text, never a surface.** `colorStyle()` sets `--m-color` to `var(--<color>-color)`, and the `colored` class reads it. The `Color` type is the four semantic colours: `red`, `orange`, `amber`, `blue`.
+**Colour is a variable, never a literal, and it colours an icon or text. A state colour also tints the pill behind its icon (16 % over the pill colour); no other surface takes one.** `colorStyle()` sets `--m-color` to `var(--<color>-color)`, and the `colored` class reads it. The `Color` type is the four semantic colours: `red`, `orange`, `amber`, `blue`.
 
 | Colour  | Means                                                                                                                                                                                                                                                                               |
 | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -128,16 +137,16 @@ Two more fills are colour on purpose: the white temperature and hue gradients (`
 - the gradient marker's `#fff`;
 - its `rgb(0 0 0 / 0.3)` ring, the only thing that makes the marker visible on the pale end of the white gradient;
 - the menu popover's `rgb(0 0 0 / 0.3)` shadow, the one elevation in the design;
-- the pop-up backdrop's `rgb(0 0 0 / 0.55)`, a dimming that must read the same over either palette.
+- the pop-up backdrop's fallback `rgb(0 0 0 / 0.55)`, which only applies without the theme.
 
-| Surface or ink                                                | Variable                                               |
-| ------------------------------------------------------------- | ------------------------------------------------------ |
-| A card                                                        | `--card-background-color`                              |
-| A pill, a filled control, a slider track, a hovered menu item | `--m-pill` (`--mnml-pill-color`, else an 8 % text mix) |
-| Text                                                          | `--primary-text-color`, `--secondary-text-color`       |
-| A bar's track                                                 | `--divider-color`                                      |
-| A card's edge                                                 | `--m-edge`                                             |
-| A slider fill without a colour of its own                     | `--accent-color`                                       |
+| Surface or ink                                                | Variable                                                                    |
+| ------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| A card                                                        | `--m-card` (`--mnml-card-background-color`, else `--card-background-color`) |
+| A pill, a filled control, a slider track, a hovered menu item | `--m-pill` (`--mnml-pill-color`, else an 8 % text mix)                      |
+| Text                                                          | `--primary-text-color`, `--secondary-text-color`                            |
+| A bar's track                                                 | `--divider-color`                                                           |
+| A card's edge                                                 | `--m-edge`                                                                  |
+| A slider fill without a colour of its own                     | `--accent-color`                                                            |
 
 Every colour a card names has a value in both modes of the theme.
 

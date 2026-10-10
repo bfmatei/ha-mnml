@@ -416,5 +416,8 @@
     "wifi-popup/card/cards/#heading",
     "wifi-popup/card/cards/#picture-entity"
   ],
-  "retired": []
+  "retired": [
+    "proxmox-popup/card/cards/#guest_disks",
+    "proxmox-popup/card/cards/#guest_disks/rows/#each-guest_disks"
+  ]
 }

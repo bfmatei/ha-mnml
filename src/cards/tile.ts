@@ -23,8 +23,8 @@ import { BASE_STYLE } from './styles.ts';
 const TILE_STYLE = css`
   .tile {
     cursor: pointer;
-    transition: box-shadow 120ms ease-out;
-    padding: 8px;
+    transition: background-color 120ms ease-out;
+    padding: 10px;
     display: grid;
     grid-template-columns: 40px minmax(0, 1fr) auto;
     column-gap: 12px;
@@ -47,34 +47,34 @@ const TILE_STYLE = css`
   }
   .tile > .chips .control {
     background: var(--m-pill);
+    box-shadow: var(--m-well);
   }
   .tile > .row {
+    position: relative;
     grid-column: 1 / -1;
-    min-height: 44px;
-    padding: 4px;
     justify-content: space-between;
     background: var(--m-pill);
-    border-radius: 16px;
+    box-shadow: var(--m-well);
+    border-radius: 14px;
   }
   .tile > .row > .pill {
-    width: 36px;
-    height: 36px;
-    border-radius: 12px;
-    background: var(--card-background-color);
+    background: var(--m-raised);
+    box-shadow: none;
   }
-  .tile > .row > .pill ha-state-icon {
-    --mdc-icon-size: 20px;
-  }
-  .tile > .row .control.primary {
-    background: var(--card-background-color);
+  @media (hover: hover) {
+    .tile > .chips .control:not(.inert):hover {
+      box-shadow:
+        inset 0 0 0 999px var(--m-hover),
+        var(--m-well);
+    }
   }
   @media (hover: hover) {
     .tile:hover:not(:has(.row.link:hover)) {
-      box-shadow: inset 0 0 0 999px var(--m-hover);
+      background-image: linear-gradient(var(--m-hover), var(--m-hover));
     }
   }
   .tile:active:not(:has(.control:active, .pill.link:active, .row.link:active)) {
-    box-shadow: inset 0 0 0 999px var(--m-hover);
+    background-image: linear-gradient(var(--m-hover), var(--m-hover));
   }
   .dot {
     position: absolute;

@@ -50,7 +50,14 @@ test('every table row fills exactly the columns its card declares', () => {
         continue;
       }
       assert.ok(Array.isArray(values));
-      assert.equal(values.length, headers.length - 1, `row ${String(row['entity'])}`);
+      const columns: number = headers.length - 1;
+      const shared: boolean = rows.some(
+        (other: unknown) => isJson(other) && other['of'] !== undefined,
+      );
+      assert.ok(
+        values.length === columns || (shared && values.length === columns - 1),
+        `row ${String(row['entity'])}`,
+      );
       checked += 1;
     }
   });
@@ -128,4 +135,28 @@ test('build() is a pure function of the home', () => {
 
 test('the dashboard names no minimal- card any more', () => {
   assert.ok(!JSON.stringify(build(DEMO)).includes('minimal-'));
+});
+
+function titles(home: typeof DEMO): unknown[] {
+  return (build(home).views[0]?.sections ?? []).map((section) => {
+    const [first] = section.cards;
+    return first !== undefined && 'slots' in first ? first.slots?.['title'] : undefined;
+  });
+}
+
+test('the titled sections come in the order the home gives, the pop-up shell last', () => {
+  assert.deepEqual(titles(DEMO), [
+    DEMO.sections.rooms,
+    DEMO.sections.people,
+    DEMO.sections.garage,
+    DEMO.sections.infrastructure,
+    undefined,
+  ]);
+  assert.deepEqual(titles({ ...DEMO, order: ['rooms', 'garage', 'infrastructure', 'people'] }), [
+    DEMO.sections.rooms,
+    DEMO.sections.garage,
+    DEMO.sections.infrastructure,
+    DEMO.sections.people,
+    undefined,
+  ]);
 });

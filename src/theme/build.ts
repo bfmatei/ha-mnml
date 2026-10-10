@@ -1,10 +1,10 @@
 import { stringify } from 'yaml';
 
-import { THEME } from './model.ts';
+import type { Theme } from './model.ts';
 import { buildTheme } from './theme.ts';
 
-export function renderTheme(): string {
-  return stringify(buildTheme(THEME), {
+export function renderTheme(theme: Theme): string {
+  return stringify(buildTheme(theme), {
     aliasDuplicateObjects: false,
     lineWidth: 0,
     singleQuote: true,

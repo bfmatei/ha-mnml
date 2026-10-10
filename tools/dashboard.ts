@@ -33,13 +33,23 @@ for (const stale of resources.filter((entry) => entry.url.startsWith('/local/mnm
 const entries = await call<{ entry_id: string }[]>({ type: 'config_entries/get', domain: 'mnml' });
 const [entry] = entries;
 if (entry === undefined) {
-  const response = await fetch(`${env.HA_URL}/api/config/config_entries/flow`, {
+  const headers = { authorization: `Bearer ${env.HA_TOKEN}`, 'content-type': 'application/json' };
+  const started = await fetch(`${env.HA_URL}/api/config/config_entries/flow`, {
     method: 'POST',
-    headers: { authorization: `Bearer ${env.HA_TOKEN}`, 'content-type': 'application/json' },
+    headers,
     body: JSON.stringify({ handler: 'mnml' }),
   });
-  if (!response.ok) {
-    throw new Error(`adding MNML answered ${response.status}: ${await response.text()}`);
+  if (!started.ok) {
+    throw new Error(`adding MNML answered ${started.status}: ${await started.text()}`);
+  }
+  const { flow_id } = (await started.json()) as { flow_id: string };
+  const chosen = await fetch(`${env.HA_URL}/api/config/config_entries/flow/${flow_id}`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ glass: true, default_theme: false }),
+  });
+  if (!chosen.ok) {
+    throw new Error(`setting MNML up answered ${chosen.status}: ${await chosen.text()}`);
   }
 } else {
   await call({

@@ -71,13 +71,6 @@ proxmox-server:
             source: { kind: text }
             name: { kind: text }
     guest_statuses: { kind: entities, group: Guests, label: 'Guest statuses' }
-    guest_disks:
-      label: 'Guest disks'
-      kind: objects
-      group: Storage
-      fields:
-        used: { kind: entity, required: true }
-        size: { kind: entity }
     message_sources:
       label: 'Message sources'
       kind: objects
@@ -174,7 +167,6 @@ proxmox-server:
         checks: '[[checks]]'
         notifications: '[[notifications]]'
         guest_statuses: '[[guest_statuses]]'
-        guest_disks: '[[guest_disks]]'
         message_sources: '[[message_sources]]'
         disk_high: '[[disk_high]]'
         disk_full: '[[disk_full]]'
@@ -265,11 +257,6 @@ proxmox-popup:
             source: { kind: text }
             name: { kind: text }
     guest_statuses: { kind: entities }
-    guest_disks:
-      kind: objects
-      fields:
-        used: { kind: entity, required: true }
-        size: { kind: entity }
     message_sources:
       kind: objects
       fields:
@@ -418,29 +405,15 @@ proxmox-popup:
         type: custom:mnml-list-card
         title: Guests
         icon: mdi:server-network
-        headers: [Guest, CPU, Memory]
+        headers: [Guest, CPU, Memory, Disk]
         rows:
           - id: each-guests
             each: guests
             as: guest
             entity: '[[guest.status]]'
             label: device
-            values: ['[[guest.cpu]]', '[[guest.memory]]']
-      - id: guest_disks
-        if: guest_disks
-        type: custom:mnml-list-card
-        fold: true
-        summary: highest
-        title: Guest disks
-        icon: mdi:harddisk
-        rows:
-          - id: each-guest_disks
-            each: guest_disks
-            as: disk
-            entity: '[[disk.used]]'
-            label: device
-            bar: true
-            of: '[[disk.size]]'
+            values: ['[[guest.cpu]]', '[[guest.memory]]', '[[guest.disk.used]]']
+            of: '[[guest.disk.size]]'
             high: '[[disk_high]]'
             critical_high: '[[disk_full]]'
       - id: backups

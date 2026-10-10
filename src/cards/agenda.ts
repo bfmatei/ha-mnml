@@ -9,8 +9,10 @@ import type { MdiIcon } from '../contract/entities.ts';
 import { SEPARATOR } from '../ha/format.ts';
 import { isUnavailable, stateOf } from '../ha/hass.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
+import { reduced } from '../ha/motion.ts';
 import { nameOf } from '../ha/names.ts';
 import { UNAVAILABLE } from '../ha/rules.ts';
+import { scrollableAncestors } from '../ha/scroll.ts';
 import { colorStyle, icon, quietly } from '../ha/templates.ts';
 
 import { MnmlCard, requireList, requireString } from './base.ts';
@@ -325,6 +327,7 @@ export class MnmlAgendaCard extends MnmlCard<AgendaCard> {
   @state() private horizon = SEARCH_WINDOWS - 1;
   private key = '';
   private token = 0;
+  private revealFrom: number | undefined;
   private readonly loaded = new Map<number, Chunk>();
   private readonly loading = new Set<number>();
 
@@ -430,8 +433,35 @@ export class MnmlAgendaCard extends MnmlCard<AgendaCard> {
     return { weeks, failed };
   }
 
+  protected override updated(): void {
+    super.updated();
+    const from = this.revealFrom;
+    if (from === undefined) {
+      return;
+    }
+    const added = this.renderRoot.querySelectorAll('.week')[from];
+    if (added === undefined && this.loading.size > 0) {
+      return;
+    }
+    this.revealFrom = undefined;
+    const more = this.renderRoot.querySelector('.more');
+    if (more === null) {
+      return;
+    }
+    const behavior = reduced() ? 'instant' : 'smooth';
+    requestAnimationFrame(() => {
+      const [view] = scrollableAncestors(more);
+      const room = view?.clientHeight ?? innerHeight;
+      const tall =
+        added !== undefined &&
+        more.getBoundingClientRect().bottom - added.getBoundingClientRect().top > room;
+      (tall ? added : more).scrollIntoView({ block: tall ? 'start' : 'nearest', behavior });
+    });
+  }
+
   private more(enough: boolean, today: Date, last: Week | undefined): TemplateResult {
     const next = (): void => {
+      this.revealFrom = this.renderRoot.querySelectorAll('.week').length;
       if (enough && last !== undefined) {
         this.shown += 1;
         this.horizon = Math.max(this.horizon, this.windowOf(today, last.start) + SEARCH_WINDOWS);

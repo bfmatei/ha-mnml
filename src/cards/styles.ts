@@ -43,6 +43,10 @@ export const BASE_STYLE = css`
       color-mix(in srgb, var(--primary-text-color) 12%, transparent)
     );
     --m-edge-strong: color-mix(in srgb, var(--primary-text-color) 50%, transparent);
+    --m-card: var(--mnml-card-background-color, var(--card-background-color));
+    --m-raised: var(--mnml-pill-raised-color, var(--card-background-color));
+    --m-shadow: var(--mnml-card-shadow, none);
+    --m-well: var(--mnml-button-shadow, 0 0 0 transparent);
   }
   *,
   *::before,
@@ -52,11 +56,16 @@ export const BASE_STYLE = css`
   .card {
     position: relative;
     overflow: hidden;
-    background: var(--card-background-color);
-    border-radius: var(--ha-card-border-radius, 18px);
+    background: var(--m-card);
+    -webkit-backdrop-filter: var(--mnml-card-backdrop-filter, none);
+    backdrop-filter: var(--mnml-card-backdrop-filter, none);
+    border-radius: var(--ha-card-border-radius, 22px);
+    box-shadow: var(--m-shadow);
     color: var(--primary-text-color);
     font-size: 13px;
     line-height: 1.25;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
   .card::after,
   .slider.full:not(.gradient)::after {
@@ -64,7 +73,9 @@ export const BASE_STYLE = css`
     position: absolute;
     inset: 0;
     border-radius: inherit;
-    box-shadow: inset 0 0 0 1px var(--m-edge);
+    box-shadow:
+      inset 0 0 0 1px var(--m-edge),
+      inset 0 1px 0 var(--mnml-card-highlight-color, transparent);
     pointer-events: none;
   }
   .hidden {
@@ -115,14 +126,16 @@ export const HEADING_STYLE = css`
     height: 36px;
     padding: 0 8px;
     color: var(--secondary-text-color);
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
   .heading ha-icon {
-    --mdc-icon-size: 18px;
+    --mdc-icon-size: 16px;
     flex: none;
   }
   .heading .state {
@@ -133,6 +146,8 @@ export const HEADING_STYLE = css`
     margin-left: auto;
     padding-left: 8px;
     font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
     font-variant-numeric: tabular-nums;
   }
   .heading .trail {
@@ -168,13 +183,15 @@ export const ROW_STYLE = css`
     flex: none;
     width: 40px;
     height: 40px;
-    border-radius: 50%;
+    border-radius: 12px;
     background: var(--m-pill);
+    box-shadow: var(--m-well);
     color: var(--primary-text-color);
     display: grid;
     place-items: center;
   }
   .pill.colored {
+    background: color-mix(in srgb, var(--m-color) 16%, var(--m-pill));
     color: var(--m-color);
   }
   .pill.link {
@@ -190,7 +207,7 @@ export const ROW_STYLE = css`
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 2px;
   }
   .name,
   .state {
@@ -199,8 +216,10 @@ export const ROW_STYLE = css`
     text-overflow: ellipsis;
   }
   .name {
-    font-size: 15px;
+    font-size: 16px;
     font-weight: 600;
+    letter-spacing: -0.011em;
+    line-height: 1.2;
   }
   .state {
     font-size: 13px;
@@ -274,6 +293,7 @@ export const CONTROL_STYLE = css`
   }
   .control.primary {
     background: var(--m-pill);
+    box-shadow: var(--m-well);
     color: var(--primary-text-color);
   }
   .control.colored {
@@ -298,6 +318,11 @@ export const CONTROL_STYLE = css`
   @media (hover: hover) {
     .control:not(.inert):hover {
       box-shadow: inset 0 0 0 999px var(--m-hover);
+    }
+    .control.primary:not(.inert):hover {
+      box-shadow:
+        inset 0 0 0 999px var(--m-hover),
+        var(--m-well);
     }
   }
 `;
