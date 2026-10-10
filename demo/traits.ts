@@ -1754,6 +1754,11 @@ export const TRAITS: Record<string, Trait> = {
     unit: 'watching',
     reading: '0',
   },
+  'sensor.infrastructure_jellyfin': {
+    icon: 'mdi:play-network-outline',
+    name: 'Jellyfin',
+    reading: '0',
+  },
   'sensor.infrastructure_proxmox_notifications': {
     icon: 'mdi:bell-outline',
     name: 'Notifications',

@@ -330,6 +330,12 @@ proxmox-popup:
             flag: true
             color: orange
             show: { is: ['on'] }
+      - id: checks-failures
+        if: checks
+        type: custom:mnml-report-card
+        entity: '[[checks.failed]]'
+        title: Failed checks
+        icon: mdi:clipboard-alert-outline
       - id: host
         type: custom:mnml-list-card
         title: Host

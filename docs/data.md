@@ -1,6 +1,6 @@
 # Data the cards read
 
-Three cards read data that a sensor holds in its attributes, rather than an entity's state. This page gives each shape, and one way to produce it.
+Four cards read data that a sensor holds in its attributes, rather than an entity's state. This page gives each shape, and one way to produce it.
 
 ## The messages card
 
@@ -51,3 +51,17 @@ command_line:
 ## The car plan
 
 Doors, hood and tailgate are binary sensors; windows and the sunroof are sensors; each part reads as open while its state is one of `open_states` (default `on`, `open`) and half open while it is one of `half_states` (default `intermediate`), compared lower-cased without hyphens. Tyre pressures and their targets are sensors in one unit; a tyre is orange under `tyre_warn_share` of its target and red under `tyre_low_share`.
+
+## The report card
+
+`entity` is a sensor whose `details` attribute holds a text report, an outline by indentation:
+
+```text
+2 failed:
+  ha: 22 names in sentence case
+       sensor.a: "A B", expected "A b"
+       ... 4 more
+  media: 14 Jellyfin answers over HTTPS
+```
+
+A line without indentation is a headline and is not drawn. The lines at the first indent are the entries, each in red under the heading with its count; the deeper lines under an entry are its details, in the secondary colour. The card is not drawn while the report has no entries. The homelab's daily checks post such a report: the failures and the first lines of what each found.

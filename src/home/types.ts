@@ -388,6 +388,7 @@ export interface Shows {
 
 export interface MediaServer {
   streams: SensorId;
+  moreStreams?: SensorId[];
   update?: UpdateId;
   requests?: MediaRequests;
   movies?: Movies;

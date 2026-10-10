@@ -26,6 +26,7 @@ export const STATES: Readonly<Record<string, string>> = {
   'light.hall_top_2': 'off',
   'sensor.infrastructure_server_checks_failed': '0',
   'sensor.infrastructure_plex': '1',
+  'sensor.infrastructure_jellyfin': '0',
   'sensor.office_3d_printer_nozzle_temperature': '215',
   'sensor.office_3d_printer_nozzle_target_temperature': '215',
   'sensor.office_3d_printer_heatbed_temperature': '60',

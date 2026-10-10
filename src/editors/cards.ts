@@ -9,6 +9,7 @@ import type {
   ListCard,
   MediaCard,
   MessagesCard,
+  ReportCard,
   SelectCard,
   SliderCard,
   TileCard,
@@ -118,6 +119,20 @@ const CLIENTS = plain<ClientsCard>(
   [
     { title: 'Clients', keys: ['entity', 'attribute', 'fields', 'names'] },
     { title: 'Networks', keys: ['networks', 'fold'] },
+  ],
+);
+
+const REPORT = plain<ReportCard>(
+  'report',
+  'Report',
+  {
+    entity: need(entity(['sensor'])),
+    title: text(),
+    icon: icon(),
+  },
+  [
+    { title: 'Report', keys: ['entity'] },
+    { title: 'Heading', keys: ['title', 'icon'] },
   ],
 );
 
@@ -338,6 +353,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Shape>> = {
   'custom:mnml-agenda-card': AGENDA,
   'custom:mnml-messages-card': MESSAGES,
   'custom:mnml-clients-card': CLIENTS,
+  'custom:mnml-report-card': REPORT,
   'custom:mnml-button-card': BUTTON,
   'custom:mnml-select-card': SELECT,
   'custom:mnml-slider-card': SLIDER,

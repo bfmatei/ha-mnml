@@ -229,6 +229,7 @@ const SYSTEM: System = {
   },
   media: {
     streams: 'sensor.infrastructure_plex',
+    moreStreams: ['sensor.infrastructure_jellyfin'],
     update: 'update.infrastructure_plex_update',
     requests: {
       pending: 'sensor.infrastructure_seerr_pending_requests',

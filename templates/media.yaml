@@ -1,7 +1,11 @@
 media-server:
-  description: A media server's tile, what is being watched, and its requests, downloads, health and update chips; it brings its pop-up. The parts are Plex, Seerr, Radarr and Sonarr.
+  description: A media server's tile, what is being watched, and its requests, downloads, health and update chips; it brings its pop-up. The parts are Plex, Jellyfin, Seerr, Radarr and Sonarr.
   slots:
     streams: { kind: entity, required: true, help: 'The number of streams playing.' }
+    more_streams:
+      kind: entities
+      label: Other media servers
+      help: 'The number of streams playing on other media servers, such as Jellyfin beside Plex.'
     update: { kind: entity }
     requests:
       kind: object
@@ -30,7 +34,9 @@ media-server:
     name: Media
     icon: mdi:play-box-multiple-outline
     popup: '#media'
-    state: [{ id: streams, entity: '[[streams]]', icon: true }]
+    state:
+      - { id: streams, entity: '[[streams]]', icon: true }
+      - { id: each-more_streams, each: more_streams, as: server, entity: '[[server]]', icon: true }
     chips:
       - id: requests
         if: requests
@@ -98,6 +104,7 @@ media-server:
       template: media-popup
       slots:
         streams: '[[streams]]'
+        more_streams: '[[more_streams]]'
         update: '[[update]]'
         requests: '[[requests]]'
         movies: '[[movies]]'
@@ -110,6 +117,7 @@ media-popup:
   description: The media server's pop-up, what is being watched, its requests, downloads, upcoming releases, library and update.
   slots:
     streams: { kind: entity, required: true }
+    more_streams: { kind: entities }
     update: { kind: entity }
     requests:
       kind: object
@@ -139,12 +147,28 @@ media-popup:
         type: custom:mnml-header-card
         name: Media
         icon: mdi:play-box-multiple-outline
-        state: [{ id: streams, entity: '[[streams]]', icon: true }]
+        state:
+          - { id: streams, entity: '[[streams]]', icon: true }
+          - {
+              id: each-more_streams,
+              each: more_streams,
+              as: server,
+              entity: '[[server]]',
+              icon: true,
+            }
       - id: watching
         type: custom:mnml-list-card
         title: Watching
         icon: mdi:play-circle-outline
-        rows: [{ id: streams, entity: '[[streams]]' }]
+        rows:
+          - { id: streams, entity: '[[streams]]', label: device }
+          - {
+              id: each-more_streams,
+              each: more_streams,
+              as: server,
+              entity: '[[server]]',
+              label: device,
+            }
       - id: requests
         if: requests
         type: custom:mnml-list-card

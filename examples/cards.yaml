@@ -77,6 +77,10 @@ views:
               - name: Servers
                 icon: mdi:server
                 subnet: 10.1.50.0/24
+          - type: custom:mnml-report-card
+            entity: sensor.fixture_report
+            title: Failed checks
+            icon: mdi:clipboard-alert-outline
           - type: custom:mnml-car-plan-card
             title: Car
             icon: mdi:car
