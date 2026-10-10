@@ -1845,6 +1845,11 @@ export const TRAITS: Record<string, Trait> = {
     device_class: 'data_size',
     reading: '10.35',
   },
+  'sensor.infrastructure_server_checks_warnings': {
+    icon: 'mdi:clipboard-alert-outline',
+    name: 'Checks warnings',
+    reading: '0',
+  },
   'sensor.infrastructure_server_checks_failed': {
     icon: 'mdi:clipboard-check-outline',
     name: 'Checks failed',

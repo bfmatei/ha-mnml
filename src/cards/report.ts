@@ -1,8 +1,8 @@
-import { css, html } from 'lit';
+import { css, html, nothing } from 'lit';
 import type { TemplateResult } from 'lit';
 import { styleMap } from 'lit/directives/style-map.js';
 
-import type { ReportCard } from '../contract/cards.ts';
+import type { Color, ReportCard } from '../contract/cards.ts';
 import type { MdiIcon } from '../contract/entities.ts';
 import { stateOf } from '../ha/hass.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
@@ -25,6 +25,14 @@ const REPORT_STYLE = css`
     grid-template-columns: 20px minmax(0, 1fr);
     column-gap: 10px;
     padding: 8px;
+  }
+  .label {
+    padding: 8px 8px 0;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--secondary-text-color);
   }
   .entry > ha-icon {
     --mdc-icon-size: 20px;
@@ -53,6 +61,12 @@ const DEFAULT_ICON: MdiIcon = 'mdi:text-box-outline';
 
 const ENTRY_ICON: MdiIcon = 'mdi:alert-circle-outline';
 
+interface Group {
+  label?: string;
+  word?: string;
+  entries: Entry[];
+}
+
 interface Entry {
   title: string;
   details: string[];
@@ -60,27 +74,30 @@ interface Entry {
 
 const indentOf = (line: string): number => line.length - line.trimStart().length;
 
-function entriesOf(raw: string): Entry[] {
+function groupsOf(raw: string): Group[] {
   const lines = raw.split('\n').filter((line) => line.trim() !== '');
   const levels = lines.map(indentOf).filter((indent) => indent > 0);
   const top = Math.min(...levels);
-  const entries: Entry[] = [];
+  const groups: Group[] = [];
   for (const line of lines) {
     const indent = indentOf(line);
     if (indent === 0) {
+      const label = line.trim().replace(/:$/, '');
+      groups.push({ label, word: label.split(' ').at(-1), entries: [] });
       continue;
     }
+    const group = groups.at(-1) ?? groups[groups.push({ entries: [] }) - 1];
     if (indent <= top) {
-      entries.push({ title: line.trim(), details: [] });
+      group?.entries.push({ title: line.trim(), details: [] });
     } else {
-      entries.at(-1)?.details.push(line.trim());
+      group?.entries.at(-1)?.details.push(line.trim());
     }
   }
-  return entries;
+  return groups.filter((group) => group.entries.length > 0);
 }
 
 function entry({ title, details }: Entry): TemplateResult {
-  return html`<div class="entry" style=${styleMap(colorStyle('red'))}>
+  return html`<div class="entry">
     ${icon(ENTRY_ICON)}
     <div class="what">
       <span class="title">${title}</span>${details.map(
@@ -90,11 +107,19 @@ function entry({ title, details }: Entry): TemplateResult {
   </div>`;
 }
 
+function group({ label, word, entries }: Group, colors: Record<string, Color>): TemplateResult {
+  const color = word === undefined ? undefined : colors[word];
+  return html`<div class="group" style=${styleMap(colorStyle(color ?? 'red'))}>
+    ${label === undefined ? nothing : html`<span class="label">${label}</span>`}${entries.map(entry)}
+  </div>`;
+}
+
 const SCHEMA = schema<ReportCard>({
   type: true,
   entity: true,
   title: true,
   icon: true,
+  colors: true,
 });
 
 export class MnmlReportCard extends MnmlCard<ReportCard> {
@@ -110,13 +135,15 @@ export class MnmlReportCard extends MnmlCard<ReportCard> {
 
   protected draw(hass: HomeAssistant, config: ReportCard): TemplateResult | undefined {
     const raw = stateOf(hass, config.entity)?.attributes['details'];
-    const entries = typeof raw === 'string' ? entriesOf(raw) : [];
-    if (entries.length === 0) {
+    const groups = typeof raw === 'string' ? groupsOf(raw) : [];
+    const count = groups.reduce((sum, each) => sum + each.entries.length, 0);
+    if (count === 0) {
       return undefined;
     }
-    const count = entries.length;
     return section(
-      html`<div class="card"><div class="entries">${entries.map(entry)}</div></div>`,
+      html`<div class="card">
+        <div class="entries">${groups.map((each) => group(each, config.colors ?? {}))}</div>
+      </div>`,
       config.title ?? DEFAULT_TITLE,
       config.icon ?? DEFAULT_ICON,
       { text: String(count), label: `${count} ${count === 1 ? 'entry' : 'entries'}` },

@@ -296,6 +296,7 @@ export interface ServerDisks {
 
 export interface ServerChecks {
   failed: SensorId;
+  warnings?: SensorId;
   lastRun: SensorId;
   overdue: BinarySensorId;
 }

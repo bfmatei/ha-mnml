@@ -48,6 +48,7 @@ import {
   text,
   textOr,
   texts,
+  words,
 } from './shape.ts';
 import type { Shape } from './shape.ts';
 
@@ -129,9 +130,10 @@ const REPORT = plain<ReportCard>(
     entity: need(entity(['sensor'])),
     title: text(),
     icon: icon(),
+    colors: words(),
   },
   [
-    { title: 'Report', keys: ['entity'] },
+    { title: 'Report', keys: ['entity', 'colors'] },
     { title: 'Heading', keys: ['title', 'icon'] },
   ],
 );

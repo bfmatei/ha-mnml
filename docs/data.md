@@ -62,6 +62,9 @@ Doors, hood and tailgate are binary sensors; windows and the sunroof are sensors
        sensor.a: "A B", expected "A b"
        ... 4 more
   media: 14 Jellyfin answers over HTTPS
+
+1 warnings:
+  client: 23 a reboot is pending
 ```
 
-A line without indentation is a headline and is not drawn. The lines at the first indent are the entries, each in red under the heading with its count; the deeper lines under an entry are its details, in the secondary colour. The card is not drawn while the report has no entries. The homelab's daily checks post such a report: the failures and the first lines of what each found.
+A line without indentation is a headline: it labels the group of entries under it, and its last word, without the colon (`failed`), picks the group's colour from the card's `colors`, red when it has none. The lines at the first indent are the entries, each with an alert icon in the group's colour; the heading counts them all; the deeper lines under an entry are its details, in the secondary colour. The card is not drawn while the report has no entries. The homelab's daily checks post such a report: the failures and the first lines of what each found.

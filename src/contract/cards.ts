@@ -317,6 +317,7 @@ export interface ReportCard {
   entity: SensorId;
   title?: string;
   icon?: MdiIcon;
+  colors?: Record<string, Color>;
 }
 
 export interface ButtonCard {

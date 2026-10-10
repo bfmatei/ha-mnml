@@ -145,6 +145,7 @@ const SYSTEM: System = {
     },
     checks: {
       failed: 'sensor.infrastructure_server_checks_failed',
+      warnings: 'sensor.infrastructure_server_checks_warnings',
       lastRun: 'sensor.infrastructure_server_checks_last_run',
       overdue: 'binary_sensor.infrastructure_server_checks_overdue',
     },

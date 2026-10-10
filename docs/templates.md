@@ -1163,6 +1163,7 @@ A Proxmox VE server's tile, its CPU and memory, and its guests, checks, backups 
 | `backups.bucket`               | entity   |                     |          |
 | `checks`                       | object   |                     |          |
 | `checks.failed`                | entity   | required            |          |
+| `checks.warnings`              | entity   |                     |          |
 | `checks.last_run`              | entity   | required            |          |
 | `checks.overdue`               | entity   | required            |          |
 | `notifications`                | object   |                     |          |
@@ -1227,6 +1228,7 @@ The server's pop-up, its notifications, stopped guests, checks, host, disks, sto
 | `backups.bucket`               | entity   |                     |          |
 | `checks`                       | object   |                     |          |
 | `checks.failed`                | entity   | required            |          |
+| `checks.warnings`              | entity   |                     |          |
 | `checks.last_run`              | entity   | required            |          |
 | `checks.overdue`               | entity   | required            |          |
 | `notifications`                | object   |                     |          |

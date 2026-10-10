@@ -108,7 +108,7 @@ Upcoming calendar events by week. `sources` (required): each has `entity`, a cal
 
 ### `mnml-report-card`
 
-`entity` (required), a sensor whose `details` attribute holds a text report, and `title` and `icon` for the heading. The card is not drawn while the report has no entries. [Data](data.md#the-report-card) has the format.
+`entity` (required), a sensor whose `details` attribute holds a text report, `title` and `icon` for the heading, and `colors`, a colour for each kind of headline (`{ warnings: orange }`; red otherwise). The card is not drawn while the report has no entries. [Data](data.md#the-report-card) has the format.
 
 ### `mnml-button-card`
 

@@ -109,6 +109,7 @@ const BY_SUFFIX: [string, Reading][] = [
   ['_pending_requests', { state: '1' }],
   ['_processing_requests', { state: '0' }],
   ['_checks_failed', { state: '0' }],
+  ['_checks_warnings', { state: '0' }],
   ['_disks_failing', { state: '0' }],
   ['_pool_health', { state: 'ONLINE' }],
   ['_last_run', { state: ago(3), device_class: 'timestamp' }],
