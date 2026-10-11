@@ -19,7 +19,11 @@ type Domain =
   | 'script'
   | 'update'
   | 'weather'
-  | 'calendar';
+  | 'calendar'
+  | 'cover'
+  | 'fan'
+  | 'humidifier'
+  | 'alarm_control_panel';
 
 export type EntityId<D extends Domain = Domain> = `${D}.${string}`;
 
@@ -44,12 +48,20 @@ export type ScriptId = EntityId<'script'>;
 export type UpdateId = EntityId<'update'>;
 export type WeatherId = EntityId<'weather'>;
 export type CalendarId = EntityId<'calendar'>;
+export type CoverId = EntityId<'cover'>;
+export type FanId = EntityId<'fan'>;
+export type HumidifierId = EntityId<'humidifier'>;
+export type AlarmPanelId = EntityId<'alarm_control_panel'>;
 
 export type MdiIcon = `mdi:${string}`;
 export type PopupHash = `#${string}`;
 export type Subnet = `${number}.${number}.${number}.${number}/${number}`;
 
 export type ServiceName =
+  | 'alarm_control_panel.alarm_arm_away'
+  | 'alarm_control_panel.alarm_arm_home'
+  | 'alarm_control_panel.alarm_arm_night'
+  | 'alarm_control_panel.alarm_disarm'
   | 'button.press'
   | 'climate.set_fan_mode'
   | 'climate.set_hvac_mode'
@@ -59,7 +71,13 @@ export type ServiceName =
   | 'climate.set_temperature'
   | 'climate.turn_off'
   | 'climate.turn_on'
+  | 'cover.close_cover'
+  | 'cover.open_cover'
+  | 'cover.set_cover_position'
+  | 'cover.stop_cover'
+  | 'fan.set_percentage'
   | 'homeassistant.toggle'
+  | 'humidifier.set_humidity'
   | 'light.turn_off'
   | 'light.turn_on'
   | 'lock.lock'

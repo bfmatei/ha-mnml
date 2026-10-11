@@ -4,7 +4,15 @@ import { expandDashboard } from '../templates/dashboard.ts';
 import { toValue } from '../templates/expand.ts';
 import { SHIPPED } from '../templates/shipped.ts';
 
-import { headingSlots, personSlots, proxmoxSlots, roomSlots, snake, systemSlots } from './slots.ts';
+import {
+  glancesSlots,
+  headingSlots,
+  personSlots,
+  proxmoxSlots,
+  roomSlots,
+  snake,
+  systemSlots,
+} from './slots.ts';
 import type { Card, Dashboard, Home, SectionName } from './types.ts';
 
 export const SECTION_NAMES: readonly SectionName[] = [
@@ -20,28 +28,12 @@ function instance(template: string, slots: Record<string, Value>): TemplateCard 
 
 export function build(home: Home): Dashboard {
   const rooms: Card[] = [
-    instance(
-      'section-heading',
-      headingSlots(home.sections.rooms, 'mdi:floor-plan', {
-        state:
-          home.outside === undefined
-            ? undefined
-            : [{ entity: home.outside, attribute: 'temperature', icon: true }],
-      }),
-    ),
+    instance('section-heading', headingSlots(home.sections.rooms, 'mdi:floor-plan')),
     ...home.rooms.map((room) => instance('room', roomSlots(room))),
   ];
 
   const people: Card[] = [
-    instance(
-      'section-heading',
-      headingSlots(home.sections.people, 'mdi:account-group', {
-        controls:
-          home.vacation === undefined
-            ? undefined
-            : [{ type: 'toggle', entity: home.vacation, color: 'amber' }],
-      }),
-    ),
+    instance('section-heading', headingSlots(home.sections.people, 'mdi:account-group')),
     ...home.people.map((person) => instance('person', personSlots(person))),
   ];
 
@@ -60,6 +52,8 @@ export function build(home: Home): Dashboard {
     ...(media ? [instance('media-server', snake(media))] : []),
   ];
 
+  const outlook: Card[] = [instance('glances', glancesSlots(home))];
+
   const parts: Record<SectionName, Card[]> = { rooms, people, garage, infrastructure };
 
   return {
@@ -72,6 +66,7 @@ export function build(home: Home): Dashboard {
         type: 'sections',
         max_columns: 3,
         sections: [
+          { type: 'grid' as const, column_span: 3, cards: outlook },
           ...(home.order ?? SECTION_NAMES).map((name) => ({
             type: 'grid' as const,
             column_span: 3,

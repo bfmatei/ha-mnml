@@ -73,14 +73,16 @@ function unknownRead(value: Value, where: string, known: ReadonlySet<string>): s
   if (!isMapping(value)) {
     return undefined;
   }
-  const gate = [...names(value['if']), ...names(value['unless']), ...names(value['each'])].find(
-    (slot) => !known.has(slot),
-  );
+  const alias = value['as'];
+  const inner = typeof alias === 'string' ? new Set([...known, alias]) : known;
+  const gate = [
+    ...names(value['if']).filter((slot) => !inner.has(slot)),
+    ...names(value['unless']).filter((slot) => !inner.has(slot)),
+    ...names(value['each']).filter((slot) => !known.has(slot)),
+  ][0];
   if (gate !== undefined) {
     return `${where}: ${gate} is not a slot the template declares`;
   }
-  const alias = value['as'];
-  const inner = typeof alias === 'string' ? new Set([...known, alias]) : known;
   for (const [key, entry] of Object.entries(value)) {
     if (key === 'if' || key === 'unless' || key === 'each' || key === 'as' || key === 'id') {
       continue;

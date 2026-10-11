@@ -1,0 +1,42 @@
+energy-popup:
+  description: 'The energy pop-up: the power now and the energy today, from the grid, the sun, the battery and the EV charger.'
+  slots:
+    usage: { kind: entity, required: true }
+    grid: { kind: entity, required: true }
+    solar: { kind: entity }
+    battery: { kind: entity }
+    ev: { kind: entity }
+    grid_today: { kind: entity }
+    solar_today: { kind: entity }
+    export_today: { kind: entity }
+    popup: { kind: text, default: '#energy' }
+  card:
+    hash: '[[popup]]'
+    cards:
+      - id: header
+        type: custom:mnml-header-card
+        name: Energy
+        icon: mdi:lightning-bolt
+        state: [{ id: usage, entity: '[[usage]]', icon: true }]
+      - id: now
+        type: custom:mnml-list-card
+        title: Now
+        icon: mdi:flash
+        rows:
+          - { id: usage, entity: '[[usage]]' }
+          - { id: solar, if: solar, entity: '[[solar]]' }
+          - { id: grid, entity: '[[grid]]' }
+          - { id: ev, if: ev, entity: '[[ev]]' }
+          - { id: battery, if: battery, entity: '[[battery]]', bar: true, low: 20, critical: 5 }
+      - id: today
+        if: [grid_today, solar_today, export_today]
+        type: custom:mnml-list-card
+        title: Today
+        icon: mdi:calendar-today
+        rows:
+          - { id: grid-today, if: grid_today, entity: '[[grid_today]]' }
+          - { id: solar-today, if: solar_today, entity: '[[solar_today]]' }
+          - { id: export-today, if: export_today, entity: '[[export_today]]' }
+  example:
+    usage: sensor.home_power
+    grid: sensor.grid_power

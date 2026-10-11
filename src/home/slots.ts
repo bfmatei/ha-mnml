@@ -2,7 +2,7 @@ import type { Control, StateItem } from '../contract/cards.ts';
 import type { Value } from '../contract/templates.ts';
 import { toValue } from '../templates/expand.ts';
 
-import type { Ac, Heating, Lights, Person, Proxmox, Room, System } from './types.ts';
+import type { Ac, Heating, Home, Lights, Person, Proxmox, Room, System } from './types.ts';
 
 export function headingSlots(
   title: string,
@@ -100,6 +100,13 @@ export function roomSlots(room: Room): Record<string, Value> {
     ac: room.ac && acSlots(room.ac),
     vacuum: room.vacuum && snake(room.vacuum),
     printer3d: room.printer3d && snake(room.printer3d),
+    cameras: (room.cameras ?? []).map((camera) => snake(camera)),
+    covers: (room.covers ?? []).map((cover) => snake(cover)),
+    fans: (room.fans ?? []).map((fan) => snake(fan)),
+    humidifiers: (room.humidifiers ?? []).map((humidifier) => snake(humidifier)),
+    appliances: (room.appliances ?? []).map((appliance) => snake(appliance)),
+    pets: (room.pets ?? []).map((pet) => snake(pet)),
+    plants: (room.plants ?? []).map((plant) => snake(plant)),
     media: members.map((member) =>
       typeof member === 'string' ? { entity: member } : { entity: member.entity, key: member.key },
     ),
@@ -158,5 +165,36 @@ export function systemSlots(system: System, rooms: readonly Room[]): Record<stri
     room_firmware: rooms.flatMap((room) =>
       room.firmware === undefined ? [] : [{ name: room.name, firmware: room.firmware }],
     ),
+  });
+}
+
+export function glancesSlots(home: Home): Record<string, Value> {
+  const checks = home.system.proxmox?.checks;
+  return record({
+    weather: home.outside,
+    alarm: home.security?.alarm,
+    vacation: home.vacation,
+    energy: home.energy && snake(home.energy),
+    people: home.people.map((person) => person.entity),
+    failed: checks?.failed,
+    warnings: checks?.warnings,
+    batteries: [
+      ...home.rooms.flatMap((room) => [
+        ...(room.batteries ?? []),
+        ...(room.heating?.thermostats ?? []).map((thermostat) => thermostat.battery),
+      ]),
+      ...home.people.flatMap((person) => person.devices.map((device) => device.battery)),
+    ].toSorted(),
+    leaks: home.rooms.flatMap((room) => room.leaks ?? []),
+    smoke: home.security?.smoke,
+    notifications: home.system.proxmox?.notifications?.messages,
+    updates: [
+      ...home.system.updates,
+      ...home.system.firmware,
+      ...home.rooms.flatMap((room) => room.firmware ?? []),
+    ],
+    services: home.system.services,
+    disks: home.system.proxmox?.disks?.failing,
+    backup: home.system.proxmox?.backups?.problem,
   });
 }

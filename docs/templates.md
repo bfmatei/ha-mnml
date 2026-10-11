@@ -294,6 +294,84 @@ A media player, opening a pop-up when it has one.
 | `entity` | entity | required            |          |
 | `popup`  | text   |                     |          |
 
+### `cover-card`
+
+A cover, such as a blind, a shade or a garage door, with its position slider when it has one, and its open, stop and close buttons.
+
+| Slot     | Kind   | Required or default | Found by |
+| -------- | ------ | ------------------- | -------- |
+| `entity` | entity | required            |          |
+| `garage` | flag   |                     |          |
+
+### `fan-card`
+
+A fan or air purifier with its air quality, its speed slider and its power toggle.
+
+| Slot      | Kind   | Required or default | Found by |
+| --------- | ------ | ------------------- | -------- |
+| `entity`  | entity | required            |          |
+| `quality` | entity |                     |          |
+
+### `humidifier-card`
+
+A humidifier or dehumidifier with its target humidity slider and its power toggle.
+
+| Slot     | Kind   | Required or default | Found by |
+| -------- | ------ | ------------------- | -------- |
+| `entity` | entity | required            |          |
+
+### `camera-card`
+
+A camera's live picture.
+
+| Slot     | Kind   | Required or default | Found by |
+| -------- | ------ | ------------------- | -------- |
+| `entity` | entity | required            |          |
+
+### `camera-activity`
+
+A folding list of what the cameras of a room detect: motion, a person, a ring at the door. Orange while detected.
+
+| Slot               | Kind    | Required or default | Found by |
+| ------------------ | ------- | ------------------- | -------- |
+| `cameras`          | objects |                     |          |
+| `cameras.entity`   | entity  | required            |          |
+| `cameras.motion`   | entity  |                     |          |
+| `cameras.person`   | entity  |                     |          |
+| `cameras.doorbell` | entity  |                     |          |
+
+### `appliance-card`
+
+A washer, dryer or dishwasher with its cycle state, the time left and its power draw; blue while a cycle runs.
+
+| Slot        | Kind   | Required or default | Found by |
+| ----------- | ------ | ------------------- | -------- |
+| `entity`    | entity | required            |          |
+| `remaining` | entity |                     |          |
+| `power`     | entity |                     |          |
+
+### `pet-card`
+
+A pet's feeder with when it last ate, the food and litter levels, and a feed button.
+
+| Slot     | Kind   | Required or default | Found by |
+| -------- | ------ | ------------------- | -------- |
+| `feed`   | entity | required            |          |
+| `fed`    | entity | required            |          |
+| `food`   | entity |                     |          |
+| `litter` | entity |                     |          |
+
+### `plants`
+
+A folding list of the plants' soil moisture, driest first, orange under 30 % and red under 15 %.
+
+| Slot              | Kind    | Required or default | Found by |
+| ----------------- | ------- | ------------------- | -------- |
+| `plants`          | objects |                     |          |
+| `plants.moisture` | entity  | required            |          |
+| `low`             | number  | `30`                |          |
+| `critical`        | number  | `15`                |          |
+
 ## Lights
 
 From `templates/lights.yaml`.
@@ -644,7 +722,7 @@ From `templates/room.yaml`.
 
 ### `room`
 
-A room's tile, its temperature and humidity, its window, door, lock and climate chips, its lights, and the problems dot; it brings the room's pop-ups.
+A room's tile, its temperature and humidity, its window, door, lock and climate chips, its lights, and its leak and low battery chips; it brings the room's pop-ups.
 
 | Slot                                  | Kind     | Required or default | Found by                                                                                                                                          |
 | ------------------------------------- | -------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -741,6 +819,30 @@ A room's tile, its temperature and humidity, its window, door, lock and climate 
 | `printer3d.outlet.energy.power`       | entity   | required            |                                                                                                                                                   |
 | `printer3d.outlet.energy.today`       | entity   |                     |                                                                                                                                                   |
 | `printer3d.outlet.energy.total`       | entity   |                     |                                                                                                                                                   |
+| `cameras`                             | objects  |                     | one per device with domain camera: `entity` domain camera                                                                                         |
+| `cameras.entity`                      | entity   | required            |                                                                                                                                                   |
+| `cameras.motion`                      | entity   |                     |                                                                                                                                                   |
+| `cameras.person`                      | entity   |                     |                                                                                                                                                   |
+| `cameras.doorbell`                    | entity   |                     |                                                                                                                                                   |
+| `covers`                              | objects  |                     | one per device with domain cover: `entity` domain cover                                                                                           |
+| `covers.entity`                       | entity   | required            |                                                                                                                                                   |
+| `covers.garage`                       | flag     |                     |                                                                                                                                                   |
+| `fans`                                | objects  |                     | one per device with domain fan: `entity` domain fan                                                                                               |
+| `fans.entity`                         | entity   | required            |                                                                                                                                                   |
+| `fans.quality`                        | entity   |                     |                                                                                                                                                   |
+| `humidifiers`                         | objects  |                     | one per device with domain humidifier: `entity` domain humidifier                                                                                 |
+| `humidifiers.entity`                  | entity   | required            |                                                                                                                                                   |
+| `appliances`                          | objects  |                     |                                                                                                                                                   |
+| `appliances.entity`                   | entity   | required            |                                                                                                                                                   |
+| `appliances.remaining`                | entity   |                     |                                                                                                                                                   |
+| `appliances.power`                    | entity   |                     |                                                                                                                                                   |
+| `pets`                                | objects  |                     |                                                                                                                                                   |
+| `pets.feed`                           | entity   | required            |                                                                                                                                                   |
+| `pets.fed`                            | entity   | required            |                                                                                                                                                   |
+| `pets.food`                           | entity   |                     |                                                                                                                                                   |
+| `pets.litter`                         | entity   |                     |                                                                                                                                                   |
+| `plants`                              | objects  |                     |                                                                                                                                                   |
+| `plants.moisture`                     | entity   | required            |                                                                                                                                                   |
 | `media`                               | objects  |                     | one per device with domain media_player: `entity` domain media_player                                                                             |
 | `media.entity`                        | entity   | required            |                                                                                                                                                   |
 | `media.key`                           | text     |                     |                                                                                                                                                   |
@@ -775,6 +877,10 @@ A room's tile, its temperature and humidity, its window, door, lock and climate 
 | `diffuser.amount`                     | entity   | required            |                                                                                                                                                   |
 | `batteries`                           | entities |                     | domain sensor, device_class battery                                                                                                               |
 | `leaks`                               | entities |                     | domain binary_sensor, device_class moisture                                                                                                       |
+| `low`                                 | number   | `20`                |                                                                                                                                                   |
+| `critical`                            | number   | `5`                 |                                                                                                                                                   |
+| `low`                                 | number   | `20`                |                                                                                                                                                   |
+| `critical`                            | number   | `5`                 |                                                                                                                                                   |
 | `meters`                              | objects  |                     |                                                                                                                                                   |
 | `meters.power`                        | entity   | required            |                                                                                                                                                   |
 | `meters.today`                        | entity   |                     |                                                                                                                                                   |
@@ -892,6 +998,30 @@ A room's pop-up, its lights, climate, media and other devices, its batteries and
 | `printer3d.outlet.energy.power`    | entity   |                     |          |
 | `printer3d.outlet.energy.today`    | entity   |                     |          |
 | `printer3d.outlet.energy.total`    | entity   |                     |          |
+| `cameras`                          | objects  |                     |          |
+| `cameras.entity`                   | entity   | required            |          |
+| `cameras.motion`                   | entity   |                     |          |
+| `cameras.person`                   | entity   |                     |          |
+| `cameras.doorbell`                 | entity   |                     |          |
+| `covers`                           | objects  |                     |          |
+| `covers.entity`                    | entity   | required            |          |
+| `covers.garage`                    | flag     |                     |          |
+| `fans`                             | objects  |                     |          |
+| `fans.entity`                      | entity   | required            |          |
+| `fans.quality`                     | entity   |                     |          |
+| `humidifiers`                      | objects  |                     |          |
+| `humidifiers.entity`               | entity   | required            |          |
+| `appliances`                       | objects  |                     |          |
+| `appliances.entity`                | entity   | required            |          |
+| `appliances.remaining`             | entity   |                     |          |
+| `appliances.power`                 | entity   |                     |          |
+| `pets`                             | objects  |                     |          |
+| `pets.feed`                        | entity   | required            |          |
+| `pets.fed`                         | entity   | required            |          |
+| `pets.food`                        | entity   |                     |          |
+| `pets.litter`                      | entity   |                     |          |
+| `plants`                           | objects  |                     |          |
+| `plants.moisture`                  | entity   | required            |          |
 | `media`                            | objects  |                     |          |
 | `media.entity`                     | entity   | required            |          |
 | `media.key`                        | text     |                     |          |
@@ -945,6 +1075,10 @@ A person's tile, whether they are driving or in a focus, and their devices' batt
 | `activities`             | entities |                     |           |
 | `focuses`                | entities |                     |           |
 | `batteries`              | entities |                     |           |
+| `low`                    | number   | `20`                |           |
+| `critical`               | number   | `5`                 |           |
+| `low`                    | number   | `20`                |           |
+| `critical`               | number   | `5`                 |           |
 
 Brings `person-popup`, `device-popup` (one per devices).
 
@@ -1496,3 +1630,67 @@ The media server's pop-up, what is being watched, its requests, downloads, upcom
 | `shows.wanted`        | entity   |                     |          |
 | `shows.upcoming`      | entity   |                     |          |
 | `shows.calendar`      | entity   |                     |          |
+
+## Glances
+
+From `templates/glances.yaml` and `templates/energy.yaml`.
+
+### `glances`
+
+The strip of the home's overall statuses, one line across the section: the weather, the alarm, the vacation toggle, and whatever needs you: failed checks, low batteries, a leak, smoke. What does not need you is not drawn.
+
+| Slot                  | Kind     | Required or default | Found by                                                          |
+| --------------------- | -------- | ------------------- | ----------------------------------------------------------------- |
+| `weather`             | entity   |                     | domain weather, anywhere in the home                              |
+| `alarm`               | entity   |                     | domain alarm_control_panel, anywhere in the home                  |
+| `vacation`            | entity   |                     |                                                                   |
+| `people`              | entities |                     | domain person, anywhere in the home                               |
+| `energy`              | object   |                     |                                                                   |
+| `energy.usage`        | entity   | required            |                                                                   |
+| `energy.grid`         | entity   | required            |                                                                   |
+| `energy.solar`        | entity   |                     |                                                                   |
+| `energy.battery`      | entity   |                     |                                                                   |
+| `energy.ev`           | entity   |                     |                                                                   |
+| `energy.grid_today`   | entity   |                     |                                                                   |
+| `energy.solar_today`  | entity   |                     |                                                                   |
+| `energy.export_today` | entity   |                     |                                                                   |
+| `failed`              | entity   |                     |                                                                   |
+| `warnings`            | entity   |                     |                                                                   |
+| `batteries`           | entities |                     | domain sensor, device_class battery, anywhere in the home         |
+| `leaks`               | entities |                     | domain binary_sensor, device_class moisture, anywhere in the home |
+| `smoke`               | entities |                     | domain binary_sensor, device_class smoke, anywhere in the home    |
+| `notifications`       | entity   |                     |                                                                   |
+| `updates`             | entities |                     | domain update, anywhere in the home                               |
+| `services`            | entities |                     |                                                                   |
+| `disks`               | entity   |                     |                                                                   |
+| `backup`              | entity   |                     |                                                                   |
+| `low`                 | number   | `20`                |                                                                   |
+| `critical`            | number   | `5`                 |                                                                   |
+
+Brings `batteries-popup` (with batteries) and `energy-popup` (with energy).
+
+### `batteries-popup`
+
+The batteries that are running low, lowest first, with their level as a bar.
+
+| Slot        | Kind     | Required or default | Found by |
+| ----------- | -------- | ------------------- | -------- |
+| `batteries` | entities |                     |          |
+| `low`       | number   | `20`                |          |
+| `critical`  | number   | `5`                 |          |
+
+### `energy-popup`
+
+The energy pop-up: the power now and the energy today, from the grid, the sun, the battery and the EV charger.
+
+| Slot           | Kind   | Required or default | Found by |
+| -------------- | ------ | ------------------- | -------- |
+| `usage`        | entity | required            |          |
+| `grid`         | entity | required            |          |
+| `solar`        | entity |                     |          |
+| `battery`      | entity |                     |          |
+| `ev`           | entity |                     |          |
+| `grid_today`   | entity |                     |          |
+| `solar_today`  | entity |                     |          |
+| `export_today` | entity |                     |          |
+| `popup`        | text   | `'#energy'`         |          |

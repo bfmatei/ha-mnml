@@ -87,10 +87,6 @@ export function isUnavailable(
   return stateObj !== undefined && stateObj.state === 'unavailable';
 }
 
-export function isOn(stateObj: HassEntity | undefined): stateObj is HassEntity {
-  return stateObj !== undefined && stateObj.state === 'on';
-}
-
 export function numberAttribute(
   stateObj: HassEntity | undefined,
   name: string,
@@ -155,6 +151,14 @@ export function toggleEntity(hass: HomeAssistant, entityId: EntityId): Promise<u
         hass,
         entityId,
         stateObj?.state === 'locked' ? 'lock.unlock' : 'lock.lock',
+      );
+    case 'alarm_control_panel':
+      return callService(
+        hass,
+        entityId,
+        stateObj?.state === 'disarmed'
+          ? 'alarm_control_panel.alarm_arm_away'
+          : 'alarm_control_panel.alarm_disarm',
       );
     case 'climate':
       return callService(

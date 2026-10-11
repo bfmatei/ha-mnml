@@ -8,7 +8,6 @@ const ICONS: Readonly<Record<string, MdiIcon>> = {
   Devices: 'mdi:devices',
   Media: 'mdi:speaker',
   Energy: 'mdi:flash',
-  Problems: 'mdi:alert-circle-outline',
   Fuel: 'mdi:gas-station',
   Status: 'mdi:information-outline',
   Locks: 'mdi:lock',

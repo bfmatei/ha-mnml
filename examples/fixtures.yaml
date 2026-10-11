@@ -1,5 +1,15 @@
 template:
   - sensor:
+      - name: Fixture battery a
+        unique_id: fixture_battery_a
+        state: '12'
+        unit_of_measurement: '%'
+        device_class: battery
+      - name: Fixture battery b
+        unique_id: fixture_battery_b
+        state: '80'
+        unit_of_measurement: '%'
+        device_class: battery
       - name: Fixture clients
         unique_id: fixture_clients
         state: '3'
@@ -77,3 +87,7 @@ template:
       - name: Fixture tailgate
         unique_id: fixture_tailgate
         state: 'false'
+
+input_boolean:
+  fixture_toggle:
+    name: Fixture toggle

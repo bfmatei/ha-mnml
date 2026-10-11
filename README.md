@@ -8,7 +8,7 @@ A minimal card set for Home Assistant, with its editors, its templates and its t
 
 - **Cards** for the things a home is made of: a room tile with its chips, items with their controls, lists and tables, a heading per section, a media card, a car seen from above, an agenda, a messages feed and a client list. Every card is plain YAML, `type: custom:mnml-<name>-card`.
 - **Pop-ups** for everything a tile opens, drawn by one `custom:mnml-popups-card` on the dashboard and opened by hash (`#living`, `#living-lights`). They are dialogs on a desktop and sheets on a phone, and moving from one to another keeps the backdrop still.
-- **Templates** for whole tiles and their pop-ups: a room, a person, a car, a server, the network, AdGuard Home, Home Assistant and a media server. Place one by area and it finds its own entities, or spell its slots by hand, or write your own.
+- **Templates** for whole tiles and their pop-ups: a room (with its cameras, covers, air, appliances, pets and plants), a person, a car, a server, the network, AdGuard Home, Home Assistant, a media server, the home's energy, and a strip of glances at its overall statuses. Place one by area and it finds its own entities, or spell its slots by hand, or write your own.
 - **A dashboard builder** in the MNML panel, which makes a whole dashboard from your home in one click, or step by step, and rebuilds it when the home changes.
 - **Two materials,** chosen when you add the integration and changed any time in its options: **glass** and **flat**, two MNML themes of one design. The cards work under any other theme, in the flat material.
 - **A home generator** for those who keep their dashboard in code: describe the home once, typed, and get the whole dashboard.
@@ -71,7 +71,7 @@ template: room
 area: living
 ```
 
-That draws the living room's tile, with its temperature and humidity, its window, door and lock, its lights and their controls, and a problems dot for a low battery or a leak. Tapping it opens the room's pop-up, and from there the lights, the heating, the AC, the vacuum and the speakers, whichever the area has.
+That draws the living room's tile, with its temperature and humidity, its window, door and lock, its lights and their controls, and a chip for a low battery or a leak while there is one. Tapping it opens the room's pop-up, and from there the lights, the heating, the AC, the vacuum and the speakers, whichever the area has.
 
 A slot set by hand wins over what the area finds, so a template can be corrected one slot at a time:
 

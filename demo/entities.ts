@@ -73,6 +73,27 @@ const SENSORS: Record<string, Reading> = {
   lifeLeft: { state: '96', unit: '%' },
   amount: { state: '70', unit: '%' },
   level: { state: '70', unit: '%' },
+  usage: { state: '850', unit: 'W', device_class: 'power' },
+  grid: { state: '-320', unit: 'W', device_class: 'power' },
+  solar: { state: '1450', unit: 'W', device_class: 'power' },
+  ev: { state: '0', unit: 'W', device_class: 'power' },
+  gridToday: { state: '4.2', unit: 'kWh', device_class: 'energy', state_class: 'total_increasing' },
+  solarToday: {
+    state: '9.6',
+    unit: 'kWh',
+    device_class: 'energy',
+    state_class: 'total_increasing',
+  },
+  exportToday: {
+    state: '3.1',
+    unit: 'kWh',
+    device_class: 'energy',
+    state_class: 'total_increasing',
+  },
+  quality: { state: '8', unit: 'µg/m³', device_class: 'pm25' },
+  moisture: { state: '48', unit: '%', device_class: 'moisture' },
+  food: { state: '62', unit: '%' },
+  litter: { state: '35', unit: '%' },
 };
 
 const BY_SUFFIX: [string, Reading][] = [
@@ -135,6 +156,11 @@ const BY_SUFFIX: [string, Reading][] = [
   ['_error', { state: 'None' }],
   ['_status', { state: 'Charging' }],
   ['_3d_printer', { state: 'Idle' }],
+  ['_dishwasher', { state: 'running' }],
+  ['_washer', { state: 'running' }],
+  ['_dryer', { state: 'idle' }],
+  ['_remaining', { state: '35', unit: 'min', device_class: 'duration' }],
+  ['_last_fed', { state: ago(4), device_class: 'timestamp' }],
   ['_filename', { state: 'benchy.gcode' }],
   ['_material', { state: 'PLA' }],
   ['_print_speed', { state: '100', unit: '%' }],
@@ -156,6 +182,10 @@ const BINARY_CLASSES: Record<string, string> = {
   status: 'running',
   services: 'running',
   vpn: 'connectivity',
+  smoke: 'smoke',
+  doorbell: 'occupancy',
+  person: 'occupancy',
+  motion: 'motion',
 };
 
 const ON_BINARY = new Set([
@@ -359,6 +389,8 @@ export function packageOf(home: Home): Record<string, Value> {
   const scripts: Record<string, Value> = {};
   const booleans: Record<string, Value> = {};
   const climates: Value[] = [];
+  const hygrostats: Value[] = [];
+  const alarms: Value[] = [];
   const add = (domain: string, entry: Record<string, Value>): void => {
     (groups[domain] ??= []).push(compact(entry));
   };
@@ -475,6 +507,70 @@ export function packageOf(home: Home): Record<string, Value> {
         booleans[object] = { name };
         break;
 
+      case 'cover': {
+        const position = STATES[entry.id] === 'closed' ? 0 : 70;
+        add('cover', {
+          ...base(entry, name, 'open'),
+          state: `{{ '${position === 0 ? 'closed' : 'open'}' }}`,
+          position: `{{ ${position} }}`,
+          open_cover: [],
+          close_cover: [],
+          stop_cover: [],
+          set_cover_position: [],
+        });
+        break;
+      }
+      case 'fan':
+        add('fan', {
+          ...base(entry, name, 'on'),
+          state: '{{ true }}',
+          percentage: '{{ 40 }}',
+          turn_on: [],
+          turn_off: [],
+          set_percentage: [],
+        });
+        break;
+      case 'humidifier': {
+        hygrostats.push({
+          platform: 'generic_hygrostat',
+          name: slugName(entry.id),
+          unique_id: `demo_${object}`,
+          humidifier: `switch.${object}_humidifier`,
+          target_sensor: `sensor.${object}_current`,
+          target_humidity: 50,
+          min_humidity: 30,
+          max_humidity: 70,
+          device_class: 'humidifier',
+        });
+        add('switch', {
+          name: `${slugName(entry.id)} humidifier`,
+          unique_id: `demo_${object}_humidifier`,
+          default_entity_id: `switch.${object}_humidifier`,
+          state: flag(true),
+          turn_on: [],
+          turn_off: [],
+        });
+        add('sensor', {
+          name: `${slugName(entry.id)} current`,
+          unique_id: `demo_${object}_current`,
+          default_entity_id: `sensor.${object}_current`,
+          state: '44',
+          unit_of_measurement: '%',
+          device_class: 'humidity',
+        });
+        break;
+      }
+      case 'alarm_control_panel':
+        alarms.push({
+          platform: 'manual',
+          name: slugName(entry.id),
+          unique_id: `demo_${object}`,
+          code_arm_required: false,
+          arming_time: 0,
+          delay_time: 0,
+          trigger_time: 0,
+        });
+        break;
       case 'climate': {
         const on = HEATING_ON.has(heating.get(entry.id) ?? '');
         climates.push({
@@ -519,6 +615,8 @@ export function packageOf(home: Home): Record<string, Value> {
     script: scripts,
     input_boolean: booleans,
     climate: climates,
+    humidifier: hygrostats,
+    alarm_control_panel: alarms,
     homeassistant: { customize: customizeEntries(home) },
   };
 }
@@ -557,7 +655,18 @@ export function camerasOf(home: Home): Map<string, { name: string; file: string 
   return new Map(
     found(home)
       .filter((entry) => entry.id.startsWith('camera.') && !SUPPLIED.has(entry.id))
-      .map((entry) => [entry.id, { name: slugName(entry.id), file: '3d-printer.png' }] as const),
+      .map(
+        (entry) =>
+          [
+            entry.id,
+            {
+              name: slugName(entry.id),
+              file: entry.id.includes('3d_printer')
+                ? '3d-printer.png'
+                : `${entry.id.split('.')[1]}.png`,
+            },
+          ] as const,
+      ),
   );
 }
 
@@ -620,6 +729,8 @@ export function created(pack: Value): Set<string> {
   for (const [domain, key] of [
     ['scene', 'name'],
     ['climate', 'name'],
+    ['humidifier', 'name'],
+    ['alarm_control_panel', 'name'],
   ] as const) {
     for (const entry of entries(pack[domain])) {
       const name = entry[key];
@@ -644,6 +755,9 @@ if (import.meta.main) {
   mkdirSync(www, { recursive: true });
   for (const image of IMAGES_ON_DISK) {
     copyFileSync(resolve(import.meta.dirname, image), resolve(www, image));
+  }
+  for (const { file } of camerasOf(DEMO).values()) {
+    copyFileSync(resolve(import.meta.dirname, '3d-printer.png'), resolve(www, file));
   }
   console.log(`wrote ${out}, and the images to ${www}`);
 }

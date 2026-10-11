@@ -18,6 +18,7 @@ test('the shipped tiles are the templates no other template uses, pop-ups aside'
     [
       'adguard',
       'car',
+      'glances',
       'home-assistant',
       'media-server',
       'person',

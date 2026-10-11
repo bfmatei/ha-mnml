@@ -40,6 +40,8 @@ person:
     activities: { kind: entities, group: Status }
     focuses: { kind: entities, group: Status }
     batteries: { kind: entities, group: Devices }
+    low: { kind: number, default: 20, label: Low battery, group: Devices }
+    critical: { kind: number, default: 5, label: Critical battery, group: Devices }
   card:
     type: custom:mnml-tile-card
     entity: '[[entity]]'
@@ -67,7 +69,21 @@ person:
         name: Do not disturb
         icon: mdi:moon-waning-crescent
         rules: [{ id: focuses, if: focuses, entities: ['[[focuses]]'], color: amber, is: ['on'] }]
-    problems: { batteries: '[[batteries]]' }
+      - id: batteries
+        if: batteries
+        type: status
+        name: Batteries
+        icon: mdi:battery-alert-variant-outline
+        silent: true
+        rules:
+          - {
+              id: critical,
+              entities: '[[batteries]]',
+              below: '[[critical]]',
+              color: red,
+              label: device,
+            }
+          - { id: low, entities: '[[batteries]]', below: '[[low]]', color: orange, label: device }
     grid_options: { columns: 12 }
   popups:
     - id: person-popup

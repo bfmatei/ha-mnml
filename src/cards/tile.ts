@@ -1,23 +1,20 @@
 import { css, html, nothing } from 'lit';
 import type { TemplateResult } from 'lit';
-import { styleMap } from 'lit/directives/style-map.js';
 
-import type { Color, Problems, TileCard } from '../contract/cards.ts';
-import { BATTERY_CRITICAL, BATTERY_LOW } from '../contract/defaults.ts';
-import { formatState, stateLine } from '../ha/format.ts';
-import { hasValue, isOn, isUnavailable, numericState, stateOf } from '../ha/hass.ts';
-import type { HassEntity, HomeAssistant } from '../ha/hass.ts';
-import { cardName, nameOf } from '../ha/names.ts';
+import type { TileCard } from '../contract/cards.ts';
+import { stateLine } from '../ha/format.ts';
+import { stateOf } from '../ha/hass.ts';
+import type { HomeAssistant } from '../ha/hass.ts';
+import { cardName } from '../ha/names.ts';
 import { navigate, offerOrigin, prebuild } from '../ha/navigation.ts';
-import { UNAVAILABLE } from '../ha/rules.ts';
-import { colorStyle, onPress, stateIcon } from '../ha/templates.ts';
+import { onPress, stateIcon } from '../ha/templates.ts';
 
 import { MnmlCard, requireString } from './base.ts';
 import { marked, variant } from './keys.ts';
 import type { KeySchema } from './keys.ts';
 import { renderControls, requireControls } from './parts/controls.ts';
 import { ITEM_STYLE, itemRow } from './parts/item.ts';
-import { CONTROLS, ITEM, PROBLEMS, STATE_ITEMS } from './schemas.ts';
+import { CONTROLS, ITEM, STATE_ITEMS } from './schemas.ts';
 import { BASE_STYLE } from './styles.ts';
 
 const TILE_STYLE = css`
@@ -76,72 +73,9 @@ const TILE_STYLE = css`
   .tile:active:not(:has(.control:active, .pill.link:active, .row.link:active)) {
     background-image: linear-gradient(var(--m-hover), var(--m-hover));
   }
-  .dot {
-    position: absolute;
-    top: -1px;
-    right: -1px;
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: var(--m-color);
-    box-shadow: 0 0 0 2px var(--card-background-color);
-  }
-  @media (forced-colors: active) {
-    .dot {
-      background: Highlight;
-      box-shadow: 0 0 0 2px Canvas;
-    }
-  }
 `;
 
-interface Problem {
-  color: Color;
-  text: string;
-}
-
-type Judge = (stateObj: HassEntity | undefined) => Color | undefined;
-
-const leakColor: Judge = (stateObj) => {
-  if (isUnavailable(stateObj)) {
-    return UNAVAILABLE;
-  }
-  return isOn(stateObj) ? 'red' : undefined;
-};
-
-const batteryColor: Judge = (stateObj) => {
-  if (isUnavailable(stateObj)) {
-    return UNAVAILABLE;
-  }
-  const level = numericState(stateObj);
-  if (!hasValue(stateObj) || level === undefined || level >= BATTERY_LOW) {
-    return undefined;
-  }
-  return level < BATTERY_CRITICAL ? 'red' : 'orange';
-};
-
-function problems(hass: HomeAssistant, config: Problems | undefined): Problem[] {
-  const found: Problem[] = [];
-  const check = (entity: string, judge: Judge): void => {
-    const stateObj = stateOf(hass, entity);
-    const color = judge(stateObj);
-    if (stateObj === undefined || color === undefined) {
-      return;
-    }
-    const text = `${nameOf(hass, entity, { label: 'device' })}: ${formatState(hass, stateObj)}`;
-    if (!found.some((problem) => problem.text === text)) {
-      found.push({ color, text });
-    }
-  };
-  for (const leak of config?.leaks ?? []) {
-    check(leak, leakColor);
-  }
-  for (const battery of config?.batteries ?? []) {
-    check(battery, batteryColor);
-  }
-  return found;
-}
-
-const NESTED = { state: STATE_ITEMS, chips: CONTROLS, item: ITEM, problems: PROBLEMS };
+const NESTED = { state: STATE_ITEMS, chips: CONTROLS, item: ITEM };
 
 const SCHEMA = marked(
   {
@@ -152,7 +86,6 @@ const SCHEMA = marked(
         state: true,
         chips: true,
         item: true,
-        problems: true,
         entity: true,
         name: true,
         icon: true,
@@ -167,7 +100,6 @@ const SCHEMA = marked(
       state: true,
       chips: true,
       item: true,
-      problems: true,
       entity: true,
       label: true,
       icon: true,
@@ -205,9 +137,6 @@ export class MnmlTileCard extends MnmlCard<TileCard> {
 
   protected draw(hass: HomeAssistant, config: TileCard): TemplateResult {
     const name = cardName(hass, config.entity, config);
-    const found = problems(hass, config.problems);
-    const parts = [name, ...found.map((problem) => problem.text)];
-    const dot: Color = found.some((problem) => problem.color === 'red') ? 'red' : 'orange';
     const open = (): void => {
       navigate(config.popup, this);
     };
@@ -218,19 +147,8 @@ export class MnmlTileCard extends MnmlCard<TileCard> {
       }}
       @click=${open}
     >
-      <div
-        class="pill"
-        role="button"
-        tabindex="0"
-        aria-label=${found.length > 0 ? parts.join('. ') : name}
-        title=${found.length > 0 ? parts.join('\n') : name}
-        @keydown=${onPress(open)}
-      >
-        ${stateIcon(hass, stateOf(hass, config.entity), config.icon)}${
-          found.length > 0
-            ? html`<div class="dot colored" style=${styleMap(colorStyle(dot))}></div>`
-            : nothing
-        }
+      <div class="pill" role="button" tabindex="0" aria-label=${name} @keydown=${onPress(open)}>
+        ${stateIcon(hass, stateOf(hass, config.entity), config.icon)}
       </div>
       <div class="text">
         <div class="name">${name}</div>

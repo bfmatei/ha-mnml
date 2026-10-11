@@ -5,6 +5,7 @@ import { test } from 'vitest';
 import { drawn } from '../../test/render.ts';
 
 import { renderControls } from './controls.ts';
+import { tipOf } from './tooltip.ts';
 
 type Controls = Parameters<typeof renderControls>[0];
 
@@ -33,7 +34,7 @@ function chip(controls: Controls, state: string): Element {
 }
 
 function tooltip(controls: Controls, state: string): unknown {
-  return Reflect.get(chip(controls, state), 'title');
+  return tipOf(chip(controls, state));
 }
 
 function pressButton(state: string): Element | undefined {
@@ -102,8 +103,8 @@ test('an unavailable entity keeps its action controls as inert orange displays',
   assert.ok(toggle.classList.contains('inert'));
   assert.ok(toggle.classList.contains('primary'), 'keeps its place in the lane');
   assert.ok(toggle.classList.contains('colored'));
-  assert.equal(Reflect.get(toggle, 'title'), 'Update: unavailable');
-  assert.equal(Reflect.get(service, 'title'), 'Install: unavailable');
+  assert.equal(tipOf(toggle), 'Update: unavailable');
+  assert.equal(tipOf(service), 'Install: unavailable');
   assert.ok(service.querySelector('ha-icon'), "a service keeps the control's own icon");
 });
 
@@ -129,6 +130,27 @@ test('a status chip lists its unavailable entities after its own rules', () => {
   assert.equal(tooltip(chip, 'unavailable'), 'Firmware\nMatter Server: unavailable');
   assert.equal(tooltip(chip, 'on'), 'Firmware\nMatter Server: on', 'a matching rule wins');
   assert.equal(tooltip(chip, 'off'), 'Firmware', 'and nothing to say leaves the name alone');
+});
+
+test('a silent status chip is drawn only while a rule holds or an entity is unavailable', () => {
+  const battery: Controls = [
+    {
+      type: 'status',
+      name: 'Batteries',
+      icon: 'mdi:battery-alert',
+      silent: true,
+      rules: [
+        { entities: ['update.a'], below: 5, color: 'red' },
+        { entities: ['update.a'], below: 20, color: 'orange' },
+      ],
+    },
+  ];
+  const drawnWith = (state: string): Element | undefined =>
+    lane(battery, { hass: hassWith(state), host: {} })?.children[0];
+  assert.equal(drawnWith('80'), undefined, 'fine: nothing is drawn');
+  assert.ok(drawnWith('14')?.classList.contains('colored'));
+  assert.equal(tipOf(drawnWith('14')), 'Batteries\nUpdate: 14');
+  assert.ok(drawnWith('unavailable')?.classList.contains('colored'), 'an offline one is a problem');
 });
 
 test('a toggle tells assistive technology whether it is pressed', () => {

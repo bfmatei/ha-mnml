@@ -74,7 +74,6 @@ export class MnmlButtonCard extends MnmlCard<ButtonCard> {
       role="button"
       tabindex="0"
       aria-label=${name}
-      title=${name}
       @click=${press}
       @keydown=${onPress(press)}
     >

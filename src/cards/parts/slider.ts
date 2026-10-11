@@ -15,6 +15,7 @@ import type { Host } from '../base.ts';
 import { BASE_STYLE } from '../styles.ts';
 
 import { dismissable } from './overlay.ts';
+import { tip } from './tooltip.ts';
 
 export interface SliderSpec {
   min: number;
@@ -264,6 +265,39 @@ export function sliderSpec(
         format: (value) => `${value} %`,
         commit: (value) =>
           callService(hass, id, 'media_player.volume_set', { volume_level: value / 100 }),
+      };
+    }
+    case 'position': {
+      const position = numberAttribute(stateObj, 'current_position');
+      return {
+        min: 0,
+        max: 100,
+        step: 1,
+        value: position ?? (stateObj.state === 'open' ? 100 : 0),
+        format: (value) => `${value} %`,
+        commit: (value) => callService(hass, id, 'cover.set_cover_position', { position: value }),
+      };
+    }
+    case 'percentage': {
+      const percentage = numberAttribute(stateObj, 'percentage') ?? 0;
+      return {
+        min: 0,
+        max: 100,
+        step: numberAttribute(stateObj, 'percentage_step') ?? 1,
+        value: stateObj.state === 'on' ? percentage : 0,
+        format: (value) => `${value} %`,
+        commit: (value) => callService(hass, id, 'fan.set_percentage', { percentage: value }),
+      };
+    }
+    case 'humidity': {
+      const min = numberAttribute(stateObj, 'min_humidity') ?? 0;
+      return {
+        min,
+        max: numberAttribute(stateObj, 'max_humidity') ?? 100,
+        step: 1,
+        value: numberAttribute(stateObj, 'humidity') ?? min,
+        format: (value) => `${value} %`,
+        commit: (value) => callService(hass, id, 'humidifier.set_humidity', { humidity: value }),
       };
     }
     default:
@@ -561,7 +595,7 @@ export function openSliderOverlay(
         type="button"
         class="control"
         aria-label="Close"
-        title="Close"
+        ${tip('Close')}
         @click=${() => {
           close(true);
         }}

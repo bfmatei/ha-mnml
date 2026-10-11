@@ -74,43 +74,6 @@ test("a name item prints another entity's name in the state line", async () => {
   assert.equal(text(out.querySelector('.state')), 'Jane');
 });
 
-test('a watched battery that goes unavailable raises the dot, once per device', async () => {
-  const offline = { state: 'unavailable', attributes: {} };
-  const out = await paint(
-    {
-      type: 'custom:mnml-tile-card',
-      name: 'Hall',
-      icon: 'mdi:door',
-      popup: '#hall',
-      problems: {
-        leaks: ['binary_sensor.hall_leak'],
-        batteries: ['sensor.hall_leak_battery', 'sensor.hall_climate_battery'],
-      },
-    },
-    {
-      ...HASS,
-      states: {
-        'binary_sensor.hall_leak': { entity_id: 'binary_sensor.hall_leak', ...offline },
-        'sensor.hall_leak_battery': { entity_id: 'sensor.hall_leak_battery', ...offline },
-        'sensor.hall_climate_battery': {
-          entity_id: 'sensor.hall_climate_battery',
-          state: '80',
-          attributes: {},
-        },
-      },
-      entities: {
-        'binary_sensor.hall_leak': { device_id: 'leak' },
-        'sensor.hall_leak_battery': { device_id: 'leak' },
-      },
-      devices: { leak: { name: 'Leak sensor' } },
-    },
-  );
-  const pill = out.querySelector<HTMLElement>('.pill');
-  const dot = pill?.querySelector('.dot');
-  assert.ok(dot?.classList.contains('colored'), 'the dot is there, painted');
-  assert.equal(pill?.title, 'Hall\nLeak sensor: unavailable', 'the device is named once');
-});
-
 test('a text in the state line follows its when rule, like a value does', async () => {
   const out = await paint({
     type: 'custom:mnml-tile-card',

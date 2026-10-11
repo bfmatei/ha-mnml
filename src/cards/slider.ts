@@ -31,6 +31,9 @@ const SLIDER_KINDS = Object.keys({
   temperature: true,
   value: true,
   volume: true,
+  position: true,
+  percentage: true,
+  humidity: true,
 } satisfies Record<SliderKind, true>);
 
 export class MnmlSliderCard extends MnmlCard<SliderCard> {
