@@ -126,6 +126,13 @@ const GLANCES_STYLE = css`
     }
   }
   @media (max-width: 480px) {
+    .glances,
+    .group {
+      justify-content: center;
+    }
+    .group.problems {
+      margin-left: 0;
+    }
     .group.calm + .group.problems {
       padding-left: 0;
       border-left: 0;
