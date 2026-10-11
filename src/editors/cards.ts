@@ -14,6 +14,7 @@ import type {
   SelectCard,
   SliderCard,
   TileCard,
+  WeatherCard,
 } from '../contract/cards.ts';
 
 import {
@@ -142,6 +143,11 @@ const REPORT = plain<ReportCard>(
     { title: 'Heading', keys: ['title', 'icon'] },
   ],
 );
+
+const WEATHER = plain<WeatherCard>('weather', 'Weather', {
+  entity: need(entity(['weather'])),
+  title: text(),
+});
 
 const BUTTON = plain<ButtonCard>('button', 'Button', {
   entity: need(entity(['button'])),
@@ -357,6 +363,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Shape>> = {
   'custom:mnml-messages-card': MESSAGES,
   'custom:mnml-clients-card': CLIENTS,
   'custom:mnml-report-card': REPORT,
+  'custom:mnml-weather-card': WEATHER,
   'custom:mnml-glances-card': GLANCES,
   'custom:mnml-button-card': BUTTON,
   'custom:mnml-select-card': SELECT,

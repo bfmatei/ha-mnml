@@ -91,6 +91,8 @@ views:
               - entities: [sensor.fixture_battery_a, sensor.fixture_battery_b]
                 name: Low batteries
                 below: 20
+          - type: custom:mnml-weather-card
+            entity: weather.demo_weather_south
           - type: custom:mnml-report-card
             entity: sensor.fixture_report
             title: Failed checks

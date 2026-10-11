@@ -19,6 +19,7 @@ import { MnmlSliderCard } from './slider.ts';
 import { STUBS } from './stubs.ts';
 import { MnmlTemplateCard } from './template.ts';
 import { MnmlTileCard } from './tile.ts';
+import { MnmlWeatherCard } from './weather.ts';
 
 interface CustomCardEntry {
   type: string;
@@ -100,6 +101,14 @@ const CARDS: readonly Entry[] = [
     card: MnmlReportCard,
     name: 'MNML Report',
     description: 'The lines of a text attribute, each with the details under it',
+    preview: false,
+    editor: CARD_EDITOR,
+  },
+  {
+    tag: 'mnml-weather-card',
+    card: MnmlWeatherCard,
+    name: 'MNML Weather',
+    description: 'The weather now, and its forecast',
     preview: false,
     editor: CARD_EDITOR,
   },

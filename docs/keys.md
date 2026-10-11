@@ -112,13 +112,17 @@ Upcoming calendar events by week. `sources` (required): each has `entity`, a cal
 `items` (required), each drawn as a well, in one of two shapes:
 
 - **An entity:** `entity` (required), `name` (the tooltip; no text is drawn for it), `icon` (the entity's own by default), `color` and `when` (the icon and the well take the colour while the entity is in the `when` state, `on` by default), `state` (state items; the entity's state by default), `show` (the glance is drawn only while the entity is in that state), `quiet` (while the entity is not in `when`, no value is drawn and the icon is dimmed), `bare` (no value is drawn, the icon alone), `alert` (the glance is red while the entity is in that state), `people` (person entities: the glance is red while it is on with somebody home, or off with everybody away; `when` says what on is), and `popup` or `toggle`: a tap opens the pop-up, or toggles the entity.
-- **A count:** `entities` and `name` (both required; the name is the tooltip), `icon`, `color` (orange by default), `popup` (opened by a tap), and what counts: `is` (the entities in one of these states) or `below` (the entities under a number), with `critical`, under which the glance turns red. It is drawn only while the count is above 0, and an unavailable entity is not counted.
+- **A count:** `entities` and `name` (both required; the name is the tooltip), `icon`, `color` (orange by default), `popup` (opened by a tap), and what counts: `is` (the entities in one of these states), `below` (the entities under a number) or `sum` (the total of the entities' numbers, counted while above 0), with `critical`, under which the glance turns red; with `sum`, `critical` is the level at which the first entity turns the glance red, the others leaving it orange. It is drawn only while the count is above 0, and an unavailable entity is not counted.
 
 A tooltip names the item, and a count's lists what it counts with each value. The items fall into two groups: the calm statuses on the left, the entity items without `show`; and what needs you on the right, set apart by a hairline, the entity items with `show` and the counts. A critical count fades in once when it is drawn, unless the reader prefers reduced motion. The wells wrap onto a second row rather than scroll. The card is not drawn while none of its items is.
 
 ### `mnml-report-card`
 
 `entity` (required), a sensor whose `details` attribute holds a text report, `title` and `icon` for the heading, and `colors`, a colour for each kind of headline (`{ warnings: orange }`; red otherwise). The card is not drawn while the report has no entries. [Data](data.md#the-report-card) has the format.
+
+### `mnml-weather-card`
+
+`entity` (required, a `weather` entity) and `title` for the heading. The conditions now come from the entity's attributes, each drawn only when the entity has it, and the forecast from Home Assistant's `weather/subscribe_forecast`: up to seven days when the entity supports a daily forecast, up to eight hours when it only supports an hourly one, and none when it has no forecast.
 
 ### `mnml-button-card`
 
