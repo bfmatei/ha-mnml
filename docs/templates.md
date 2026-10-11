@@ -1654,8 +1654,11 @@ The strip of the home's overall statuses, one line across the section: the weath
 | `energy.grid_today`   | entity   |                     |                                                                   |
 | `energy.solar_today`  | entity   |                     |                                                                   |
 | `energy.export_today` | entity   |                     |                                                                   |
-| `failed`              | entity   |                     |                                                                   |
-| `warnings`            | entity   |                     |                                                                   |
+| `checks`              | object   |                     |                                                                   |
+| `checks.failed`       | entity   | required            |                                                                   |
+| `checks.warnings`     | entity   |                     |                                                                   |
+| `checks.last_run`     | entity   | required            |                                                                   |
+| `checks.overdue`      | entity   | required            |                                                                   |
 | `batteries`           | entities |                     | domain sensor, device_class battery, anywhere in the home         |
 | `leaks`               | entities |                     | domain binary_sensor, device_class moisture, anywhere in the home |
 | `smoke`               | entities |                     | domain binary_sensor, device_class smoke, anywhere in the home    |
@@ -1667,7 +1670,27 @@ The strip of the home's overall statuses, one line across the section: the weath
 | `low`                 | number   | `20`                |                                                                   |
 | `critical`            | number   | `5`                 |                                                                   |
 
-Brings `batteries-popup` (with batteries) and `energy-popup` (with energy).
+Brings `weather-popup` (with weather), `checks-popup` (with checks), `batteries-popup` (with batteries) and `energy-popup` (with energy). The checks item counts the failed checks and the warnings together, red while a check failed and orange while there are only warnings.
+
+### `weather-popup`
+
+The weather now, its conditions and its forecast.
+
+| Slot      | Kind   | Required or default | Found by |
+| --------- | ------ | ------------------- | -------- |
+| `weather` | entity | required            |          |
+
+### `checks-popup`
+
+The daily checks: what failed, the warnings, when they last ran, and the details.
+
+| Slot              | Kind   | Required or default | Found by |
+| ----------------- | ------ | ------------------- | -------- |
+| `checks`          | object | required            |          |
+| `checks.failed`   | entity | required            |          |
+| `checks.warnings` | entity |                     |          |
+| `checks.last_run` | entity | required            |          |
+| `checks.overdue`  | entity | required            |          |
 
 ### `batteries-popup`
 

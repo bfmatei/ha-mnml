@@ -23,6 +23,7 @@ const COLUMNS: Record<string, number> = {
   'mnml-messages-card': 12,
   'mnml-clients-card': 12,
   'mnml-report-card': 12,
+  'mnml-weather-card': 12,
   'mnml-glances-card': 12,
   'mnml-button-card': 6,
   'mnml-select-card': 6,

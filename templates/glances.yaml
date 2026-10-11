@@ -36,20 +36,15 @@ glances:
         grid_today: { kind: entity, label: Grid today }
         solar_today: { kind: entity, label: Solar today }
         export_today: { kind: entity, label: Export today }
-    failed:
-      {
-        kind: entity,
-        label: Failed checks,
-        group: Problems,
-        help: A sensor counting what failed; shown while it is not 0.,
-      }
-    warnings:
-      {
-        kind: entity,
-        label: Warnings,
-        group: Problems,
-        help: A sensor counting the warnings; shown while it is not 0.,
-      }
+    checks:
+      kind: object
+      group: Problems
+      help: The daily checks; the item counts the failed ones and the warnings together while there are any, and opens the checks pop-up.
+      fields:
+        failed: { kind: entity, required: true, label: Failed checks }
+        warnings: { kind: entity }
+        last_run: { kind: entity, required: true }
+        overdue: { kind: entity, required: true }
     batteries:
       {
         kind: entities,
@@ -115,6 +110,7 @@ glances:
         if: weather
         entity: '[[weather]]'
         state: [{ id: temperature, attribute: temperature }]
+        popup: '#weather'
       - id: alarm
         if: alarm
         entity: '[[alarm]]'
@@ -139,24 +135,15 @@ glances:
         name: Energy
         icon: mdi:lightning-bolt
         popup: '#energy'
-      - id: failed
-        if: failed
-        entity: '[[failed]]'
-        name: Failed checks
-        icon: mdi:clipboard-alert-outline
-        color: red
-        when: { not: ['0'] }
-        show: { not: ['0'] }
-        popup: '#proxmox'
-      - id: warnings
-        if: warnings
-        entity: '[[warnings]]'
-        name: Warnings
+      - id: checks
+        if: checks
+        entities: ['[[checks.failed]]', '[[checks.warnings]]']
+        name: Checks
         icon: mdi:clipboard-alert-outline
         color: orange
-        when: { not: ['0'] }
-        show: { not: ['0'] }
-        popup: '#proxmox'
+        sum: true
+        critical: 1
+        popup: '#checks'
       - id: notifications
         if: notifications
         entity: '[[notifications]]'
@@ -235,6 +222,14 @@ glances:
         grid_today: '[[energy.grid_today]]'
         solar_today: '[[energy.solar_today]]'
         export_today: '[[energy.export_today]]'
+    - id: weather-popup
+      if: weather
+      template: weather-popup
+      slots: { weather: '[[weather]]' }
+    - id: checks-popup
+      if: checks
+      template: checks-popup
+      slots: { checks: '[[checks]]' }
     - id: batteries-popup
       if: batteries
       template: batteries-popup
@@ -243,6 +238,76 @@ glances:
     weather: weather.home
     vacation: input_boolean.vacation
     batteries: [sensor.window_battery]
+
+weather-popup:
+  description: The weather now, its conditions and its forecast.
+  slots:
+    weather: { kind: entity, required: true }
+  card:
+    hash: '#weather'
+    cards:
+      - id: header
+        type: custom:mnml-header-card
+        name: Weather
+        icon: mdi:weather-partly-cloudy
+      - id: forecast
+        type: custom:mnml-weather-card
+        entity: '[[weather]]'
+        title: Now and next
+  example:
+    weather: weather.home
+
+checks-popup:
+  description: 'The daily checks: what failed, the warnings, when they last ran, and the details.'
+  slots:
+    checks:
+      kind: object
+      required: true
+      fields:
+        failed: { kind: entity, required: true, label: Failed checks }
+        warnings: { kind: entity }
+        last_run: { kind: entity, required: true }
+        overdue: { kind: entity, required: true }
+  card:
+    hash: '#checks'
+    cards:
+      - id: header
+        type: custom:mnml-header-card
+        name: Checks
+        icon: mdi:clipboard-check-outline
+      - id: checks
+        type: custom:mnml-list-card
+        title: Daily checks
+        icon: mdi:clipboard-check-outline
+        rows:
+          - id: checks-failed
+            entity: '[[checks.failed]]'
+            color: red
+            when: { not: ['0'] }
+          - id: checks-warnings
+            if: checks.warnings
+            entity: '[[checks.warnings]]'
+            color: orange
+            when: { not: ['0'] }
+          - id: checks-last_run
+            entity: '[[checks.last_run]]'
+            relative: true
+          - id: checks-overdue
+            entity: '[[checks.overdue]]'
+            flag: true
+            color: orange
+            show: { is: ['on'] }
+      - id: failures
+        type: custom:mnml-report-card
+        entity: '[[checks.failed]]'
+        title: Check details
+        icon: mdi:clipboard-alert-outline
+        colors: { warnings: orange }
+  example:
+    checks:
+      failed: sensor.checks_failed
+      last_run: sensor.checks_last_run
+      overdue: binary_sensor.checks_overdue
 
 batteries-popup:
   description: The batteries that are running low, lowest first, with their level as a bar.

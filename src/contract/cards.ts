@@ -15,6 +15,7 @@ import type {
   SensorId,
   ServiceName,
   Subnet,
+  WeatherId,
 } from './entities.ts';
 import type { Value } from './templates.ts';
 
@@ -320,6 +321,12 @@ export interface ClientsCard {
   fold?: true;
 }
 
+export interface WeatherCard {
+  type: 'custom:mnml-weather-card';
+  entity: WeatherId;
+  title?: string;
+}
+
 export interface ReportCard {
   type: 'custom:mnml-report-card';
   entity: SensorId;
@@ -345,6 +352,7 @@ export interface GlanceOne {
   people?: PersonId[];
   is?: never;
   below?: never;
+  sum?: never;
   critical?: never;
 }
 
@@ -365,6 +373,7 @@ export interface GlanceCount {
   people?: never;
   is?: string[];
   below?: number;
+  sum?: true;
   critical?: number;
 }
 
@@ -527,6 +536,7 @@ export type CustomCard =
   | MessagesCard
   | ClientsCard
   | ReportCard
+  | WeatherCard
   | GlancesCard
   | ButtonCard
   | SelectCard
