@@ -87,7 +87,7 @@ slots:
 
 The **MNML** panel in Home Assistant's sidebar, for admins, keeps the home's templates. Its library lists the tiles, the templates you place on a dashboard, and with **Pop-ups and parts** every other one too, shipped, customised and the home's own, with where each is used. A template opens in a builder:
 
-- **Simple**, where it opens: each part with a switch, and its colour, icon and name, beside the live preview;
+- **Design**, where it opens: the template drawn large. Click, drag or arrow to any part of it to change what it shows, its colour, icon and name, move it, copy it, delete it, or add another beside it. A new template starts from a tile, a list, a strip or a pop-up. The other tools are behind **More tools**;
 
 - the outline of its card and pop-ups;
 - a live preview, on the example or on any area;
@@ -97,7 +97,7 @@ Slots and their discovery rules are set as sentences ("Find the first sensor wit
 
 ![The template library](docs/screenshots/panel-library.png)
 
-![The Simple tab of the template builder](docs/screenshots/panel-simple.png)
+![The Design tab of the template builder](docs/screenshots/panel-design.png)
 
 ![The builder](docs/screenshots/panel-builder.png)
 

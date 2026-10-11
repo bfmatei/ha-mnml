@@ -75,3 +75,5 @@ export function isTemplate(value: unknown): value is Template {
 export function isMapping(value: unknown): value is Record<string, Value> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
+
+export const PART_KEY = '_part';

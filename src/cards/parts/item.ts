@@ -10,6 +10,7 @@ import { stateOf } from '../../ha/hass.ts';
 import type { HomeAssistant } from '../../ha/hass.ts';
 import { nameOf } from '../../ha/names.ts';
 import { navigate, openedFrom, prebuild } from '../../ha/navigation.ts';
+import { partOf } from '../../ha/part.ts';
 import { tint } from '../../ha/rules.ts';
 import { colorStyle, onPress, quietly, stateIcon } from '../../ha/templates.ts';
 import type { Host } from '../base.ts';
@@ -79,6 +80,7 @@ export function itemRow(
   const lane = controlsOf(item.controls, { hass, host });
   return html`<div
     class=${classMap({ row: true, link: link !== undefined })}
+    data-part=${partOf(item)}
     @pointerdown=${link?.pointerdown ?? nothing}
     @click=${link?.click ?? nothing}
   >

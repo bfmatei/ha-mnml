@@ -1,8 +1,6 @@
 import { html, nothing } from 'lit';
 import type { TemplateResult } from 'lit';
-import { classMap } from 'lit/directives/class-map.js';
 import { live } from 'lit/directives/live.js';
-import { styleMap } from 'lit/directives/style-map.js';
 
 import { isMapping } from '../contract/templates.ts';
 import type { Template, Value } from '../contract/templates.ts';
@@ -41,8 +39,6 @@ export interface KeptPart {
 }
 
 const LOOKS: readonly LookKey[] = ['name', 'title', 'icon', 'color'];
-const EDITOR_DOCS =
-  'https://github.com/bfmatei/ha-mnml/blob/main/docs/editors.md#the-template-cards-editor';
 
 const words = (label: string): string => label.replaceAll(/\[\[([^\]]+)\]\]/g, '$1');
 
@@ -50,22 +46,31 @@ const idOf = (item: Value): string | undefined =>
   isMapping(item) && typeof item['id'] === 'string' ? item['id'] : undefined;
 
 function looksOf(part: Part, shipped: Template | undefined): SimpleLook[] {
-  return LOOKS.flatMap((key) => {
-    const value = part.value[key];
-    if (typeof value !== 'string' || value.includes('[[')) {
-      return [];
-    }
-    const path = [...part.path, key];
-    const original = shipped === undefined ? undefined : valueAt(shipped, path);
-    return [
-      {
-        path,
-        key,
-        value,
-        ...(typeof original === 'string' && original !== value ? { original } : {}),
-      },
-    ];
-  });
+  const slots = part.value['slots'];
+  const homes: { holder: Record<string, Value>; base: Path }[] = [
+    { holder: part.value, base: part.path },
+    ...(part.kind === 'fragment' && isMapping(slots)
+      ? [{ holder: slots, base: [...part.path, 'slots'] }]
+      : []),
+  ];
+  return homes.flatMap(({ holder, base }) =>
+    LOOKS.flatMap((key) => {
+      const value = holder[key];
+      if (typeof value !== 'string' || value.includes('[[')) {
+        return [];
+      }
+      const path = [...base, key];
+      const original = shipped === undefined ? undefined : valueAt(shipped, path);
+      return [
+        {
+          path,
+          key,
+          value,
+          ...(typeof original === 'string' && original !== value ? { original } : {}),
+        },
+      ];
+    }),
+  );
 }
 
 function listAt(template: Template | undefined, path: Path): Value[] {
@@ -251,6 +256,8 @@ export function keptPart(template: Template, path: Path): KeptPart {
   return { value: valueAt(template, path), after: before === undefined ? undefined : idOf(before) };
 }
 
+export type { SimpleLook };
+
 export interface SimpleActions {
   toggle: (row: SimpleRow, on: boolean) => void;
   look: (look: SimpleLook, value: string) => void;
@@ -261,7 +268,7 @@ const changed = (event: Event): string => {
   return typeof value === 'string' ? value : '';
 };
 
-function drawLook(
+export function drawLook(
   look: SimpleLook,
   of: string,
   actions: SimpleActions,
@@ -271,7 +278,7 @@ function drawLook(
   const label = `${of}: ${look.key === 'color' ? 'colour' : look.key === 'icon' ? 'icon' : look.key}`;
   if (look.key === 'color') {
     const options = [
-      ...new Set([look.value, ...(look.original === undefined ? [] : [look.original]), ...COLORS]),
+      ...new Set([...COLORS, look.value, ...(look.original === undefined ? [] : [look.original])]),
     ];
     return html`<select
       class="area-picker"
@@ -313,50 +320,4 @@ function drawLook(
       }}
     />
   </span>`;
-}
-
-export function drawSimple(
-  rows: readonly SimpleRow[],
-  actions: SimpleActions,
-  hass?: HomeAssistant,
-): TemplateResult {
-  return html`<div class="simple">
-    <p class="muted">
-      What changes here changes this template everywhere it is used. A card's own entities and names
-      are set in
-      <a href=${EDITOR_DOCS} target="_blank" rel="noreferrer">its editor</a>.
-    </p>
-    ${rows.map(
-      (row, index) => html`${
-          row.depth > 0 && row.group !== rows[index - 1]?.group
-            ? html`<div class="simple-group" style=${styleMap({ '--depth': String(row.depth) })}>
-                ${row.group}
-              </div>`
-            : nothing
-        }
-        <div
-          class=${classMap({ 'simple-row': true, off: !row.on })}
-          style=${styleMap({ '--depth': String(row.depth) })}
-        >
-          ${
-            row.switchable
-              ? html`<input
-                  type="checkbox"
-                  aria-label=${`Show ${row.label}`}
-                  data-path=${row.path.join('/')}
-                  .checked=${live(row.on)}
-                  @change=${(event: Event) => {
-                    actions.toggle(row, field(event.target, 'checked') === true);
-                  }}
-                />`
-              : html`<span class="simple-spacer"></span>`
-          }
-          <span class="simple-words">
-            <span>${row.label}</span>
-            ${row.condition === undefined ? nothing : html`<span class="muted">${row.condition}</span>`}
-          </span>
-          ${row.on ? row.looks.map((look) => drawLook(look, row.label, actions, hass)) : nothing}
-        </div>`,
-    )}
-  </div>`;
 }

@@ -12,7 +12,10 @@ export function editorOf(tag: string): () => Promise<HTMLElement> {
       await import(url.href);
     } catch (error) {
       attempt += 1;
-      throw error;
+      throw new Error(
+        'The editor of MNML could not be loaded. If MNML was updated since this page was opened, reload the page.',
+        { cause: error },
+      );
     }
     return document.createElement(tag);
   };

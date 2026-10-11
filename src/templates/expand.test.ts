@@ -431,3 +431,80 @@ test('a slot label, help and group change nothing in what a template draws', () 
     expand(plain, { template: 't', slots: { name: 'Hall' } }),
   );
 });
+
+test('a marked expansion tells each part its path, and a fragment use is one part', () => {
+  const templates: Templates = {
+    ...T,
+    marked: {
+      slots: { door: { kind: 'entity' }, lights: { kind: 'entities' } },
+      card: {
+        type: 'custom:mnml-tile-card',
+        name: 'Hall',
+        icon: 'mdi:door',
+        popup: '#hall',
+        chips: [
+          { id: 'door', if: 'door', type: 'indicator', entity: '[[door]]', color: 'orange' },
+          { id: 'power', template: 'power', slots: { entity: 'light.hall' } },
+          { id: 'each-lights', each: 'lights', as: 'light', type: 'toggle', entity: '[[light]]' },
+        ],
+        item: { entity: 'light.hall' },
+      },
+    },
+  };
+  const slots = { door: 'binary_sensor.door', lights: ['light.a', 'light.b'] };
+  const plain = expand(templates, { template: 'marked', slots });
+  assert.ok(!JSON.stringify(plain.card).includes('_part'));
+  const out = expand(templates, { template: 'marked', slots }, {}, new Set(), {
+    singles: new Set(['card', 'card/item']),
+  });
+  assert.deepEqual(toValue(out.card), {
+    type: 'custom:mnml-tile-card',
+    name: 'Hall',
+    icon: 'mdi:door',
+    popup: '#hall',
+    chips: [
+      {
+        type: 'indicator',
+        entity: 'binary_sensor.door',
+        color: 'orange',
+        _part: 'card/chips/#door',
+      },
+      {
+        type: 'toggle',
+        entity: 'light.hall',
+        icon: 'mdi:power',
+        color: 'amber',
+        primary: true,
+        _part: 'card/chips/#power',
+      },
+      { type: 'toggle', entity: 'light.a', _part: 'card/chips/#each-lights' },
+      { type: 'toggle', entity: 'light.b', _part: 'card/chips/#each-lights' },
+    ],
+    item: { entity: 'light.hall', _part: 'card/item' },
+    _part: 'card',
+  });
+});
+
+test('a fragment that draws a list marks each of its cards, and a mark never makes a draw fail', () => {
+  const templates: Templates = {
+    pair: { card: [{ type: 'a' }, { type: 'b' }] },
+    stack: {
+      card: {
+        type: 'vertical-stack',
+        cards: [
+          { id: 'pair', template: 'pair' },
+          { id: 'one', type: 'c' },
+        ],
+      },
+    },
+  };
+  const out = expand(templates, { template: 'stack' }, {}, new Set(), { singles: new Set() });
+  assert.deepEqual(toValue(out.card), {
+    type: 'vertical-stack',
+    cards: [
+      { type: 'a', _part: 'card/cards/#pair' },
+      { type: 'b', _part: 'card/cards/#pair' },
+      { type: 'c', _part: 'card/cards/#one' },
+    ],
+  });
+});

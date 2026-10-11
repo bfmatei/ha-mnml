@@ -10,6 +10,7 @@ import { hasValue, isUnavailable, numericState, run, stateOf, toggleEntity } fro
 import type { HomeAssistant } from '../ha/hass.ts';
 import { nameOf } from '../ha/names.ts';
 import { navigate, prebuild } from '../ha/navigation.ts';
+import { partOf } from '../ha/part.ts';
 import { active, matches, shown, tint } from '../ha/rules.ts';
 import { colorStyle, icon, onPress, stateIcon } from '../ha/templates.ts';
 
@@ -232,6 +233,7 @@ export class MnmlGlancesCard extends MnmlCard<GlancesCard> {
     title: string | undefined,
     press: Press,
     content: TemplateResult,
+    part: string | typeof nothing,
   ): TemplateResult {
     const { acts, click, down } = press;
     return html`<div
@@ -243,6 +245,7 @@ export class MnmlGlancesCard extends MnmlCard<GlancesCard> {
         link: acts,
       })}
       style=${styleMap(colorStyle(look.color))}
+      data-part=${part}
       ${tip(title)}
       role=${acts ? 'button' : nothing}
       tabindex=${acts ? '0' : nothing}
@@ -285,6 +288,7 @@ export class MnmlGlancesCard extends MnmlCard<GlancesCard> {
             ? nothing
             : html`<span class="state">${stateLine(hass, item.entity, item.state ?? [{}])}</span>`
         }`,
+        partOf(item),
       ),
     };
   }
@@ -320,6 +324,7 @@ export class MnmlGlancesCard extends MnmlCard<GlancesCard> {
         [item.name, ...lines].join('\n'),
         this.press(hass, item.popup, undefined),
         html`${icon(item.icon ?? COUNT_ICON)}<span class="state">${found.length}</span>`,
+        partOf(item),
       ),
     };
   }

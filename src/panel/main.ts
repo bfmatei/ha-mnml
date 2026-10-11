@@ -263,6 +263,9 @@ export class MnmlPanel extends LitElement {
     exportOne: (name, template) => {
       this.exportAll([name], { [name]: template });
     },
+    open: (name) => {
+      this.go(`${BASE}/templates/${name}`, true);
+    },
   };
 
   private readonly send = (message: { type: string } & Record<string, unknown>): Promise<unknown> =>
@@ -875,6 +878,7 @@ export class MnmlPanel extends LitElement {
         shipped: undefined,
         conflicts: [],
         fresh: true,
+        blank: true,
       });
       if (!this.go(`${BASE}/templates/${name}`)) {
         this.fresh.delete(name);

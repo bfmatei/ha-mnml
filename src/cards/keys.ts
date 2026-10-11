@@ -1,3 +1,5 @@
+import { PART_KEY } from '../contract/templates.ts';
+
 export type AllKeys<T> = T extends unknown ? keyof T & string : never;
 
 type AllowedKeys<T> = {
@@ -77,7 +79,7 @@ export function unknownKeys(value: unknown, of: KeySchema, path = ''): string[] 
   const found: string[] = [];
   for (const [key, child] of entries) {
     const where = path === '' ? key : `${path}.${key}`;
-    if (!chosen.keys.has(key) && !(path === '' && LAYOUT.has(key))) {
+    if (!chosen.keys.has(key) && key !== PART_KEY && !(path === '' && LAYOUT.has(key))) {
       found.push(where);
     }
     const inner = chosen.nested?.[key];

@@ -30,6 +30,7 @@ import {
 import type { HassEntity, HomeAssistant } from '../../ha/hass.ts';
 import { entityName, nameOf } from '../../ha/names.ts';
 import { navigate, openedFrom, prebuild } from '../../ha/navigation.ts';
+import { partOf } from '../../ha/part.ts';
 import { UNAVAILABLE, active, matches, shown, tint, tyreBand } from '../../ha/rules.ts';
 import { colorStyle, icon, quietly, stateIcon } from '../../ha/templates.ts';
 import { requireList, requireOneOf } from '../base.ts';
@@ -49,6 +50,7 @@ type Action = ToggleControl | SliderControl | SelectControl | ServiceControl;
 
 interface Look {
   title: string;
+  part?: string | typeof nothing;
   spoken?: string;
   color?: Color | undefined;
   primary?: boolean | undefined;
@@ -73,6 +75,7 @@ function pressed(
     type="button"
     class=${classes(look, false)}
     style=${styleMap(colorStyle(look.color))}
+    data-part=${look.part ?? nothing}
     aria-label=${look.spoken ?? look.title}
     ${tip(look.title)}
     aria-pressed=${extra.pressed === undefined ? nothing : String(extra.pressed)}
@@ -88,6 +91,7 @@ function inert(look: Look, glyph: TemplateResult): TemplateResult {
   return html`<div
     class=${classes(look, true)}
     style=${styleMap(colorStyle(look.color))}
+    data-part=${look.part ?? nothing}
     role="img"
     aria-label=${look.spoken ?? look.title}
     ${tip(look.title)}
@@ -115,6 +119,7 @@ function toggle(control: ToggleControl, ctx: ControlContext): TemplateResult {
   return pressed(
     {
       title: entityName(ctx.hass, control.entity),
+      part: partOf(control),
       primary: control.primary,
       color: tint(control.color, control.when, stateObj),
     },
@@ -128,7 +133,7 @@ function toggle(control: ToggleControl, ctx: ControlContext): TemplateResult {
 }
 
 function slider(control: SliderControl, ctx: ControlContext): TemplateResult {
-  return pressed({ title: control.name }, icon(control.icon), (event) => {
+  return pressed({ title: control.name, part: partOf(control) }, icon(control.icon), (event) => {
     const hass = ctx.host.hass ?? ctx.hass;
     const stateObj = stateOf(hass, control.entity);
     const spec = hasValue(stateObj)
@@ -156,6 +161,7 @@ function select(control: SelectControl, ctx: ControlContext): TemplateResult | u
   return pressed(
     {
       title: entityName(ctx.hass, control.entity),
+      part: partOf(control),
       primary: control.primary,
       color: tint(control.color, control.when, stateObj),
     },
@@ -166,10 +172,14 @@ function select(control: SelectControl, ctx: ControlContext): TemplateResult | u
 }
 
 function service(control: ServiceControl, ctx: ControlContext): TemplateResult {
-  return pressed({ title: control.name, primary: control.primary }, icon(control.icon), () => {
-    const hass = ctx.host.hass ?? ctx.hass;
-    run(ctx.host, callService(hass, control.entity, control.service));
-  });
+  return pressed(
+    { title: control.name, part: partOf(control), primary: control.primary },
+    icon(control.icon),
+    () => {
+      const hass = ctx.host.hass ?? ctx.hass;
+      run(ctx.host, callService(hass, control.entity, control.service));
+    },
+  );
 }
 
 function nav(control: NavControl, ctx: ControlContext): TemplateResult {
@@ -179,6 +189,7 @@ function nav(control: NavControl, ctx: ControlContext): TemplateResult {
     type="button"
     class=${classes({ title, color: tint(control.color, control.when, stateObj) }, false)}
     style=${styleMap(colorStyle(tint(control.color, control.when, stateObj)))}
+    data-part=${partOf(control)}
     aria-label=${title}
     ${tip(title)}
     @pointerdown=${quietly(() => {
@@ -200,7 +211,7 @@ function indicator(control: IndicatorControl, ctx: ControlContext): TemplateResu
       ? `${name}: ${formatState(ctx.hass, stateObj)}`
       : name;
   return inert(
-    { title, color: tint(control.color, undefined, stateObj) },
+    { title, part: partOf(control), color: tint(control.color, undefined, stateObj) },
     stateIcon(ctx.hass, stateObj),
   );
 }
@@ -233,7 +244,12 @@ function status(control: StatusControl, ctx: ControlContext): TemplateResult | u
     if (lines.length > 0) {
       const parts = [control.name, ...lines];
       return inert(
-        { title: parts.join('\n'), spoken: parts.join('. '), color: rule.color },
+        {
+          title: parts.join('\n'),
+          part: partOf(control),
+          spoken: parts.join('. '),
+          color: rule.color,
+        },
         icon(control.icon),
       );
     }
@@ -241,11 +257,18 @@ function status(control: StatusControl, ctx: ControlContext): TemplateResult | u
   if (down.size > 0) {
     const parts = [control.name, ...down.values()];
     return inert(
-      { title: parts.join('\n'), spoken: parts.join('. '), color: UNAVAILABLE },
+      {
+        title: parts.join('\n'),
+        part: partOf(control),
+        spoken: parts.join('. '),
+        color: UNAVAILABLE,
+      },
       icon(control.icon),
     );
   }
-  return control.silent === true ? undefined : inert({ title: control.name }, icon(control.icon));
+  return control.silent === true
+    ? undefined
+    : inert({ title: control.name, part: partOf(control) }, icon(control.icon));
 }
 
 function tyres(control: TyresControl, ctx: ControlContext): TemplateResult {
@@ -266,6 +289,7 @@ function tyres(control: TyresControl, ctx: ControlContext): TemplateResult {
   return inert(
     {
       title: off === undefined || low || warn ? title : `${title}: ${formatState(ctx.hass, off)}`,
+      part: partOf(control),
       color: low ? 'red' : warn ? 'orange' : off === undefined ? undefined : UNAVAILABLE,
     },
     icon('mdi:car-tire-alert'),
@@ -278,7 +302,12 @@ function unavailable(control: Action, ctx: ControlContext, stateObj: HassEntity)
   const primary = control.type !== 'slider' && control.primary;
   const glyphIcon: MdiIcon | undefined = control.type === 'toggle' ? control.icon : undefined;
   return inert(
-    { title: `${name}: ${formatState(ctx.hass, stateObj)}`, primary, color: UNAVAILABLE },
+    {
+      title: `${name}: ${formatState(ctx.hass, stateObj)}`,
+      part: partOf(control),
+      primary,
+      color: UNAVAILABLE,
+    },
     own ? stateIcon(ctx.hass, stateObj, glyphIcon) : icon(control.icon),
   );
 }
@@ -288,9 +317,12 @@ function scenes(control: ScenesControl, ctx: ControlContext): TemplateResult | u
   if (choice.options.length === 0) {
     return undefined;
   }
-  return pressed({ title: control.name }, icon(control.icon), menuOpener(choice, ctx), {
-    menu: true,
-  });
+  return pressed(
+    { title: control.name, part: partOf(control) },
+    icon(control.icon),
+    menuOpener(choice, ctx),
+    { menu: true },
+  );
 }
 
 const ACTIONS = new Set(['toggle', 'slider', 'select', 'service']);

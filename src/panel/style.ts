@@ -1,5 +1,7 @@
 import { css } from 'lit';
 
+import { SELECT_STYLE } from '../cards/styles.ts';
+
 export const PAGE_STYLE = css`
   :host {
     min-height: 100vh;
@@ -568,7 +570,7 @@ export const PANEL_STYLE = css`
   .inspector {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 20px;
   }
   .inspect-head {
     display: flex;
@@ -583,18 +585,30 @@ export const PANEL_STYLE = css`
   .inspect-section {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 12px;
+    padding-top: 16px;
+    border-top: 1px solid var(--divider-color);
+  }
+  .inspect-section p {
+    margin: 0;
   }
   .inspect-section h3 {
     margin: 0;
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--secondary-text-color);
+    font-size: 14px;
+    font-weight: 600;
+  }
+  :host(mnml-binder) {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  :host(mnml-binder) .action {
+    align-self: flex-start;
   }
   .binding {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 8px;
   }
   .binding > ha-form {
     flex: 1;
@@ -644,56 +658,301 @@ export const PANEL_STYLE = css`
     flex-direction: column;
     gap: 12px;
   }
-  .simple-work {
+  .design {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) 340px;
+    align-items: start;
   }
-  .simple-work.narrow {
+  .design.narrow {
     grid-template-columns: minmax(0, 1fr);
   }
-  .simple {
+  .design-stage {
+    min-width: 0;
+    padding: 16px;
+  }
+  .design-panel {
+    box-sizing: border-box;
+    border-left: 1px solid var(--divider-color);
+    padding: 16px;
+    position: sticky;
+    top: 0;
+    max-height: 100vh;
+    overflow: auto;
+  }
+  .design.narrow .design-panel {
+    position: static;
+    max-height: none;
+    border-left: none;
+    border-top: 1px solid var(--divider-color);
+  }
+  .preview.staged .stage {
+    position: relative;
+    max-width: 640px;
+  }
+  .preview.staged .cards {
+    cursor: pointer;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+  .cards.sheet {
+    box-sizing: border-box;
+    max-width: 560px;
+    padding: 10px;
+    border-radius: 22px;
+    background: var(--card-background-color);
+    box-shadow: 0 8px 28px rgb(0 0 0 / 0.18);
+  }
+  .marks {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  .mark {
+    position: absolute;
+    box-sizing: border-box;
+    border-radius: 12px;
+    outline-offset: 2px;
+  }
+  .mark.hover {
+    outline: 2px dashed color-mix(in srgb, var(--primary-color) 70%, transparent);
+  }
+  .mark.drop {
+    outline: 3px solid var(--primary-color);
+    background: color-mix(in srgb, var(--primary-color) 18%, transparent);
+  }
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    margin: 0;
+    white-space: nowrap;
+  }
+  .stage-box:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 4px;
+    border-radius: 22px;
+  }
+  .mark.chosen {
+    outline: 2px solid var(--primary-color);
+    background: color-mix(in srgb, var(--primary-color) 9%, transparent);
+  }
+  .view-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-right: auto;
+  }
+  .pick {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .pick-label {
+    color: var(--secondary-text-color);
+    font-size: 13px;
+  }
+  .design-start {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 24px 16px;
+    max-width: 760px;
+  }
+  .design-start h2 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 500;
+  }
+  .design-start p {
+    margin: 0;
+  }
+  .starts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+    width: 100%;
+  }
+  .start {
+    all: unset;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 16px;
+    border-radius: 16px;
+    border: 1px solid var(--divider-color);
+    background: var(--card-background-color);
+    cursor: pointer;
+  }
+  .start:hover {
+    border-color: var(--primary-color);
+  }
+  .start:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+  }
+  .start ha-icon {
+    --mdc-icon-size: 28px;
+    color: var(--primary-color);
+  }
+  .tab.more {
+    margin-left: auto;
+    color: var(--secondary-text-color);
+  }
+  .stage-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .stage-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .stage-head > div {
     display: flex;
     flex-direction: column;
     gap: 4px;
-    padding: 16px;
+    min-width: 0;
   }
-  .simple > p {
-    margin: 0 0 8px;
-  }
-  .simple-group {
-    margin: 8px 0 0;
-    padding-left: calc(var(--depth, 0) * 20px - 20px);
-    color: var(--secondary-text-color);
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-  .simple-row {
+  .stage-section {
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    gap: 12px;
+    padding-top: 16px;
+    border-top: 1px solid var(--divider-color);
+  }
+  .stage-section h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .stage-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .stage-field-label {
+    color: var(--secondary-text-color);
+    font-size: 13px;
+  }
+  .stage-modes {
+    display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    min-height: 36px;
-    padding-left: calc(var(--depth, 0) * 20px - 20px);
   }
-  .simple-row input[type='checkbox'] {
+  .stage-hint {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    color: var(--secondary-text-color);
+  }
+  .stage-crumbs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px;
+    color: var(--secondary-text-color);
+    font-size: 12px;
+  }
+  .stage-crumbs ha-icon {
+    --mdc-icon-size: 14px;
+  }
+  .crumb {
+    all: unset;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 6px;
+  }
+  .crumb:hover {
+    background: var(--secondary-background-color);
+  }
+  .crumb.current {
+    color: var(--primary-text-color);
+    font-weight: 600;
+  }
+  .stage-title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 500;
+  }
+  .stage-panel p {
+    margin: 0;
+  }
+  .stage-looks {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .stage-look {
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+  }
+  .stage-look > span:first-child {
+    color: var(--secondary-text-color);
+  }
+  .stage-switch {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .stage-switch input {
     width: 18px;
     height: 18px;
     margin: 0;
     accent-color: var(--primary-color);
   }
-  .simple-spacer {
-    width: 18px;
-  }
-  .simple-row.off .simple-words > span:first-child {
-    color: var(--secondary-text-color);
-    text-decoration: line-through;
-  }
-  .simple-words {
+  .stage-moves,
+  .stage-add {
     display: flex;
-    flex-direction: column;
-    flex: 1;
-    min-width: 160px;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+  .stage-adds {
+    gap: 16px;
+  }
+  .stage-add-label {
+    flex-basis: 100%;
+    color: var(--secondary-text-color);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .stage-rest {
+    flex-basis: 100%;
+  }
+  .stage-rest summary {
+    list-style: none;
+  }
+  .stage-rest[open] > summary {
+    margin-bottom: 6px;
+  }
+  .stage-more {
+    padding-top: 16px;
+    border-top: 1px solid var(--divider-color);
+  }
+  .stage-more summary {
+    cursor: pointer;
+    color: var(--secondary-text-color);
+    padding: 4px 0;
+  }
+  .stage-more[open] summary {
+    margin-bottom: 8px;
+  }
+  .chip.danger {
+    color: var(--error-color);
+  }
+  .chip[disabled] {
+    opacity: 0.4;
+    cursor: default;
   }
   .simple-look {
     display: inline-flex;
@@ -735,21 +994,20 @@ export const PANEL_STYLE = css`
   .slot-list {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 16px;
   }
   .slot-group {
-    margin: 8px 0 0;
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--secondary-text-color);
+    margin: 12px 0 0;
+    font-size: 14px;
+    font-weight: 600;
   }
   .slot {
     border: 1px solid var(--divider-color);
     border-radius: 12px;
-    padding: 10px 12px;
+    padding: 16px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 16px;
     background: var(--card-background-color);
   }
   .slot-head {
@@ -767,14 +1025,22 @@ export const PANEL_STYLE = css`
   .slot-facts {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 8px;
+    gap: 12px 16px;
+    align-items: start;
   }
   .fact {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    font-size: 12px;
+    align-items: flex-start;
+    gap: 6px;
+    font-size: 13px;
     color: var(--secondary-text-color);
+  }
+  .fact input[type='checkbox'] {
+    width: 20px;
+    height: 20px;
+    margin: 6px 0;
+    accent-color: var(--primary-color);
   }
   .fact-input {
     box-sizing: border-box;
@@ -793,7 +1059,9 @@ export const PANEL_STYLE = css`
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 6px;
+    gap: 10px;
+    padding-top: 12px;
+    border-top: 1px solid var(--divider-color);
   }
   .finding > .sentence,
   .finding > .trial {
@@ -802,15 +1070,14 @@ export const PANEL_STYLE = css`
   .finding h4,
   .fields h4 {
     margin: 0;
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--secondary-text-color);
+    font-size: 14px;
+    font-weight: 600;
   }
   .sentence {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
   }
   .word-box input {
     width: 140px;
@@ -898,4 +1165,5 @@ export const PANEL_STYLE = css`
       padding: 12px 8px;
     }
   }
+  ${SELECT_STYLE}
 `;

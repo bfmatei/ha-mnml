@@ -507,7 +507,7 @@ function drawSlot(
       ${text(spec.help, 'Help', (help) => (help === '' ? without('help') : { ...now(), help }))}
       ${
         depth === 0
-          ? text(spec.group, 'Panel', (group) =>
+          ? text(spec.group, 'Group', (group) =>
               group === '' ? without('group') : { ...now(), group },
             )
           : nothing

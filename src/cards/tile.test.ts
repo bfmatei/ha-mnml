@@ -172,3 +172,28 @@ test('the slider of the lights row opens over that row, and not over the whole t
   assert.equal(row.querySelector('.overlay')?.parentElement, row, 'in the row');
   assert.equal(out.querySelector('.tile > .overlay'), null, 'not over the tile');
 });
+
+test('a part the template marked carries its path on the card, its chips, its state and its item, and a card without marks carries none', async () => {
+  const marked = {
+    type: 'custom:mnml-tile-card',
+    entity: 'person.jane',
+    popup: '#jane',
+    state: [{ entity: 'person.jane', _part: 'card/state/#where' }],
+    chips: [
+      { type: 'indicator', entity: 'person.jane', color: 'orange', _part: 'card/chips/#home' },
+    ],
+    item: { entity: 'person.jane', _part: 'card/item' },
+    _part: 'card',
+  };
+  const made = card();
+  made.setConfig(marked as never);
+  made.hass = HASS as never;
+  const out = await mounted(made);
+  assert.equal(made.getAttribute('data-part'), 'card');
+  assert.deepEqual(
+    [...out.querySelectorAll('[data-part]')].map((node) => node.getAttribute('data-part')),
+    ['card/state/#where', 'card/chips/#home', 'card/item'],
+  );
+  const plain = await paint({ type: 'custom:mnml-tile-card', entity: 'person.jane', popup: '#j' });
+  assert.equal(plain.querySelector('[data-part]'), null);
+});

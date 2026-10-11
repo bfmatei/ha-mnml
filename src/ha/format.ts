@@ -8,6 +8,7 @@ import type { Color, StateItem } from '../contract/cards.ts';
 import { hasValue, isUnavailable, numericState, stateOf } from './hass.ts';
 import type { HassEntity, HomeAssistant } from './hass.ts';
 import { deviceSerial, entityName } from './names.ts';
+import { partOf } from './part.ts';
 import { UNAVAILABLE, normalise, shown } from './rules.ts';
 import { colorStyle, stateIcon } from './templates.ts';
 
@@ -68,11 +69,11 @@ function formatItem(hass: HomeAssistant, stateObj: HassEntity, item: StateItem):
   return item.minutes ? formatMinutes(stateObj) : hass.formatEntityState(stateObj);
 }
 
-function textPart(text: string | undefined): TemplateResult | undefined {
+function textPart(text: string | undefined, item: StateItem): TemplateResult | undefined {
   if (text === undefined || text === '') {
     return undefined;
   }
-  return html`<span><span class="value">${text}</span></span>`;
+  return html`<span data-part=${partOf(item)}><span class="value">${text}</span></span>`;
 }
 
 function valuePart(
@@ -85,6 +86,7 @@ function valuePart(
   return html`<span
     class=${classMap({ colored: color !== undefined })}
     style=${styleMap(colorStyle(color))}
+    data-part=${partOf(item)}
     >${item.icon ? stateIcon(hass, stateObj) : ''}<span class="value">${value}</span></span
   >`;
 }
@@ -98,13 +100,13 @@ function itemPart(
     return undefined;
   }
   if (item.text !== undefined) {
-    return textPart(item.text);
+    return textPart(item.text, item);
   }
   if (item.serial) {
-    return textPart(entityId === undefined ? undefined : deviceSerial(hass, entityId));
+    return textPart(entityId === undefined ? undefined : deviceSerial(hass, entityId), item);
   }
   if (item.name) {
-    return textPart(entityId === undefined ? undefined : entityName(hass, entityId));
+    return textPart(entityId === undefined ? undefined : entityName(hass, entityId), item);
   }
   const stateObj = stateOf(hass, entityId);
   if (isUnavailable(stateObj)) {

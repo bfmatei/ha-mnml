@@ -9,6 +9,7 @@ import { DASH, formatState, unavailableValue } from '../ha/format.ts';
 import { callService, hasValue, isUnavailable, numericState, run, stateOf } from '../ha/hass.ts';
 import type { HassEntity, HomeAssistant } from '../ha/hass.ts';
 import { nameOf } from '../ha/names.ts';
+import { partOf } from '../ha/part.ts';
 import { UNAVAILABLE, matches, shown } from '../ha/rules.ts';
 import { colorStyle, icon, quietly, relativeTime, stateIcon } from '../ha/templates.ts';
 
@@ -158,10 +159,16 @@ interface Rendered {
   color: Color | undefined;
 }
 
-function cell(className: string, content: Content = nothing, color?: Color): TemplateResult {
+function cell(
+  className: string,
+  content: Content = nothing,
+  color?: Color,
+  part: string | typeof nothing = nothing,
+): TemplateResult {
   return html`<div
     class=${color === undefined ? `cell ${className}` : `cell ${className} colored`}
     style=${styleMap(colorStyle(color))}
+    data-part=${part}
   >
     ${content}
   </div>`;
@@ -247,6 +254,7 @@ function barCell(
   return html`<div
     class=${classMap({ bar: row.bar === true, colored: color !== undefined })}
     style=${styleMap({ ...colorStyle(color), '--fill': fill })}
+    data-part=${partOf(row)}
   >
     ${row.bar ? html`<div></div>` : nothing}
   </div>`;
@@ -326,7 +334,8 @@ function renderRow(
     }
   }
   const stateObj = emptyAsZero(row, stateOf(hass, row.entity));
-  const label = cell('label', nameOf(hass, row.entity, row));
+  const part = partOf(row);
+  const label = cell('label', nameOf(hass, row.entity, row), undefined, part);
   if (mode === 'table') {
     const values = Array.from({ length: columns }, (_, index) =>
       stateOf(hass, row.values?.[index]),
@@ -342,6 +351,7 @@ function renderRow(
       'icon-cell',
       stateIcon(hass, stateObj),
       isUnavailable(stateObj) ? UNAVAILABLE : undefined,
+      part,
     );
     return {
       row,
@@ -365,10 +375,10 @@ function renderRow(
   const number = rowNumber(hass, row, stateObj);
   const color = rowColor(row, stateObj, number);
   const cells = [
-    cell('icon-cell', stateIcon(hass, stateObj), color),
+    cell('icon-cell', stateIcon(hass, stateObj), color, part),
     label,
     ...(mode === 'bars' ? [barCell(row, number, color)] : []),
-    cell('value', valueOf(hass, row, stateObj, number), color),
+    cell('value', valueOf(hass, row, stateObj, number), color, part),
     ...(resets ? [resetCell(hass, row, host)] : []),
   ];
   return { row, stateObj, cells, number, color };

@@ -20,3 +20,17 @@ test('a template whose card is a card is tried as that card', () => {
   const made = tryDraft(SHIPPED, 'room', template, trialOf(template, undefined), undefined);
   assert.ok(typeof made.card === 'object' && made.card !== null && 'type' in made.card);
 });
+
+test('a marked trial tells each part of the card its path', () => {
+  const template = SHIPPED['room'];
+  assert.ok(template);
+  const plain = tryDraft(SHIPPED, 'room', template, trialOf(template, undefined), undefined);
+  assert.ok(!JSON.stringify(plain).includes('_part'));
+  const marked = tryDraft(SHIPPED, 'room', template, trialOf(template, undefined), undefined, {
+    singles: new Set(['card', 'card/item']),
+  });
+  const text = JSON.stringify(marked.card);
+  assert.ok(text.includes('"_part":"card"'));
+  assert.ok(text.includes('"_part":"card/item"'));
+  assert.ok(marked.sources.every((source) => source === '' || source.startsWith('popups/')));
+});

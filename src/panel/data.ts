@@ -37,6 +37,7 @@ export interface Draft {
   shipped: Template | undefined;
   conflicts: readonly Clash[];
   fresh?: true;
+  blank?: true;
 }
 
 export interface Dashboard {

@@ -11,7 +11,7 @@ import type { Field, PlainShape } from '../editors/shape.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
 import { icon } from '../ha/templates.ts';
 
-import { select, simpleForm } from './form.ts';
+import { pick, select, simpleForm } from './form.ts';
 import type { Part } from './outline.ts';
 import { PANEL_STYLE } from './style.ts';
 import type { Path } from './tree.ts';
@@ -110,36 +110,44 @@ export function withCondition(
 
 function drawCondition(part: Part, actions: InspectorActions): TemplateResult {
   const { show, slots } = conditionOf(part.value);
+  const change = (wanted: string, chosen: readonly string[]): void => {
+    const first = slotPaths(actions.template.slots).slice(0, 1);
+    actions.update(
+      part.path,
+      withCondition(actions.value(part.path), wanted, chosen.length > 0 ? chosen : first),
+      true,
+    );
+  };
   return html`<section class="inspect-section">
-    <h3>Shown</h3>
-    ${simpleForm({
-      hass: actions.hass,
-      schema: [
-        {
-          name: 'show',
-          selector: select([
-            { value: 'always', label: 'Always' },
-            { value: 'if', label: 'Only if these slots are set' },
-            { value: 'unless', label: 'Only if they are not set' },
-          ]),
-        },
-        ...(show === 'always'
-          ? []
-          : [{ name: 'slots', selector: select(slotPaths(actions.template.slots), true) }]),
+    <h3>When it shows</h3>
+    ${pick({
+      label: 'Show',
+      options: [
+        { value: 'always', label: 'Always' },
+        { value: 'if', label: 'Only when found' },
+        { value: 'unless', label: 'Only when not found' },
       ],
-      data: { show, slots },
-      labels: { show: 'Shown', slots: 'Slots' },
-      changed: (data) => {
-        const chosen = Array.isArray(data['slots']) ? data['slots'].map((slot) => text(slot)) : [];
-        const wanted = text(data['show'], 'always');
-        const first = slotPaths(actions.template.slots).slice(0, 1);
-        actions.update(
-          part.path,
-          withCondition(actions.value(part.path), wanted, chosen.length > 0 ? chosen : first),
-          true,
-        );
+      value: show,
+      changed: (wanted) => {
+        change(wanted, slots);
       },
     })}
+    ${
+      show === 'always'
+        ? nothing
+        : simpleForm({
+            hass: actions.hass,
+            schema: [{ name: 'slots', selector: select(slotPaths(actions.template.slots), true) }],
+            data: { slots },
+            labels: { slots: 'Depends on' },
+            changed: (data) => {
+              change(
+                show,
+                Array.isArray(data['slots']) ? data['slots'].map((slot) => text(slot)) : [],
+              );
+            },
+          })
+    }
   </section>`;
 }
 
@@ -166,28 +174,28 @@ export class MnmlBinder extends LitElement {
     if (field === undefined) {
       return nothing;
     }
-    return html`${simpleForm({
-        hass: this.hass,
-        schema: [
-          {
-            name: 'field',
-            selector: select(this.fields.map(({ value, label }) => ({ value, label }))),
-          },
-          { name: 'slot', selector: select(slots) },
-        ],
-        data: { field: field.value, slot },
-        labels: { field: 'Field', slot: 'Slot' },
-        helpers: slots.length === 0 ? { slot: 'No slot of a kind that fits this field' } : {},
-        changed: (data) => {
-          this.chosenField = text(data['field']);
-          this.chosenSlot = text(data['slot']);
+    return html`${pick({
+        label: 'Setting',
+        options: this.fields.map(({ value, label }) => ({ value, label })),
+        value: field.value,
+        changed: (value) => {
+          this.chosenField = value;
+        },
+      })}
+      ${pick({
+        label: 'Link it to',
+        options: slots,
+        value: slot,
+        ...(slots.length === 0 ? { help: 'No slot of a kind that fits this setting' } : {}),
+        changed: (value) => {
+          this.chosenSlot = value;
         },
       })}
       <button
         type="button"
         class="action"
-        aria-label="Bind the field to the slot"
-        title="Bind the field to the slot"
+        aria-label="Link the setting to the slot"
+        title="Link the setting to the slot"
         ?disabled=${slot === ''}
         @click=${() => {
           if (slot !== '') {
@@ -195,7 +203,7 @@ export class MnmlBinder extends LitElement {
           }
         }}
       >
-        ${icon('mdi:link-variant')}<span>Bind</span>
+        ${icon('mdi:link-variant')}<span>Link</span>
       </button>`;
   }
 }
@@ -212,7 +220,8 @@ function drawBindings(part: Part, shape: PlainShape, actions: InspectorActions):
     .filter(([key]) => !bound.some(([taken]) => taken === key))
     .map(([key, spec]) => ({ value: key, label: spec.label ?? key, kind: spec.kind }));
   return html`<section class="inspect-section">
-    <h3>From slots</h3>
+    <h3>Linked to slots</h3>
+    ${bound.length === 0 ? nothing : html`<p class="muted">A slot is written in double brackets, such as [[name]], alone or inside text.</p>`}
     ${bound.map(
       ([key, spec]) =>
         html`<div class="binding">
@@ -221,7 +230,6 @@ function drawBindings(part: Part, shape: PlainShape, actions: InspectorActions):
             schema: [{ name: key, selector: { text: {} } }],
             data: { [key]: part.value[key] ?? '' },
             labels: { [key]: spec.label ?? key },
-            helpers: { [key]: 'A slot in double brackets, alone or inside text' },
             changed: (data) => {
               actions.update(
                 part.path,
@@ -265,7 +273,7 @@ function drawBindings(part: Part, shape: PlainShape, actions: InspectorActions):
 
 const unknown = (message: string): TemplateResult[] => [
   html`<section class="inspect-section">
-    <h3>Values</h3>
+    <h3>Fixed values</h3>
     <p class="muted">${message}</p>
   </section>`,
 ];
@@ -284,23 +292,14 @@ function drawValues(part: Part, actions: InspectorActions): TemplateResult[] {
   const kinds =
     shape.kind === 'plain'
       ? nothing
-      : simpleForm({
-          hass: actions.hass,
-          schema: [
-            {
-              name: 'kind',
-              selector: select(
-                shape.variants.map((each) => ({
-                  value: each.when ?? PLAIN,
-                  label: each.shape.label,
-                })),
-              ),
-            },
-          ],
-          data: { kind: shape.variants.find((each) => each.shape === variant)?.when ?? PLAIN },
-          labels: { kind: 'Kind' },
-          changed: (data) => {
-            const when = text(data['kind'], PLAIN);
+      : pick({
+          label: 'Type',
+          options: shape.variants.map((each) => ({
+            value: each.when ?? PLAIN,
+            label: each.shape.label,
+          })),
+          value: shape.variants.find((each) => each.shape === variant)?.when ?? PLAIN,
+          changed: (when) => {
             actions.update(
               part.path,
               switchVariant(shape, actions.value(part.path), when === PLAIN ? undefined : when),
@@ -333,7 +332,7 @@ function drawValues(part: Part, actions: InspectorActions): TemplateResult[] {
     drawBindings(part, variant, actions),
     html`<section class="inspect-section">
       ${kinds}
-      <h3>Values</h3>
+      <h3>Fixed values</h3>
       ${objectForm(
         values,
         {
@@ -356,24 +355,19 @@ function drawFragment(part: Part, actions: InspectorActions): TemplateResult {
   const slots = isMapping(part.value['slots']) ? part.value['slots'] : {};
   const specs = Object.keys(fragment?.slots ?? {});
   return html`<section class="inspect-section">
-    <h3>Fragment</h3>
-    ${simpleForm({
-      hass: actions.hass,
-      schema: [{ name: 'template', selector: select(Object.keys(actions.templates).toSorted()) }],
-      data: { template: name },
-      labels: { template: 'Template' },
-      changed: (data) => {
-        actions.update(
-          part.path,
-          { ...actions.value(part.path), template: text(data['template']) },
-          true,
-        );
+    <h3>Shared piece</h3>
+    ${pick({
+      label: 'Uses',
+      options: Object.keys(actions.templates).toSorted(),
+      value: name,
+      changed: (chosen) => {
+        actions.update(part.path, { ...actions.value(part.path), template: chosen }, true);
       },
     })}
     ${
       specs.length === 0
         ? nothing
-        : html`<h3>Its slots</h3>
+        : html`<h3>What it is given</h3>
             ${simpleForm({
               hass: actions.hass,
               schema: specs.map((slot) => ({ name: slot, selector: { text: {} } })),
@@ -410,7 +404,7 @@ export function drawInspector(part: Part | undefined, actions: InspectorActions)
   return html`<div class="inspector">
     <div class="inspect-head">
       <h2>${part.label}</h2>
-      <span class="muted">${part.kind === 'fragment' ? 'a fragment' : part.kind}</span>
+      <span class="muted">${part.kind === 'fragment' ? 'a shared piece' : part.kind}</span>
     </div>
     ${drawCondition(part, actions)}
     ${part.kind === 'fragment' ? drawFragment(part, actions) : drawValues(part, actions)}
