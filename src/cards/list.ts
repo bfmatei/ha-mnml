@@ -18,6 +18,7 @@ import { schema } from './keys.ts';
 import type { KeySchema } from './keys.ts';
 import { SECTION_STYLE, section } from './parts/section.ts';
 import type { Fold, HeadingState } from './parts/section.ts';
+import { tip } from './parts/tooltip.ts';
 import { LIST_ROW } from './schemas.ts';
 import { BASE_STYLE, HEADING_STYLE } from './styles.ts';
 
@@ -287,7 +288,7 @@ function resetCell(hass: HomeAssistant, row: ListRow, host: Host): TemplateResul
       type="button"
       class="reset"
       aria-label=${label}
-      title=${label}
+      ${tip(label)}
       @click=${quietly(() => {
         run(host, callService(hass, id, 'button.press'));
       })}
@@ -317,6 +318,12 @@ function renderRow(
 ): Rendered | undefined {
   if (!shown(hass, row.show, row.entity)) {
     return undefined;
+  }
+  if (row.low_only === true) {
+    const level = numericState(stateOf(hass, row.entity));
+    if (level === undefined || row.low === undefined || level >= row.low) {
+      return undefined;
+    }
   }
   const stateObj = emptyAsZero(row, stateOf(hass, row.entity));
   const label = cell('label', nameOf(hass, row.entity, row));

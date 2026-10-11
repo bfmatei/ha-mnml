@@ -1,5 +1,5 @@
 room:
-  description: A room's tile, its temperature and humidity, its window, door, lock and climate chips, its lights, and the problems dot; it brings the room's pop-ups.
+  description: A room's tile, its temperature and humidity, its window, door, lock and climate chips, its lights, and its leak and low battery chips; it brings the room's pop-ups.
   slots:
     key:
       {
@@ -173,6 +173,56 @@ room:
                 power: { kind: entity, required: true }
                 today: { kind: entity }
                 total: { kind: entity }
+    cameras:
+      kind: objects
+      group: Security
+      fields:
+        entity: { kind: entity, required: true }
+        motion: { kind: entity }
+        person: { kind: entity }
+        doorbell: { kind: entity }
+      discover: { per: device, where: { domain: camera }, fields: { entity: { domain: camera } } }
+    covers:
+      kind: objects
+      group: Covers
+      fields:
+        entity: { kind: entity, required: true }
+        garage: { kind: flag }
+      discover: { per: device, where: { domain: cover }, fields: { entity: { domain: cover } } }
+    fans:
+      kind: objects
+      group: Air
+      fields:
+        entity: { kind: entity, required: true }
+        quality: { kind: entity }
+      discover: { per: device, where: { domain: fan }, fields: { entity: { domain: fan } } }
+    humidifiers:
+      kind: objects
+      group: Air
+      fields:
+        entity: { kind: entity, required: true }
+      discover:
+        { per: device, where: { domain: humidifier }, fields: { entity: { domain: humidifier } } }
+    appliances:
+      kind: objects
+      group: Devices
+      fields:
+        entity: { kind: entity, required: true }
+        remaining: { kind: entity }
+        power: { kind: entity }
+    pets:
+      kind: objects
+      group: Devices
+      fields:
+        feed: { kind: entity, required: true }
+        fed: { kind: entity, required: true }
+        food: { kind: entity }
+        litter: { kind: entity }
+    plants:
+      kind: objects
+      group: Devices
+      fields:
+        moisture: { kind: entity, required: true }
     media:
       kind: objects
       label: Players
@@ -243,7 +293,7 @@ room:
       {
         kind: entities,
         discover: { domain: sensor, device_class: battery },
-        help: Low ones show in the problems dot.,
+        help: Low ones show as a chip on the tile.,
         group: Problems,
       }
     leaks:
@@ -253,6 +303,8 @@ room:
         label: Leak sensors,
         group: Problems,
       }
+    low: { kind: number, default: 20, label: Low battery, group: Problems }
+    critical: { kind: number, default: 5, label: Critical battery, group: Problems }
     meters:
       kind: objects
       group: Energy
@@ -291,6 +343,31 @@ room:
         entity: '[[lock]]'
         color: red
         when: { is: [unlocked, open, jammed] }
+      - id: each-garage
+        each: covers
+        as: cover
+        if: cover.garage
+        type: toggle
+        entity: '[[cover.entity]]'
+        color: orange
+        when: { is: [open, opening, closing] }
+        show: { is: [open, opening, closing] }
+      - id: each-doorbell
+        each: cameras
+        as: camera
+        if: camera.doorbell
+        type: indicator
+        entity: '[[camera.doorbell]]'
+        color: orange
+        show: { is: ['on'] }
+      - id: each-person
+        each: cameras
+        as: camera
+        if: camera.person
+        type: indicator
+        entity: '[[camera.person]]'
+        color: orange
+        show: { is: ['on'] }
       - id: ac
         if: ac
         template: nav-chip
@@ -306,6 +383,29 @@ room:
             color: orange,
             when: { not: ['off'] },
           }
+      - id: leaks
+        if: leaks
+        type: status
+        name: Leak
+        icon: mdi:water-alert-outline
+        silent: true
+        rules:
+          - { id: leaks, entities: '[[leaks]]', is: ['on'], color: red, label: device }
+      - id: batteries
+        if: batteries
+        type: status
+        name: Batteries
+        icon: mdi:battery-alert-variant-outline
+        silent: true
+        rules:
+          - {
+              id: critical,
+              entities: '[[batteries]]',
+              below: '[[critical]]',
+              color: red,
+              label: device,
+            }
+          - { id: low, entities: '[[batteries]]', below: '[[low]]', color: orange, label: device }
     item:
       if: lights.group
       template: light-item
@@ -315,9 +415,6 @@ room:
         scenes: '[[lights.scenes]]'
         active_scene: '[[lights.active_scene]]'
         color: '[[lights.color]]'
-    problems?:
-      leaks?: '[[leaks]]'
-      batteries?: '[[batteries]]'
     grid_options: { columns: 12 }
   popups:
     - id: room-popup
@@ -336,6 +433,13 @@ room:
         ac: '[[ac]]'
         vacuum: '[[vacuum]]'
         printer3d: '[[printer3d]]'
+        cameras: '[[cameras]]'
+        covers: '[[covers]]'
+        fans: '[[fans]]'
+        humidifiers: '[[humidifiers]]'
+        appliances: '[[appliances]]'
+        pets: '[[pets]]'
+        plants: '[[plants]]'
         media: '[[media]]'
         outlets: '[[outlets]]'
         diffuser: '[[diffuser]]'
@@ -550,6 +654,44 @@ room-popup:
                 power: { kind: entity }
                 today: { kind: entity }
                 total: { kind: entity }
+    cameras:
+      kind: objects
+      fields:
+        entity: { kind: entity, required: true }
+        motion: { kind: entity }
+        person: { kind: entity }
+        doorbell: { kind: entity }
+    covers:
+      kind: objects
+      fields:
+        entity: { kind: entity, required: true }
+        garage: { kind: flag }
+    fans:
+      kind: objects
+      fields:
+        entity: { kind: entity, required: true }
+        quality: { kind: entity }
+    humidifiers:
+      kind: objects
+      fields:
+        entity: { kind: entity, required: true }
+    appliances:
+      kind: objects
+      fields:
+        entity: { kind: entity, required: true }
+        remaining: { kind: entity }
+        power: { kind: entity }
+    pets:
+      kind: objects
+      fields:
+        feed: { kind: entity, required: true }
+        fed: { kind: entity, required: true }
+        food: { kind: entity }
+        litter: { kind: entity }
+    plants:
+      kind: objects
+      fields:
+        moisture: { kind: entity, required: true }
     media:
       kind: objects
       fields:
@@ -637,6 +779,76 @@ room-popup:
         if: heating
         template: heating-item
         slots: { key: '[[key]]', entity: '[[heating.entity]]', preset: '[[heating.preset]]' }
+      - id: fans-humidifiers
+        if: [fans, humidifiers]
+        type: custom:mnml-heading-card
+        title: Air
+        icon: mdi:air-filter
+      - id: each-fans
+        each: fans
+        as: fan
+        template: fan-card
+        slots: { entity: '[[fan.entity]]', quality: '[[fan.quality]]' }
+      - id: each-humidifiers
+        each: humidifiers
+        as: humidifier
+        template: humidifier-card
+        slots: { entity: '[[humidifier.entity]]' }
+      - id: covers
+        if: covers
+        type: custom:mnml-heading-card
+        title: Covers
+        icon: mdi:blinds-horizontal
+      - id: each-covers
+        each: covers
+        as: cover
+        template: cover-card
+        slots: { entity: '[[cover.entity]]', garage: '[[cover.garage]]' }
+      - id: cameras
+        if: cameras
+        type: custom:mnml-heading-card
+        title: Cameras
+        icon: mdi:cctv
+      - id: each-cameras
+        each: cameras
+        as: camera
+        template: camera-card
+        slots: { entity: '[[camera.entity]]' }
+      - id: camera-activity
+        if: cameras
+        template: camera-activity
+        slots: { cameras: '[[cameras]]' }
+      - id: appliances
+        if: appliances
+        type: custom:mnml-heading-card
+        title: Appliances
+        icon: mdi:washing-machine
+      - id: each-appliances
+        each: appliances
+        as: appliance
+        template: appliance-card
+        slots:
+          entity: '[[appliance.entity]]'
+          remaining: '[[appliance.remaining]]'
+          power: '[[appliance.power]]'
+      - id: pets
+        if: pets
+        type: custom:mnml-heading-card
+        title: Pets
+        icon: mdi:paw
+      - id: each-pets
+        each: pets
+        as: pet
+        template: pet-card
+        slots:
+          feed: '[[pet.feed]]'
+          fed: '[[pet.fed]]'
+          food: '[[pet.food]]'
+          litter: '[[pet.litter]]'
+      - id: plants
+        if: plants
+        template: plants
+        slots: { plants: '[[plants]]' }
       - id: media
         if: media
         type: custom:mnml-heading-card

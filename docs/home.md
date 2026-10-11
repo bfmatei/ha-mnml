@@ -15,6 +15,7 @@ What `build(home)` draws for a `Home`, every tile and pop-up, and why. The templ
 - [Heating and AC](#heating-and-ac)
 - [Vacuum](#vacuum)
 - [3D printer](#3d-printer)
+- [More devices](#more-devices)
 - [Media](#media)
 - [Garage](#garage)
 - [People](#people)
@@ -28,30 +29,32 @@ What the generator writes: one `sections` view with four sections of tiles and a
 
 | Section        | Tiles                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Rooms          | Per room: the icon with a problems dot, the temperature and humidity, chips for the window, door, lock, heating and AC, and a Lights row with its controls                                                                                                                                                                                                                                                                    |
-| People         | Per person: presence, and Driving and Do not disturb chips. The heading carries the vacation toggle                                                                                                                                                                                                                                                                                                                           |
+| Rooms          | Per room: the icon, the temperature and humidity, chips for the window, door, lock, heating and AC, a Leak and a Batteries chip while there is a problem, and a Lights row with its controls                                                                                                                                                                                                                                  |
+| People         | Per person: presence, and Driving and Do not disturb chips.                                                                                                                                                                                                                                                                                                                                                                   |
 | Garage         | Per car: the fuel, and Doors, Windows, Alarm and Tyres chips                                                                                                                                                                                                                                                                                                                                                                  |
 | Infrastructure | Server (Proxmox): its CPU and memory, and Guests, Checks, Backups and Notifications chips. Network: the internet latency, and Devices, VPN and Firmware chips. AdGuard: the blocked share and the processing time, an Update chip and the protection toggle. Home Assistant: its memory and free disk, and Services, Updates and Firmware chips. Media: the streams playing, and Requests, Downloads, Health and Update chips |
 
-| Pop-up                   | Shows                                                                                                                                                                               |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `#<room>`                | Lights, Climate, Media, Other (vacuum, 3D printer, outlets, diffuser), Batteries, Energy: each only when present; Batteries and Energy folded, Batteries open while one is low      |
-| `#<room>-3d-printer`     | The camera, the print, the temperatures, the power outlet and its energy                                                                                                            |
-| `#<room>-lights`         | The group's sliders, the scenes, every light (sub-groups expandable)                                                                                                                |
-| `#<room>-heating`        | The target and preset, the valves, the thermostats' batteries                                                                                                                       |
-| `#<room>-ac`             | The target, fan, swing, horizontal swing, power saving, dehumidifier, energy                                                                                                        |
-| `#<room>-vacuum`         | Routines, the map, details, settings, the dock, maintenance, totals                                                                                                                 |
-| `#car-<key>`             | The VIN, security, a plan of the car from above with its openings and tyres, details, its location                                                                                  |
-| `#<room>-<speaker>`      | The speaker's sound: volume, bass, treble, balance, loudness, then its TV, subwoofer and surround settings                                                                          |
-| `#person-<key>`          | Devices, and location permissions that aren't "always"                                                                                                                              |
-| `#person-<key>-<device>` | The battery, and the companion app's details                                                                                                                                        |
-| `#system`                | Resources, services, updates, firmware (the system's, then one list per room)                                                                                                       |
-| `#proxmox`               | Notifications, stopped guests, daily checks, the host, disks, storage, energy, the guests table, backups                                                                            |
-| `#proxmox-notifications` | Every message Proxmox sent, newest first, one card each with its title, its source (Proxmox VE, PBS or the guest) and a clear button; a tap shows the text; Clear all in the header |
-| `#adguard`               | Queries, the update; the protection toggle in the header                                                                                                                            |
-| `#network`               | Internet, devices, the router, the VPN, the Wi-Fi networks, the clients per network, folded but for Other, firmware                                                                 |
-| `#network-<key>`         | A Wi-Fi network's QR code, while the network is on                                                                                                                                  |
-| `#media`                 | Watching, requests, downloads, the upcoming releases, the library, Plex's update                                                                                                    |
+| Pop-up                   | Shows                                                                                                                                                                                                                                  |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `#<room>`                | Lights, Climate, Air, Covers, Cameras, Appliances, Pets, Plants, Media, Other (vacuum, 3D printer, outlets, diffuser), Batteries, Energy: each only when present; Plants, Batteries and Energy folded, Batteries open while one is low |
+| `#energy`                | The power now (home, solar, grid, EV charger, battery) and the energy today                                                                                                                                                            |
+| `#batteries`             | The batteries under 20 %, lowest first, with their level as a bar                                                                                                                                                                      |
+| `#<room>-3d-printer`     | The camera, the print, the temperatures, the power outlet and its energy                                                                                                                                                               |
+| `#<room>-lights`         | The group's sliders, the scenes, every light (sub-groups expandable)                                                                                                                                                                   |
+| `#<room>-heating`        | The target and preset, the valves, the thermostats' batteries                                                                                                                                                                          |
+| `#<room>-ac`             | The target, fan, swing, horizontal swing, power saving, dehumidifier, energy                                                                                                                                                           |
+| `#<room>-vacuum`         | Routines, the map, details, settings, the dock, maintenance, totals                                                                                                                                                                    |
+| `#car-<key>`             | The VIN, security, a plan of the car from above with its openings and tyres, details, its location                                                                                                                                     |
+| `#<room>-<speaker>`      | The speaker's sound: volume, bass, treble, balance, loudness, then its TV, subwoofer and surround settings                                                                                                                             |
+| `#person-<key>`          | Devices, and location permissions that aren't "always"                                                                                                                                                                                 |
+| `#person-<key>-<device>` | The battery, and the companion app's details                                                                                                                                                                                           |
+| `#system`                | Resources, services, updates, firmware (the system's, then one list per room)                                                                                                                                                          |
+| `#proxmox`               | Notifications, stopped guests, daily checks, the host, disks, storage, energy, the guests table, backups                                                                                                                               |
+| `#proxmox-notifications` | Every message Proxmox sent, newest first, one card each with its title, its source (Proxmox VE, PBS or the guest) and a clear button; a tap shows the text; Clear all in the header                                                    |
+| `#adguard`               | Queries, the update; the protection toggle in the header                                                                                                                                                                               |
+| `#network`               | Internet, devices, the router, the VPN, the Wi-Fi networks, the clients per network, folded but for Other, firmware                                                                                                                    |
+| `#network-<key>`         | A Wi-Fi network's QR code, while the network is on                                                                                                                                                                                     |
+| `#media`                 | Watching, requests, downloads, the upcoming releases, the library, Plex's update                                                                                                                                                       |
 
 **How the pop-ups behave.** They open as adaptive dialogs, 560 px wide on a desktop and a sheet on a phone, or as the home's `popupOpen` says for each kind of screen (`{ tablet: 'unfold', desktop: 'unfold' }` unfolds them out of their tile, in its place); second-level pop-ups have a back button. Every item follows one pattern: name, icon and state on the left, and flat buttons on the right, with the filled on / off last.
 
@@ -77,7 +80,7 @@ Every threshold has two stages, so a slow drift and a fault don't look alike. Th
 ## Layout
 
 - **One view.** It is a `sections` view with `max_columns: 3`. Four titled sections come first, each `column_span: 3`: Rooms, People, Garage, Infrastructure, or in the order of the home's `order` (a list of `rooms`, `people`, `garage` and `infrastructure`, each once), which `problems()` checks. The titles are `mnml-heading-card`s with `grid_options.columns: full`, from the home's `sections`. Last comes an untitled section holding the pop-up shell.
-- **Section headings.** A heading has its title and icon at the left, and a trailing group (`.trail`) at the right with a state line, controls, or both. Rooms shows the outdoor temperature there, and People the vacation toggle, each when the home names its entity (`outside`, `vacation`). A folding list's heading ends in a chevron after its summary, and the whole heading is the tap target; folded, the heading stands alone, with no surface under it.
+- **Section headings.** A heading has its title and icon at the left, and a trailing group (`.trail`) at the right with a state line, controls, or both. A folding list's heading ends in a chevron after its summary, and the whole heading is the tap target; folded, the heading stands alone, with no surface under it.
 - **Tile width.** Every tile writes `grid_options: { columns: 12 }` over MNML's default of half a section, so each takes 12 grid columns. The Garage and the Infrastructure keep the rhythm of the Rooms: at three columns, three infrastructure tiles fill a row and the other two take the next.
   - Each view column is twelve grid columns, so a section is 36 wide when three columns fit and 24 when two do.
   - Two tiles share a row only while twice the width fits, so 12 is a third of a row at three columns and half a row at two. No single value can be half at three columns and full at two.
@@ -177,15 +180,13 @@ A pop-up template's card is its `hash` and its `cards`, a `mnml-header-card` fir
 
 **First row.**
 
-- **The pill.** The room icon, with the problems dot on its corner while there is a problem (`problems`):
-  - red while a leak sensor is wet or a battery is under `BATTERY_CRITICAL`;
-  - orange while a battery is under `BATTERY_LOW`, or while a leak sensor or a battery is unavailable: its device has dropped off the network. Every climate sensor runs on a battery the room lists, so an offline climate sensor shows here as well as in the orange "— • —".
-    Red wins over orange, and hovering the pill lists the problems, an offline device once.
+- **The pill.** The room icon alone. Problems are chips, below.
 - **The name**, with the temperature and humidity under it (`room`: `state` with `icon: true`, so each value follows its sensor's icon, joined with `•`).
 - **Chips** at the top right, icon-only on the pill colour, in this order (`room`, then `room`):
   1. the window and the door: `indicator`, orange while open;
   2. the lock: `toggle`, red while unlocked, open or jammed. Tapping it locks or unlocks, without confirmation;
-  3. AC and Heating: `nav`, the unit's own icon, blue or orange while not off. They open `#<room>-ac` and `#<room>-heating`.
+  3. AC and Heating: `nav`, the unit's own icon, blue or orange while not off. They open `#<room>-ac` and `#<room>-heating`;
+  4. Leak and Batteries: `status` chips drawn only while there is a problem, hidden otherwise. The leak chip is red while a leak sensor is wet. The battery chip is red under 5 % and orange under 20 % (`critical`, `low`), and either chip turns orange while a sensor it watches is unavailable. Hovering a chip lists the sensors behind it, an offline device once.
 
 **Second row: the Lights item, across the whole tile.**
 
@@ -194,7 +195,7 @@ A pop-up template's card is its `hash` and its `cards`, a `mnml-header-card` fir
 - **Brightness is a button**, like the other two values, not a strip to drag. So the tile and the pop-up offer the same controls in the same order, and one lights item in the model can't drift into two shapes.
 - **Taps.** Tapping the strip opens `#<room>-lights` and stops there. Its controls stop their own taps. Tapping anything else on the tile opens `#<room>`.
 
-**The tile shows vital state only:** temperature, humidity, window and door, lock, problems, climate, lights. Every other device lives in the room pop-up.
+**The tile shows vital state only:** temperature, humidity, window and door, lock, climate, lights, and a leak or a low battery while there is one. Every other device lives in the room pop-up.
 
 ### The room pop-up, `#<room>`
 
@@ -205,18 +206,24 @@ A pop-up template's card is its `hash` and its `cards`, a `mnml-header-card` fir
 
 **Sections**, in a fixed order, each only when non-empty:
 
-| Section   | Contents                                                                                                                                                           |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Lights    | The light group item, opening `#<room>-lights`, with the room's scenes in its lane                                                                                 |
-| Climate   | The AC and the Heating items, each with a line of Off, or the target and the action                                                                                |
-| Media     | `media-card` per player; a speaker's opens its pop-up                                                                                                              |
-| Other     | `room-popup`: the vacuum, the 3D printer, outlets, the diffuser                                                                                                    |
-| Batteries | `batteries`: one row per battery, labelled with its device, the level as a bar                                                                                     |
-| Energy    | `energy-table`: headers Item / Now / Today / Total, one row per metered device (outlets, then the AC), labelled with the device. An outlet's power shows only here |
+| Section    | Contents                                                                                                                                                           |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Lights     | The light group item, opening `#<room>-lights`, with the room's scenes in its lane                                                                                 |
+| Climate    | The AC and the Heating items, each with a line of Off, or the target and the action                                                                                |
+| Media      | `media-card` per player; a speaker's opens its pop-up                                                                                                              |
+| Air        | `fan-card` and `humidifier-card` per fan and humidifier: the state, a speed or target slider, a power button                                                       |
+| Covers     | `cover-card` per cover: a position slider, and Open, Stop and Close buttons, each only while it applies                                                            |
+| Cameras    | `camera-card` per camera, a live picture, then `camera-activity`: the doorbell, person and motion sensors, orange while on                                         |
+| Appliances | `appliance-card` per appliance: the cycle state, the time left and the power, blue while a cycle runs                                                              |
+| Pets       | `pet-card` per feeder: when it last ate, the food and litter levels, and a Feed button                                                                             |
+| Plants     | `plants`: soil moisture per plant, driest first, orange under 30 % and red under 15 %                                                                              |
+| Other      | `room-popup`: the vacuum, the 3D printer, outlets, the diffuser                                                                                                    |
+| Batteries  | `batteries`: one row per battery, labelled with its device, the level as a bar                                                                                     |
+| Energy     | `energy-table`: headers Item / Now / Today / Total, one row per metered device (outlets, then the AC), labelled with the device. An outlet's power shows only here |
 
 **What has no card here.**
 
-- **Leak sensors.** They surface through the tile's problems dot while wet, and through the batteries.
+- **Leak sensors.** They surface through the tile's Leak chip while wet, and through the batteries.
 - **The lock.** Its chip is in the header.
 - **Anything generic.** There is no general info section; a new read-only value needs its own place.
 
@@ -230,7 +237,7 @@ Every battery is spelled once, next to its device:
 - the vacuum's in `vacuum.battery`, a charge level in its state line rather than a battery to replace;
 - the room's other batteries in `batteries`.
 
-`roomSlots()`'s `batteries` (`src/home/slots.ts`) joins the room's and the thermostats' lists and sorts them by entity id. It is the one list the generator orders itself, since two lists of the home meet in it. The room pop-up's Batteries list and the tile's problems dot both read it. The list then shows them lowest first (`lowest_first`), so the entity ids only settle a tie.
+`roomSlots()`'s `batteries` (`src/home/slots.ts`) joins the room's and the thermostats' lists and sorts them by entity id. It is the one list the generator orders itself, since two lists of the home meet in it. The room pop-up's Batteries list and the tile's Batteries chip both read it. The list then shows them lowest first (`lowest_first`), so the entity ids only settle a tie.
 
 ## Lights
 
@@ -316,6 +323,25 @@ The 3D printer is an item of its room's Other section, like the vacuum. Its line
 **Job rows wait for a job.** PrusaLink reports the job's entities, and its buttons, as unavailable while the 3D printer is idle. Shown then, they would be orange dashes for a 3D printer that is fine. So they are shown only while a job runs.
 
 **The outlet belongs to the 3D printer, not the room.** The room pop-up lists neither the outlet nor its meter; only the 3D printer's pop-up does. Its firmware stays in the room's firmware list, with the room's other devices.
+
+## More devices
+
+The room's tile and pop-up take these from the room's `cameras`, `covers`, `fans`, `humidifiers`, `appliances`, `pets` and `plants`, each only when the room has them. A room placed by area finds its cameras, covers, fans and humidifiers itself. The home's `security` adds the alarm and the smoke detectors to the glances above Rooms; `energy` adds the power the home uses to them.
+
+- **Cameras.** The pop-up streams each camera live as long as it is open; the tile never loads a picture. A chip on the room's tile lights orange while a camera's `doorbell` or `person` sensor is on, and all three sensors are rows of Activity, orange while on.
+- **Covers.** A cover with a position has a slider; a garage door (`garage: true`) has none, and its chip on the room's tile lights orange while it is open, opening or closing, and closes it when pressed.
+- **Air.** A fan's slider sets its speed in percent, a humidifier's its target humidity; either has a power button.
+- **Appliances.** The entity is the status sensor of the washer, the dryer or the dishwasher; the item is blue while a cycle runs (running, washing, drying, rinsing, spinning, in use).
+- **Pets and plants.** The feeder's Feed button presses a `button`. The plants' bars use the thresholds of the batteries, 30 % and 15 %.
+- **Glances.** One strip across the top of the dashboard, a line high, each item a well. It has the weather (the temperature of `outside`, the icon showing the conditions), the alarm panel as a button that arms it (away) or disarms it, and the vacation toggle (`vacation`), and the energy the home uses now (`energy`), which opens `#energy`. The alarm and vacation are red when they do not fit who is home: switched on with somebody home, or off with everybody away; the alarm is also red while triggered. Otherwise they read as normal, the alarm as its icon alone. Then what needs you, each drawn only while it does, and a tap opens where to deal with it:
+  - failed checks and warnings of the server, failing disks and a backup problem: `#proxmox`;
+  - the server's notifications: `#proxmox-notifications`;
+  - services that are down and pending updates and firmware: `#system`;
+  - the power the home uses: `#energy`, which lists the power now (home, solar, grid, EV charger, battery) and the energy today;
+  - low batteries, a count of the room's, the heating's and the people's, orange under 20 % and red under 5 %: `#batteries`, which lists those under 20 %, lowest first;
+  - leaks and smoke, which open nothing: the room's tile has its Leak chip.
+
+  A strip with nothing to show is not drawn. An item is an icon and its value, with no title: the name is its tooltip, and a count's tooltip lists what it counts. The calm statuses sit on the left and what needs you on the right, behind a hairline, in wells that are louder than the calm ones. The vacation item is its dimmed icon alone until it is on. The weather is the temperature beside an icon that follows the conditions.
 
 ## Media
 
@@ -427,7 +453,7 @@ Hovering a chip lists the entities behind its colour, with their states. The loc
 
 A tile per person of the home's `people` (`person`):
 
-- **The pill:** the `person` entity's icon, with the problems dot while a device battery is low or unavailable.
+- **The pill:** the `person` entity's icon. A Batteries chip, drawn only while a device battery is low or unavailable, sits with the status chips.
 - **The `person` entity's name**, with its state under it: Home, Away or a zone.
 - **Two `status` chips**, inert, and each titled with the entities behind its colour:
   - Driving (`mdi:steering`), amber while any device's `activity` reads `automotive`;

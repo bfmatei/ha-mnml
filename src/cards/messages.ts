@@ -17,6 +17,7 @@ import { colorStyle, icon, onPress, quietly, relativeTime } from '../ha/template
 import { MnmlCard, requireString } from './base.ts';
 import { schema } from './keys.ts';
 import type { KeySchema } from './keys.ts';
+import { tip } from './parts/tooltip.ts';
 import { MESSAGE_SOURCE } from './schemas.ts';
 import { BASE_STYLE, CONTROL_STYLE, ROW_STYLE } from './styles.ts';
 
@@ -181,7 +182,7 @@ export class MnmlMessagesCard extends MnmlCard<MessagesCard> {
           role=${expandable ? 'button' : nothing}
           tabindex=${expandable ? 0 : nothing}
           aria-label=${expandable ? label : nothing}
-          title=${expandable ? label : nothing}
+          ${tip(expandable ? label : undefined)}
           aria-expanded=${expandable ? String(open) : nothing}
           @keydown=${expandable ? onPress(toggle) : nothing}
         >
@@ -198,7 +199,7 @@ export class MnmlMessagesCard extends MnmlCard<MessagesCard> {
             type="button"
             class="control"
             aria-label=${`Clear ${entry.title}`}
-            title=${`Clear ${entry.title}`}
+            ${tip(`Clear ${entry.title}`)}
             @click=${quietly(clear)}
           >
             ${icon('mdi:close')}

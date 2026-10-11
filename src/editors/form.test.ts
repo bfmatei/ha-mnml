@@ -27,7 +27,17 @@ test("a section's plain fields become one ha-form schema with Home Assistant's p
       selector: {
         select: {
           mode: 'dropdown',
-          options: ['brightness', 'color_temp', 'hue', 'temperature', 'value', 'volume'],
+          options: [
+            'brightness',
+            'color_temp',
+            'hue',
+            'temperature',
+            'value',
+            'volume',
+            'position',
+            'percentage',
+            'humidity',
+          ],
         },
       },
     },

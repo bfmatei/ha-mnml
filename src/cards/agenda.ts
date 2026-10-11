@@ -474,13 +474,7 @@ export class MnmlAgendaCard extends MnmlCard<AgendaCard> {
       this.horizon = SEARCH_WINDOWS - 1;
     };
     return html`<div class="more">
-      <button
-        type="button"
-        class="control primary"
-        aria-label="Next"
-        title="Next"
-        @click=${quietly(next)}
-      >
+      <button type="button" class="control primary" aria-label="Next" @click=${quietly(next)}>
         ${icon('mdi:chevron-down')}Next
       </button>
       ${
@@ -489,7 +483,6 @@ export class MnmlAgendaCard extends MnmlCard<AgendaCard> {
               type="button"
               class="control"
               aria-label="Back to now"
-              title="Back to now"
               @click=${quietly(back)}
             >
               ${icon('mdi:chevron-up')}Back to now

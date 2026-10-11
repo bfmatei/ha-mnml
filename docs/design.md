@@ -70,7 +70,6 @@ The hairline is on `.card` and on the full-width slider card, except a gradient 
 | List row / table header row    | 32 px / 24 px, the header in 12 px text                                                             |
 | List bar column / reset button | 72 px / 28 px                                                                                       |
 | Tile's Lights row              | 56 px, as any item row, in the pill colour; its icon tile 40 px in the raised colour                |
-| Problems dot                   | 12 px, ringed by 2 px of the card colour                                                            |
 | Slider track / slider card     | 40 px / 56 px                                                                                       |
 | Client row                     | 40 px: the name over its 12 px FQDN, the IP right-aligned                                           |
 | Menu row                       | 36 px                                                                                               |
@@ -119,13 +118,12 @@ Everything else has no background, with one exception: **a tile's chips** sit on
 | Blue    | A message of severity `info` or `notice`; by convention, a climate unit while it cools                                                                                                                                                                                              |
 | Neutral | Everything else. A message of any other severity is grey: its envelope in the secondary text colour                                                                                                                                                                                 |
 
-Every threshold has two stages, so that a slow drift and a fault don't look alike. Red and orange are also the two colours of a tile's problems dot.
+Every threshold has two stages, so that a slow drift and a fault don't look alike. Red and orange are also the two colours of a tile's battery chip.
 
 **An unavailable entity keeps its place.** Its icon, pill, chip or control turns orange, and where its value would print an em dash stands in orange, so a room whose sensor is offline reads "— • —" rather than losing its line. The name beside it stays in the text colour: the warning is on the reading, not the label. A daily total is the exception (`zero_when_empty`): a total such as the day's steps may report nothing until the day's first sample, so its row reads 0 in its unit, uncoloured. [Cards](cards.md#rules) has the rule kind by kind.
 
 **Where a fill is the reading.** In these few regions the colour is the state itself, so it fills a surface:
 
-- the problems dot (`.dot`);
 - a slider's fill (`.fill`, the colour at 38 %);
 - a list row's bar (`.bar > div`, in `currentColor`);
 - the car plan's open parts and low tyres (`.part.open`, `.half`, `.tyre.low`, `.warn`).
@@ -159,6 +157,10 @@ Every colour a card names has a value in both modes of the theme.
 
 **Menus** are popovers in the card colour, under their anchor. Rows are 36 px, and the selected one is in the primary colour.
 
+## Tooltips
+
+An icon with no text beside it (a chip, a round button, a chevron, a glance) explains itself in a tooltip of the cards' own, not the browser's `title`: one `mnml-tooltip`, drawn in the top layer so it shows over pop-ups. It opens 400 ms after the pointer rests on the element, at once when the pointer moves to a neighbour, and on keyboard focus; it never opens for a touch. It sits above the element, below when there is no room, kept inside the screen, and closes when the pointer leaves, on a press, on a scroll and on Escape. The first line is the name, in bold; the lines after it are the details, such as the batteries a chip counts. Text that a label already shows beside its icon gets none.
+
 ## Feedback
 
 | Input     | Feedback                                                                                                                                                                                                                                                                                                |
@@ -175,7 +177,7 @@ Two media queries adapt the design rather than decorate it:
 - **`prefers-contrast: more`** takes the hairline to a 50 % mix of the text colour (3.0:1 in light, 4.7:1 in dark), and the slider fill's border to 3 px.
 - **`forced-colors: active`** replaces what that mode destroys. The mode drops `box-shadow`, which is how the hairline is drawn, and forces every background. So:
   - the hairline becomes a real `CanvasText` border, and so do the menu's edge and a list bar's track;
-  - the slider fill, a list bar's fill and the problems dot become `Highlight`, the dot ringed in `Canvas`;
+  - the slider fill and a list bar's fill become `Highlight`;
   - the gradient sliders show their fill again;
   - their markers become `CanvasText`.
 - **`prefers-reduced-motion: reduce`** turns every animation and transition off (see [Motion](cards.md#motion)).

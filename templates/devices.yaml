@@ -70,3 +70,222 @@ media-card:
     popup: '[[popup]]'
   example:
     entity: media_player.living_tv
+
+cover-card:
+  description: A cover, such as a blind, a shade or a garage door, with its position slider when it has one, and its open, stop and close buttons.
+  slots:
+    entity: { kind: entity, required: true }
+    garage: { kind: flag }
+  card:
+    type: custom:mnml-entity-card
+    entity: '[[entity]]'
+    color: amber
+    controls:
+      - id: position
+        unless: garage
+        type: slider
+        entity: '[[entity]]'
+        slider: position
+        name: Position
+        icon: mdi:blinds-horizontal
+      - id: open
+        type: service
+        entity: '[[entity]]'
+        service: cover.open_cover
+        name: Open
+        icon: mdi:arrow-up
+        show: { not: [open, opening] }
+      - id: stop
+        unless: garage
+        type: service
+        entity: '[[entity]]'
+        service: cover.stop_cover
+        name: Stop
+        icon: mdi:stop
+        show: { is: [opening, closing] }
+      - id: close
+        type: service
+        entity: '[[entity]]'
+        service: cover.close_cover
+        name: Close
+        icon: mdi:arrow-down
+        show: { not: [closed, closing] }
+  example:
+    entity: cover.living_blinds
+
+fan-card:
+  description: A fan or air purifier with its air quality, its speed slider and its power toggle.
+  slots:
+    entity: { kind: entity, required: true }
+    quality: { kind: entity }
+  card:
+    type: custom:mnml-entity-card
+    entity: '[[entity]]'
+    color: blue
+    state: [{ id: part }, { id: quality, if: quality, entity: '[[quality]]' }]
+    controls:
+      - id: speed
+        type: slider
+        entity: '[[entity]]'
+        slider: percentage
+        name: Speed
+        icon: mdi:fan
+      - id: power
+        template: power
+        slots: { entity: '[[entity]]', color: blue }
+  example:
+    entity: fan.bedroom_purifier
+
+humidifier-card:
+  description: A humidifier or dehumidifier with its target humidity slider and its power toggle.
+  slots:
+    entity: { kind: entity, required: true }
+  card:
+    type: custom:mnml-entity-card
+    entity: '[[entity]]'
+    color: blue
+    controls:
+      - id: target
+        type: slider
+        entity: '[[entity]]'
+        slider: humidity
+        name: Target
+        icon: mdi:water-percent
+      - id: power
+        template: power
+        slots: { entity: '[[entity]]', color: blue }
+  example:
+    entity: humidifier.bedroom
+
+camera-card:
+  description: A camera's live picture.
+  slots:
+    entity: { kind: entity, required: true }
+  card:
+    type: picture-entity
+    entity: '[[entity]]'
+    show_name: false
+    show_state: false
+    camera_view: live
+  example:
+    entity: camera.porch
+
+camera-activity:
+  description: 'A folding list of what the cameras of a room detect: motion, a person, a ring at the door. Orange while detected.'
+  slots:
+    cameras:
+      kind: objects
+      fields:
+        entity: { kind: entity, required: true }
+        motion: { kind: entity }
+        person: { kind: entity }
+        doorbell: { kind: entity }
+  card:
+    type: custom:mnml-list-card
+    title: Activity
+    icon: mdi:motion-sensor
+    rows:
+      - id: each-doorbell
+        each: cameras
+        as: camera
+        if: camera.doorbell
+        entity: '[[camera.doorbell]]'
+        label: device
+        color: orange
+      - id: each-person
+        each: cameras
+        as: camera
+        if: camera.person
+        entity: '[[camera.person]]'
+        label: device
+        color: orange
+      - id: each-motion
+        each: cameras
+        as: camera
+        if: camera.motion
+        entity: '[[camera.motion]]'
+        label: device
+        color: orange
+  example:
+    cameras:
+      - {
+          entity: camera.porch,
+          motion: binary_sensor.porch_motion,
+          doorbell: binary_sensor.porch_doorbell,
+        }
+
+appliance-card:
+  description: A washer, dryer or dishwasher with its cycle state, the time left and its power draw; blue while a cycle runs.
+  slots:
+    entity: { kind: entity, required: true }
+    remaining: { kind: entity }
+    power: { kind: entity }
+  card:
+    type: custom:mnml-entity-card
+    entity: '[[entity]]'
+    color: blue
+    when: { is: [running, washing, drying, rinsing, spinning, in_use, 'on'] }
+    state:
+      - { id: part }
+      - { id: remaining, if: remaining, entity: '[[remaining]]' }
+      - { id: power, if: power, entity: '[[power]]' }
+  example:
+    entity: sensor.laundry_washer
+    remaining: sensor.laundry_washer_time_left
+
+pet-card:
+  description: A pet's feeder with when it last ate, the food and litter levels, and a feed button.
+  slots:
+    feed: { kind: entity, required: true }
+    fed: { kind: entity, required: true }
+    food: { kind: entity }
+    litter: { kind: entity }
+  card:
+    type: custom:mnml-entity-card
+    entity: '[[fed]]'
+    color: amber
+    state:
+      - { id: part }
+      - { id: food, if: food, entity: '[[food]]' }
+      - { id: litter, if: litter, entity: '[[litter]]' }
+    controls:
+      - id: feed
+        type: service
+        entity: '[[feed]]'
+        service: button.press
+        name: Feed
+        icon: mdi:food-drumstick
+  example:
+    feed: button.kitchen_feeder_feed
+    fed: sensor.kitchen_feeder_last_fed
+
+plants:
+  description: A folding list of the plants' soil moisture, driest first, orange under 30 % and red under 15 %.
+  slots:
+    plants:
+      kind: objects
+      fields:
+        moisture: { kind: entity, required: true }
+    low: { kind: number, default: 30 }
+    critical: { kind: number, default: 15 }
+  card:
+    - id: plants
+      if: plants
+      type: custom:mnml-list-card
+      lowest_first: true
+      fold: true
+      summary: lowest
+      title: Plants
+      icon: mdi:flower
+      rows:
+        - id: each-plants
+          each: plants
+          as: plant
+          entity: '[[plant.moisture]]'
+          label: device
+          bar: true
+          low: '[[low]]'
+          critical: '[[critical]]'
+  example:
+    plants:
+      - { moisture: sensor.living_ficus_moisture }

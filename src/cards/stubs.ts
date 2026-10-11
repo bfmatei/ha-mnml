@@ -8,6 +8,9 @@ const SLIDER_FOR: Readonly<Record<string, string>> = {
   media_player: 'volume',
   number: 'value',
   climate: 'temperature',
+  cover: 'position',
+  fan: 'percentage',
+  humidifier: 'humidity',
 };
 
 function first(hass: HomeAssistant, domains: readonly string[], fallback: string): string {
@@ -35,6 +38,9 @@ export const STUBS: Readonly<Record<string, Stub>> = {
   'mnml-clients-card': (hass) => ({
     entity: first(hass, ['sensor'], 'sensor.example'),
     networks: [{ name: 'Home', icon: 'mdi:lan', subnet: '192.168.1.0/24' }],
+  }),
+  'mnml-glances-card': (hass) => ({
+    items: [{ entity: first(hass, ['weather', 'light'], 'light.example') }],
   }),
   'mnml-report-card': (hass) => ({ entity: first(hass, ['sensor'], 'sensor.example') }),
   'mnml-button-card': (hass) => ({

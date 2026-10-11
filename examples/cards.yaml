@@ -77,6 +77,20 @@ views:
               - name: Servers
                 icon: mdi:server
                 subnet: 10.1.50.0/24
+          - type: custom:mnml-glances-card
+            items:
+              - entity: weather.demo_weather_south
+                state:
+                  - {}
+                  - { attribute: temperature, icon: true }
+              - entity: input_boolean.fixture_toggle
+                name: Vacation
+                icon: mdi:palm-tree
+                color: amber
+                toggle: true
+              - entities: [sensor.fixture_battery_a, sensor.fixture_battery_b]
+                name: Low batteries
+                below: 20
           - type: custom:mnml-report-card
             entity: sensor.fixture_report
             title: Failed checks

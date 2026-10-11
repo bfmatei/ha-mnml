@@ -1507,6 +1507,26 @@ export const TRAITS: Record<string, Trait> = {
     icon: 'mdi:car-windshield',
     name: 'Window (rear right)',
   },
+  'sensor.hall_dryer': {
+    icon: 'mdi:tumble-dryer',
+    name: 'Dryer',
+  },
+  'sensor.hall_washer': {
+    icon: 'mdi:washing-machine',
+    name: 'Washer',
+  },
+  'sensor.kitchen_dishwasher': {
+    icon: 'mdi:dishwasher',
+    name: 'Dishwasher',
+  },
+  'sensor.kitchen_feeder_food_level': {
+    icon: 'mdi:food-drumstick',
+    name: 'Food level',
+  },
+  'sensor.kitchen_litter_box_waste_level': {
+    icon: 'mdi:tray-full',
+    name: 'Litter box',
+  },
   'sensor.hall_climate_battery': {
     name: 'Climate',
     unit: '%',

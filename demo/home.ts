@@ -1,9 +1,20 @@
 import type { InputBooleanId, WeatherId } from '../src/contract/entities.ts';
-import type { Car, Guest, Home, Person, Room, System } from '../src/home/types.ts';
+import type { Car, Energy, Guest, Home, Person, Room, System } from '../src/home/types.ts';
 
 const OUTSIDE: WeatherId = 'weather.demo_weather_south';
 
 const VACATION: InputBooleanId = 'input_boolean.infrastructure_vacation';
+
+const ENERGY: Energy = {
+  usage: 'sensor.infrastructure_energy_usage',
+  grid: 'sensor.infrastructure_energy_grid',
+  solar: 'sensor.infrastructure_energy_solar',
+  battery: 'sensor.infrastructure_energy_battery',
+  ev: 'sensor.infrastructure_energy_ev',
+  gridToday: 'sensor.infrastructure_energy_grid_today',
+  solarToday: 'sensor.infrastructure_energy_solar_today',
+  exportToday: 'sensor.infrastructure_energy_export_today',
+};
 
 const HOME_ASSISTANT: Guest = {
   host: 'ha.home.arpa',
@@ -434,6 +445,9 @@ const ROOMS: readonly Room[] = [
       },
     },
     media: ['media_player.bedroom'],
+    fans: [{ entity: 'fan.bedroom_purifier', quality: 'sensor.bedroom_purifier_air_quality' }],
+    humidifiers: [{ entity: 'humidifier.bedroom_humidifier' }],
+    covers: [{ entity: 'cover.bedroom_blinds' }],
     batteries: [
       'sensor.bedroom_climate_battery',
       'sensor.bedroom_switch_battery',
@@ -531,6 +545,15 @@ const ROOMS: readonly Room[] = [
         total: 'sensor.entry_ac_energy',
       },
     },
+    cameras: [
+      {
+        entity: 'camera.entry_doorbell',
+        doorbell: 'binary_sensor.entry_doorbell_ring',
+        person: 'binary_sensor.entry_doorbell_person',
+        motion: 'binary_sensor.entry_doorbell_motion',
+      },
+    ],
+    covers: [{ entity: 'cover.entry_garage_door', garage: true }],
     batteries: [
       'sensor.entry_climate_battery',
       'sensor.entry_door_battery',
@@ -572,6 +595,14 @@ const ROOMS: readonly Room[] = [
       ],
       activeScene: 'select.hall_lights_scene',
     },
+    appliances: [
+      {
+        entity: 'sensor.hall_washer',
+        remaining: 'sensor.hall_washer_remaining',
+        power: 'sensor.hall_washer_power',
+      },
+      { entity: 'sensor.hall_dryer' },
+    ],
     batteries: [
       'sensor.hall_climate_battery',
       'sensor.hall_laundry_water_leak_battery',
@@ -645,6 +676,21 @@ const ROOMS: readonly Room[] = [
           today: 'sensor.kitchen_extractor_outlet_energy_daily',
           total: 'sensor.kitchen_extractor_outlet_energy',
         },
+      },
+    ],
+    appliances: [
+      {
+        entity: 'sensor.kitchen_dishwasher',
+        remaining: 'sensor.kitchen_dishwasher_remaining',
+        power: 'sensor.kitchen_dishwasher_power',
+      },
+    ],
+    pets: [
+      {
+        feed: 'button.kitchen_feeder_feed',
+        fed: 'sensor.kitchen_feeder_last_fed',
+        food: 'sensor.kitchen_feeder_food_level',
+        litter: 'sensor.kitchen_litter_box_waste_level',
       },
     ],
     batteries: [
@@ -821,6 +867,11 @@ const ROOMS: readonly Room[] = [
         },
       },
     ],
+    plants: [
+      { moisture: 'sensor.living_ficus_moisture' },
+      { moisture: 'sensor.living_monstera_moisture' },
+    ],
+    covers: [{ entity: 'cover.living_blinds' }],
     batteries: ['sensor.living_climate_battery', 'sensor.living_window_battery'],
     firmware: [
       'update.living_climate_firmware',
@@ -1056,6 +1107,11 @@ export const DEMO: Home = {
   popupOpen: { tablet: 'unfold', desktop: 'unfold' },
   outside: OUTSIDE,
   vacation: VACATION,
+  security: {
+    alarm: 'alarm_control_panel.infrastructure_home_alarm',
+    smoke: ['binary_sensor.kitchen_smoke', 'binary_sensor.hall_smoke'],
+  },
+  energy: ENERGY,
   rooms: ROOMS,
   people: PEOPLE,
   cars: CARS,

@@ -1,12 +1,16 @@
 import type { ClientNetwork, CustomCard, PopupOpen } from '../contract/cards.ts';
 import type {
+  AlarmPanelId,
   BinarySensorId,
   ButtonId,
   CalendarId,
   CameraId,
   ClimateId,
   Corners,
+  CoverId,
   DeviceTrackerId,
+  FanId,
+  HumidifierId,
   ImageId,
   InputBooleanId,
   LightId,
@@ -146,6 +150,44 @@ export interface Diffuser {
   amount: NumberId;
 }
 
+export interface RoomCamera {
+  entity: CameraId;
+  motion?: BinarySensorId;
+  person?: BinarySensorId;
+  doorbell?: BinarySensorId;
+}
+
+export interface Cover {
+  entity: CoverId;
+  garage?: true;
+}
+
+export interface Fan {
+  entity: FanId;
+  quality?: SensorId;
+}
+
+export interface Humidifier {
+  entity: HumidifierId;
+}
+
+export interface Appliance {
+  entity: SensorId;
+  remaining?: SensorId;
+  power?: SensorId;
+}
+
+export interface Pet {
+  feed: ButtonId;
+  fed: SensorId;
+  food?: SensorId;
+  litter?: SensorId;
+}
+
+export interface Plant {
+  moisture: SensorId;
+}
+
 export interface SpeakerTv {
   inputFormat?: SensorId;
   nightSound: SwitchId;
@@ -193,6 +235,13 @@ export interface Room {
   ac?: Ac;
   vacuum?: Vacuum;
   printer3d?: Printer3d;
+  cameras?: RoomCamera[];
+  covers?: Cover[];
+  fans?: Fan[];
+  humidifiers?: Humidifier[];
+  appliances?: Appliance[];
+  pets?: Pet[];
+  plants?: Plant[];
   media?: MediaMember[];
   outlets?: Outlet[];
   diffuser?: Diffuser;
@@ -396,6 +445,17 @@ export interface MediaServer {
   shows?: Shows;
 }
 
+export interface Energy {
+  usage: SensorId;
+  grid: SensorId;
+  solar?: SensorId;
+  battery?: SensorId;
+  ev?: SensorId;
+  gridToday?: SensorId;
+  solarToday?: SensorId;
+  exportToday?: SensorId;
+}
+
 export interface System {
   cpu: SensorId;
   memory: SensorId;
@@ -409,6 +469,11 @@ export interface System {
   adguard?: Adguard;
   network?: Network;
   media?: MediaServer;
+}
+
+export interface Security {
+  alarm: AlarmPanelId;
+  smoke?: BinarySensorId[];
 }
 
 export type Card = CustomCard;
@@ -449,6 +514,8 @@ export interface Home {
   popupOpen?: PopupOpen;
   outside?: WeatherId;
   vacation?: InputBooleanId;
+  security?: Security;
+  energy?: Energy;
   rooms: readonly Room[];
   people: readonly Person[];
   cars: readonly Car[];

@@ -7,6 +7,7 @@ import type {
   EntityId,
   MdiIcon,
   MediaPlayerId,
+  PersonId,
   PopupHash,
   SceneId,
   ScriptId,
@@ -116,7 +117,16 @@ export type StateItem =
   | StateName
   | StateValue;
 
-export type SliderKind = 'brightness' | 'color_temp' | 'hue' | 'temperature' | 'value' | 'volume';
+export type SliderKind =
+  | 'brightness'
+  | 'color_temp'
+  | 'hue'
+  | 'temperature'
+  | 'value'
+  | 'volume'
+  | 'position'
+  | 'percentage'
+  | 'humidity';
 export type ModeAttribute =
   | 'hvac_modes'
   | 'preset_modes'
@@ -180,6 +190,7 @@ export interface IndicatorControl extends ControlBase {
 
 interface StatusRule extends StateRule {
   entities: EntityId[];
+  below?: number;
   label?: 'device';
   words?: Record<string, string>;
   color: Color;
@@ -189,6 +200,7 @@ export interface StatusControl extends ControlBase {
   type: 'status';
   name: string;
   icon: MdiIcon;
+  silent?: true;
   rules: StatusRule[];
 }
 
@@ -219,11 +231,6 @@ export type Control =
   | TyresControl
   | ScenesControl;
 
-export interface Problems {
-  leaks?: BinarySensorId[];
-  batteries?: SensorId[];
-}
-
 export interface HeadingCard {
   type: 'custom:mnml-heading-card';
   title: string;
@@ -244,6 +251,7 @@ export interface ListRow {
   bar?: true;
   of?: EntityId;
   low?: number;
+  low_only?: true;
   critical?: number;
   high?: number;
   critical_high?: number;
@@ -318,6 +326,53 @@ export interface ReportCard {
   title?: string;
   icon?: MdiIcon;
   colors?: Record<string, Color>;
+}
+
+export interface GlanceOne {
+  entity: EntityId;
+  entities?: never;
+  name?: string;
+  icon?: MdiIcon;
+  color?: Color;
+  when?: StateRule;
+  show?: StateRule;
+  state?: StateItem[];
+  popup?: PopupHash;
+  toggle?: true;
+  quiet?: true;
+  bare?: true;
+  alert?: StateRule;
+  people?: PersonId[];
+  is?: never;
+  below?: never;
+  critical?: never;
+}
+
+export interface GlanceCount {
+  entity?: never;
+  entities: EntityId[];
+  name: string;
+  icon?: MdiIcon;
+  color?: Color;
+  when?: never;
+  show?: never;
+  state?: never;
+  popup?: PopupHash;
+  toggle?: never;
+  quiet?: never;
+  bare?: never;
+  alert?: never;
+  people?: never;
+  is?: string[];
+  below?: number;
+  critical?: number;
+}
+
+export type Glance = GlanceOne | GlanceCount;
+
+export interface GlancesCard {
+  type: 'custom:mnml-glances-card';
+  items: Glance[];
 }
 
 export interface ButtonCard {
@@ -407,7 +462,6 @@ export type TileCard = {
   state?: StateItem[];
   chips?: Control[];
   item?: Item;
-  problems?: Problems;
 } & Subject;
 
 export interface MediaCard {
@@ -473,6 +527,7 @@ export type CustomCard =
   | MessagesCard
   | ClientsCard
   | ReportCard
+  | GlancesCard
   | ButtonCard
   | SelectCard
   | SliderCard

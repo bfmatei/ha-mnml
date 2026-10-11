@@ -165,7 +165,6 @@ export class MnmlMediaCard extends MnmlCard<MediaCard> {
         role=${link === undefined ? nothing : 'button'}
         tabindex=${link === undefined ? nothing : 0}
         aria-label=${link === undefined ? nothing : name}
-        title=${link === undefined ? nothing : name}
         @pointerdown=${link?.pointerdown ?? nothing}
         @click=${link?.click ?? nothing}
         @keydown=${link?.keydown ?? nothing}

@@ -3,10 +3,11 @@ import type {
   ClientNetwork,
   Control,
   EntityRule,
+  GlanceCount,
+  GlanceOne,
   Item,
   ListRow,
   MessageSource,
-  Problems,
   StateItem,
   StateRule,
 } from '../contract/cards.ts';
@@ -51,6 +52,7 @@ export const STATE_ITEMS = marked(
 const STATUS_RULE = schema<Extract<Control, { type: 'status' }>['rules'][number]>({
   is: true,
   not: true,
+  below: true,
   entities: true,
   label: true,
   words: true,
@@ -91,7 +93,7 @@ export const CONTROLS = tagged<Control>({
     { show: ENTITY_RULE },
   ),
   status: variant<Extract<Control, { type: 'status' }>>(
-    { type: true, show: true, name: true, icon: true, rules: true },
+    { type: true, show: true, name: true, icon: true, silent: true, rules: true },
     { show: ENTITY_RULE, rules: STATUS_RULE },
   ),
   tyres: variant<Extract<Control, { type: 'tyres' }>>(
@@ -120,6 +122,39 @@ export const ITEM = schema<Item>(
   { when: STATE_RULE, state: STATE_ITEMS, controls: CONTROLS },
 );
 
+export const GLANCE = marked(
+  {
+    entities: variant<GlanceCount>({
+      entities: true,
+      name: true,
+      icon: true,
+      color: true,
+      popup: true,
+      is: true,
+      below: true,
+      critical: true,
+    }),
+  },
+  variant<GlanceOne>(
+    {
+      entity: true,
+      name: true,
+      icon: true,
+      color: true,
+      when: true,
+      show: true,
+      state: true,
+      popup: true,
+      toggle: true,
+      quiet: true,
+      bare: true,
+      alert: true,
+      people: true,
+    },
+    { when: STATE_RULE, show: STATE_RULE, alert: STATE_RULE, state: STATE_ITEMS },
+  ),
+);
+
 export const LIST_ROW = schema<ListRow>(
   {
     entity: true,
@@ -133,6 +168,7 @@ export const LIST_ROW = schema<ListRow>(
     bar: true,
     of: true,
     low: true,
+    low_only: true,
     critical: true,
     high: true,
     critical_high: true,
@@ -153,5 +189,3 @@ export const MESSAGE_SOURCE = marked(
 );
 
 export const CLIENT_NETWORK = schema<ClientNetwork>({ name: true, icon: true, subnet: true });
-
-export const PROBLEMS = schema<Problems>({ leaks: true, batteries: true });

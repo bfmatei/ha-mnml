@@ -71,6 +71,49 @@ test('a target temperature turns the climate on first only when asked to', async
   );
 });
 
+test('a cover slider reads its position, or its state when it has none, and sets it', async () => {
+  const { hass, calls } = recorder();
+  const blinds = sliderSpec(hass, 'cover.a', entity('open', { current_position: 35 }), 'position');
+  const garage = sliderSpec(hass, 'cover.b', entity('open', {}), 'position');
+  assert.ok(blinds && garage);
+  assert.deepEqual([blinds.value, garage.value], [35, 100]);
+  assert.equal(sliderSpec(hass, 'cover.b', entity('closed', {}), 'position')?.value, 0);
+  await blinds.commit(80);
+  assert.deepEqual(calls, [{ service: 'cover.set_cover_position', data: { position: 80 } }]);
+});
+
+test('a fan slider is at 0 while the fan is off, and sets its percentage', async () => {
+  const { hass, calls } = recorder();
+  const on = sliderSpec(
+    hass,
+    'fan.a',
+    entity('on', { percentage: 40, percentage_step: 20 }),
+    'percentage',
+  );
+  assert.ok(on);
+  assert.deepEqual([on.value, on.step], [40, 20]);
+  assert.equal(
+    sliderSpec(hass, 'fan.a', entity('off', { percentage: 40 }), 'percentage')?.value,
+    0,
+  );
+  await on.commit(60);
+  assert.deepEqual(calls, [{ service: 'fan.set_percentage', data: { percentage: 60 } }]);
+});
+
+test('a humidifier slider runs over its humidity range and sets the target', async () => {
+  const { hass, calls } = recorder();
+  const spec = sliderSpec(
+    hass,
+    'humidifier.a',
+    entity('on', { min_humidity: 30, max_humidity: 70, humidity: 50 }),
+    'humidity',
+  );
+  assert.ok(spec);
+  assert.deepEqual([spec.min, spec.max, spec.value], [30, 70, 50]);
+  await spec.commit(55);
+  assert.deepEqual(calls, [{ service: 'humidifier.set_humidity', data: { humidity: 55 } }]);
+});
+
 test('the slider shows the value it is dragged to, and commits it once the drag ends', async () => {
   const { hass, calls } = recorder();
   const spec = sliderSpec(hass, 'light.a', entity('on', { brightness: 128 }), 'brightness');

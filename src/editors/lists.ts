@@ -15,6 +15,9 @@ export const SLIDER_KINDS: readonly string[] = Object.keys({
   temperature: true,
   value: true,
   volume: true,
+  position: true,
+  percentage: true,
+  humidity: true,
 } satisfies Record<SliderKind, true>);
 
 export const MODE_ATTRIBUTES: readonly string[] = Object.keys({
@@ -31,6 +34,10 @@ export const AGENDA_KINDS: readonly string[] = Object.keys({
 } satisfies Record<AgendaSource['kind'], true>);
 
 export const SERVICES: readonly string[] = Object.keys({
+  'alarm_control_panel.alarm_arm_away': true,
+  'alarm_control_panel.alarm_arm_home': true,
+  'alarm_control_panel.alarm_arm_night': true,
+  'alarm_control_panel.alarm_disarm': true,
   'button.press': true,
   'climate.set_fan_mode': true,
   'climate.set_hvac_mode': true,
@@ -40,7 +47,13 @@ export const SERVICES: readonly string[] = Object.keys({
   'climate.set_temperature': true,
   'climate.turn_off': true,
   'climate.turn_on': true,
+  'cover.close_cover': true,
+  'cover.open_cover': true,
+  'cover.set_cover_position': true,
+  'cover.stop_cover': true,
+  'fan.set_percentage': true,
   'homeassistant.toggle': true,
+  'humidifier.set_humidity': true,
   'light.turn_off': true,
   'light.turn_on': true,
   'lock.lock': true,

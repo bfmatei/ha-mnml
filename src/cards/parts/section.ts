@@ -6,6 +6,8 @@ import type { MdiIcon } from '../../contract/entities.ts';
 import { reduced } from '../../ha/motion.ts';
 import { icon, quietly } from '../../ha/templates.ts';
 
+import { tip } from './tooltip.ts';
+
 export const SECTION_STYLE = css`
   .section {
     display: flex;
@@ -100,7 +102,7 @@ export function heading(
             type="button"
             class="chevron"
             aria-label=${title}
-            title=${title}
+            ${tip(title)}
             aria-expanded=${String(fold.open)}
             @click=${quietly(toggle)}
           >

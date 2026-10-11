@@ -22,6 +22,7 @@ import {
   sceneChoice,
 } from './parts/menu.ts';
 import type { Choice } from './parts/menu.ts';
+import { tip } from './parts/tooltip.ts';
 import { BASE_STYLE, CONTROL_STYLE, ROW_STYLE } from './styles.ts';
 
 const SELECT_STYLE = css`
@@ -119,7 +120,7 @@ export class MnmlSelectCard extends MnmlCard<SelectCard> {
         type="button"
         class="control"
         aria-label=${label}
-        title=${label}
+        ${tip(label)}
         aria-haspopup="menu"
         aria-expanded="false"
         @click=${quietly(fromArrow)}

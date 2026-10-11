@@ -74,7 +74,8 @@ const SURFACE: Record<string, string> = {
   'custom:mnml-entity-card':
     'color, controls, entity, icon, items, label, name, popup, state, strip_word, type, visibility, when',
   'custom:mnml-header-card': 'back, color, controls, entity, icon, label, name, state, type, when',
-  'custom:mnml-heading-card': 'controls, grid_options, icon, state, title, type, visibility',
+  'custom:mnml-glances-card': 'grid_options, items, type',
+  'custom:mnml-heading-card': 'grid_options, icon, state, title, type, visibility',
   'custom:mnml-list-card': 'fold, headers, icon, lowest_first, rows, summary, title, type',
   'custom:mnml-media-card': 'entity, popup, type',
   'custom:mnml-messages-card': 'clear, entity, sources, type',
@@ -83,17 +84,17 @@ const SURFACE: Record<string, string> = {
     'active_scene, attribute, entity, icon, name, scenes, type, visibility',
   'custom:mnml-slider-card': 'color, entity, icon, name, slider, turn_on, type, visibility',
   'custom:mnml-tile-card':
-    'chips, entity, grid_options, icon, item, label, name, popup, problems, state, type',
+    'chips, entity, grid_options, icon, item, label, name, popup, state, type',
   grid_options: 'columns',
-  indicator: 'color, entity, type',
+  indicator: 'color, entity, show, type',
   item: 'color, controls, entity, popup, state',
-  items: 'color, controls, entity, state, strip_word',
+  items:
+    'alert, bare, below, color, controls, critical, entities, entity, icon, is, name, people, popup, quiet, show, state, strip_word, toggle, when',
   nav: 'color, entity, popup, type, when',
   networks: 'icon, name, subnet',
   popups: 'cards, hash',
-  problems: 'batteries, leaks',
-  rows: 'bar, color, critical, critical_high, entity, flag, high, label, low, name, of, relative, reset, show, strip, values, when, words, zero_when_empty',
-  rules: 'color, entities, is, label, not, words',
+  rows: 'bar, color, critical, critical_high, entity, flag, high, label, low, low_only, name, of, relative, reset, show, strip, values, when, words, zero_when_empty',
+  rules: 'below, color, entities, is, label, not, words',
   scenes: 'active_scene, icon, name, scenes, type',
   select: 'attribute, color, entity, primary, show, type, when',
   service: 'entity, icon, name, primary, service, show, type',
@@ -101,7 +102,7 @@ const SURFACE: Record<string, string> = {
   slider: 'color, entity, icon, name, show, slider, type',
   sources: 'entity, kind, name, source',
   state: 'attribute, entity, icon, minutes, name, serial, text, when',
-  status: 'icon, name, rules, type',
+  status: 'icon, name, rules, silent, type',
   toggle: 'color, entity, icon, primary, show, type, when',
   tyres: 'low_share, targets, type, tyres, warn_share',
   visibility: 'condition, entity, state_not',
@@ -145,8 +146,9 @@ function titles(home: typeof DEMO): unknown[] {
   });
 }
 
-test('the titled sections come in the order the home gives, the pop-up shell last', () => {
+test('the untitled outlook comes first, the titled sections in the order the home gives, the pop-up shell last', () => {
   assert.deepEqual(titles(DEMO), [
+    undefined,
     DEMO.sections.rooms,
     DEMO.sections.people,
     DEMO.sections.garage,
@@ -154,6 +156,7 @@ test('the titled sections come in the order the home gives, the pop-up shell las
     undefined,
   ]);
   assert.deepEqual(titles({ ...DEMO, order: ['rooms', 'garage', 'infrastructure', 'people'] }), [
+    undefined,
     DEMO.sections.rooms,
     DEMO.sections.garage,
     DEMO.sections.infrastructure,

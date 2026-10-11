@@ -43,14 +43,14 @@ A list of controls, each with a `type`:
 | `service`   | `entity`, `service` (`domain.service`), `name`, `icon`            | `primary`                                                    |
 | `nav`       | `entity`, `popup`                                                 | `color`, `when`                                              |
 | `indicator` | `entity`, `color`                                                 |                                                              |
-| `status`    | `name`, `icon`, `rules`                                           |                                                              |
+| `status`    | `name`, `icon`, `silent`, `rules`                                 |                                                              |
 | `tyres`     | `tyres`, `targets` (four sensors each), `low_share`, `warn_share` |                                                              |
 | `scenes`    | `scenes` (scene entities), `name`, `icon`                         | `active_scene` (a select whose state names the active scene) |
 
 - Every control takes `show`. `primary: true` marks the control as the card's main one: brighter than the others, and filled in a tile chip.
-- A `status` control's `rules` are tried in order, and the first that any of its `entities` matches colours it. Each rule has `entities`, `color` and `is` or `not`, and may add `label: device` and `words` for the tooltip.
+- A `status` control's `rules` are tried in order, and the first that any of its `entities` matches colours it. Each rule has `entities`, `color` and `is`, `not` or `below` (the entities under a number), and may add `label: device` and `words` for the tooltip. A `silent` status control is drawn only while a rule holds or an entity is unavailable.
 - Four sensors are listed front left, front right, rear left, rear right. A tyre is orange under `warn_share` of its target and red under `low_share`.
-- The slider kinds are `brightness`, `color_temp` and `hue` for a light, `temperature` for a climate unit, `value` for a `number` or `input_number`, and `volume` for a media player.
+- The slider kinds are `brightness`, `color_temp` and `hue` for a light, `temperature` for a climate unit, `value` for a `number` or `input_number`, `volume` for a media player, `position` for a cover, `percentage` for a fan, and `humidity` for a humidifier.
 - The mode lists are `hvac_modes`, `preset_modes`, `fan_modes`, `swing_modes` and `swing_horizontal_modes`.
 
 ### An item (`item`, `items`)
@@ -89,6 +89,7 @@ A row has `entity` (required), and:
 | `bar`                   | draws a bar of the value, out of 100                                                             |
 | `of`                    | prints the value as a share of another entity in the same unit; in a table, the row's last value |
 | `low`, `critical`       | orange under `low`, red under `critical`, in the entity's unit                                   |
+| `low_only`              | draws the row only while its value is under `low`                                                |
 | `high`, `critical_high` | orange over `high`, red over `critical_high`                                                     |
 | `reset`                 | a `button` entity, pressed by a reset button at the end of the row                               |
 | `color`, `when`, `show` | the row's colour and whether it is shown                                                         |
@@ -105,6 +106,15 @@ Upcoming calendar events by week. `sources` (required): each has `entity`, a cal
 ### `mnml-clients-card`
 
 `entity` (required), a sensor whose `data` attribute lists the clients, and `networks` (required): each has `name`, `icon` and `subnet` (`10.0.0.0/24`). `attribute` reads another attribute than `data`, and `fields` maps another source's field names (`name`, `ip_address`, `type`). `names` is a sensor of reverse lookups, and `fold` folds each network to its heading ([Data](data.md#the-clients-card)).
+
+### `mnml-glances-card`
+
+`items` (required), each drawn as a well, in one of two shapes:
+
+- **An entity:** `entity` (required), `name` (the tooltip; no text is drawn for it), `icon` (the entity's own by default), `color` and `when` (the icon and the well take the colour while the entity is in the `when` state, `on` by default), `state` (state items; the entity's state by default), `show` (the glance is drawn only while the entity is in that state), `quiet` (while the entity is not in `when`, no value is drawn and the icon is dimmed), `bare` (no value is drawn, the icon alone), `alert` (the glance is red while the entity is in that state), `people` (person entities: the glance is red while it is on with somebody home, or off with everybody away; `when` says what on is), and `popup` or `toggle`: a tap opens the pop-up, or toggles the entity.
+- **A count:** `entities` and `name` (both required; the name is the tooltip), `icon`, `color` (orange by default), `popup` (opened by a tap), and what counts: `is` (the entities in one of these states) or `below` (the entities under a number), with `critical`, under which the glance turns red. It is drawn only while the count is above 0, and an unavailable entity is not counted.
+
+A tooltip names the item, and a count's lists what it counts with each value. The items fall into two groups: the calm statuses on the left, the entity items without `show`; and what needs you on the right, set apart by a hairline, the entity items with `show` and the counts. A critical count fades in once when it is drawn, unless the reader prefers reduced motion. The wells wrap onto a second row rather than scroll. The card is not drawn while none of its items is.
 
 ### `mnml-report-card`
 
@@ -135,7 +145,7 @@ A pop-up's header: a `name` and an `icon`, or an `entity` to take them from (`la
 
 ### `mnml-tile-card`
 
-A tile that opens a pop-up: `popup` (required), and a `name` and an `icon`, or an `entity`, as the header takes them; a `state` line; `chips`, controls; an `item` row; and `problems`, a dot that turns orange or red for `leaks` (binary sensors) or `batteries` (sensors) under 20 % and 5 %.
+A tile that opens a pop-up: `popup` (required), and a `name` and an `icon`, or an `entity`, as the header takes them; a `state` line; `chips`, controls; and an `item` row.
 
 ### `mnml-media-card`
 

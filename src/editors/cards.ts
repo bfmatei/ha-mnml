@@ -4,6 +4,7 @@ import type {
   CarPlanCard,
   ClientsCard,
   EntityCard,
+  GlancesCard,
   HeaderCard,
   HeadingCard,
   ListCard,
@@ -20,10 +21,10 @@ import {
   CLIENT_FIELDS,
   CLIENT_NETWORK,
   CONTROL,
+  GLANCE,
   ITEM,
   LIST_ROW,
   MESSAGE_SOURCE,
-  PROBLEMS,
   STATE_ITEM,
 } from './kinds.ts';
 import { MODE_ATTRIBUTES, SLIDER_KINDS } from './lists.ts';
@@ -62,6 +63,10 @@ const HEADING = plain<HeadingCard>(
     { title: 'Controls', keys: ['controls'] },
   ],
 );
+
+const GLANCES = plain<GlancesCard>('glances', 'Glances', { items: need(parts(GLANCE)) }, [
+  { title: 'Items', keys: ['items'] },
+]);
 
 const LIST = plain<ListCard>(
   'list',
@@ -282,14 +287,12 @@ const TILE = marked(
         state: parts(STATE_ITEM),
         chips: parts(CONTROL),
         item: part(ITEM),
-        problems: part(PROBLEMS),
       },
       [
         { title: 'Subject', keys: ['entity', 'name', 'icon', 'popup'] },
         { title: 'State', keys: ['state'] },
         { title: 'Chips', keys: ['chips'] },
         { title: 'Item', keys: ['item'] },
-        { title: 'Problems', keys: ['problems'] },
       ],
     ),
   },
@@ -304,14 +307,12 @@ const TILE = marked(
       state: parts(STATE_ITEM),
       chips: parts(CONTROL),
       item: part(ITEM),
-      problems: part(PROBLEMS),
     },
     [
       { title: 'Subject', keys: ['entity', 'label', 'icon', 'popup'] },
       { title: 'State', keys: ['state'] },
       { title: 'Chips', keys: ['chips'] },
       { title: 'Item', keys: ['item'] },
-      { title: 'Problems', keys: ['problems'] },
     ],
   ),
 );
@@ -356,6 +357,7 @@ export const DESCRIPTIONS: Readonly<Record<string, Shape>> = {
   'custom:mnml-messages-card': MESSAGES,
   'custom:mnml-clients-card': CLIENTS,
   'custom:mnml-report-card': REPORT,
+  'custom:mnml-glances-card': GLANCES,
   'custom:mnml-button-card': BUTTON,
   'custom:mnml-select-card': SELECT,
   'custom:mnml-slider-card': SLIDER,

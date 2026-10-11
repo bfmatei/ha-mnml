@@ -105,6 +105,16 @@ test('lowest first orders the rows by their value, a row without a number last',
   assert.deepEqual(values(out), ['12 %', '45 %', '80 %']);
 });
 
+test('a low-only row is drawn while its value is under low, and not otherwise', async () => {
+  const config = {
+    ...BATTERIES,
+    fold: undefined,
+    rows: BATTERIES.rows.map((row) => ({ ...row, low_only: true })),
+  };
+  const out = await paint(config, { ...HEALTHY, 'sensor.c': ['12', '%'] });
+  assert.deepEqual(values(out), ['12 %']);
+});
+
 test('a folding list is folded while no row needs you, its heading kept', async () => {
   const out = await paint(BATTERIES, HEALTHY);
   assert.ok(folded(out));

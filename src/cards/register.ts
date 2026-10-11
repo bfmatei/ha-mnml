@@ -4,12 +4,14 @@ import { MnmlCarPlanCard } from './car-plan.ts';
 import { MnmlClientsCard } from './clients.ts';
 import { editorOf } from './edit.ts';
 import { MnmlEntityCard } from './entity.ts';
+import { MnmlGlancesCard } from './glances.ts';
 import { MnmlHeaderCard } from './header.ts';
 import { MnmlHeadingCard } from './heading.ts';
 import { MnmlListCard } from './list.ts';
 import { MnmlMediaCard } from './media.ts';
 import { MnmlMessagesCard } from './messages.ts';
 import { MnmlSlider } from './parts/slider.ts';
+import { MnmlTooltip } from './parts/tooltip.ts';
 import { MnmlPopupsCard } from './popups.ts';
 import { MnmlReportCard } from './report.ts';
 import { MnmlSelectCard } from './select.ts';
@@ -102,6 +104,14 @@ const CARDS: readonly Entry[] = [
     editor: CARD_EDITOR,
   },
   {
+    tag: 'mnml-glances-card',
+    card: MnmlGlancesCard,
+    name: 'MNML Glances',
+    description: 'A one-line strip of overall statuses, side by side',
+    preview: false,
+    editor: CARD_EDITOR,
+  },
+  {
     tag: 'mnml-button-card',
     card: MnmlButtonCard,
     name: 'MNML Button',
@@ -177,6 +187,10 @@ const CARDS: readonly Entry[] = [
 
 if (customElements.get('mnml-slider') === undefined) {
   customElements.define('mnml-slider', MnmlSlider);
+}
+
+if (customElements.get('mnml-tooltip') === undefined) {
+  customElements.define('mnml-tooltip', MnmlTooltip);
 }
 
 window.customCards ??= [];

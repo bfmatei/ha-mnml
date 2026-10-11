@@ -38,6 +38,7 @@ import type { Host } from '../base.ts';
 import { modeChoice, openMenu, optionChoice, sceneChoice } from './menu.ts';
 import type { Choice } from './menu.ts';
 import { openSliderOverlay, sliderSpec } from './slider.ts';
+import { tip } from './tooltip.ts';
 
 export interface ControlContext {
   hass: HomeAssistant;
@@ -73,7 +74,7 @@ function pressed(
     class=${classes(look, false)}
     style=${styleMap(colorStyle(look.color))}
     aria-label=${look.spoken ?? look.title}
-    title=${look.title}
+    ${tip(look.title)}
     aria-pressed=${extra.pressed === undefined ? nothing : String(extra.pressed)}
     aria-haspopup=${extra.menu ? 'menu' : nothing}
     aria-expanded=${extra.menu ? 'false' : nothing}
@@ -89,7 +90,7 @@ function inert(look: Look, glyph: TemplateResult): TemplateResult {
     style=${styleMap(colorStyle(look.color))}
     role="img"
     aria-label=${look.spoken ?? look.title}
-    title=${look.title}
+    ${tip(look.title)}
   >
     ${glyph}
   </div>`;
@@ -179,7 +180,7 @@ function nav(control: NavControl, ctx: ControlContext): TemplateResult {
     class=${classes({ title, color: tint(control.color, control.when, stateObj) }, false)}
     style=${styleMap(colorStyle(tint(control.color, control.when, stateObj)))}
     aria-label=${title}
-    title=${title}
+    ${tip(title)}
     @pointerdown=${quietly(() => {
       prebuild(control.popup);
     })}
@@ -204,7 +205,15 @@ function indicator(control: IndicatorControl, ctx: ControlContext): TemplateResu
   );
 }
 
-function status(control: StatusControl, ctx: ControlContext): TemplateResult {
+function holds(rule: StatusControl['rules'][number], stateObj: HassEntity): boolean {
+  if (rule.below !== undefined) {
+    const level = numericState(stateObj);
+    return level !== undefined && level < rule.below;
+  }
+  return matches(rule, stateObj.state);
+}
+
+function status(control: StatusControl, ctx: ControlContext): TemplateResult | undefined {
   const down = new Map<EntityId, string>();
   for (const rule of control.rules) {
     const lines: string[] = [];
@@ -215,7 +224,7 @@ function status(control: StatusControl, ctx: ControlContext): TemplateResult {
           entityId,
           `${nameOf(ctx.hass, entityId, rule)}: ${formatState(ctx.hass, stateObj)}`,
         );
-      } else if (hasValue(stateObj) && matches(rule, stateObj.state)) {
+      } else if (hasValue(stateObj) && holds(rule, stateObj)) {
         lines.push(
           `${nameOf(ctx.hass, entityId, rule)}: ${formatState(ctx.hass, stateObj, rule.words)}`,
         );
@@ -236,7 +245,7 @@ function status(control: StatusControl, ctx: ControlContext): TemplateResult {
       icon(control.icon),
     );
   }
-  return inert({ title: control.name }, icon(control.icon));
+  return control.silent === true ? undefined : inert({ title: control.name }, icon(control.icon));
 }
 
 function tyres(control: TyresControl, ctx: ControlContext): TemplateResult {

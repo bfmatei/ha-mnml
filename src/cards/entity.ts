@@ -12,6 +12,7 @@ import { schema } from './keys.ts';
 import type { KeySchema } from './keys.ts';
 import { requireControls } from './parts/controls.ts';
 import { ITEM_STYLE, itemRow } from './parts/item.ts';
+import { tip } from './parts/tooltip.ts';
 import { CONTROLS, ITEM, STATE_ITEMS, STATE_RULE } from './schemas.ts';
 import { BASE_STYLE } from './styles.ts';
 
@@ -61,7 +62,7 @@ export class MnmlEntityCard extends MnmlCard<EntityCard> {
       type="button"
       class="control"
       aria-label=${label}
-      title=${label}
+      ${tip(label)}
       aria-expanded=${String(this.expanded)}
       @click=${quietly(() => {
         this.expanded = !this.expanded;

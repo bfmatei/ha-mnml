@@ -35,7 +35,7 @@ test('a slider of a kind the card does not know is an error card that lists the 
   const slider = { type: 'custom:mnml-slider-card', entity: 'light.a' };
   assert.throws(() => {
     made.setConfig({ ...slider, slider: 'brightnes' } as never);
-  }, /slider must be one of brightness, color_temp, hue, temperature, value, volume/);
+  }, /slider must be one of brightness, color_temp, hue, temperature, value, volume, position, percentage, humidity/);
   assert.doesNotThrow(() => {
     made.setConfig({ ...slider, slider: 'brightness' } as never);
   });

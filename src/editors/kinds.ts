@@ -3,10 +3,11 @@ import type {
   ClientFields,
   ClientNetwork,
   Control,
+  GlanceCount,
+  GlanceOne,
   Item,
   ListRow,
   MessageSource,
-  Problems,
   StateItem,
 } from '../contract/cards.ts';
 
@@ -83,6 +84,7 @@ const STATUS_RULE = plain<Extract<Control, { type: 'status' }>['rules'][number]>
     color: need(color()),
     is: texts(),
     not: texts(),
+    below: number(),
   },
 );
 
@@ -134,6 +136,7 @@ export const CONTROL = tagged<Control>('control', 'Control', {
   status: plain<Extract<Control, { type: 'status' }>>('control-status', 'Status', {
     name: need(text()),
     icon: need(icon()),
+    silent: flag(),
     rules: need(parts(STATUS_RULE)),
     show: rule(true),
   }),
@@ -166,6 +169,38 @@ export const ITEM = plain<Item>('item', 'Item', {
   controls: parts(CONTROL),
 });
 
+export const GLANCE = marked(
+  'glance',
+  'Glance',
+  {
+    entities: plain<GlanceCount>('glance-count', 'A count', {
+      entities: need(entities()),
+      name: need(text()),
+      icon: icon(),
+      color: color(),
+      popup: popup(),
+      is: texts(),
+      below: number(),
+      critical: number(),
+    }),
+  },
+  plain<GlanceOne>('glance-entity', 'An entity', {
+    entity: need(entity()),
+    name: text(),
+    icon: icon(),
+    color: color(),
+    when: rule(),
+    show: rule(),
+    state: parts(STATE_ITEM),
+    popup: popup(),
+    toggle: flag(),
+    quiet: flag(),
+    bare: flag(),
+    alert: rule(),
+    people: entities(['person']),
+  }),
+);
+
 export const LIST_ROW = plain<ListRow>('row', 'Row', {
   entity: need(entity()),
   name: text(),
@@ -178,6 +213,7 @@ export const LIST_ROW = plain<ListRow>('row', 'Row', {
   bar: flag(),
   of: entity(),
   low: number(),
+  low_only: flag(),
   critical: number(),
   high: number(),
   critical_high: number(),
@@ -218,9 +254,4 @@ export const CLIENT_FIELDS = plain<ClientFields>('client-fields', 'Fields', {
   name: text(),
   ip_address: text(),
   type: text(),
-});
-
-export const PROBLEMS = plain<Problems>('problems', 'Problems', {
-  leaks: entities(['binary_sensor']),
-  batteries: entities(['sensor']),
 });

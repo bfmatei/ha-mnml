@@ -1,0 +1,276 @@
+glances:
+  description: "The strip of the home's overall statuses, one line across the section: the weather, the alarm, the vacation toggle, and whatever needs you: failed checks, low batteries, a leak, smoke. What does not need you is not drawn."
+  slots:
+    weather:
+      {
+        kind: entity,
+        discover: { domain: weather, scope: all },
+        help: The weather entity of the home.,
+        group: Status,
+      }
+    alarm: { kind: entity, discover: { domain: alarm_control_panel, scope: all }, group: Status }
+    vacation:
+      {
+        kind: entity,
+        label: Vacation,
+        group: Status,
+        help: The input boolean that marks the home as away.,
+      }
+    people:
+      {
+        kind: entities,
+        discover: { domain: person, scope: all },
+        help: The people whose presence tells whether the alarm and vacation fit the home.,
+        group: Status,
+      }
+    energy:
+      kind: object
+      group: Status
+      help: What the home uses, makes and stores; the item shows the power it uses and opens the energy pop-up.
+      fields:
+        usage: { kind: entity, required: true, label: Home usage }
+        grid: { kind: entity, required: true }
+        solar: { kind: entity }
+        battery: { kind: entity }
+        ev: { kind: entity, label: EV charger }
+        grid_today: { kind: entity, label: Grid today }
+        solar_today: { kind: entity, label: Solar today }
+        export_today: { kind: entity, label: Export today }
+    failed:
+      {
+        kind: entity,
+        label: Failed checks,
+        group: Problems,
+        help: A sensor counting what failed; shown while it is not 0.,
+      }
+    warnings:
+      {
+        kind: entity,
+        label: Warnings,
+        group: Problems,
+        help: A sensor counting the warnings; shown while it is not 0.,
+      }
+    batteries:
+      {
+        kind: entities,
+        discover: { domain: sensor, device_class: battery, scope: all },
+        help: Counted while low.,
+        group: Problems,
+      }
+    leaks:
+      {
+        kind: entities,
+        discover: { domain: binary_sensor, device_class: moisture, scope: all },
+        label: Leak sensors,
+        group: Problems,
+      }
+    smoke:
+      {
+        kind: entities,
+        discover: { domain: binary_sensor, device_class: smoke, scope: all },
+        label: Smoke detectors,
+        group: Problems,
+      }
+    notifications:
+      {
+        kind: entity,
+        help: A sensor counting the notifications; shown while it is not 0.,
+        group: Problems,
+      }
+    updates:
+      {
+        kind: entities,
+        discover: { domain: update, scope: all },
+        label: Updates and firmware,
+        help: Counted while an update is pending.,
+        group: Problems,
+      }
+    services:
+      {
+        kind: entities,
+        label: Services,
+        help: Binary sensors that are on while a service runs; counted while off.,
+        group: Problems,
+      }
+    disks:
+      {
+        kind: entity,
+        label: Failing disks,
+        help: A sensor counting the failing disks; shown while it is not 0.,
+        group: Problems,
+      }
+    backup:
+      {
+        kind: entity,
+        label: Backup problem,
+        help: A binary sensor that is on while the backups have a problem.,
+        group: Problems,
+      }
+    low: { kind: number, default: 20 }
+    critical: { kind: number, default: 5 }
+  card:
+    type: custom:mnml-glances-card
+    items:
+      - id: weather
+        if: weather
+        entity: '[[weather]]'
+        state: [{ id: temperature, attribute: temperature }]
+      - id: alarm
+        if: alarm
+        entity: '[[alarm]]'
+        name: Alarm
+        bare: true
+        toggle: true
+        when: { not: [disarmed] }
+        alert: { is: [triggered] }
+        people: '[[people]]'
+      - id: vacation
+        if: vacation
+        entity: '[[vacation]]'
+        name: Vacation
+        icon: mdi:palm-tree
+        color: amber
+        toggle: true
+        quiet: true
+        people: '[[people]]'
+      - id: energy
+        if: energy
+        entity: '[[energy.usage]]'
+        name: Energy
+        icon: mdi:lightning-bolt
+        popup: '#energy'
+      - id: failed
+        if: failed
+        entity: '[[failed]]'
+        name: Failed checks
+        icon: mdi:clipboard-alert-outline
+        color: red
+        when: { not: ['0'] }
+        show: { not: ['0'] }
+        popup: '#proxmox'
+      - id: warnings
+        if: warnings
+        entity: '[[warnings]]'
+        name: Warnings
+        icon: mdi:clipboard-alert-outline
+        color: orange
+        when: { not: ['0'] }
+        show: { not: ['0'] }
+        popup: '#proxmox'
+      - id: notifications
+        if: notifications
+        entity: '[[notifications]]'
+        name: Notifications
+        icon: mdi:bell-badge-outline
+        color: amber
+        when: { not: ['0'] }
+        show: { not: ['0'] }
+        popup: '#proxmox-notifications'
+      - id: disks
+        if: disks
+        entity: '[[disks]]'
+        name: Failing disks
+        icon: mdi:harddisk-remove
+        color: red
+        when: { not: ['0'] }
+        show: { not: ['0'] }
+        popup: '#proxmox'
+      - id: backup
+        if: backup
+        entity: '[[backup]]'
+        name: Backups
+        icon: mdi:backup-restore
+        color: orange
+        show: { is: ['on'] }
+        popup: '#proxmox'
+      - id: batteries
+        if: batteries
+        entities: '[[batteries]]'
+        name: Low batteries
+        icon: mdi:battery-alert-variant-outline
+        below: '[[low]]'
+        critical: '[[critical]]'
+        popup: '#batteries'
+      - id: services
+        if: services
+        entities: '[[services]]'
+        name: Services down
+        icon: mdi:server-off
+        color: red
+        is: ['off']
+        popup: '#system'
+      - id: updates
+        if: updates
+        entities: '[[updates]]'
+        name: Updates
+        icon: mdi:package-up
+        color: amber
+        is: ['on']
+        popup: '#system'
+      - id: leaks
+        if: leaks
+        entities: '[[leaks]]'
+        name: Leaks
+        icon: mdi:water-alert-outline
+        color: red
+        is: ['on']
+      - id: smoke
+        if: smoke
+        entities: '[[smoke]]'
+        name: Smoke
+        icon: mdi:smoke-detector-variant-alert
+        color: red
+        is: ['on']
+    grid_options: { columns: full }
+  popups:
+    - id: energy-popup
+      if: energy
+      template: energy-popup
+      slots:
+        usage: '[[energy.usage]]'
+        grid: '[[energy.grid]]'
+        solar: '[[energy.solar]]'
+        battery: '[[energy.battery]]'
+        ev: '[[energy.ev]]'
+        grid_today: '[[energy.grid_today]]'
+        solar_today: '[[energy.solar_today]]'
+        export_today: '[[energy.export_today]]'
+    - id: batteries-popup
+      if: batteries
+      template: batteries-popup
+      slots: { batteries: '[[batteries]]', low: '[[low]]', critical: '[[critical]]' }
+  example:
+    weather: weather.home
+    vacation: input_boolean.vacation
+    batteries: [sensor.window_battery]
+
+batteries-popup:
+  description: The batteries that are running low, lowest first, with their level as a bar.
+  slots:
+    batteries: { kind: entities }
+    low: { kind: number, default: 20 }
+    critical: { kind: number, default: 5 }
+  card:
+    hash: '#batteries'
+    cards:
+      - id: header
+        type: custom:mnml-header-card
+        name: Batteries
+        icon: mdi:battery-alert-variant-outline
+      - id: batteries
+        type: custom:mnml-list-card
+        lowest_first: true
+        title: Running low
+        icon: mdi:battery-low
+        rows:
+          - id: each-batteries
+            each: batteries
+            as: battery
+            entity: '[[battery]]'
+            label: device
+            bar: true
+            low: '[[low]]'
+            low_only: true
+            critical: '[[critical]]'
+  example:
+    batteries: [sensor.window_battery, sensor.door_battery]

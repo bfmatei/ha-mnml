@@ -17,6 +17,7 @@ import { marked, variant } from './keys.ts';
 import type { KeySchema } from './keys.ts';
 import { renderControls, requireControls } from './parts/controls.ts';
 import { ITEM_STYLE } from './parts/item.ts';
+import { tip } from './parts/tooltip.ts';
 import { CONTROLS, STATE_ITEMS, STATE_RULE } from './schemas.ts';
 import { BASE_STYLE } from './styles.ts';
 
@@ -94,7 +95,7 @@ function round(label: string, glyph: TemplateResult, run: () => void): TemplateR
     type="button"
     class="control round"
     aria-label=${label}
-    title=${label}
+    ${tip(label)}
     @click=${quietly(run)}
   >
     ${glyph}
