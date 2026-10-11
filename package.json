@@ -43,21 +43,21 @@
     "lit": "^3.3.3"
   },
   "devDependencies": {
-    "@types/node": "^26.6.4",
+    "@types/node": "^26.6.5",
     "jsdom": "^30.1.2",
-    "knip": "^6.39.0",
+    "knip": "^6.41.0",
     "markdownlint-cli2": "^0.23.3",
     "minify-literals": "^2.2.0",
-    "oxfmt": "^0.71.0",
-    "oxlint": "^1.86.0",
-    "oxlint-tsgolint": "^7.0.2003",
-    "playwright": "^1.63.0",
-    "rolldown": "^1.2.12",
+    "oxfmt": "^0.72.0",
+    "oxlint": "^1.87.0",
+    "oxlint-tsgolint": "^7.0.2004",
+    "playwright": "^1.64.0",
+    "rolldown": "^1.2.13",
     "vitest": "^5.0.3",
     "yaml": "^2.9.1"
   },
   "engines": {
     "node": ">=22.18"
   },
-  "packageManager": "pnpm@12.9.1"
+  "packageManager": "pnpm@12.11.2"
 }

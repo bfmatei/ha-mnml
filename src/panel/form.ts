@@ -46,21 +46,22 @@ interface Pick {
   changed: (value: string) => void;
 }
 
-export const pick = (options: Pick): TemplateResult => html`<label class="pick">
-  <span class="pick-label">${options.label}</span>
-  <select
-    .value=${live(options.value)}
-    @change=${(event: Event) => {
-      const value = field(event.target, 'value');
-      options.changed(typeof value === 'string' ? value : '');
-    }}
-  >
-    ${options.options.map((option) => {
-      const entry = typeof option === 'string' ? { value: option, label: option } : option;
-      return html`<option value=${entry.value} ?selected=${entry.value === options.value}>
-        ${entry.label}
-      </option>`;
-    })}
-  </select>
-  ${options.help === undefined ? '' : html`<span class="muted">${options.help}</span>`}
-</label>`;
+export const pick = (options: Pick): TemplateResult =>
+  html`<label class="pick">
+    <span class="pick-label">${options.label}</span>
+    <select
+      .value=${live(options.value)}
+      @change=${(event: Event) => {
+        const value = field(event.target, 'value');
+        options.changed(typeof value === 'string' ? value : '');
+      }}
+    >
+      ${options.options.map((option) => {
+        const entry = typeof option === 'string' ? { value: option, label: option } : option;
+        return html`<option value=${entry.value} ?selected=${entry.value === options.value}>
+          ${entry.label}
+        </option>`;
+      })}
+    </select>
+    ${options.help === undefined ? '' : html`<span class="muted">${options.help}</span>`}
+  </label>`;

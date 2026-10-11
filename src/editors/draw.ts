@@ -337,18 +337,19 @@ function kindsForm(shape: ChoiceShape, slot: Slot): TemplateResult {
   const current = variantOf(shape, slot.get());
   return html`<div class="kinds">
     ${shape.variants.map(
-      (variant) => html`<button
-        type="button"
-        class="control"
-        aria-label=${variant.shape.label}
-        title=${variant.shape.label}
-        aria-pressed=${String(variant.shape === current)}
-        @click=${quietly(() => {
-          slot.set(switchVariant(shape, slot.get(), variant.when), true);
-        })}
-      >
-        ${variant.shape.label}
-      </button>`,
+      (variant) =>
+        html`<button
+          type="button"
+          class="control"
+          aria-label=${variant.shape.label}
+          title=${variant.shape.label}
+          aria-pressed=${String(variant.shape === current)}
+          @click=${quietly(() => {
+            slot.set(switchVariant(shape, slot.get(), variant.when), true);
+          })}
+        >
+          ${variant.shape.label}
+        </button>`,
     )}
   </div>`;
 }
