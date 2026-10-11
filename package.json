@@ -34,6 +34,7 @@
     "test:frontend": "vitest run",
     "test:python": "uv run pytest",
     "test:python-floor": "uv run --no-project --python 3.14 --with pytest-homeassistant-custom-component==0.13.368 --with home-assistant-frontend==20260930.0 pytest",
+    "videos": "node tools/videos.ts",
     "walk": "node tools/walk.ts",
     "zip": "node tools/zip.ts"
   },
