@@ -132,6 +132,7 @@ export const GLANCE = marked(
       popup: true,
       is: true,
       below: true,
+      sum: true,
       critical: true,
     }),
   },

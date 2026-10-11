@@ -42,6 +42,7 @@ export const STUBS: Readonly<Record<string, Stub>> = {
   'mnml-glances-card': (hass) => ({
     items: [{ entity: first(hass, ['weather', 'light'], 'light.example') }],
   }),
+  'mnml-weather-card': (hass) => ({ entity: first(hass, ['weather'], 'weather.example') }),
   'mnml-report-card': (hass) => ({ entity: first(hass, ['sensor'], 'sensor.example') }),
   'mnml-button-card': (hass) => ({
     entity: first(hass, ['button'], 'button.example'),

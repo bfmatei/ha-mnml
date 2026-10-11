@@ -11,6 +11,7 @@ import type { ChildCard } from '../ha/card-helpers.ts';
 import { visible } from '../ha/conditions.ts';
 import { field } from '../ha/field.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
+import { letGoOfFocus, trackInput } from '../ha/modality.ts';
 import { leave, narrow, reduced } from '../ha/motion.ts';
 import { PREBUILD_EVENT, closePopup, originOf, popupDepth, whenOrigin } from '../ha/navigation.ts';
 import { scrollable, scrollableAncestors } from '../ha/scroll.ts';
@@ -562,6 +563,7 @@ export class MnmlPopupsCard extends LitElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
+    trackInput();
     this.landing = location.hash === '' ? undefined : location.hash;
     for (const name of ROUTE_EVENTS) {
       window.addEventListener(name, this.route);
@@ -931,6 +933,7 @@ export class MnmlPopupsCard extends LitElement {
     this.motion = [];
     this.swipe = undefined;
     this.dialog?.close();
+    letGoOfFocus();
     this.view = undefined;
     this.leaving = false;
   }

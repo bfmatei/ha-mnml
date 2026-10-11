@@ -181,6 +181,7 @@ export const GLANCE = marked(
       popup: popup(),
       is: texts(),
       below: number(),
+      sum: flag(),
       critical: number(),
     }),
   },

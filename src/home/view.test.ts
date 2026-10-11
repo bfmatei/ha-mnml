@@ -80,6 +80,7 @@ const SURFACE: Record<string, string> = {
   'custom:mnml-media-card': 'entity, popup, type',
   'custom:mnml-messages-card': 'clear, entity, sources, type',
   'custom:mnml-report-card': 'colors, entity, icon, title, type',
+  'custom:mnml-weather-card': 'entity, title, type',
   'custom:mnml-select-card':
     'active_scene, attribute, entity, icon, name, scenes, type, visibility',
   'custom:mnml-slider-card': 'color, entity, icon, name, slider, turn_on, type, visibility',
@@ -89,7 +90,7 @@ const SURFACE: Record<string, string> = {
   indicator: 'color, entity, show, type',
   item: 'color, controls, entity, popup, state',
   items:
-    'alert, bare, below, color, controls, critical, entities, entity, icon, is, name, people, popup, quiet, show, state, strip_word, toggle, when',
+    'alert, bare, below, color, controls, critical, entities, entity, icon, is, name, people, popup, quiet, show, state, strip_word, sum, toggle, when',
   nav: 'color, entity, popup, type, when',
   networks: 'icon, name, subnet',
   popups: 'cards, hash',

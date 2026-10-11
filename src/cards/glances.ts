@@ -300,10 +300,45 @@ export class MnmlGlancesCard extends MnmlCard<GlancesCard> {
     };
   }
 
+  private tally(
+    hass: HomeAssistant,
+    item: Extract<Glance, { entities: string[] }>,
+  ): Drawn | undefined {
+    const levels = item.entities.map((id) => numericState(stateOf(hass, id)) ?? 0);
+    const total = levels.reduce((sum, level) => sum + level, 0);
+    if (total <= 0) {
+      return undefined;
+    }
+    const limit = item.critical;
+    const critical = limit !== undefined && (levels[0] ?? 0) >= limit;
+    const lines = item.entities.flatMap((id, index) => {
+      const stateObj = stateOf(hass, id);
+      return stateObj === undefined || (levels[index] ?? 0) <= 0
+        ? []
+        : [`${nameOf(hass, id, { label: 'device' })}: ${formatState(hass, stateObj)}`];
+    });
+    return {
+      problem: true,
+      well: this.well(
+        {
+          color: critical ? 'red' : (item.color ?? COUNT_COLOR),
+          ...(critical ? { critical } : {}),
+        },
+        [item.name, ...lines].join('\n'),
+        this.press(hass, item.popup, undefined),
+        html`${icon(item.icon ?? COUNT_ICON)}<span class="state">${total}</span>`,
+        partOf(item),
+      ),
+    };
+  }
+
   private count(
     hass: HomeAssistant,
     item: Extract<Glance, { entities: string[] }>,
   ): Drawn | undefined {
+    if (item.sum === true) {
+      return this.tally(hass, item);
+    }
     const found = matching(hass, item);
     if (found.length === 0) {
       return undefined;

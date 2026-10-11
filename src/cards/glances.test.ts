@@ -211,3 +211,42 @@ test('tapping the alarm arms it while it is disarmed and disarms it otherwise', 
     { service: 'alarm_control_panel.alarm_disarm' },
   ]);
 });
+
+test('a summed item adds its sensors together, drawn while the total is above 0 and red while the first is at the limit', async () => {
+  const config = {
+    type: 'custom:mnml-glances-card',
+    items: [
+      {
+        entities: ['sensor.failed', 'sensor.warned'],
+        name: 'Checks',
+        color: 'orange',
+        sum: true,
+        critical: 1,
+      },
+    ],
+  };
+  const paint = async (failed: string, warned: string) => {
+    const made = document.createElement('mnml-glances-card');
+    assert.ok(made instanceof MnmlGlancesCard);
+    made.setConfig(config as never);
+    made.hass = {
+      states: Object.fromEntries([
+        reading('sensor.failed', failed),
+        reading('sensor.warned', warned),
+      ]),
+      entities: {},
+      devices: {},
+      locale: { language: 'en' },
+      formatEntityState: (stateObj: { state: string }): string => stateObj.state,
+    } as never;
+    return mounted(made);
+  };
+  const quiet = await paint('0', '0');
+  assert.equal(quiet.querySelectorAll('.glance').length, 0);
+  const warnings = await paint('0', '2');
+  assert.equal(text(warnings.querySelector('.glance .state')), '2');
+  assert.equal(warnings.querySelector('.glance.critical'), null);
+  const both = await paint('1', '2');
+  assert.equal(text(both.querySelector('.glance .state')), '3');
+  assert.ok(both.querySelector('.glance.critical'));
+});

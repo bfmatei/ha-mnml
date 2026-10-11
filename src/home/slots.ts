@@ -176,8 +176,7 @@ export function glancesSlots(home: Home): Record<string, Value> {
     vacation: home.vacation,
     energy: home.energy && snake(home.energy),
     people: home.people.map((person) => person.entity),
-    failed: checks?.failed,
-    warnings: checks?.warnings,
+    checks: checks && snake(checks),
     batteries: [
       ...home.rooms.flatMap((room) => [
         ...(room.batteries ?? []),
