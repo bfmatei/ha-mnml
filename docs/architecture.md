@@ -274,10 +274,13 @@ The tools reach it over Home Assistant's websocket through `home-assistant-js-we
 ```bash
 pnpm look           # out/look/: the default theme and MNML, light and dark, phone and desktop
 pnpm walk           # the panel, walked through: edit, save, reset, new, duplicate, delete, build a dashboard
+pnpm videos         # out/videos/: five silent .webm tutorials, with captions, a visible cursor and click rings
 pnpm screenshots    # docs/screenshots/: the demo for the README in the glass design, light and dark, six pop-ups and the panel, then the desktop in the flat design (through the options); tools/split.ts joins each desktop's light and dark diagonally into desktop.png and flat-desktop.png
 ```
 
 `pnpm look` fails on any error card on the examples' cards and templates views, on a card of the examples whose editor cannot be opened or opens without a form (it mounts each inside `home-assistant`, whose context Home Assistant's pickers read), on a panel that lists no template or a shipped template whose builder does not open or shows a problem, and on a demo pop-up that opens nothing, has no header or shows a blank body. The panel and the demo it checks under MNML, light and dark, opening each of the demo's 46 pop-ups by its hash. The screenshots are read by eye: under the default theme each card keeps its hairline edge and its pills.
+
+`pnpm videos` records the demo and the panel with Playwright's video recorder: a tour of the dashboard, building a dashboard, editing a shipped template, making a template and the phone layout. It needs the demo running (`pnpm demo`), draws a cursor and captions over the page since the videos have no sound, and leaves the demo as it found it. The videos stay in `out/`, which git ignores.
 
 `pnpm walk` drives the panel on a desktop: it opens `room`, picks a part, edits a slot's label, sees the slot marked changed and the change counted in the header, saves, and finds `room` customised in the library; resets it to shipped and saves; makes a new template and saves it; duplicates it and sees the copy open under its own name; leaves another new template unsaved and finds its name free again; and deletes the first. Then it forgets every dashboard MNML built, finds the offer to build one, makes one by Quick start and opens it (template cards, no error card), rebuilds it with a new title and a room fewer, undoes the rebuild, shares it (no area or person in the text), forgets it with Delete it too, and makes it again from the shared text, which draws its rooms with no error card. It fails on a step that does not hold, and on a page error from MNML's files.
 

@@ -1,6 +1,6 @@
 import { mkdirSync } from 'node:fs';
 
-import type { Browser, BrowserContextOptions } from 'playwright';
+import type { Browser, BrowserContextOptions, Page } from 'playwright';
 
 import { VIEWPORTS, launch, navigate, signedIn, useTheme } from './browser.ts';
 import { readEnv } from './env.ts';
@@ -22,6 +22,19 @@ async function demo(browser: Browser, size: BrowserContextOptions, dark: boolean
   await opened.page.waitForTimeout(5000);
   await useTheme(opened.page, 'MNML', dark);
   return opened;
+}
+
+async function whole(page: Page, path: string): Promise<void> {
+  const first = await page.screenshot({ fullPage: true });
+  const size = page.viewportSize();
+  if (size !== null) {
+    await page.setViewportSize({ width: size.width, height: first.readUInt32BE(20) });
+    await page.waitForTimeout(1500);
+  }
+  await page.screenshot({ path });
+  if (size !== null) {
+    await page.setViewportSize(size);
+  }
 }
 
 async function useGlass(glass: boolean): Promise<void> {
@@ -57,7 +70,7 @@ for (const [name, size] of Object.entries(VIEWPORTS)) {
   for (const dark of [false, true]) {
     const { context, page } = await demo(browser, size, dark);
     const look = `${name}-${dark ? 'dark' : 'light'}`;
-    await page.screenshot({ path: `${OUT}/${look}.png`, fullPage: true });
+    await whole(page, `${OUT}/${look}.png`);
     console.log(`${OUT}/${look}.png`);
     if (name === 'desktop' && dark) {
       for (const hash of POPUPS) {
@@ -110,7 +123,7 @@ await useGlass(false);
 for (const dark of [false, true]) {
   const { context, page } = await demo(browser, VIEWPORTS.desktop, dark);
   const look = `flat-desktop-${dark ? 'dark' : 'light'}`;
-  await page.screenshot({ path: `${OUT}/${look}.png`, fullPage: true });
+  await whole(page, `${OUT}/${look}.png`);
   console.log(`${OUT}/${look}.png`);
   await context.close();
 }
