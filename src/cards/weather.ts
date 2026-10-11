@@ -291,19 +291,20 @@ export class MnmlWeatherCard extends MnmlCard<WeatherCard> {
             ? nothing
             : html`<div class="forecast">
                 ${steps.map(
-                  (step) => html`<div class="step">
-                    <span class="when">${whenOf(language, step, kind ?? 'daily')}</span>
-                    ${icon(CONDITIONS[step.condition ?? ''] ?? FALLBACK_ICON)}
-                    <span class="rain"
-                      >${step.rain === undefined ? '' : `${Math.round(step.rain)}%`}</span
-                    >
-                    <span class="range">
-                      ${step.low === undefined ? nothing : html`<span class="low">${formatAttribute(hass, stateObj, 'temperature', step.low)}</span>`}
-                      <span class="high"
-                        >${step.high === undefined ? '' : formatAttribute(hass, stateObj, 'temperature', step.high)}</span
+                  (step) =>
+                    html`<div class="step">
+                      <span class="when">${whenOf(language, step, kind ?? 'daily')}</span>
+                      ${icon(CONDITIONS[step.condition ?? ''] ?? FALLBACK_ICON)}
+                      <span class="rain"
+                        >${step.rain === undefined ? '' : `${Math.round(step.rain)}%`}</span
                       >
-                    </span>
-                  </div>`,
+                      <span class="range">
+                        ${step.low === undefined ? nothing : html`<span class="low">${formatAttribute(hass, stateObj, 'temperature', step.low)}</span>`}
+                        <span class="high"
+                          >${step.high === undefined ? '' : formatAttribute(hass, stateObj, 'temperature', step.high)}</span
+                        >
+                      </span>
+                    </div>`,
                 )}
               </div>`
         }

@@ -568,21 +568,22 @@ export class MnmlTemplateCardEditor extends LitElement {
     const choices = homeWide(slots) ? [...SOURCES, HOME] : SOURCES;
     return html`<div class="sources" role="radiogroup">
       ${choices.map(
-        ([source, title, help]) => html`<button
-          type="button"
-          class="source"
-          role="radio"
-          aria-label=${title}
-          title=${title}
-          aria-checked=${String(source === current)}
-          @click=${quietly(() => {
-            this.switchSource(template, source);
-          })}
-        >
-          ${icon(source === current ? 'mdi:radiobox-marked' : 'mdi:radiobox-blank')}
-          <span class="source-title">${title}</span>
-          <span class="source-help">${help}</span>
-        </button>`,
+        ([source, title, help]) =>
+          html`<button
+            type="button"
+            class="source"
+            role="radio"
+            aria-label=${title}
+            title=${title}
+            aria-checked=${String(source === current)}
+            @click=${quietly(() => {
+              this.switchSource(template, source);
+            })}
+          >
+            ${icon(source === current ? 'mdi:radiobox-marked' : 'mdi:radiobox-blank')}
+            <span class="source-title">${title}</span>
+            <span class="source-help">${help}</span>
+          </button>`,
       )}
     </div>`;
   }
@@ -645,27 +646,29 @@ export class MnmlTemplateCardEditor extends LitElement {
     }
     if (origin.source === 'area') {
       const back = 'Use what the area found';
-      drawn.push(html`<button
-        type="button"
-        class="control adder"
-        aria-label=${back}
-        title=${back}
-        ?hidden=${!names.some((name) => Object.hasOwn(origin.own, name))}
-        @click=${quietly(() => {
-          const next = Object.fromEntries(
-            Object.entries(slot.get()).filter(([key]) => !names.includes(key)),
-          );
-          for (const name of names) {
-            const found = origin.found[name];
-            if (found !== undefined) {
-              next[name] = found;
+      drawn.push(
+        html`<button
+          type="button"
+          class="control adder"
+          aria-label=${back}
+          title=${back}
+          ?hidden=${!names.some((name) => Object.hasOwn(origin.own, name))}
+          @click=${quietly(() => {
+            const next = Object.fromEntries(
+              Object.entries(slot.get()).filter(([key]) => !names.includes(key)),
+            );
+            for (const name of names) {
+              const found = origin.found[name];
+              if (found !== undefined) {
+                next[name] = found;
+              }
             }
-          }
-          slot.set(next, true);
-        })}
-      >
-        ${icon('mdi:restore')}<span>${back}</span>
-      </button>`);
+            slot.set(next, true);
+          })}
+        >
+          ${icon('mdi:restore')}<span>${back}</span>
+        </button>`,
+      );
     }
     return drawn;
   }

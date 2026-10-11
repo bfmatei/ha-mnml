@@ -535,43 +535,46 @@ export class MnmlPlanEditor extends LitElement {
         Each area with something for its tile gets a room. Tick the ones to show, in order.
       </p>
       ${chosen.map(
-        (room, index) => html`<div class="plan-row">
-          <input
-            type="checkbox"
-            .checked=${live(true)}
-            aria-label=${`Show ${registries.areas[room.area]?.name ?? room.area}`}
-            @change=${() => {
-              this.change({ rooms: plan.rooms.filter((each) => each !== room) });
-            }}
-          />
-          ${this.drawTile(roomCard(room, look.rooms))}
-          <span class="row-actions">
-            ${iconButton(
-              'mdi:tune-variant',
-              `Customize ${registries.areas[room.area]?.name ?? room.area}`,
-              () => {
-                this.edit(
-                  `Customize ${registries.areas[room.area]?.name ?? room.area}`,
-                  look.rooms,
-                  roomCard(room, look.rooms),
-                  (config) => {
-                    this.change({
-                      rooms: chosen.map((each) => (each === room ? roomFrom(room, config) : each)),
-                    });
-                  },
-                );
-              },
-            )}
-            ${this.moves(
-              registries.areas[room.area]?.name ?? room.area,
-              index,
-              chosen.length,
-              (by) => {
-                this.change({ rooms: moved(chosen, index, by) });
-              },
-            )}
-          </span>
-        </div>`,
+        (room, index) =>
+          html`<div class="plan-row">
+            <input
+              type="checkbox"
+              .checked=${live(true)}
+              aria-label=${`Show ${registries.areas[room.area]?.name ?? room.area}`}
+              @change=${() => {
+                this.change({ rooms: plan.rooms.filter((each) => each !== room) });
+              }}
+            />
+            ${this.drawTile(roomCard(room, look.rooms))}
+            <span class="row-actions">
+              ${iconButton(
+                'mdi:tune-variant',
+                `Customize ${registries.areas[room.area]?.name ?? room.area}`,
+                () => {
+                  this.edit(
+                    `Customize ${registries.areas[room.area]?.name ?? room.area}`,
+                    look.rooms,
+                    roomCard(room, look.rooms),
+                    (config) => {
+                      this.change({
+                        rooms: chosen.map((each) =>
+                          each === room ? roomFrom(room, config) : each,
+                        ),
+                      });
+                    },
+                  );
+                },
+              )}
+              ${this.moves(
+                registries.areas[room.area]?.name ?? room.area,
+                index,
+                chosen.length,
+                (by) => {
+                  this.change({ rooms: moved(chosen, index, by) });
+                },
+              )}
+            </span>
+          </div>`,
       )}
       ${others.map((area) => {
         const shows = this.remembered(`room:${look.rooms}:${area.area_id}`, () =>
@@ -613,49 +616,51 @@ export class MnmlPlanEditor extends LitElement {
           : nothing
       }
       ${chosen.map(
-        (choice, index) => html`<div class="plan-row">
-          <input
-            type="checkbox"
-            aria-label=${`Show ${nameOf(choice.entity)}`}
-            .checked=${live(true)}
-            @change=${() => {
-              this.change({ people: chosen.filter((person) => person !== choice) });
-            }}
-          />
-          ${this.drawTile(personCard(choice, registries, look.people))}
-          <span class="row-actions">
-            ${iconButton('mdi:tune-variant', `Customize ${nameOf(choice.entity)}`, () => {
-              this.edit(
-                `Customize ${nameOf(choice.entity)}`,
-                look.people,
-                personCard(choice, registries, look.people),
-                (config) => {
-                  this.change({
-                    people: chosen.map((each) =>
-                      each === choice ? personFrom(choice, config, registries) : each,
-                    ),
-                  });
-                },
-              );
-            })}
-            ${this.moves(nameOf(choice.entity), index, chosen.length, (by) => {
-              this.change({ people: moved(chosen, index, by) });
-            })}
-          </span>
-        </div>`,
+        (choice, index) =>
+          html`<div class="plan-row">
+            <input
+              type="checkbox"
+              aria-label=${`Show ${nameOf(choice.entity)}`}
+              .checked=${live(true)}
+              @change=${() => {
+                this.change({ people: chosen.filter((person) => person !== choice) });
+              }}
+            />
+            ${this.drawTile(personCard(choice, registries, look.people))}
+            <span class="row-actions">
+              ${iconButton('mdi:tune-variant', `Customize ${nameOf(choice.entity)}`, () => {
+                this.edit(
+                  `Customize ${nameOf(choice.entity)}`,
+                  look.people,
+                  personCard(choice, registries, look.people),
+                  (config) => {
+                    this.change({
+                      people: chosen.map((each) =>
+                        each === choice ? personFrom(choice, config, registries) : each,
+                      ),
+                    });
+                  },
+                );
+              })}
+              ${this.moves(nameOf(choice.entity), index, chosen.length, (by) => {
+                this.change({ people: moved(chosen, index, by) });
+              })}
+            </span>
+          </div>`,
       )}
       ${others.map(
-        (entity) => html`<div class="plan-row off">
-          <input
-            type="checkbox"
-            aria-label=${`Show ${nameOf(entity)}`}
-            .checked=${live(false)}
-            @change=${() => {
-              this.change({ people: [...chosen, { entity }] });
-            }}
-          />
-          <span class="plan-words">${nameOf(entity)}</span>
-        </div>`,
+        (entity) =>
+          html`<div class="plan-row off">
+            <input
+              type="checkbox"
+              aria-label=${`Show ${nameOf(entity)}`}
+              .checked=${live(false)}
+              @change=${() => {
+                this.change({ people: [...chosen, { entity }] });
+              }}
+            />
+            <span class="plan-words">${nameOf(entity)}</span>
+          </div>`,
       )}
     </section>`;
   }
@@ -685,31 +690,32 @@ export class MnmlPlanEditor extends LitElement {
           : nothing
       }
       ${plan.cars.map(
-        (car, index) => html`<div class="plan-row">
-          ${this.drawTile(carCard(car, look.cars))}
-          <span class="row-actions">
-            ${this.moves(car.key, index, plan.cars.length, (by) => {
-              this.change({ cars: moved(plan.cars, index, by) });
-            })}
-            ${iconButton('mdi:tune-variant', `Customize ${car.key}`, () => {
-              this.edit(
-                `Customize ${car.key}`,
-                look.cars,
-                carCard(car, look.cars),
-                (config) => {
-                  const next = carFrom(config);
-                  if (next !== undefined) {
-                    this.change({ cars: plan.cars.map((each) => (each === car ? next : each)) });
-                  }
-                },
-                (config) => this.carProblem(plan, config, car.key),
-              );
-            })}
-            ${iconButton('mdi:delete-outline', `Remove ${car.key}`, () => {
-              this.change({ cars: plan.cars.filter((each) => each !== car) });
-            })}
-          </span>
-        </div>`,
+        (car, index) =>
+          html`<div class="plan-row">
+            ${this.drawTile(carCard(car, look.cars))}
+            <span class="row-actions">
+              ${this.moves(car.key, index, plan.cars.length, (by) => {
+                this.change({ cars: moved(plan.cars, index, by) });
+              })}
+              ${iconButton('mdi:tune-variant', `Customize ${car.key}`, () => {
+                this.edit(
+                  `Customize ${car.key}`,
+                  look.cars,
+                  carCard(car, look.cars),
+                  (config) => {
+                    const next = carFrom(config);
+                    if (next !== undefined) {
+                      this.change({ cars: plan.cars.map((each) => (each === car ? next : each)) });
+                    }
+                  },
+                  (config) => this.carProblem(plan, config, car.key),
+                );
+              })}
+              ${iconButton('mdi:delete-outline', `Remove ${car.key}`, () => {
+                this.change({ cars: plan.cars.filter((each) => each !== car) });
+              })}
+            </span>
+          </div>`,
       )}
       <div>
         <button
@@ -903,27 +909,28 @@ export class MnmlPlanEditor extends LitElement {
       <h2>Pop-ups</h2>
       <p class="muted">How a tile's pop-up opens on each screen.</p>
       ${DEVICES.map(
-        ({ device, label, otherwise }) => html`<label class="plan-field">
-          <span>${label}</span>
-          <select
-            class="area-picker"
-            .value=${live(plan.open[device] ?? '')}
-            @change=${(event: Event) => {
-              const value = OPENINGS.find((each) => each.opening === text(event))?.opening;
-              this.change({ open: withOpening(plan.open, device, value) });
-            }}
-          >
-            <option value="" ?selected=${plan.open[device] === undefined}>
-              The default, ${otherwise}
-            </option>
-            ${OPENINGS.map(
-              ({ opening, label: words }) =>
-                html`<option value=${opening} ?selected=${plan.open[device] === opening}>
-                  ${words}
-                </option>`,
-            )}
-          </select>
-        </label>`,
+        ({ device, label, otherwise }) =>
+          html`<label class="plan-field">
+            <span>${label}</span>
+            <select
+              class="area-picker"
+              .value=${live(plan.open[device] ?? '')}
+              @change=${(event: Event) => {
+                const value = OPENINGS.find((each) => each.opening === text(event))?.opening;
+                this.change({ open: withOpening(plan.open, device, value) });
+              }}
+            >
+              <option value="" ?selected=${plan.open[device] === undefined}>
+                The default, ${otherwise}
+              </option>
+              ${OPENINGS.map(
+                ({ opening, label: words }) =>
+                  html`<option value=${opening} ?selected=${plan.open[device] === opening}>
+                    ${words}
+                  </option>`,
+              )}
+            </select>
+          </label>`,
       )}
     </section>`;
   }

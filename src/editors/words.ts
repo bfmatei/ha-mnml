@@ -72,35 +72,36 @@ export class MnmlWords extends LitElement {
     const add = 'Add a word';
     return html`<div class="words">
       ${pairs.map(
-        ([state, word], index) => html`<input
-            class="word"
-            aria-label="State"
-            aria-invalid=${String(clashes(pairs, index))}
-            .value=${live(state)}
-            @input=${(event: Event) => {
-              this.edited(index, 0, event);
-            }}
-          /><input
-            class="word"
-            aria-label=${`Word for ${named(state)}`}
-            .value=${live(word)}
-            @input=${(event: Event) => {
-              this.edited(index, 1, event);
-            }}
-          /><button
-            type="button"
-            class="control"
-            aria-label=${`Remove the word for ${named(state)}`}
-            title=${`Remove the word for ${named(state)}`}
-            @click=${quietly(() => {
-              this.write(
-                pairsOf(this.words).filter((_, position) => position !== index),
-                true,
-              );
-            })}
-          >
-            ${icon('mdi:close')}
-          </button>`,
+        ([state, word], index) =>
+          html`<input
+              class="word"
+              aria-label="State"
+              aria-invalid=${String(clashes(pairs, index))}
+              .value=${live(state)}
+              @input=${(event: Event) => {
+                this.edited(index, 0, event);
+              }}
+            /><input
+              class="word"
+              aria-label=${`Word for ${named(state)}`}
+              .value=${live(word)}
+              @input=${(event: Event) => {
+                this.edited(index, 1, event);
+              }}
+            /><button
+              type="button"
+              class="control"
+              aria-label=${`Remove the word for ${named(state)}`}
+              title=${`Remove the word for ${named(state)}`}
+              @click=${quietly(() => {
+                this.write(
+                  pairsOf(this.words).filter((_, position) => position !== index),
+                  true,
+                );
+              })}
+            >
+              ${icon('mdi:close')}
+            </button>`,
       )}
       <button
         type="button"
