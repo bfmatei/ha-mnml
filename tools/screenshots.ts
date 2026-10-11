@@ -77,8 +77,9 @@ for (const [name, size] of Object.entries(VIEWPORTS)) {
       console.log(`${OUT}/panel-library.png`);
       await page.goto(`${env.HA_URL}/mnml/templates/room`, { waitUntil: 'domcontentloaded' });
       await page.waitForTimeout(8000);
-      await page.screenshot({ path: `${OUT}/panel-simple.png` });
-      console.log(`${OUT}/panel-simple.png`);
+      await page.screenshot({ path: `${OUT}/panel-design.png` });
+      console.log(`${OUT}/panel-design.png`);
+      await page.locator('mnml-panel .tabs .tab.more').click();
       await page.locator('mnml-panel .tabs:not(.panes) .tab').filter({ hasText: 'Card' }).click();
       await page.waitForTimeout(2000);
       await page.locator('mnml-panel .outline-name').nth(1).click();

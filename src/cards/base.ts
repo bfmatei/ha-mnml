@@ -1,6 +1,7 @@
 import { LitElement, nothing } from 'lit';
 import type { CSSResultGroup, TemplateResult } from 'lit';
 
+import { PART_KEY } from '../contract/templates.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
 
 import { requireKnownKeys } from './keys.ts';
@@ -75,6 +76,12 @@ export abstract class MnmlCard<C extends { type: string }> extends LitElement im
     this.validate(config);
     this.releaseAll();
     this.config = config;
+    const part: unknown = Reflect.get(config, PART_KEY);
+    if (typeof part === 'string') {
+      this.dataset['part'] = part;
+    } else {
+      delete this.dataset['part'];
+    }
     const ids = new Set<string>();
     collectEntityIds(config, ids);
     this.watched = [...ids];

@@ -326,3 +326,42 @@ export const CONTROL_STYLE = css`
     }
   }
 `;
+
+export const SELECT_STYLE = css`
+  select,
+  select.area-picker,
+  select.word {
+    appearance: none;
+    -webkit-appearance: none;
+    box-sizing: border-box;
+    height: 36px;
+    max-width: 100%;
+    padding: 0 34px 0 14px;
+    border: 1px solid var(--divider-color);
+    border-radius: 18px;
+    background-color: var(--card-background-color);
+    background-image:
+      linear-gradient(45deg, transparent 50%, var(--secondary-text-color) 50%),
+      linear-gradient(135deg, var(--secondary-text-color) 50%, transparent 50%);
+    background-position:
+      calc(100% - 19px) 50%,
+      calc(100% - 14px) 50%;
+    background-size: 5px 5px;
+    background-repeat: no-repeat;
+    color: var(--primary-text-color);
+    font: inherit;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  select:hover {
+    border-color: var(--secondary-text-color);
+  }
+  select:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+  }
+  select:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+`;

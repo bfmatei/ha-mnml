@@ -164,7 +164,7 @@ export function groupOf(items: readonly Value[], path: Path, key: string, field?
   };
 }
 
-function startersOf(group: Group): Starter[] {
+export function startersOf(group: Group): Starter[] {
   const of = group.of;
   if (of === undefined) {
     const cards: Starter[] = Object.entries(DESCRIPTIONS)
@@ -309,4 +309,54 @@ export function drawOutline(root: Part | Group, actions: OutlineActions): Templa
   return html`<div class="outline">
     ${'groups' in root ? drawPart(root, top, 0, actions) : drawGroup(root, actions)}
   </div>`;
+}
+
+export function singlesOf(root: Part | Group): Set<string> {
+  const found = new Set<string>();
+  const walk = (part: Part): void => {
+    for (const group of part.groups) {
+      if (!group.list) {
+        for (const only of group.parts) {
+          found.add(key(only.path));
+        }
+      }
+      for (const inner of group.parts) {
+        walk(inner);
+      }
+    }
+  };
+  if ('groups' in root) {
+    found.add(key(root.path));
+    walk(root);
+  } else {
+    for (const part of root.parts) {
+      walk(part);
+    }
+  }
+  return found;
+}
+
+export function chainTo(root: Part | Group, where: string): Part[] {
+  const walk = (part: Part, above: Part[]): Part[] | undefined => {
+    const here = [...above, part];
+    if (key(part.path) === where) {
+      return here;
+    }
+    for (const group of part.groups) {
+      for (const inner of group.parts) {
+        const found = walk(inner, here);
+        if (found !== undefined) {
+          return found;
+        }
+      }
+    }
+    return undefined;
+  };
+  for (const part of 'groups' in root ? [root] : root.parts) {
+    const found = walk(part, []);
+    if (found !== undefined) {
+      return found;
+    }
+  }
+  return [];
 }

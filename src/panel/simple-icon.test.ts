@@ -1,12 +1,20 @@
 import assert from 'node:assert/strict';
 
-import { render } from 'lit';
+import { html, render } from 'lit';
+import type { TemplateResult } from 'lit';
 import { test } from 'vitest';
 
 import type { Template } from '../contract/templates.ts';
 import { define, drawn } from '../test/render.ts';
 
-import { drawSimple, simpleOf } from './simple.ts';
+import { drawLook, simpleOf } from './simple.ts';
+import type { SimpleActions, SimpleRow } from './simple.ts';
+
+function drawLooks(rows: readonly SimpleRow[], actions: SimpleActions): TemplateResult {
+  return html`${rows.flatMap((row) =>
+    row.looks.map((look) => drawLook(look, row.label, actions, undefined)),
+  )}`;
+}
 
 class FakePicker extends HTMLElement {
   value = '';
@@ -21,7 +29,7 @@ const TILE: Template = {
 test("an icon is chosen with Home Assistant's icon picker where the page has it", () => {
   const chosen: string[] = [];
   const box = drawn(
-    drawSimple(simpleOf(TILE, TILE), {
+    drawLooks(simpleOf(TILE, TILE), {
       toggle: () => undefined,
       look: (_look, value) => {
         chosen.push(value);
@@ -39,7 +47,7 @@ test('an icon picker cleared shows its value again when drawn again', () => {
   const box = document.createElement('div');
   const draw = (): void => {
     render(
-      drawSimple(simpleOf(TILE, TILE), { toggle: () => undefined, look: () => undefined }),
+      drawLooks(simpleOf(TILE, TILE), { toggle: () => undefined, look: () => undefined }),
       box,
     );
   };

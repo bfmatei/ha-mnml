@@ -33,16 +33,18 @@ const ROW_MENU_STYLE = css`
     background: var(--m-hover);
   }
   .row-menu-list {
-    position: absolute;
-    right: 0;
-    top: 40px;
-    z-index: 2;
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    border: 0;
+    overflow: visible;
     display: none;
     flex-direction: column;
-    min-width: 160px;
+    min-width: 200px;
     padding: 4px 0;
     border-radius: 8px;
     background: var(--card-background-color);
+    color: var(--primary-text-color);
     box-shadow: var(--ha-card-box-shadow, 0 2px 8px rgba(0, 0, 0, 0.28));
   }
   .row-menu.open .row-menu-list {
@@ -56,6 +58,7 @@ const ROW_MENU_STYLE = css`
     padding: 10px 16px;
     color: var(--primary-text-color);
     cursor: pointer;
+    white-space: nowrap;
   }
   .row-menu-item:hover {
     background: var(--m-hover);
@@ -99,7 +102,7 @@ export class MnmlRowMenu extends LitElement {
       >
         ${icon('mdi:dots-vertical')}
       </button>
-      <div class="row-menu-list" role="menu">
+      <div class="row-menu-list" role="menu" popover="manual">
         ${this.open ? this.items.map((item) => this.entry(item)) : nothing}
       </div>
     </div>`;
@@ -128,11 +131,53 @@ export class MnmlRowMenu extends LitElement {
       return;
     }
     window.addEventListener('pointerdown', this.outside, true);
+    window.addEventListener('scroll', this.scrolled, true);
+    window.addEventListener('resize', this.scrolled);
     this.open = true;
+    void this.updateComplete.then(() => {
+      this.place();
+    });
+  };
+
+  private place(): void {
+    const list = this.renderRoot.querySelector<HTMLElement>('.row-menu-list');
+    const button = this.renderRoot.querySelector<HTMLElement>('.row-menu-button');
+    if (list === null || button === null || !this.open) {
+      return;
+    }
+    if (typeof list.showPopover === 'function' && !list.matches(':popover-open')) {
+      list.showPopover();
+    }
+    const anchor = button.getBoundingClientRect();
+    const box = list.getBoundingClientRect();
+    const below = anchor.bottom + 4;
+    const top = below + box.height > window.innerHeight - 8 ? anchor.top - box.height - 4 : below;
+    const left = Math.min(Math.max(anchor.right - box.width, 8), window.innerWidth - box.width - 8);
+    list.style.top = `${Math.max(Math.round(top), 8)}px`;
+    list.style.left = `${Math.round(left)}px`;
+  }
+
+  private readonly scrolled = (event: Event): void => {
+    if (event.composedPath().includes(this)) {
+      return;
+    }
+    const button = this.renderRoot.querySelector<HTMLElement>('.row-menu-button');
+    const anchor = button?.getBoundingClientRect();
+    if (anchor === undefined || anchor.bottom < 0 || anchor.top > window.innerHeight) {
+      this.close();
+      return;
+    }
+    this.place();
   };
 
   private close(): void {
     window.removeEventListener('pointerdown', this.outside, true);
+    window.removeEventListener('scroll', this.scrolled, true);
+    window.removeEventListener('resize', this.scrolled);
+    const list = this.renderRoot.querySelector<HTMLElement>('.row-menu-list');
+    if (typeof list?.hidePopover === 'function' && list.matches(':popover-open')) {
+      list.hidePopover();
+    }
     this.open = false;
   }
 

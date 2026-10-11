@@ -1,5 +1,7 @@
 import { css } from 'lit';
 
+import { SELECT_STYLE } from '../cards/styles.ts';
+
 export const EDITOR_STYLE = css`
   [hidden] {
     display: none !important;
@@ -114,7 +116,6 @@ export const EDITOR_STYLE = css`
   .adding .control {
     padding: 0 12px;
   }
-  select,
   input {
     font: inherit;
     font-size: 13px;
@@ -248,4 +249,5 @@ export const EDITOR_STYLE = css`
     font-weight: 500;
     align-self: flex-start;
   }
+  ${SELECT_STYLE}
 `;

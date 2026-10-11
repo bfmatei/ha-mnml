@@ -134,25 +134,55 @@ check(
 
 await page.goto(`${env.HA_URL}/mnml/templates/room`, { waitUntil: 'domcontentloaded' });
 await page.locator('mnml-builder .builder-head').waitFor({ timeout: 30000 });
-await page.locator('mnml-builder .simple-row').first().waitFor({ timeout: 30000 });
-const lockChip = page.locator('mnml-builder input[type="checkbox"][data-path="card/chips?/#lock"]');
-check(
-  (await lockChip.count()) === 1 && (await lockChip.isChecked()),
-  'the room opens on Simple, its lock chip switched on',
+await page.locator('mnml-builder mnml-preview .cards > *').first().waitFor({ timeout: 30000 });
+await page.locator('mnml-builder select.area-picker').selectOption({ label: 'Living' });
+await settle(page, 3500);
+const heatingChip = page.locator(
+  'mnml-builder input[type="checkbox"][data-path="card/chips?/#heating"]',
 );
-await lockChip.uncheck();
+const partAt = (key: string) =>
+  page.evaluate((wanted) => {
+    const find = (root: ParentNode): Element | undefined => {
+      for (const element of root.querySelectorAll('*')) {
+        if (element.getAttribute('data-part') === wanted) {
+          return element;
+        }
+        const inner = element.shadowRoot === null ? undefined : find(element.shadowRoot);
+        if (inner !== undefined) {
+          return inner;
+        }
+      }
+      return undefined;
+    };
+    const box = find(document)?.getBoundingClientRect();
+    return box === undefined
+      ? undefined
+      : { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+  }, key);
+const heatingAt = await partAt('card/chips?/#heating');
+check(heatingAt !== undefined, 'the Design tab draws the room, its heating chip a part of it');
+if (heatingAt !== undefined) {
+  await page.mouse.click(heatingAt.x, heatingAt.y);
+}
+await settle(page, 500);
+check(
+  (await heatingChip.count()) === 1 && (await heatingChip.isChecked()),
+  'a click on the heating chip picks it, switched on in the panel',
+);
+await heatingChip.uncheck();
 await settle(page, 500);
 check(
   (await page.locator('mnml-builder').getByRole('button', { name: 'Save' }).isEnabled()) &&
-    !(await lockChip.isChecked()),
-  'switching the lock chip off is a change to save',
+    (await partAt('card/chips?/#heating')) === undefined,
+  'switching the heating chip off is a change to save, and the chip leaves the drawing',
 );
-await lockChip.check();
+await page.locator('mnml-builder input[type="checkbox"][data-path="card/chips?/#heating"]').check();
 await settle(page, 500);
 check(
   !(await page.locator('mnml-builder').getByRole('button', { name: 'Save' }).isEnabled()),
   'switching it on again is no change at all',
 );
+await page.locator('mnml-builder button.tab.more').click();
 await page.locator('mnml-builder').getByRole('tab', { name: 'Card' }).click();
 await settle(page, 500);
 await settle(page, 3000);

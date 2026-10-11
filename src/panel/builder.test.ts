@@ -136,6 +136,7 @@ const host = (calls: Calls): BuilderHost => ({
   history: () => Promise.resolve(calls.history),
   duplicate: () => {},
   exportOne: () => {},
+  open: () => {},
 });
 
 async function opened(
@@ -334,12 +335,13 @@ test('a new hass reaches the forms and the preview without drawing the builder a
   builder.remove();
 });
 
-test('another draft opens on Simple, not on the tab the last one was left on', async () => {
+test('another draft opens on Design, not on the tab the last one was left on', async () => {
   const calls: Calls = { saved: [], left: 0 };
   const { builder, root } = await opened(
     { name: 'room', template: structuredClone(ROOM), shipped: ROOM, conflicts: [] },
     calls,
   );
+  await moreTools(builder, root);
   const slots = [...root.querySelectorAll('[role="tab"]')].find(
     (tab) => tab.textContent?.trim() === 'Slots',
   );
@@ -355,7 +357,7 @@ test('another draft opens on Simple, not on the tab the last one was left on', a
   };
   await builder.updateComplete;
   const active = root.querySelector('[role="tab"][aria-selected="true"]');
-  assert.equal(active?.textContent?.trim(), 'Simple');
+  assert.equal(active?.textContent?.trim(), 'Design');
   builder.remove();
 });
 
@@ -384,14 +386,17 @@ test('Discard is offered only when the draft differs from what is stored', async
   builder.remove();
 });
 
-test('the builder has Simple, Card, Pop-ups, Slots and YAML, and the example lives with the slots', async () => {
+test('the builder has Design, Card, Pop-ups, Slots and YAML, and the example lives with the slots', async () => {
   const calls: Calls = { saved: [], left: 0 };
   const { builder, root } = await opened(
     { name: 'room', template: structuredClone(ROOM), shipped: ROOM, conflicts: [] },
     calls,
   );
-  const tabs = [...root.querySelectorAll('[role="tab"]')].map((tab) => tab.textContent?.trim());
-  assert.deepEqual(tabs, ['Simple', 'Card', 'Pop-ups', 'Slots', 'YAML']);
+  const names = (): (string | undefined)[] =>
+    [...root.querySelectorAll('[role="tab"]')].map((tab) => tab.textContent?.trim());
+  assert.deepEqual(names(), ['Design'], 'the other tools are one click away, not in the way');
+  await moreTools(builder, root);
+  assert.deepEqual(names(), ['Design', 'Card', 'Pop-ups', 'Slots', 'YAML']);
   const slots = [...root.querySelectorAll('[role="tab"]')].find(
     (tab) => tab.textContent?.trim() === 'Slots',
   );
@@ -402,18 +407,35 @@ test('the builder has Simple, Card, Pop-ups, Slots and YAML, and the example liv
   builder.remove();
 });
 
+async function picked(builder: MnmlBuilder, root: ShadowRoot, key: string): Promise<void> {
+  const stage = root.querySelector('mnml-preview');
+  assert.ok(stage);
+  const pick: unknown = Reflect.get(stage, 'pick');
+  assert.equal(typeof pick, 'function');
+  Reflect.apply(pick as (key: string) => void, undefined, [key]);
+  await builder.updateComplete;
+}
+
+async function moreTools(builder: MnmlBuilder, root: ShadowRoot): Promise<void> {
+  const more = [...root.querySelectorAll('button.tab.more')].at(0);
+  assert.ok(more instanceof HTMLButtonElement);
+  more.click();
+  await builder.updateComplete;
+}
+
 const saveOff = (root: ShadowRoot): boolean => {
   const save = root.querySelector('button[aria-label="Save"]');
   assert.ok(save instanceof HTMLButtonElement);
   return save.disabled;
 };
 
-test('Simple switches a part off and on again, and the template is back as it was', async () => {
+test('Design switches a part off and on again, and the template is back as it was', async () => {
   const calls: Calls = { saved: [], left: 0 };
   const { builder, root } = await opened(
     { name: 'room', template: structuredClone(ROOM), shipped: ROOM, conflicts: [] },
     calls,
   );
+  await picked(builder, root, 'card/chips?/#lock');
   const lock = root.querySelector('input[type="checkbox"][data-path="card/chips?/#lock"]');
   assert.ok(lock instanceof HTMLInputElement);
   assert.equal(lock.checked, true);
@@ -422,6 +444,7 @@ test('Simple switches a part off and on again, and the template is back as it wa
   lock.dispatchEvent(new Event('change'));
   await builder.updateComplete;
   assert.equal(saveOff(root), false);
+  await picked(builder, root, 'card/chips?/#lock');
   const again = root.querySelector('input[type="checkbox"][data-path="card/chips?/#lock"]');
   assert.ok(again instanceof HTMLInputElement);
   assert.equal(again.checked, false);
@@ -432,12 +455,13 @@ test('Simple switches a part off and on again, and the template is back as it wa
   builder.remove();
 });
 
-test('a colour chosen in Simple changes the draft', async () => {
+test('a colour chosen in Design changes the draft', async () => {
   const calls: Calls = { saved: [], left: 0 };
   const { builder, root } = await opened(
     { name: 'room', template: structuredClone(ROOM), shipped: ROOM, conflicts: [] },
     calls,
   );
+  await picked(builder, root, 'card/chips?/#window');
   const colour = root.querySelector('select[data-path="card/chips?/#window/color"]');
   assert.ok(colour instanceof HTMLSelectElement);
   assert.equal(colour.value, 'orange');
@@ -448,7 +472,7 @@ test('a colour chosen in Simple changes the draft', async () => {
   builder.remove();
 });
 
-test('a look cleared and left empty in Simple shows its value again', async () => {
+test('a look cleared and left empty in Design shows its value again', async () => {
   const calls: Calls = { saved: [], left: 0 };
   const named: Template = {
     ...structuredClone(ROOM),
@@ -458,6 +482,7 @@ test('a look cleared and left empty in Simple shows its value again', async () =
     { name: 'hall', template: named, shipped: undefined, conflicts: [] },
     calls,
   );
+  await picked(builder, root, 'card');
   const input = root.querySelector<HTMLInputElement>('input[data-path="card/name"]');
   assert.ok(input);
   input.value = '';
@@ -488,5 +513,112 @@ test("a save the integration refuses says the integration's reason", async () =>
   await new Promise((resolve) => setTimeout(resolve, 0));
   await builder.updateComplete;
   assert.match(text(root), /Not saved: a template is at most 262144 bytes/);
+  builder.remove();
+});
+
+const BLANK: Template = {
+  description: '',
+  slots: { title: { kind: 'text', required: true, label: 'Title' } },
+  card: { type: 'custom:mnml-heading-card', title: '[[title]]', icon: 'mdi:star-outline' },
+  example: { title: 'New' },
+};
+
+test('a new template asks what to make, and the choice is what the template then is', async () => {
+  const calls: Calls = { saved: [], left: 0 };
+  const { builder, root } = await opened(
+    {
+      name: 'mine',
+      template: structuredClone(BLANK),
+      shipped: undefined,
+      conflicts: [],
+      fresh: true,
+      blank: true,
+    },
+    calls,
+  );
+  const starts = [...root.querySelectorAll('button.start')];
+  assert.deepEqual(
+    starts.map((start) => start.querySelector('strong')?.textContent),
+    ['A tile', 'A list', 'A strip of statuses', 'A pop-up'],
+  );
+  assert.equal(root.querySelector('mnml-preview'), null, 'nothing to draw yet');
+  const list = starts[1];
+  assert.ok(list instanceof HTMLButtonElement);
+  list.click();
+  await builder.updateComplete;
+  assert.ok(root.querySelector('mnml-preview'), 'now the stage');
+  assert.equal(root.querySelector('button.start'), null);
+  const save = root.querySelector('button[aria-label="Save"]');
+  assert.ok(save instanceof HTMLButtonElement);
+  save.click();
+  await new Promise((done) => setTimeout(done, 10));
+  const saved = calls.saved[0]?.[1];
+  assert.equal(saved?.kind, 'own');
+  assert.match(JSON.stringify(saved?.template?.card), /mnml-list-card/);
+  assert.equal(saved?.template?.slots, undefined, 'and no leftover slot');
+  builder.remove();
+});
+
+test('a copy of a template opens on the stage, not on the starting points', async () => {
+  const calls: Calls = { saved: [], left: 0 };
+  const { builder, root } = await opened(
+    {
+      name: 'room-copy',
+      template: structuredClone(ROOM),
+      shipped: undefined,
+      conflicts: [],
+      fresh: true,
+    },
+    calls,
+  );
+  assert.equal(root.querySelector('button.start'), null);
+  assert.ok(root.querySelector('mnml-preview'));
+  builder.remove();
+});
+
+test('a shared piece can be written out in the card, which then no longer follows it', async () => {
+  const chip: Template = {
+    slots: { entity: { kind: 'entity', required: true }, color: { kind: 'text', default: 'blue' } },
+    card: { type: 'nav', entity: '[[entity]]', popup: '#x', color: '[[color]]' },
+  };
+  const mine: Template = {
+    slots: { ac: { kind: 'entity' } },
+    card: {
+      type: 'custom:mnml-tile-card',
+      name: 'Hall',
+      icon: 'mdi:door',
+      popup: '#hall',
+      chips: [{ id: 'ac', template: 'chip', slots: { entity: '[[ac]]' } }],
+    },
+  };
+  const calls: Calls = { saved: [], left: 0 };
+  const builder = document.createElement('mnml-builder');
+  assert.ok(builder instanceof MnmlBuilder);
+  builder.host = { ...host(calls), templates: () => ({ chip, mine }) };
+  builder.draft = {
+    name: 'mine',
+    template: structuredClone(mine),
+    shipped: undefined,
+    conflicts: [],
+  };
+  const root = await mounted(builder);
+  await picked(builder, root, 'card/chips/#ac');
+  const here = [...root.querySelectorAll('button.chip')].find((button) =>
+    button.textContent?.includes('Edit it here'),
+  );
+  assert.ok(here instanceof HTMLButtonElement);
+  here.click();
+  await builder.updateComplete;
+  const save = root.querySelector('button[aria-label="Save"]');
+  assert.ok(save instanceof HTMLButtonElement);
+  assert.equal(save.disabled, false, 'it is a change to save');
+  save.click();
+  await new Promise((done) => setTimeout(done, 10));
+  const saved = calls.saved[0]?.[1];
+  const card = saved?.template?.card;
+  assert.ok(typeof card === 'object' && card !== null && !Array.isArray(card));
+  assert.deepEqual(card['chips'], [
+    { id: 'my-ac', type: 'nav', entity: '[[ac]]', popup: '#x', color: 'blue' },
+  ]);
   builder.remove();
 });

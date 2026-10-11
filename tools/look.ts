@@ -118,7 +118,7 @@ const cardEditors = (page: Page): Promise<{ opened: number; problems: string[] }
         await new Promise((resolve) => {
           setTimeout(resolve, 300);
         });
-        if (!editor.shadowRoot?.querySelector('ha-form, .gallery, .kinds')) {
+        if (!editor.shadowRoot?.querySelector('ha-form, .gallery, .kinds, .parts')) {
           problems.push(`${String(card['type'])}: no form`);
         }
         editor.remove();

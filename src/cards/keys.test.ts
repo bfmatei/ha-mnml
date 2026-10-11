@@ -83,3 +83,12 @@ test('a marked union checks a value against the variant its marker key picks', (
     ['[0].entity'],
   );
 });
+
+test('the path a template marks a part with is a key of every part, and of no card the author wrote', () => {
+  const config = {
+    type: 'x',
+    rows: [{ entity: 'sensor.a', _part: 'card/rows/#a' }],
+    _part: 'card',
+  };
+  assert.deepEqual(unknownKeys(config, CARD), []);
+});

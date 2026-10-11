@@ -100,3 +100,21 @@ test("Escape closes an open row menu and goes no further, so Home Assistant's di
   assert.equal(reached, 1, 'a closed menu lets it through');
   document.body.removeEventListener('keydown', count);
 });
+
+test('the list of a row menu is a popover, so that no pane crops it', async () => {
+  const menu = await menuOf('Living Sonos', [
+    { label: 'Delete', icon: 'mdi:delete-outline', run: () => undefined },
+  ]);
+  assert.equal(menu.shadowRoot?.querySelector('.row-menu-list')?.getAttribute('popover'), 'manual');
+});
+
+test('a row menu stays open while the page scrolls under it, following its button', async () => {
+  const menu = await menuOf('Living Sonos', [
+    { label: 'Delete', icon: 'mdi:delete-outline', run: () => undefined },
+  ]);
+  labelled(menu, 'More for Living Sonos')?.click();
+  await menu.updateComplete;
+  document.body.dispatchEvent(new Event('scroll', { bubbles: true }));
+  await menu.updateComplete;
+  assert.ok(labelled(menu, 'Delete'));
+});

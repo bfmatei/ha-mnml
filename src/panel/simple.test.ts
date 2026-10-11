@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 
+import { html } from 'lit';
+import type { TemplateResult } from 'lit';
 import { test } from 'vitest';
 
 import { isMapping } from '../contract/templates.ts';
@@ -7,8 +9,15 @@ import type { Template } from '../contract/templates.ts';
 import { readTemplates } from '../templates/shipped.ts';
 import { drawn } from '../test/render.ts';
 
-import { drawSimple, keptPart, simpleOf, switchedOff, switchedOn } from './simple.ts';
+import { drawLook, keptPart, simpleOf, switchedOff, switchedOn } from './simple.ts';
+import type { SimpleActions, SimpleRow } from './simple.ts';
 import { valueAt, withValue } from './tree.ts';
+
+function drawLooks(rows: readonly SimpleRow[], actions: SimpleActions): TemplateResult {
+  return html`${rows.flatMap((row) =>
+    row.looks.map((look) => drawLook(look, row.label, actions, undefined)),
+  )}`;
+}
 
 const SHIPPED = readTemplates();
 const ROOM = SHIPPED['room'];
@@ -147,17 +156,9 @@ test("a look keeps the shipped value it started from, so a colour outside the ca
     original: 'teal',
   });
   const box = drawn(
-    drawSimple(simpleOf(recoloured, TILE), { toggle: () => undefined, look: () => undefined }),
+    drawLooks(simpleOf(recoloured, TILE), { toggle: () => undefined, look: () => undefined }),
   );
   const select = box.querySelector<HTMLSelectElement>('select[data-path="card/chips/#wind/color"]');
   assert.ok(select);
   assert.ok([...select.options].some((option) => option.value === 'teal'));
-});
-
-test("the Simple tab's note links to the card editor, where a card's own values are set", () => {
-  const box = drawn(
-    drawSimple(simpleOf(TILE, TILE), { toggle: () => undefined, look: () => undefined }),
-  );
-  const link = box.querySelector('a');
-  assert.match(link?.getAttribute('href') ?? '', /editors\.md#the-template-cards-editor$/);
 });

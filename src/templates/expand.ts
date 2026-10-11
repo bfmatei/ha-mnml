@@ -1,4 +1,4 @@
-import { isMapping } from '../contract/templates.ts';
+import { PART_KEY, isMapping } from '../contract/templates.ts';
 import type {
   Instance,
   Kind,
@@ -35,12 +35,18 @@ interface Scope {
   specs: ReadonlyMap<string, SlotSpec | undefined>;
 }
 
+export interface Marking {
+  singles: ReadonlySet<string>;
+}
+
 interface Context {
   templates: Templates;
   later: ReadonlySet<string>;
   missing: Set<string>;
   stack: readonly string[];
   popups: Value[];
+  marking?: Marking | undefined;
+  trail: readonly string[];
 }
 
 export function filled(value: Value | undefined): boolean {
@@ -185,6 +191,13 @@ function push(out: Value[], value: Out): void {
   }
 }
 
+function entered(context: Context, item: Mapping): Context {
+  const id = item['id'];
+  return context.marking === undefined || typeof id !== 'string'
+    ? context
+    : { ...context, trail: [...context.trail, `#${id}`] };
+}
+
 function renderList(
   items: readonly Value[],
   scope: Scope,
@@ -195,7 +208,7 @@ function renderList(
   for (const [index, item] of items.entries()) {
     const at = `${where}[${index}]`;
     if (isMapping(item) && item['each'] === undefined) {
-      push(out, renderMapping(item, scope, context, at, true));
+      push(out, renderMapping(item, scope, entered(context, item), at, true));
       continue;
     }
     if (!isMapping(item)) {
@@ -223,10 +236,20 @@ function renderList(
         values: new Map([...scope.values, [alias, element]]),
         specs: new Map([...scope.specs, [alias, member(spec)]]),
       };
-      push(out, renderMapping(body, inner, context, at, true));
+      push(out, renderMapping(body, inner, entered(context, item), at, true));
     }
   }
   return out;
+}
+
+function marked(context: Context, node: Mapping, item: boolean): boolean {
+  if (context.marking === undefined) {
+    return false;
+  }
+  if (item) {
+    return typeof node['id'] === 'string';
+  }
+  return context.marking.singles.has(context.trail.join('/'));
 }
 
 function renderMapping(
@@ -249,35 +272,57 @@ function renderMapping(
     }
     const optional = written.endsWith('?');
     const key = optional ? written.slice(0, -1) : written;
-    const rendered = render(value, scope, context, where === '' ? key : `${where}.${key}`);
+    const rendered = render(
+      value,
+      scope,
+      context.marking === undefined ? context : { ...context, trail: [...context.trail, written] },
+      where === '' ? key : `${where}.${key}`,
+    );
     if (rendered === DROP || (optional && !filled(rendered))) {
       continue;
     }
     own[key] = rendered;
   }
   const name = node['template'];
+  const mark: Mapping = marked(context, node, item) ? { [PART_KEY]: context.trail.join('/') } : {};
   if (name === undefined) {
     if (node['slots'] !== undefined) {
       fail(scope.template, where, 'slots: belongs beside template:');
     }
-    return own;
+    return { ...own, ...mark };
   }
   if (typeof name !== 'string') {
     return fail(scope.template, where, 'template: takes a name');
   }
   const slots =
-    node['slots'] === undefined ? {} : render(node['slots'], scope, context, `${where}.slots`);
+    node['slots'] === undefined
+      ? {}
+      : render(node['slots'], scope, { ...context, marking: undefined }, `${where}.slots`);
   if (!isMapping(slots)) {
     return fail(scope.template, where, 'slots: must be a mapping');
   }
-  const base = expandNamed(name, slots, {}, context, scope.template, where);
-  if (base === DROP || Object.keys(own).length === 0) {
+  const base = expandNamed(
+    name,
+    slots,
+    {},
+    { ...context, marking: undefined },
+    scope.template,
+    where,
+  );
+  if (base === DROP) {
     return base;
   }
-  if (!isMapping(base)) {
-    return fail(scope.template, where, `${name} draws a list, so no keys can be added to it`);
+  if (Array.isArray(base) && Object.keys(own).length === 0) {
+    return Object.keys(mark).length === 0
+      ? base
+      : base.map((each) => (isMapping(each) ? { ...each, ...mark } : each));
   }
-  return { ...base, ...own };
+  if (!isMapping(base)) {
+    return Object.keys(own).length === 0
+      ? base
+      : fail(scope.template, where, `${name} draws a list, so no keys can be added to it`);
+  }
+  return { ...base, ...own, ...mark };
 }
 
 function render(node: Value, scope: Scope, context: Context, where: string): Out {
@@ -410,11 +455,13 @@ function expandNamed(
   if (context.stack.includes(name)) {
     return fail(caller, where, `${name} includes itself`);
   }
-  const inner: Context = { ...context, stack: [...context.stack, name] };
+  const inner: Context = { ...context, stack: [...context.stack, name], trail: [] };
   const who = where === '' ? name : `${caller} at ${where}: ${name}`;
   const scope = resolve(name, who, template, given, discovered);
-  const card = render(template.card, scope, inner, 'card');
-  context.popups.push(...renderList(template.popups ?? [], scope, inner, 'popups'));
+  const card = render(template.card, scope, { ...inner, trail: ['card'] }, 'card');
+  context.popups.push(
+    ...renderList(template.popups ?? [], scope, { ...inner, trail: ['popups'] }, 'popups'),
+  );
   return card;
 }
 
@@ -445,8 +492,17 @@ export function expand(
   instance: Instance,
   discovered: Record<string, Value> = {},
   later: ReadonlySet<string> = new Set(),
+  marking?: Marking,
 ): Expanded {
-  const context: Context = { templates, later, missing: new Set(), stack: [], popups: [] };
+  const context: Context = {
+    templates,
+    later,
+    missing: new Set(),
+    stack: [],
+    popups: [],
+    marking,
+    trail: [],
+  };
   const waiting = (): Expanded => ({
     card: null,
     popups: [],

@@ -154,17 +154,21 @@ test('the binder offers the slots that fit the field chosen, and binds the one c
     bound.push(`${key}=${slot}`);
   };
   const root = await mounted(binder);
-  const form = root.querySelector('ha-form');
-  assert.ok(form);
-  const options = (): unknown =>
-    field(field(field(field(form, 'schema'), '1'), 'selector'), 'select');
-  assert.deepEqual(field(options(), 'options'), ['lamp']);
-  form.dispatchEvent(
-    new CustomEvent('value-changed', { detail: { value: { field: 'name', slot: 'lamp' } } }),
-  );
+  const picks = (): HTMLSelectElement[] => [...root.querySelectorAll('select')];
+  const slots = (): string[] => [...(picks()[1]?.options ?? [])].map((option) => option.value);
+  assert.deepEqual(slots(), ['lamp']);
+  const chosen = picks()[0];
+  assert.ok(chosen);
+  chosen.value = 'name';
+  chosen.dispatchEvent(new Event('change'));
   await binder.updateComplete;
-  assert.deepEqual(field(options(), 'options'), ['title', 'lamp']);
-  const bind = root.querySelector('button[aria-label="Bind the field to the slot"]');
+  assert.deepEqual(slots(), ['title', 'lamp']);
+  const slot = picks()[1];
+  assert.ok(slot);
+  slot.value = 'lamp';
+  slot.dispatchEvent(new Event('change'));
+  await binder.updateComplete;
+  const bind = root.querySelector('button[aria-label="Link the setting to the slot"]');
   assert.ok(bind instanceof HTMLButtonElement);
   bind.click();
   assert.deepEqual(bound, ['name=lamp']);
