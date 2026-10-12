@@ -332,11 +332,13 @@ room:
         type: indicator
         entity: '[[window]]'
         color: orange
+        show: { not: ['off'] }
       - id: door
         if: door
         type: indicator
         entity: '[[door]]'
         color: orange
+        show: { not: ['off'] }
       - id: lock
         if: lock
         type: toggle

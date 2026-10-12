@@ -45,8 +45,12 @@ glances:
         warnings: { kind: entity }
         last_run: { kind: entity, required: true }
         overdue: { kind: entity, required: true }
-        run: { kind: entity }
-        stop: { kind: entity }
+        actions:
+          kind: object
+          fields:
+            run: { kind: entity, required: true }
+            stop: { kind: entity, required: true }
+            running: { kind: entity, required: true }
     batteries:
       {
         kind: entities,
@@ -270,8 +274,12 @@ checks-popup:
         warnings: { kind: entity }
         last_run: { kind: entity, required: true }
         overdue: { kind: entity, required: true }
-        run: { kind: entity }
-        stop: { kind: entity }
+        actions:
+          kind: object
+          fields:
+            run: { kind: entity, required: true }
+            stop: { kind: entity, required: true }
+            running: { kind: entity, required: true }
   card:
     hash: '#checks'
     cards:
@@ -279,6 +287,12 @@ checks-popup:
         type: custom:mnml-header-card
         name: Checks
         icon: mdi:clipboard-check-outline
+        controls:
+          - id: checks-actions
+            if: checks.actions
+            template: checks-actions
+            slots: { actions: '[[checks.actions]]' }
+        back: true
       - id: checks
         type: custom:mnml-list-card
         title: Daily checks
@@ -301,21 +315,6 @@ checks-popup:
             flag: true
             color: orange
             show: { is: ['on'] }
-      - id: checks-run
-        if: checks.run
-        type: custom:mnml-button-card
-        entity: '[[checks.run]]'
-        service: button.press
-      - id: checks-stop
-        if: checks.stop
-        type: custom:mnml-button-card
-        entity: '[[checks.stop]]'
-        service: button.press
-        visibility:
-          - id: checks-stop-shown
-            condition: state
-            entity: '[[checks.stop]]'
-            state_not: unavailable
       - id: failures
         type: custom:mnml-report-card
         entity: '[[checks.failed]]'

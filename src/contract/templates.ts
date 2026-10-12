@@ -16,6 +16,14 @@ export interface Filter {
   device_class?: string;
   platform?: string;
   translation_key?: string;
+  entity_category?: 'none' | 'diagnostic' | 'config';
+  unit?: string;
+  state_class?: string;
+  name?: string;
+  manufacturer?: string;
+  model?: string;
+  label?: string;
+  exclude?: Filter;
 }
 
 export type AreaValue =

@@ -16,8 +16,14 @@ const JANE = {
   attributes: { friendly_name: 'Jane' },
 };
 
+const LAST_RUN = {
+  entity_id: 'sensor.last_run',
+  state: '2026-10-12T07:00:00+00:00',
+  attributes: { friendly_name: 'Last run', device_class: 'timestamp' },
+};
+
 const HASS = {
-  states: { 'person.jane': JANE },
+  states: { 'person.jane': JANE, 'sensor.last_run': LAST_RUN },
   entities: {},
   devices: {},
   locale: { language: 'en' },
@@ -72,6 +78,224 @@ test("a name item prints another entity's name in the state line", async () => {
     state: [{ entity: 'person.jane', name: true }],
   });
   assert.equal(text(out.querySelector('.state')), 'Jane');
+});
+
+test('a relative item prints a timestamp as a relative time', async () => {
+  const out = await paint({
+    type: 'custom:mnml-tile-card',
+    name: 'Checks',
+    icon: 'mdi:clipboard-check-outline',
+    popup: '#checks',
+    state: [{ entity: 'sensor.last_run', relative: true }],
+  });
+  const time = out.querySelector('.state ha-relative-time') as unknown as {
+    datetime: string;
+  } | null;
+  assert.equal(time?.datetime, '2026-10-12T07:00:00+00:00');
+});
+
+test('a relative item takes the entity of its card, and nothing prints while the entity has no value', async () => {
+  const own = await paint({
+    type: 'custom:mnml-tile-card',
+    entity: 'sensor.last_run',
+    popup: '#checks',
+    state: [{ relative: true }],
+  });
+  assert.ok(own.querySelector('.state ha-relative-time'));
+  const none = await paint({
+    type: 'custom:mnml-tile-card',
+    entity: 'sensor.missing',
+    popup: '#checks',
+    state: [{ relative: true }],
+  });
+  assert.equal(none.querySelector('.state ha-relative-time'), null);
+});
+
+const CORNERS = ['front_left', 'front_right', 'rear_left', 'rear_right'] as const;
+
+function tyreHass(pressures: Record<string, string>): unknown {
+  const states: Record<string, unknown> = {};
+  for (const corner of CORNERS) {
+    states[`sensor.tyre_${corner}`] = {
+      entity_id: `sensor.tyre_${corner}`,
+      state: pressures[corner] ?? '2.4',
+      attributes: { friendly_name: `Tyre ${corner}` },
+    };
+    states[`sensor.target_${corner}`] = {
+      entity_id: `sensor.target_${corner}`,
+      state: '2.4',
+      attributes: { friendly_name: `Target ${corner}` },
+    };
+  }
+  return { ...HASS, states: { ...HASS.states, ...states } };
+}
+
+const TYRES = {
+  type: 'tyres',
+  tyres: CORNERS.map((corner) => `sensor.tyre_${corner}`),
+  targets: CORNERS.map((corner) => `sensor.target_${corner}`),
+  low_share: 0.85,
+  warn_share: 0.92,
+};
+
+async function tyreChips(silent: boolean, pressures: Record<string, string>): Promise<Element[]> {
+  const out = await paint(
+    {
+      type: 'custom:mnml-tile-card',
+      name: 'M3',
+      icon: 'mdi:car',
+      popup: '#car',
+      chips: [{ ...TYRES, ...(silent ? { silent: true } : {}) }],
+    },
+    tyreHass(pressures),
+  );
+  return [...out.querySelectorAll('.chips .control')];
+}
+
+test('a silent tyres icon is drawn only while a tyre is dropping, low, or its sensor is unavailable', async () => {
+  assert.equal((await tyreChips(true, {})).length, 0, 'all tyres at target: nothing');
+  const dropping = await tyreChips(true, { front_left: '2.1' });
+  assert.equal(dropping.length, 1);
+  assert.match(dropping[0]?.getAttribute('aria-label') ?? '', /dropping/);
+  const low = await tyreChips(true, { rear_right: '1.8' });
+  assert.equal(low.length, 1);
+  assert.match(low[0]?.getAttribute('aria-label') ?? '', /low/);
+  const gone = await tyreChips(true, { front_right: 'unavailable' });
+  assert.equal(gone.length, 1);
+  assert.match(gone[0]?.getAttribute('aria-label') ?? '', /unavailable/i);
+});
+
+test('a tyres icon that is not silent is drawn while all is well, as before', async () => {
+  assert.equal((await tyreChips(false, {})).length, 1);
+});
+
+function alarmChips(rules: unknown[], state: string): Promise<Element[]> {
+  return paint(
+    {
+      type: 'custom:mnml-tile-card',
+      name: 'M3',
+      icon: 'mdi:car',
+      popup: '#car',
+      chips: [
+        {
+          type: 'status',
+          name: 'Alarm',
+          icon: 'mdi:shield-car',
+          silent: true,
+          rules,
+        },
+      ],
+    },
+    {
+      ...HASS,
+      states: {
+        ...HASS.states,
+        'sensor.alarm': {
+          entity_id: 'sensor.alarm',
+          state,
+          attributes: { friendly_name: 'Alarm' },
+        },
+      },
+    },
+  ).then((out) => [...out.querySelectorAll('.chips .control')]);
+}
+
+const UNARMED = { entities: ['sensor.alarm'], color: 'red', is: ['unarmed'] };
+
+test('a status rule that names unavailable colours an unavailable entity, which is orange otherwise', async () => {
+  const named = await alarmChips(
+    [UNARMED, { entities: ['sensor.alarm'], color: 'red', is: ['unavailable'] }],
+    'unavailable',
+  );
+  assert.equal(named.length, 1);
+  assert.match(named[0]?.getAttribute('style') ?? '', /red/);
+  const plain = await alarmChips([UNARMED], 'unavailable');
+  assert.equal(plain.length, 1, 'an unavailable entity is still drawn');
+  assert.match(plain[0]?.getAttribute('style') ?? '', /orange/);
+});
+
+test('a status rule with only a not does not take an unavailable entity from the orange', async () => {
+  const chips = await alarmChips(
+    [{ entities: ['sensor.alarm'], color: 'red', not: ['unarmed'] }],
+    'unavailable',
+  );
+  assert.equal(chips.length, 1);
+  assert.match(chips[0]?.getAttribute('style') ?? '', /orange/);
+});
+
+test('a silent status control with a rule for unarmed shows while unarmed and hides while armed', async () => {
+  assert.equal((await alarmChips([UNARMED], 'unarmed')).length, 1);
+  assert.equal((await alarmChips([UNARMED], 'doorsOnly')).length, 0);
+  assert.equal((await alarmChips([UNARMED], 'doorsTiltCabin')).length, 0);
+});
+
+test("the tile washes on hover wherever the pointer is, over its item row and that row's controls too, and its row changes no shadow", () => {
+  const css = MnmlTileCard.styles
+    .flat()
+    .map((sheet) => ('cssText' in sheet ? sheet.cssText : ''))
+    .join('\n');
+  assert.match(css, /\.tile:hover::before/, 'the shared overlay washes the tile');
+  assert.doesNotMatch(css, /\.tile:hover:not\(/, 'with no exemption of its own');
+  assert.doesNotMatch(css, /\.tile > \.row\.link:hover/, 'so the row keeps its well as it is');
+  assert.match(
+    css,
+    /\.tile:active:not\(:has\(\.control:active, \.pill\.link:active, \.row\.link:active\)\)::before/,
+  );
+});
+
+const DAY = 86_400_000;
+
+function expiryChips(state: string, withinDays = 14): Promise<Element[]> {
+  return paint(
+    {
+      type: 'custom:mnml-tile-card',
+      name: 'Tablet',
+      icon: 'mdi:tablet',
+      popup: '#tablet',
+      chips: [
+        {
+          type: 'status',
+          name: 'Key expires soon',
+          icon: 'mdi:key-alert-outline',
+          silent: true,
+          rules: [{ entities: ['sensor.key'], color: 'red', within_days: withinDays }],
+        },
+      ],
+    },
+    {
+      ...HASS,
+      states: {
+        ...HASS.states,
+        'sensor.key': {
+          entity_id: 'sensor.key',
+          state,
+          attributes: { friendly_name: 'Key', device_class: 'timestamp' },
+        },
+      },
+    },
+  ).then((out) => [...out.querySelectorAll('.chips .control')]);
+}
+
+test('a status rule with within_days holds while a timestamp is that near, or already past, and not before', async () => {
+  const soon = await expiryChips(new Date(Date.now() + 5 * DAY).toISOString());
+  assert.equal(soon.length, 1, 'five days off, inside 14');
+  assert.match(soon[0]?.getAttribute('style') ?? '', /red/);
+  assert.equal((await expiryChips(new Date(Date.now() - DAY).toISOString())).length, 1, 'expired');
+  assert.equal(
+    (await expiryChips(new Date(Date.now() + 60 * DAY).toISOString())).length,
+    0,
+    'far off',
+  );
+  assert.equal(
+    (await expiryChips(new Date(Date.now() + 20 * DAY).toISOString(), 30)).length,
+    1,
+    'the limit is the rule',
+  );
+});
+
+test('a silent status rule with within_days is quiet for a timestamp that is not a date', async () => {
+  assert.equal((await expiryChips('unknown')).length, 0);
+  assert.equal((await expiryChips('not a date')).length, 0);
 });
 
 test('a text in the state line follows its when rule, like a value does', async () => {

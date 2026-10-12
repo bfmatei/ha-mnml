@@ -216,10 +216,20 @@ function indicator(control: IndicatorControl, ctx: ControlContext): TemplateResu
   );
 }
 
+function namesUnavailable(rule: StatusControl['rules'][number]): boolean {
+  return rule.is?.some((entry) => entry.toLowerCase() === 'unavailable') === true;
+}
+
+const DAY = 86_400_000;
+
 function holds(rule: StatusControl['rules'][number], stateObj: HassEntity): boolean {
   if (rule.below !== undefined) {
     const level = numericState(stateObj);
     return level !== undefined && level < rule.below;
+  }
+  if (rule.within_days !== undefined) {
+    const at = Date.parse(stateObj.state);
+    return Number.isFinite(at) && at - Date.now() < rule.within_days * DAY;
   }
   return matches(rule, stateObj.state);
 }
@@ -230,12 +240,12 @@ function status(control: StatusControl, ctx: ControlContext): TemplateResult | u
     const lines: string[] = [];
     for (const entityId of rule.entities) {
       const stateObj = stateOf(ctx.hass, entityId);
-      if (isUnavailable(stateObj)) {
+      if (isUnavailable(stateObj) && !namesUnavailable(rule)) {
         down.set(
           entityId,
           `${nameOf(ctx.hass, entityId, rule)}: ${formatState(ctx.hass, stateObj)}`,
         );
-      } else if (hasValue(stateObj) && holds(rule, stateObj)) {
+      } else if ((isUnavailable(stateObj) || hasValue(stateObj)) && holds(rule, stateObj)) {
         lines.push(
           `${nameOf(ctx.hass, entityId, rule)}: ${formatState(ctx.hass, stateObj, rule.words)}`,
         );
@@ -271,7 +281,7 @@ function status(control: StatusControl, ctx: ControlContext): TemplateResult | u
     : inert({ title: control.name, part: partOf(control) }, icon(control.icon));
 }
 
-function tyres(control: TyresControl, ctx: ControlContext): TemplateResult {
+function tyres(control: TyresControl, ctx: ControlContext): TemplateResult | undefined {
   const bands = new Set(
     control.tyres.map((tyre, index) =>
       tyreBand(
@@ -285,6 +295,9 @@ function tyres(control: TyresControl, ctx: ControlContext): TemplateResult {
   const low = bands.has('low');
   const warn = bands.has('warn');
   const off = control.tyres.map((tyre) => stateOf(ctx.hass, tyre)).find(isUnavailable);
+  if (control.silent === true && !low && !warn && off === undefined) {
+    return undefined;
+  }
   const title = low ? 'Tyre pressure low' : warn ? 'Tyre pressure dropping' : 'Tyres';
   return inert(
     {

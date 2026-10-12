@@ -20,7 +20,6 @@ import { BASE_STYLE } from './styles.ts';
 const TILE_STYLE = css`
   .tile {
     cursor: pointer;
-    transition: background-color 120ms ease-out;
     padding: 10px;
     display: grid;
     grid-template-columns: 40px minmax(0, 1fr) auto;
@@ -58,20 +57,8 @@ const TILE_STYLE = css`
     background: var(--m-raised);
     box-shadow: none;
   }
-  @media (hover: hover) {
-    .tile > .chips .control:not(.inert):hover {
-      box-shadow:
-        inset 0 0 0 999px var(--m-hover),
-        var(--m-well);
-    }
-  }
-  @media (hover: hover) {
-    .tile:hover:not(:has(.row.link:hover)) {
-      background-image: linear-gradient(var(--m-hover), var(--m-hover));
-    }
-  }
-  .tile:active:not(:has(.control:active, .pill.link:active, .row.link:active)) {
-    background-image: linear-gradient(var(--m-hover), var(--m-hover));
+  .tile:active:not(:has(.control:active, .pill.link:active, .row.link:active))::before {
+    opacity: 1;
   }
 `;
 

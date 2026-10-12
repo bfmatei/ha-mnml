@@ -37,11 +37,6 @@ export const ITEM_STYLE = [
       background: transparent;
       box-shadow: none;
     }
-    @media (hover: hover) {
-      .row .control.primary:not(.inert):hover {
-        box-shadow: inset 0 0 0 999px var(--m-hover);
-      }
-    }
   `,
 ];
 

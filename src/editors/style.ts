@@ -242,6 +242,37 @@ export const EDITOR_STYLE = css`
     color: var(--secondary-text-color);
     font-size: 12px;
   }
+  .alternatives {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+  .alt-note {
+    flex-basis: 100%;
+    color: var(--secondary-text-color);
+    font-size: 12px;
+  }
+  .alt {
+    height: 28px;
+    padding: 0 10px;
+    border: 1px solid var(--divider-color);
+    border-radius: 14px;
+    background: transparent;
+    color: var(--primary-text-color);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .alt[aria-pressed='true'] {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+    font-weight: 600;
+  }
+  .alt:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+  }
   .adder {
     color: var(--primary-color);
     gap: 8px;

@@ -131,16 +131,68 @@ export const TRAITS: Record<string, Trait> = {
     name: 'Backup status',
     device_class: 'problem',
   },
+  'binary_sensor.infrastructure_server_checks_running': {
+    name: 'Checks running',
+    device_class: 'running',
+  },
   'binary_sensor.infrastructure_server_checks_overdue': {
     name: 'Checks overdue',
     device_class: 'problem',
+  },
+  'binary_sensor.infrastructure_tailscale_exit_node_client': {
+    name: 'Tailscale exit node client',
+    device_class: 'update',
   },
   'binary_sensor.infrastructure_tailscale_exit_node_connected_to_control': {
     name: 'Tailscale exit node',
     device_class: 'connectivity',
   },
+  'binary_sensor.infrastructure_tailscale_exit_node_supports_udp': {
+    name: 'Tailscale exit node supports UDP',
+    device_class: 'connectivity',
+  },
+  'binary_sensor.infrastructure_tailscale_jane_phone_client': {
+    name: 'Tailscale Jane phone client',
+    device_class: 'update',
+  },
+  'binary_sensor.infrastructure_tailscale_jane_phone_connected_to_control': {
+    name: 'Tailscale Jane phone',
+    device_class: 'connectivity',
+  },
+  'binary_sensor.infrastructure_tailscale_joe_laptop_client': {
+    name: 'Tailscale Joe laptop client',
+    device_class: 'update',
+  },
+  'binary_sensor.infrastructure_tailscale_joe_laptop_connected_to_control': {
+    name: 'Tailscale Joe laptop',
+    device_class: 'connectivity',
+  },
+  'binary_sensor.infrastructure_tailscale_joe_phone_client': {
+    name: 'Tailscale Joe phone client',
+    device_class: 'update',
+  },
+  'binary_sensor.infrastructure_tailscale_joe_phone_connected_to_control': {
+    name: 'Tailscale Joe phone',
+    device_class: 'connectivity',
+  },
+  'binary_sensor.infrastructure_tailscale_joe_tablet_client': {
+    name: 'Tailscale Joe tablet client',
+    device_class: 'update',
+  },
+  'binary_sensor.infrastructure_tailscale_joe_tablet_connected_to_control': {
+    name: 'Tailscale Joe tablet',
+    device_class: 'connectivity',
+  },
+  'binary_sensor.infrastructure_tailscale_router_client': {
+    name: 'Tailscale router client',
+    device_class: 'update',
+  },
   'binary_sensor.infrastructure_tailscale_router_connected_to_control': {
     name: 'Tailscale router',
+    device_class: 'connectivity',
+  },
+  'binary_sensor.infrastructure_tailscale_router_supports_udp': {
+    name: 'Tailscale router supports UDP',
     device_class: 'connectivity',
   },
   'binary_sensor.infrastructure_vpn_exit_node_status': {
@@ -1522,6 +1574,78 @@ export const TRAITS: Record<string, Trait> = {
   'sensor.hall_washer': {
     icon: 'mdi:washing-machine',
     name: 'Washer',
+  },
+  'sensor.infrastructure_tailscale_exit_node_expires': {
+    name: 'Tailscale exit node key expires',
+    device_class: 'timestamp',
+  },
+  'sensor.infrastructure_tailscale_exit_node_ip_address': {
+    name: 'Tailscale exit node IP address',
+    icon: 'mdi:ip-network-outline',
+  },
+  'sensor.infrastructure_tailscale_exit_node_last_seen': {
+    name: 'Tailscale exit node last seen',
+    device_class: 'timestamp',
+  },
+  'sensor.infrastructure_tailscale_jane_phone_expires': {
+    name: 'Tailscale Jane phone key expires',
+    device_class: 'timestamp',
+  },
+  'sensor.infrastructure_tailscale_jane_phone_ip_address': {
+    name: 'Tailscale Jane phone IP address',
+    icon: 'mdi:ip-network-outline',
+  },
+  'sensor.infrastructure_tailscale_jane_phone_last_seen': {
+    name: 'Tailscale Jane phone last seen',
+    device_class: 'timestamp',
+  },
+  'sensor.infrastructure_tailscale_joe_laptop_expires': {
+    name: 'Tailscale Joe laptop key expires',
+    device_class: 'timestamp',
+  },
+  'sensor.infrastructure_tailscale_joe_laptop_ip_address': {
+    name: 'Tailscale Joe laptop IP address',
+    icon: 'mdi:ip-network-outline',
+  },
+  'sensor.infrastructure_tailscale_joe_laptop_last_seen': {
+    name: 'Tailscale Joe laptop last seen',
+    device_class: 'timestamp',
+  },
+  'sensor.infrastructure_tailscale_joe_phone_expires': {
+    name: 'Tailscale Joe phone key expires',
+    device_class: 'timestamp',
+  },
+  'sensor.infrastructure_tailscale_joe_phone_ip_address': {
+    name: 'Tailscale Joe phone IP address',
+    icon: 'mdi:ip-network-outline',
+  },
+  'sensor.infrastructure_tailscale_joe_phone_last_seen': {
+    name: 'Tailscale Joe phone last seen',
+    device_class: 'timestamp',
+  },
+  'sensor.infrastructure_tailscale_joe_tablet_expires': {
+    name: 'Tailscale Joe tablet key expires',
+    device_class: 'timestamp',
+  },
+  'sensor.infrastructure_tailscale_joe_tablet_ip_address': {
+    name: 'Tailscale Joe tablet IP address',
+    icon: 'mdi:ip-network-outline',
+  },
+  'sensor.infrastructure_tailscale_joe_tablet_last_seen': {
+    name: 'Tailscale Joe tablet last seen',
+    device_class: 'timestamp',
+  },
+  'sensor.infrastructure_tailscale_router_expires': {
+    name: 'Tailscale router key expires',
+    device_class: 'timestamp',
+  },
+  'sensor.infrastructure_tailscale_router_ip_address': {
+    name: 'Tailscale router IP address',
+    icon: 'mdi:ip-network-outline',
+  },
+  'sensor.infrastructure_tailscale_router_last_seen': {
+    name: 'Tailscale router last seen',
+    device_class: 'timestamp',
   },
   'sensor.kitchen_dishwasher': {
     icon: 'mdi:dishwasher',

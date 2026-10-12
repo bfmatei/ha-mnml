@@ -83,6 +83,7 @@ home-assistant:
         type: status
         name: Services
         icon: mdi:lan-connect
+        silent: true
         rules:
           [
             {
@@ -99,6 +100,7 @@ home-assistant:
         type: status
         name: Updates
         icon: mdi:package-up
+        silent: true
         rules:
           [
             {
@@ -115,6 +117,7 @@ home-assistant:
         type: status
         name: Firmware
         icon: mdi:memory
+        silent: true
         rules:
           [
             {

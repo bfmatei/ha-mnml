@@ -1,0 +1,317 @@
+tailscale:
+  description: A tailnet's tile, and its offline, relayed and update chips; it brings the tailnet's pop-up.
+  slots:
+    devices:
+      kind: objects
+      required: true
+      group: Devices
+      help: "The tailnet's devices, each with the sensors Tailscale reports for it."
+      discover:
+        per: device
+        scope: all
+        where: { domain: binary_sensor, platform: tailscale, translation_key: connected_to_control }
+        fields:
+          connected:
+            { domain: binary_sensor, platform: tailscale, translation_key: connected_to_control }
+          ip_address: { domain: sensor, platform: tailscale, translation_key: ip }
+          last_seen: { domain: sensor, platform: tailscale, translation_key: last_seen }
+          expires: { domain: sensor, platform: tailscale, translation_key: expires }
+          update: { domain: binary_sensor, platform: tailscale, translation_key: client }
+          udp: { domain: binary_sensor, platform: tailscale, translation_key: client_supports_udp }
+      fields:
+        connected: { kind: entity, required: true, label: Connected to control }
+        essential:
+          {
+            kind: flag,
+            help: 'A device that must stay connected, such as the router and the exit node; the others may come and go.',
+          }
+        ip_address: { kind: entity, label: IP address }
+        last_seen: { kind: entity }
+        expires: { kind: entity, label: Key expires }
+        update: { kind: entity, label: Client update }
+        udp: { kind: entity, label: Supports UDP }
+    essential:
+      {
+        kind: entities,
+        group: Devices,
+        help: "The essential devices' connections, for the Offline chip.",
+      }
+    personal:
+      {
+        kind: entities,
+        group: Devices,
+        help: "The other devices' connections, for the pop-up's Devices heading.",
+      }
+    updates:
+      { kind: entities, group: Devices, help: "The devices' client updates, for the Update chip." }
+    soon_days:
+      {
+        kind: number,
+        default: 14,
+        label: Key expires soon after,
+        group: Devices,
+        help: 'A key that expires within this many days is flagged red.',
+      }
+    direct:
+      {
+        kind: entities,
+        group: Devices,
+        help: 'The devices that carry traffic and need UDP to connect directly.',
+      }
+  card:
+    type: custom:mnml-tile-card
+    name: Tailscale
+    icon: mdi:vpn
+    popup: '#tailscale'
+    chips:
+      - id: offline
+        if: essential
+        type: status
+        name: Offline
+        icon: mdi:lan-disconnect
+        silent: true
+        rules:
+          [
+            {
+              id: offline,
+              if: essential,
+              entities: ['[[essential]]'],
+              label: device,
+              color: red,
+              is: ['off'],
+            },
+          ]
+      - id: relayed
+        if: direct
+        type: status
+        name: Relayed
+        icon: mdi:transit-connection-variant
+        silent: true
+        rules:
+          [
+            {
+              id: relayed,
+              if: direct,
+              entities: ['[[direct]]'],
+              label: device,
+              words: { 'off': Relayed },
+              color: orange,
+              is: ['off'],
+            },
+          ]
+      - id: update
+        if: updates
+        type: status
+        name: Update
+        icon: mdi:package-up
+        silent: true
+        rules:
+          [
+            {
+              id: update,
+              if: updates,
+              entities: ['[[updates]]'],
+              label: device,
+              color: amber,
+              is: ['on'],
+            },
+          ]
+    grid_options: { columns: 12 }
+  popups:
+    - id: tailscale-popup
+      template: tailscale-popup
+      slots:
+        devices: '[[devices]]'
+        essential: '[[essential]]'
+        personal: '[[personal]]'
+        soon_days: '[[soon_days]]'
+  example: &tailscale
+    devices:
+      - connected: binary_sensor.router_connected
+        essential: true
+        ip_address: sensor.router_ip_address
+        last_seen: sensor.router_last_seen
+        expires: sensor.router_expires
+        update: binary_sensor.router_client
+        udp: binary_sensor.router_supports_udp
+      - connected: binary_sensor.phone_connected
+    essential: [binary_sensor.router_connected]
+    updates: [binary_sensor.router_client]
+    direct: [binary_sensor.router_supports_udp]
+
+tailscale-popup:
+  description: The tailnet's pop-up, a card per device, the essential ones under Infrastructure and the others under Devices.
+  slots:
+    devices:
+      kind: objects
+      required: true
+      fields:
+        connected: { kind: entity, required: true }
+        essential: { kind: flag }
+        ip_address: { kind: entity }
+        last_seen: { kind: entity }
+        expires: { kind: entity }
+        update: { kind: entity }
+        udp: { kind: entity }
+    essential: { kind: entities }
+    personal: { kind: entities }
+    soon_days: { kind: number, default: 14 }
+  card:
+    hash: '#tailscale'
+    cards:
+      - id: header
+        type: custom:mnml-header-card
+        name: Tailscale
+        icon: mdi:vpn
+      - id: infrastructure
+        if: essential
+        type: custom:mnml-heading-card
+        title: Infrastructure
+        icon: mdi:server-network
+      - id: each-essential
+        each: devices
+        as: device
+        if: device.essential
+        template: tailscale-device
+        slots: { device: '[[device]]', alert: red, soon_days: '[[soon_days]]' }
+      - id: devices
+        if: personal
+        type: custom:mnml-heading-card
+        title: Devices
+        icon: mdi:devices
+      - id: each-personal
+        each: devices
+        as: device
+        unless: device.essential
+        template: tailscale-device
+        slots: { device: '[[device]]', soon_days: '[[soon_days]]' }
+  example:
+    devices:
+      - connected: binary_sensor.router_connected
+        essential: true
+        ip_address: sensor.router_ip_address
+        last_seen: sensor.router_last_seen
+        expires: sensor.router_expires
+        update: binary_sensor.router_client
+        udp: binary_sensor.router_supports_udp
+      - connected: binary_sensor.phone_connected
+        last_seen: sensor.phone_last_seen
+    essential: [binary_sensor.router_connected]
+    personal: [binary_sensor.phone_connected]
+
+tailscale-device:
+  description: A tailnet device's card, its name, Connected or when it was last seen, and icons for a pending update, a key about to expire and how it connects.
+  slots:
+    device:
+      kind: object
+      required: true
+      fields:
+        connected: { kind: entity, required: true }
+        essential: { kind: flag }
+        ip_address: { kind: entity }
+        last_seen: { kind: entity }
+        expires: { kind: entity }
+        update: { kind: entity }
+        udp: { kind: entity }
+    alert:
+      {
+        kind: text,
+        help: 'The colour of its icon while it is not connected, for a device that must stay connected.',
+      }
+    soon_days:
+      {
+        kind: number,
+        default: 14,
+        help: 'A key that expires within this many days is flagged red.',
+      }
+  card:
+    type: custom:mnml-entity-card
+    entity: '[[device.connected]]'
+    label: device
+    strip_word: Tailscale
+    color?: '[[alert]]'
+    when?: { is: ['off'] }
+    state:
+      - id: ip
+        if: device.ip_address
+        entity: '[[device.ip_address]]'
+    controls:
+      - id: update
+        if: device.update
+        type: status
+        name: Update
+        icon: mdi:package-up
+        silent: true
+        rules:
+          [
+            {
+              id: update,
+              if: device.update,
+              entities: ['[[device.update]]'],
+              color: red,
+              is: ['on'],
+            },
+          ]
+      - id: key
+        if: device.expires
+        type: status
+        name: Key expires soon
+        icon: mdi:key-alert-outline
+        silent: true
+        rules:
+          [
+            {
+              id: key,
+              if: device.expires,
+              entities: ['[[device.expires]]'],
+              color: red,
+              within_days: '[[soon_days]]',
+            },
+          ]
+      - id: connection
+        if: device.udp
+        type: status
+        name: Connection
+        icon: mdi:transit-connection-variant
+        rules:
+          - id: relayed
+            if: device.udp
+            entities: ['[[device.udp]]']
+            color: orange
+            is: ['off']
+            words: { 'off': Relayed }
+          - id: direct
+            if: device.udp
+            entities: ['[[device.udp]]']
+            color: blue
+            is: ['on']
+            words: { 'on': Direct }
+      - id: connected
+        type: status
+        name: Connected
+        icon: mdi:lan-connect
+        silent: true
+        rules:
+          [
+            {
+              id: connected,
+              entities: ['[[device.connected]]'],
+              label: device,
+              color: blue,
+              is: ['on'],
+            },
+          ]
+      - id: last-seen
+        if: device.last_seen
+        type: indicator
+        entity: '[[device.last_seen]]'
+        color: blue
+        show: { entity: '[[device.connected]]', not: ['on'] }
+  example:
+    device:
+      connected: binary_sensor.router_connected
+      ip_address: sensor.router_ip_address
+      last_seen: sensor.router_last_seen
+      expires: sensor.router_expires
+      update: binary_sensor.router_client
+      udp: binary_sensor.router_supports_udp

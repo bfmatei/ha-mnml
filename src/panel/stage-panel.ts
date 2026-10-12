@@ -67,6 +67,7 @@ const STATE_WORDS: Record<string, string> = {
   Text: 'A text',
   Attribute: 'An attribute',
   Minutes: 'A duration',
+  'Relative time': 'A relative time',
   Serial: 'A serial number',
   Name: 'A name',
   Value: 'A value',

@@ -231,8 +231,11 @@ const POPUPS_STYLE = css`
     display: flex;
     flex-direction: column;
     gap: var(--mnml-popup-gap, 8px);
+    margin-inline-end: calc(5px - var(--mnml-popup-gap, 8px));
+    padding-inline-end: 6px;
     overflow-y: auto;
     overscroll-behavior: contain;
+    scrollbar-width: thin;
     touch-action: pan-y;
   }
   .body:empty {

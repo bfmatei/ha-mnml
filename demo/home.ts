@@ -159,8 +159,11 @@ const SYSTEM: System = {
       warnings: 'sensor.infrastructure_server_checks_warnings',
       lastRun: 'sensor.infrastructure_server_checks_last_run',
       overdue: 'binary_sensor.infrastructure_server_checks_overdue',
-      run: 'button.infrastructure_server_checks_run',
-      stop: 'button.infrastructure_server_checks_stop',
+      actions: {
+        run: 'button.infrastructure_server_checks_run',
+        stop: 'button.infrastructure_server_checks_stop',
+        running: 'binary_sensor.infrastructure_server_checks_running',
+      },
     },
     notifications: {
       messages: 'sensor.infrastructure_proxmox_notifications',
@@ -212,10 +215,6 @@ const SYSTEM: System = {
         switchable: true,
       },
     ],
-    vpn: [
-      'binary_sensor.infrastructure_tailscale_router_connected_to_control',
-      'binary_sensor.infrastructure_tailscale_exit_node_connected_to_control',
-    ],
     clients: {
       entity: 'sensor.infrastructure_unifi_clients',
       names: 'sensor.infrastructure_adguard_clients',
@@ -239,6 +238,56 @@ const SYSTEM: System = {
       'update.infrastructure_switch_1_firmware',
       'update.infrastructure_switch_2_firmware',
       'update.infrastructure_ap_firmware',
+    ],
+  },
+  tailscale: {
+    devices: [
+      {
+        connected: 'binary_sensor.infrastructure_tailscale_router_connected_to_control',
+        essential: true,
+        ipAddress: 'sensor.infrastructure_tailscale_router_ip_address',
+        lastSeen: 'sensor.infrastructure_tailscale_router_last_seen',
+        expires: 'sensor.infrastructure_tailscale_router_expires',
+        update: 'binary_sensor.infrastructure_tailscale_router_client',
+        udp: 'binary_sensor.infrastructure_tailscale_router_supports_udp',
+      },
+      {
+        connected: 'binary_sensor.infrastructure_tailscale_exit_node_connected_to_control',
+        essential: true,
+        ipAddress: 'sensor.infrastructure_tailscale_exit_node_ip_address',
+        lastSeen: 'sensor.infrastructure_tailscale_exit_node_last_seen',
+        expires: 'sensor.infrastructure_tailscale_exit_node_expires',
+        update: 'binary_sensor.infrastructure_tailscale_exit_node_client',
+        udp: 'binary_sensor.infrastructure_tailscale_exit_node_supports_udp',
+      },
+      {
+        connected: 'binary_sensor.infrastructure_tailscale_joe_phone_connected_to_control',
+        ipAddress: 'sensor.infrastructure_tailscale_joe_phone_ip_address',
+        lastSeen: 'sensor.infrastructure_tailscale_joe_phone_last_seen',
+        expires: 'sensor.infrastructure_tailscale_joe_phone_expires',
+        update: 'binary_sensor.infrastructure_tailscale_joe_phone_client',
+      },
+      {
+        connected: 'binary_sensor.infrastructure_tailscale_joe_laptop_connected_to_control',
+        ipAddress: 'sensor.infrastructure_tailscale_joe_laptop_ip_address',
+        lastSeen: 'sensor.infrastructure_tailscale_joe_laptop_last_seen',
+        expires: 'sensor.infrastructure_tailscale_joe_laptop_expires',
+        update: 'binary_sensor.infrastructure_tailscale_joe_laptop_client',
+      },
+      {
+        connected: 'binary_sensor.infrastructure_tailscale_joe_tablet_connected_to_control',
+        ipAddress: 'sensor.infrastructure_tailscale_joe_tablet_ip_address',
+        lastSeen: 'sensor.infrastructure_tailscale_joe_tablet_last_seen',
+        expires: 'sensor.infrastructure_tailscale_joe_tablet_expires',
+        update: 'binary_sensor.infrastructure_tailscale_joe_tablet_client',
+      },
+      {
+        connected: 'binary_sensor.infrastructure_tailscale_jane_phone_connected_to_control',
+        ipAddress: 'sensor.infrastructure_tailscale_jane_phone_ip_address',
+        lastSeen: 'sensor.infrastructure_tailscale_jane_phone_last_seen',
+        expires: 'sensor.infrastructure_tailscale_jane_phone_expires',
+        update: 'binary_sensor.infrastructure_tailscale_jane_phone_client',
+      },
     ],
   },
   media: {

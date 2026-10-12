@@ -55,6 +55,7 @@ export const MENU_STYLE = css`
     text-align: left;
     cursor: pointer;
     white-space: nowrap;
+    transition: background-color 120ms ease-out;
   }
   .menu button:hover {
     background: var(--m-pill);

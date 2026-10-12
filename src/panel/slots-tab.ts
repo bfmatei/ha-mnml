@@ -18,8 +18,10 @@ import { field } from '../ha/field.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
 import { icon } from '../ha/templates.ts';
 import { nodeHash } from '../templates/changes.ts';
-import { discover } from '../templates/discover.ts';
+import type { Step } from '../templates/discover.ts';
 import { toValue } from '../templates/expand.ts';
+import { explain } from '../templates/explain.ts';
+import type { Trace } from '../templates/explain.ts';
 
 import { readYaml } from './yaml.ts';
 
@@ -54,14 +56,35 @@ const FILTERS = [
   { key: 'device_class', words: 'with device class' },
   { key: 'platform', words: 'from the integration' },
   { key: 'translation_key', words: 'with translation key' },
+  { key: 'entity_category', words: 'in the category' },
+  { key: 'unit', words: 'with unit' },
+  { key: 'state_class', words: 'with state class' },
+  { key: 'name', words: 'named like' },
+  { key: 'manufacturer', words: 'made by' },
+  { key: 'model', words: 'of model' },
+  { key: 'label', words: 'labelled' },
 ] as const;
+const CATEGORIES = ['none', 'diagnostic', 'config'];
 const SLOT_NAME = /^[a-z_][a-z0-9_]*$/;
 
 type Mode = 'area' | 'find' | 'per' | 'fields';
 
 const isAreaValue = (rule: Rule): rule is AreaValue => typeof rule === 'string';
 
-const FILTER_KEYS = new Set(['domain', 'device_class', 'platform', 'translation_key', 'scope']);
+const FILTER_KEYS = new Set([
+  'domain',
+  'device_class',
+  'platform',
+  'translation_key',
+  'entity_category',
+  'unit',
+  'state_class',
+  'name',
+  'manufacturer',
+  'model',
+  'label',
+  'scope',
+]);
 
 function isRule(value: unknown): value is Rule {
   if (typeof value === 'string') {
@@ -77,8 +100,8 @@ function isRule(value: unknown): value is Rule {
   if (fields !== undefined) {
     return isMapping(fields) && Object.values(fields).every(isRule);
   }
-  return Object.entries(value).every(
-    ([key, inner]) => FILTER_KEYS.has(key) && typeof inner === 'string',
+  return Object.entries(value).every(([key, inner]) =>
+    key === 'exclude' ? isMapping(inner) : FILTER_KEYS.has(key) && typeof inner === 'string',
   );
 }
 const isPer = (rule: Rule): rule is ObjectsRule => isMapping(rule) && 'per' in rule;
@@ -236,7 +259,9 @@ function drawFind(
         ? facts.classes(rule.domain)
         : filter.key === 'platform'
           ? facts.platforms
-          : [];
+          : filter.key === 'entity_category'
+            ? CATEGORIES
+            : [];
     words.push(
       html`<span>${filter.words}</span>`,
       typed(value, filter.key.replace('_', ' '), list, (next) => {
@@ -390,6 +415,38 @@ function describeFound(value: Value | undefined, hass: HomeAssistant | undefined
     : named(value);
 }
 
+function matchesOf(step: Step): string {
+  const count = step.candidates.length;
+  const took = step.picked.length === 0 ? '' : `, took ${step.picked.join(', ')}`;
+  const tie = step.tied === undefined ? '' : `, tied with ${step.tied.slice(1).join(', ')}`;
+  return `${count} ${count === 1 ? 'match' : 'matches'}${took}${tie}`;
+}
+
+function drawTrace(trace: Trace): TemplateResult {
+  return html`<ul class="trace">
+    ${trace.steps.map(
+      (step) =>
+        html`<li>
+          ${step.field === '' ? nothing : html`<b>${step.field}</b>: `}${step.rule}${
+            step.filter === undefined && step.candidates.length === 0 && step.picked.length === 0
+              ? nothing
+              : html`: ${matchesOf(step)}`
+          }
+          ${
+            step.near.length === 0
+              ? nothing
+              : html`<ul class="near">
+                  ${step.near.map(
+                    (near) => html`<li>${near.entity_id} ${near.why.join(' and ')}</li>`,
+                  )}
+                </ul>`
+          }
+        </li>`,
+    )}
+    ${trace.reason === undefined ? nothing : html`<li class="reason">${trace.reason}</li>`}
+  </ul>`;
+}
+
 function drawTrial(
   name: string,
   spec: SlotSpec,
@@ -404,12 +461,12 @@ function drawTrial(
     [...actions.open.keys()].find((each) => each.startsWith(`${key}=`))?.slice(key.length + 1) ??
     actions.areas[0]?.value ??
     '';
-  const found = discover({ card: {}, slots: { [name]: spec } }, chosen, {
+  const trace = explain({ card: {}, slots: { [name]: spec } }, chosen, {
     areas: hass.areas,
     devices: hass.devices,
     entities: hass.entities,
     states: hass.states,
-  });
+  })[name];
   return html`<div class="trial">
     <span class="muted">In</span>
     ${choose(actions.areas, chosen, 'Try it in', (where) => {
@@ -419,7 +476,8 @@ function drawTrial(
       actions.open.set(`${key}=${where}`, true);
       actions.redraw();
     })}
-    <span class="found">it finds ${describeFound(found[name], hass)}</span>
+    <span class="found">it finds ${describeFound(trace?.value, hass)}</span>
+    ${trace === undefined ? nothing : drawTrace(trace)}
   </div>`;
 }
 

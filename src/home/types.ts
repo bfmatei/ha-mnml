@@ -343,13 +343,18 @@ export interface ServerDisks {
   lifeLeft: SensorId;
 }
 
+export interface ChecksActions {
+  run: ButtonId;
+  stop: ButtonId;
+  running: BinarySensorId;
+}
+
 export interface ServerChecks {
   failed: SensorId;
   warnings?: SensorId;
   lastRun: SensorId;
   overdue: BinarySensorId;
-  run?: ButtonId;
-  stop?: ButtonId;
+  actions?: ChecksActions;
 }
 
 export interface NotificationSource {
@@ -411,10 +416,23 @@ export interface Network {
   wan?: SensorId;
   devices: SensorId[];
   wifi?: Wifi[];
-  vpn?: BinarySensorId[];
   clients?: Clients;
   router: Router;
   firmware: UpdateId[];
+}
+
+export interface TailscaleDevice {
+  connected: BinarySensorId;
+  essential?: true;
+  ipAddress?: SensorId;
+  lastSeen?: SensorId;
+  expires?: SensorId;
+  update?: BinarySensorId;
+  udp?: BinarySensorId;
+}
+
+export interface Tailscale {
+  devices: [TailscaleDevice, ...TailscaleDevice[]];
 }
 
 export interface MediaRequests {
@@ -470,6 +488,7 @@ export interface System {
   proxmox?: Proxmox;
   adguard?: Adguard;
   network?: Network;
+  tailscale?: Tailscale;
   media?: MediaServer;
 }
 

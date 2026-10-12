@@ -13,10 +13,24 @@ proxmox-server:
             power: { kind: entity, required: true }
             today: { kind: entity }
             total: { kind: entity }
-    cpu: { kind: entity, label: CPU, group: Load, help: "The server's processor use." }
-    memory: { kind: entity, group: Load, help: "The server's memory use." }
+    cpu:
+      kind: entity
+      label: CPU
+      group: Load
+      help: "The server's processor use."
+      discover: { domain: sensor, platform: proxmoxve, translation_key: node_cpu, scope: all }
+    memory:
+      kind: entity
+      group: Load
+      help: "The server's memory use."
+      discover:
+        { domain: sensor, platform: proxmoxve, translation_key: node_memory_percentage, scope: all }
     last_boot:
-      { kind: entity, group: Load, label: 'Last boot', help: 'When the server last started.' }
+      kind: entity
+      group: Load
+      label: 'Last boot'
+      help: 'When the server last started.'
+      discover: { domain: sensor, platform: proxmoxve, translation_key: node_uptime, scope: all }
     uplink: { kind: entity, group: Load }
     temperatures:
       kind: object
@@ -35,6 +49,22 @@ proxmox-server:
     guests:
       kind: objects
       group: Guests
+      discover:
+        per: device
+        scope: all
+        where: { domain: binary_sensor, platform: proxmoxve, translation_key: status }
+        fields:
+          status: { domain: binary_sensor, platform: proxmoxve, translation_key: status }
+          cpu:
+            [
+              { domain: sensor, platform: proxmoxve, translation_key: vm_cpu },
+              { domain: sensor, platform: proxmoxve, translation_key: container_cpu },
+            ]
+          memory:
+            [
+              { domain: sensor, platform: proxmoxve, translation_key: vm_memory_percentage },
+              { domain: sensor, platform: proxmoxve, translation_key: container_memory_percentage },
+            ]
       fields:
         host: { kind: text }
         status: { kind: entity, required: true }
@@ -48,6 +78,22 @@ proxmox-server:
     backups:
       kind: object
       group: Health
+      discover:
+        fields:
+          last:
+            {
+              domain: sensor,
+              platform: proxmoxve,
+              translation_key: node_backup_last_backup,
+              scope: all,
+            }
+          problem:
+            {
+              domain: binary_sensor,
+              platform: proxmoxve,
+              translation_key: node_backup_status,
+              scope: all,
+            }
       fields:
         last: { kind: entity, required: true }
         problem: { kind: entity, required: true }
@@ -60,8 +106,12 @@ proxmox-server:
         warnings: { kind: entity }
         last_run: { kind: entity, required: true }
         overdue: { kind: entity, required: true }
-        run: { kind: entity }
-        stop: { kind: entity }
+        actions:
+          kind: object
+          fields:
+            run: { kind: entity, required: true }
+            stop: { kind: entity, required: true }
+            running: { kind: entity, required: true }
     notifications:
       kind: object
       group: Health
@@ -114,6 +164,7 @@ proxmox-server:
         type: status
         name: Guests
         icon: mdi:server-network
+        silent: true
         rules:
           [
             {
@@ -130,6 +181,7 @@ proxmox-server:
         type: status
         name: Checks
         icon: mdi:clipboard-check-outline
+        silent: true
         rules:
           - id: checks-failed
             entities: ['[[checks.failed]]']
@@ -149,6 +201,7 @@ proxmox-server:
         type: status
         name: Backups
         icon: mdi:cloud-upload-outline
+        silent: true
         rules: [{ id: backups-problem, entities: ['[[backups.problem]]'], color: red, is: ['on'] }]
       - id: notifications
         if: notifications
@@ -157,6 +210,7 @@ proxmox-server:
         popup: '#proxmox-notifications'
         color: amber
         when: { not: ['0'] }
+        show: { not: ['0'] }
     grid_options: { columns: 12 }
   popups:
     - id: proxmox-popup
@@ -255,8 +309,12 @@ proxmox-popup:
         warnings: { kind: entity }
         last_run: { kind: entity, required: true }
         overdue: { kind: entity, required: true }
-        run: { kind: entity }
-        stop: { kind: entity }
+        actions:
+          kind: object
+          fields:
+            run: { kind: entity, required: true }
+            stop: { kind: entity, required: true }
+            running: { kind: entity, required: true }
     notifications:
       kind: object
       fields:
@@ -325,49 +383,40 @@ proxmox-popup:
             slots: { entity: '[[guest.status]]' }
       - id: checks
         if: checks
-        type: custom:mnml-list-card
-        title: Daily checks
+        type: custom:mnml-entity-card
+        entity: '[[checks.last_run]]'
+        name: Checks
         icon: mdi:clipboard-check-outline
-        rows:
-          - id: checks-failed
-            entity: '[[checks.failed]]'
-            color: red
-            when: { not: ['0'] }
-          - id: checks-warnings
-            if: checks.warnings
-            entity: '[[checks.warnings]]'
-            color: orange
-            when: { not: ['0'] }
-          - id: checks-last_run
-            entity: '[[checks.last_run]]'
+        state:
+          - id: last-run
             relative: true
-          - id: checks-overdue
-            entity: '[[checks.overdue]]'
-            flag: true
-            color: orange
-            show: { is: ['on'] }
-      - id: checks-run
-        if: checks.run
-        type: custom:mnml-button-card
-        entity: '[[checks.run]]'
-        service: button.press
-      - id: checks-stop
-        if: checks.stop
-        type: custom:mnml-button-card
-        entity: '[[checks.stop]]'
-        service: button.press
-        visibility:
-          - id: checks-stop-shown
-            condition: state
-            entity: '[[checks.stop]]'
-            state_not: unavailable
-      - id: checks-failures
-        if: checks
-        type: custom:mnml-report-card
-        entity: '[[checks.failed]]'
-        title: Check details
-        icon: mdi:clipboard-alert-outline
-        colors: { warnings: orange }
+        controls:
+          - id: failed
+            type: status
+            name: Failed
+            icon: mdi:alert-circle-outline
+            silent: true
+            rules:
+              - id: failed
+                entities: ['[[checks.failed]]']
+                color: red
+                not: ['0']
+          - id: warnings
+            if: checks.warnings
+            type: status
+            name: Warnings
+            icon: mdi:alert-outline
+            silent: true
+            rules:
+              - id: warnings
+                entities: ['[[checks.warnings]]']
+                color: orange
+                not: ['0']
+          - id: checks-actions
+            if: checks.actions
+            template: checks-actions
+            slots: { actions: '[[checks.actions]]' }
+        popup: '#checks'
       - id: host
         type: custom:mnml-list-card
         title: Host

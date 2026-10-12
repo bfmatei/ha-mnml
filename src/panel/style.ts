@@ -1096,6 +1096,20 @@ export const PANEL_STYLE = css`
   .found {
     color: var(--primary-text-color);
   }
+  .trace {
+    flex-basis: 100%;
+    margin: 0;
+    padding-left: 18px;
+    color: var(--secondary-text-color);
+    font-size: 12px;
+  }
+  .trace .near {
+    margin: 2px 0 4px;
+    padding-left: 16px;
+  }
+  .trace .reason {
+    color: var(--primary-text-color);
+  }
   .fields {
     padding-left: 12px;
     border-left: 2px solid var(--divider-color);

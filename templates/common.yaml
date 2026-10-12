@@ -50,6 +50,35 @@ nav-chip:
     popup: '#living-heating'
     color: orange
 
+checks-actions:
+  description: The daily checks' Run and Stop controls, Run shown while they are not running and Stop while they are.
+  slots:
+    actions:
+      kind: object
+      required: true
+      fields:
+        run: { kind: entity, required: true }
+        stop: { kind: entity, required: true }
+        running: { kind: entity, required: true }
+  card:
+    - id: run
+      type: service
+      entity: '[[actions.run]]'
+      service: button.press
+      name: Run checks
+      icon: mdi:play
+      show: { entity: '[[actions.running]]', not: ['on'] }
+    - id: stop
+      type: service
+      entity: '[[actions.stop]]'
+      service: button.press
+      name: Stop checks
+      icon: mdi:stop
+      show: { entity: '[[actions.running]]', is: ['on'] }
+  example:
+    actions:
+      { run: button.checks_run, stop: button.checks_stop, running: binary_sensor.checks_running }
+
 while-not-off:
   description: The visibility that shows a card while its entity is not off.
   slots:

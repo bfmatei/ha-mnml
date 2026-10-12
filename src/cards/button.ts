@@ -20,9 +20,7 @@ const BUTTON_STYLE = css`
   .card.button {
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
-    transition:
-      transform 90ms ease-out,
-      box-shadow 120ms ease-out;
+    transition: transform 90ms ease-out;
   }
   .card.button .pill {
     transition: color 160ms ease-out;
@@ -32,11 +30,6 @@ const BUTTON_STYLE = css`
   }
   .card.pressed .pill {
     color: var(--primary-color);
-  }
-  @media (hover: hover) {
-    .card.button:hover {
-      background-image: linear-gradient(var(--m-hover), var(--m-hover));
-    }
   }
 `;
 

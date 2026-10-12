@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 import { test } from 'vitest';
 
-import type { Template } from '../contract/templates.ts';
+import type { Rule, Template } from '../contract/templates.ts';
 
 import { discover } from './discover.ts';
 import type { Registries } from './discover.ts';
@@ -221,4 +221,216 @@ test('an object slot whose required field nothing fills is not found, even when 
   };
   assert.deepEqual(discover(lighty, 'kitchen', registries), {});
   assert.deepEqual(discover(lighty, 'living', registries), { lights: { group: 'light.lamp' } });
+});
+
+const F: Registries = {
+  areas: { den: { area_id: 'den', name: 'Den', icon: null } },
+  devices: {
+    hue: {
+      id: 'hue',
+      area_id: 'den',
+      name: 'Lamp',
+      manufacturer: 'Signify',
+      model: 'Hue white',
+      labels: ['guest'],
+    },
+    ikea: {
+      id: 'ikea',
+      area_id: 'den',
+      name: 'Bulb',
+      manufacturer: 'IKEA of Sweden',
+      model: 'TRADFRI',
+    },
+  },
+  entities: {
+    'sensor.den_power': { entity_id: 'sensor.den_power', area_id: 'den', platform: 'tplink' },
+    'sensor.den_energy': { entity_id: 'sensor.den_energy', area_id: 'den', platform: 'tplink' },
+    'sensor.den_rssi': {
+      entity_id: 'sensor.den_rssi',
+      area_id: 'den',
+      platform: 'tplink',
+      entity_category: 'diagnostic',
+    },
+    'sensor.den_tagged': {
+      entity_id: 'sensor.den_tagged',
+      area_id: 'den',
+      platform: 'mqtt',
+      labels: ['mnml_temperature', 'main'],
+    },
+    'sensor.den_t1': { entity_id: 'sensor.den_t1', area_id: 'den', platform: 'zha' },
+    'sensor.den_t2': { entity_id: 'sensor.den_t2', area_id: 'den', platform: 'zha' },
+    'light.hue_lamp': { entity_id: 'light.hue_lamp', device_id: 'hue', platform: 'hue' },
+    'light.ikea_bulb': { entity_id: 'light.ikea_bulb', device_id: 'ikea', platform: 'ikea' },
+  },
+  states: {
+    'sensor.den_power': {
+      attributes: {
+        unit_of_measurement: 'W',
+        state_class: 'measurement',
+        friendly_name: 'Den power',
+      },
+    },
+    'sensor.den_energy': {
+      attributes: {
+        unit_of_measurement: 'kWh',
+        state_class: 'total_increasing',
+        friendly_name: 'Den energy',
+      },
+    },
+    'sensor.den_rssi': { attributes: { unit_of_measurement: 'dBm', friendly_name: 'Den signal' } },
+    'sensor.den_tagged': { attributes: { friendly_name: 'Odd one out' } },
+    'sensor.den_t1': {
+      attributes: { device_class: 'temperature', friendly_name: 'Window temperature' },
+    },
+    'sensor.den_t2': {
+      attributes: { device_class: 'temperature', friendly_name: 'Sofa temperature' },
+    },
+  },
+};
+
+function find(rule: Rule, kind: 'entity' | 'entities' = 'entities', slot = 'x'): unknown {
+  return discover({ card: {}, slots: { [slot]: { kind, discover: rule } } }, 'den', F)[slot];
+}
+
+test('a filter takes an entity category: none for the primary ones, diagnostic or config', () => {
+  assert.deepEqual(find({ domain: 'sensor', platform: 'tplink', entity_category: 'none' }), [
+    'sensor.den_energy',
+    'sensor.den_power',
+  ]);
+  assert.deepEqual(find({ domain: 'sensor', entity_category: 'diagnostic' }), ['sensor.den_rssi']);
+});
+
+test('a filter takes a unit and a state class, read from the state', () => {
+  assert.deepEqual(find({ domain: 'sensor', unit: 'W' }), ['sensor.den_power']);
+  assert.deepEqual(find({ domain: 'sensor', state_class: 'total_increasing' }), [
+    'sensor.den_energy',
+  ]);
+});
+
+test('a filter takes words of the name, any case, and every word must be in it', () => {
+  assert.deepEqual(find({ domain: 'sensor', name: 'SOFA' }), ['sensor.den_t2']);
+  assert.deepEqual(find({ domain: 'sensor', name: 'window temperature' }), ['sensor.den_t1']);
+  assert.deepEqual(
+    find({ domain: 'sensor', name: 'temperature sofa' }),
+    ['sensor.den_t2'],
+    'in any order',
+  );
+  assert.equal(find({ domain: 'sensor', name: 'nothing like it' }), undefined);
+});
+
+test("a filter takes a device's manufacturer or model, any case, as part of the text", () => {
+  assert.deepEqual(find({ domain: 'light', manufacturer: 'signify' }), ['light.hue_lamp']);
+  assert.deepEqual(find({ domain: 'light', model: 'tradfri' }), ['light.ikea_bulb']);
+});
+
+test('a filter takes a label of the entity or of its device', () => {
+  assert.deepEqual(find({ label: 'main' }), ['sensor.den_tagged']);
+  assert.deepEqual(find({ label: 'guest' }), ['light.hue_lamp'], "the device's label counts");
+});
+
+test('exclude removes what the other keys let through', () => {
+  assert.deepEqual(
+    find({ domain: 'sensor', platform: 'tplink', exclude: { entity_category: 'diagnostic' } }),
+    ['sensor.den_energy', 'sensor.den_power'],
+  );
+  assert.deepEqual(find({ domain: 'light', exclude: { manufacturer: 'ikea' } }), [
+    'light.hue_lamp',
+  ]);
+});
+
+test('an entity labelled mnml_<slot> is that slot, ahead of any rule, inside the area', () => {
+  assert.equal(
+    find({ domain: 'sensor', device_class: 'temperature' }, 'entity', 'temperature'),
+    'sensor.den_tagged',
+  );
+  assert.deepEqual(
+    find({ domain: 'sensor' }, 'entities', 'temperature'),
+    ['sensor.den_tagged'],
+    'an entities slot takes every labelled one',
+  );
+  assert.equal(
+    discover(
+      {
+        card: {},
+        slots: {
+          temperature: {
+            kind: 'entity',
+            discover: { domain: 'sensor', device_class: 'temperature' },
+          },
+        },
+      },
+      undefined,
+      F,
+    )['temperature'],
+    'sensor.den_tagged',
+    'with no area, the whole home is searched for the label',
+  );
+  assert.equal(
+    find({ domain: 'sensor', device_class: 'temperature' }, 'entity', 'other'),
+    'sensor.den_t1',
+    'another slot is not affected',
+  );
+});
+
+const K: Registries = {
+  areas: { den: { area_id: 'den', name: 'Den', icon: null } },
+  devices: {},
+  entities: {
+    'sensor.a_gone': { entity_id: 'sensor.a_gone', area_id: 'den' },
+    'sensor.b_unknown': { entity_id: 'sensor.b_unknown', area_id: 'den' },
+    'sensor.c_named': { entity_id: 'sensor.c_named', area_id: 'den', name: 'Probe 2' },
+    'sensor.d_main': { entity_id: 'sensor.d_main', area_id: 'den' },
+    'sensor.e_diag': { entity_id: 'sensor.e_diag', area_id: 'den', entity_category: 'diagnostic' },
+  },
+  states: {
+    'sensor.b_unknown': { state: 'unknown', attributes: { device_class: 'temperature' } },
+    'sensor.c_named': { state: '20', attributes: { device_class: 'temperature' } },
+    'sensor.d_main': { state: '21', attributes: { device_class: 'temperature' } },
+    'sensor.e_diag': { state: '19', attributes: { device_class: 'temperature' } },
+  },
+};
+
+function pick(drop: string[] = []): unknown {
+  const entities = Object.fromEntries(
+    Object.entries(K.entities).filter(([id]) => !drop.includes(id)),
+  );
+  return discover(
+    { card: {}, slots: { t: { kind: 'entity', discover: { domain: 'sensor' } } } },
+    'den',
+    { ...K, entities },
+  )['t'];
+}
+
+test('with several matches an entity slot ranks them: a primary category first, then a usable state over a blank one over none, then no name of its own, then the id', () => {
+  assert.equal(pick(), 'sensor.d_main', 'primary, usable, no name of its own');
+  assert.equal(
+    pick(['sensor.d_main']),
+    'sensor.c_named',
+    'a usable state beats a blank one, though it has a name',
+  );
+  assert.equal(
+    pick(['sensor.d_main', 'sensor.c_named']),
+    'sensor.b_unknown',
+    'a blank state beats none at all',
+  );
+  assert.equal(
+    pick(['sensor.d_main', 'sensor.c_named', 'sensor.b_unknown']),
+    'sensor.a_gone',
+    'a primary entity beats a diagnostic one, whatever its state',
+  );
+  assert.equal(
+    pick(['sensor.d_main', 'sensor.c_named', 'sensor.b_unknown', 'sensor.a_gone']),
+    'sensor.e_diag',
+  );
+});
+
+test('an entities slot keeps every match, in the order of their ids', () => {
+  assert.deepEqual(
+    discover(
+      { card: {}, slots: { t: { kind: 'entities', discover: { domain: 'sensor' } } } },
+      'den',
+      K,
+    )['t'],
+    ['sensor.a_gone', 'sensor.b_unknown', 'sensor.c_named', 'sensor.d_main', 'sensor.e_diag'],
+  );
 });

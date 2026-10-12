@@ -1,14 +1,21 @@
 unifi-network:
-  description: A UniFi network's tile, its latency, and its devices, VPN and firmware chips; it brings the network's pop-up and one per Wi-Fi network.
+  description: A UniFi network's tile, its latency, and its devices and firmware chips; it brings the network's pop-up and one per Wi-Fi network.
   slots:
     latency:
       {
         kind: entities,
         group: Basics,
         help: "The sensors of the network's latency, the first on the tile.",
+        discover: { domain: sensor, platform: unifi, translation_key: wan_latency, scope: all },
       }
     wan: { kind: entity, label: WAN, group: Basics }
-    devices: { kind: entities, group: Devices, help: "The network's devices, for their state." }
+    devices:
+      {
+        kind: entities,
+        group: Devices,
+        help: "The network's devices, for their state.",
+        discover: { domain: sensor, platform: unifi, translation_key: device_state, scope: all },
+      }
     wifi:
       kind: objects
       label: Wi-Fi networks
@@ -18,7 +25,6 @@ unifi-network:
         enabled: { kind: entity, required: true }
         qr: { kind: entity, label: QR code }
         switchable: { kind: flag }
-    vpn: { kind: entities, label: VPN, group: VPN }
     clients:
       kind: object
       group: Wi-Fi
@@ -36,10 +42,22 @@ unifi-network:
       help: "The router's processor use and temperature."
       kind: object
       group: Basics
+      discover:
+        fields:
+          cpu:
+            { domain: sensor, platform: unifi, translation_key: device_cpu_utilization, scope: all }
+          temperature:
+            { domain: sensor, platform: unifi, translation_key: device_sub_temperature, scope: all }
       fields:
         cpu: { kind: entity, required: true, label: CPU }
         temperature: { kind: entity, required: true }
-    firmware: { kind: entities, group: Devices, help: "The devices' firmware updates." }
+    firmware:
+      {
+        kind: entities,
+        group: Devices,
+        help: "The devices' firmware updates.",
+        discover: { domain: update, platform: unifi, scope: all },
+      }
     device_up:
       {
         kind: texts,
@@ -59,6 +77,7 @@ unifi-network:
         type: status
         name: Devices
         icon: mdi:lan
+        silent: true
         rules:
           [
             {
@@ -70,17 +89,12 @@ unifi-network:
               not: '[[device_up]]',
             },
           ]
-      - id: vpn
-        if: vpn
-        type: status
-        name: VPN
-        icon: mdi:vpn
-        rules: [{ id: vpn, if: vpn, entities: ['[[vpn]]'], label: device, color: red, is: ['off'] }]
       - id: firmware
         if: firmware
         type: status
         name: Firmware
         icon: mdi:memory
+        silent: true
         rules:
           [
             {
@@ -101,7 +115,6 @@ unifi-network:
         wan: '[[wan]]'
         devices: '[[devices]]'
         wifi: '[[wifi]]'
-        vpn: '[[vpn]]'
         clients: '[[clients]]'
         router: '[[router]]'
         firmware: '[[firmware]]'
@@ -142,7 +155,7 @@ wifi-item:
     wifi: { key: guests, enabled: switch.guests_wifi, switchable: true }
 
 network-popup:
-  description: The network's pop-up, its internet, devices, router, VPN, Wi-Fi networks, clients and firmware.
+  description: The network's pop-up, its internet, devices, router, Wi-Fi networks, clients and firmware.
   slots:
     latency: { kind: entities }
     wan: { kind: entity }
@@ -154,7 +167,6 @@ network-popup:
         enabled: { kind: entity, required: true }
         qr: { kind: entity, label: QR code }
         switchable: { kind: flag }
-    vpn: { kind: entities }
     clients:
       kind: object
       fields:
@@ -220,19 +232,6 @@ network-popup:
           - id: router-temperature
             if: router.temperature
             entity: '[[router.temperature]]'
-      - id: vpn
-        if: vpn
-        type: custom:mnml-list-card
-        title: VPN
-        icon: mdi:vpn
-        rows:
-          - id: each-vpn
-            each: vpn
-            as: tunnel
-            entity: '[[tunnel]]'
-            label: device
-            color: red
-            when: { is: ['off'] }
       - id: wifi
         if: wifi
         type: custom:mnml-heading-card

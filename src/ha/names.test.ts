@@ -27,6 +27,21 @@ const hass = {
       state: '1',
       attributes: { friendly_name: 'Long' },
     },
+    'sensor.router': {
+      entity_id: 'sensor.router',
+      state: '1',
+      attributes: { friendly_name: 'Tailscale router' },
+    },
+    'sensor.angie': {
+      entity_id: 'sensor.angie',
+      state: '1',
+      attributes: { friendly_name: 'Tailscale Angie phone' },
+    },
+    'sensor.phone': {
+      entity_id: 'sensor.phone',
+      state: '1',
+      attributes: { friendly_name: 'iPhone battery' },
+    },
   },
   entities: {
     'sensor.sedan_fuel': { entity_id: 'sensor.sedan_fuel', device_id: 'car' },
@@ -50,6 +65,26 @@ test('label: device names an entity after its device, as the user renamed it', (
 test('strip removes a literal suffix, strip_word a word with its plural', () => {
   assert.equal(nameOf(hass, 'light.top', { strip: ' Lights' }), 'Top');
   assert.equal(nameOf(hass, 'light.top', { strip_word: 'Light' }), 'Top');
+});
+
+test('strip_word that removes the first word capitalises the rest, and only then', () => {
+  assert.equal(nameOf(hass, 'sensor.router', { strip_word: 'Tailscale' }), 'Router');
+  assert.equal(nameOf(hass, 'sensor.angie', { strip_word: 'Tailscale' }), 'Angie phone');
+  assert.equal(
+    nameOf(hass, 'sensor.angie', { strip_word: 'tailscale' }),
+    'Angie phone',
+    'whatever its case',
+  );
+  assert.equal(
+    nameOf(hass, 'sensor.phone', { strip_word: 'Tailscale' }),
+    'iPhone battery',
+    'no match, no change',
+  );
+  assert.equal(
+    nameOf(hass, 'sensor.phone', { strip_word: 'battery' }),
+    'iPhone',
+    'a later word leaves the start alone',
+  );
 });
 
 test('a card without an entity keeps its own name; with one, the entity names it', () => {

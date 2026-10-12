@@ -134,6 +134,9 @@ const BY_SUFFIX: [string, Reading][] = [
   ['_disks_failing', { state: '0' }],
   ['_pool_health', { state: 'ONLINE' }],
   ['_last_run', { state: ago(3), device_class: 'timestamp' }],
+  ['_last_seen', { state: ago(2), device_class: 'timestamp' }],
+  ['_ip_address', { state: '100.64.0.1' }],
+  ['_expires', { state: ahead(2400), device_class: 'timestamp' }],
   ['_last_backup', { state: ago(5), device_class: 'timestamp' }],
   ['_last_successful_automatic_backup', { state: ago(9), device_class: 'timestamp' }],
   ['_last_attempted_automatic_backup', { state: ago(9), device_class: 'timestamp' }],
@@ -193,6 +196,7 @@ const ON_BINARY = new Set([
   'services',
   'vpn',
   'connected',
+  'udp',
   'mopAttached',
   'waterBoxAttached',
 ]);

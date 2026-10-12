@@ -1,0 +1,1065 @@
+{
+  "demo": {
+    "glances": {
+      "*": {
+        "alarm": "alarm_control_panel.infrastructure_home_alarm",
+        "batteries": [
+          "sensor.bathroom_climate_battery",
+          "sensor.bathroom_switch_battery",
+          "sensor.bathroom_thermostat_battery",
+          "sensor.bedroom_climate_battery",
+          "sensor.bedroom_switch_battery",
+          "sensor.bedroom_thermostat_1_battery",
+          "sensor.bedroom_thermostat_2_battery",
+          "sensor.bedroom_window_battery",
+          "sensor.carbon_dioxide_battery",
+          "sensor.dressing_climate_battery",
+          "sensor.dressing_switch_battery",
+          "sensor.entry_climate_battery",
+          "sensor.entry_door_battery",
+          "sensor.entry_door_lock_battery",
+          "sensor.entry_switch_1_battery",
+          "sensor.entry_switch_2_battery",
+          "sensor.fixture_battery_a",
+          "sensor.fixture_battery_b",
+          "sensor.hall_climate_battery",
+          "sensor.hall_laundry_water_leak_battery",
+          "sensor.hall_switch_battery",
+          "sensor.infrastructure_energy_battery",
+          "sensor.jane_phone_battery_level",
+          "sensor.joe_phone_battery_level",
+          "sensor.joe_tablet_battery_level",
+          "sensor.kitchen_button_battery",
+          "sensor.kitchen_climate_battery",
+          "sensor.kitchen_coffee_machine_button_battery",
+          "sensor.kitchen_entry_button_battery",
+          "sensor.kitchen_living_button_battery",
+          "sensor.kitchen_thermostat_battery",
+          "sensor.kitchen_window_battery",
+          "sensor.living_climate_battery",
+          "sensor.living_thermostat_1_battery",
+          "sensor.living_thermostat_2_battery",
+          "sensor.living_vacuum_battery",
+          "sensor.living_window_battery",
+          "sensor.office_button_1_battery",
+          "sensor.office_button_2_battery",
+          "sensor.office_button_3_battery",
+          "sensor.office_climate_battery",
+          "sensor.office_switch_battery",
+          "sensor.office_thermostat_battery",
+          "sensor.office_window_battery",
+          "sensor.outside_temperature_battery",
+          "sensor.toilet_climate_battery",
+          "sensor.toilet_switch_battery",
+          "sensor.toilet_thermostat_battery"
+        ],
+        "leaks": ["binary_sensor.basement_floor_wet", "binary_sensor.hall_laundry_water_leak"],
+        "people": ["person.demo", "person.jane", "person.joe"],
+        "smoke": ["binary_sensor.hall_smoke", "binary_sensor.kitchen_smoke"],
+        "updates": [
+          "update.bathroom_climate_firmware",
+          "update.bathroom_thermostat_firmware",
+          "update.bedroom_climate_firmware",
+          "update.bedroom_thermostat_1_firmware",
+          "update.bedroom_thermostat_2_firmware",
+          "update.bedroom_window_firmware",
+          "update.demo_add_on",
+          "update.demo_living_room_bulb_update",
+          "update.demo_no_update",
+          "update.demo_update_no_install",
+          "update.demo_update_with_decimal_progress",
+          "update.demo_update_with_progress",
+          "update.dressing_climate_firmware",
+          "update.entry_climate_firmware",
+          "update.entry_door_firmware",
+          "update.hall_climate_firmware",
+          "update.hall_laundry_water_leak_firmware",
+          "update.infrastructure_adguard_home",
+          "update.infrastructure_advanced_ssh_web_terminal_update",
+          "update.infrastructure_ap_firmware",
+          "update.infrastructure_better_thermostat_update",
+          "update.infrastructure_car_data_update",
+          "update.infrastructure_file_editor_update",
+          "update.infrastructure_hacs_update",
+          "update.infrastructure_home_assistant_connect_zbt_2_firmware",
+          "update.infrastructure_home_assistant_core_update",
+          "update.infrastructure_home_assistant_operating_system_update",
+          "update.infrastructure_home_assistant_supervisor_update",
+          "update.infrastructure_let_s_encrypt_update",
+          "update.infrastructure_matter_server_update",
+          "update.infrastructure_mitsubishi_air_conditioner_update",
+          "update.infrastructure_openthread_border_router_update",
+          "update.infrastructure_plex_update",
+          "update.infrastructure_roborock_local_server_update",
+          "update.infrastructure_router_firmware",
+          "update.infrastructure_server_outlet_firmware",
+          "update.infrastructure_switch_1_firmware",
+          "update.infrastructure_switch_2_firmware",
+          "update.kitchen_climate_firmware",
+          "update.kitchen_coffee_machine_outlet_firmware",
+          "update.kitchen_extractor_outlet_firmware",
+          "update.kitchen_thermostat_firmware",
+          "update.kitchen_window_firmware",
+          "update.living_climate_firmware",
+          "update.living_thermostat_1_firmware",
+          "update.living_thermostat_2_firmware",
+          "update.living_window_firmware",
+          "update.office_3d_printer_outlet_firmware",
+          "update.office_climate_firmware",
+          "update.office_thermostat_firmware",
+          "update.office_window_firmware",
+          "update.toilet_climate_firmware",
+          "update.toilet_thermostat_firmware"
+        ],
+        "weather": "weather.demo_weather_north"
+      },
+      "bedroom": {
+        "alarm": "alarm_control_panel.infrastructure_home_alarm",
+        "batteries": [
+          "sensor.bathroom_climate_battery",
+          "sensor.bathroom_switch_battery",
+          "sensor.bathroom_thermostat_battery",
+          "sensor.bedroom_climate_battery",
+          "sensor.bedroom_switch_battery",
+          "sensor.bedroom_thermostat_1_battery",
+          "sensor.bedroom_thermostat_2_battery",
+          "sensor.bedroom_window_battery",
+          "sensor.carbon_dioxide_battery",
+          "sensor.dressing_climate_battery",
+          "sensor.dressing_switch_battery",
+          "sensor.entry_climate_battery",
+          "sensor.entry_door_battery",
+          "sensor.entry_door_lock_battery",
+          "sensor.entry_switch_1_battery",
+          "sensor.entry_switch_2_battery",
+          "sensor.fixture_battery_a",
+          "sensor.fixture_battery_b",
+          "sensor.hall_climate_battery",
+          "sensor.hall_laundry_water_leak_battery",
+          "sensor.hall_switch_battery",
+          "sensor.infrastructure_energy_battery",
+          "sensor.jane_phone_battery_level",
+          "sensor.joe_phone_battery_level",
+          "sensor.joe_tablet_battery_level",
+          "sensor.kitchen_button_battery",
+          "sensor.kitchen_climate_battery",
+          "sensor.kitchen_coffee_machine_button_battery",
+          "sensor.kitchen_entry_button_battery",
+          "sensor.kitchen_living_button_battery",
+          "sensor.kitchen_thermostat_battery",
+          "sensor.kitchen_window_battery",
+          "sensor.living_climate_battery",
+          "sensor.living_thermostat_1_battery",
+          "sensor.living_thermostat_2_battery",
+          "sensor.living_vacuum_battery",
+          "sensor.living_window_battery",
+          "sensor.office_button_1_battery",
+          "sensor.office_button_2_battery",
+          "sensor.office_button_3_battery",
+          "sensor.office_climate_battery",
+          "sensor.office_switch_battery",
+          "sensor.office_thermostat_battery",
+          "sensor.office_window_battery",
+          "sensor.outside_temperature_battery",
+          "sensor.toilet_climate_battery",
+          "sensor.toilet_switch_battery",
+          "sensor.toilet_thermostat_battery"
+        ],
+        "leaks": ["binary_sensor.basement_floor_wet", "binary_sensor.hall_laundry_water_leak"],
+        "people": ["person.demo", "person.jane", "person.joe"],
+        "smoke": ["binary_sensor.hall_smoke", "binary_sensor.kitchen_smoke"],
+        "updates": [
+          "update.bathroom_climate_firmware",
+          "update.bathroom_thermostat_firmware",
+          "update.bedroom_climate_firmware",
+          "update.bedroom_thermostat_1_firmware",
+          "update.bedroom_thermostat_2_firmware",
+          "update.bedroom_window_firmware",
+          "update.demo_add_on",
+          "update.demo_living_room_bulb_update",
+          "update.demo_no_update",
+          "update.demo_update_no_install",
+          "update.demo_update_with_decimal_progress",
+          "update.demo_update_with_progress",
+          "update.dressing_climate_firmware",
+          "update.entry_climate_firmware",
+          "update.entry_door_firmware",
+          "update.hall_climate_firmware",
+          "update.hall_laundry_water_leak_firmware",
+          "update.infrastructure_adguard_home",
+          "update.infrastructure_advanced_ssh_web_terminal_update",
+          "update.infrastructure_ap_firmware",
+          "update.infrastructure_better_thermostat_update",
+          "update.infrastructure_car_data_update",
+          "update.infrastructure_file_editor_update",
+          "update.infrastructure_hacs_update",
+          "update.infrastructure_home_assistant_connect_zbt_2_firmware",
+          "update.infrastructure_home_assistant_core_update",
+          "update.infrastructure_home_assistant_operating_system_update",
+          "update.infrastructure_home_assistant_supervisor_update",
+          "update.infrastructure_let_s_encrypt_update",
+          "update.infrastructure_matter_server_update",
+          "update.infrastructure_mitsubishi_air_conditioner_update",
+          "update.infrastructure_openthread_border_router_update",
+          "update.infrastructure_plex_update",
+          "update.infrastructure_roborock_local_server_update",
+          "update.infrastructure_router_firmware",
+          "update.infrastructure_server_outlet_firmware",
+          "update.infrastructure_switch_1_firmware",
+          "update.infrastructure_switch_2_firmware",
+          "update.kitchen_climate_firmware",
+          "update.kitchen_coffee_machine_outlet_firmware",
+          "update.kitchen_extractor_outlet_firmware",
+          "update.kitchen_thermostat_firmware",
+          "update.kitchen_window_firmware",
+          "update.living_climate_firmware",
+          "update.living_thermostat_1_firmware",
+          "update.living_thermostat_2_firmware",
+          "update.living_window_firmware",
+          "update.office_3d_printer_outlet_firmware",
+          "update.office_climate_firmware",
+          "update.office_thermostat_firmware",
+          "update.office_window_firmware",
+          "update.toilet_climate_firmware",
+          "update.toilet_thermostat_firmware"
+        ],
+        "weather": "weather.demo_weather_north"
+      },
+      "kitchen": {
+        "alarm": "alarm_control_panel.infrastructure_home_alarm",
+        "batteries": [
+          "sensor.bathroom_climate_battery",
+          "sensor.bathroom_switch_battery",
+          "sensor.bathroom_thermostat_battery",
+          "sensor.bedroom_climate_battery",
+          "sensor.bedroom_switch_battery",
+          "sensor.bedroom_thermostat_1_battery",
+          "sensor.bedroom_thermostat_2_battery",
+          "sensor.bedroom_window_battery",
+          "sensor.carbon_dioxide_battery",
+          "sensor.dressing_climate_battery",
+          "sensor.dressing_switch_battery",
+          "sensor.entry_climate_battery",
+          "sensor.entry_door_battery",
+          "sensor.entry_door_lock_battery",
+          "sensor.entry_switch_1_battery",
+          "sensor.entry_switch_2_battery",
+          "sensor.fixture_battery_a",
+          "sensor.fixture_battery_b",
+          "sensor.hall_climate_battery",
+          "sensor.hall_laundry_water_leak_battery",
+          "sensor.hall_switch_battery",
+          "sensor.infrastructure_energy_battery",
+          "sensor.jane_phone_battery_level",
+          "sensor.joe_phone_battery_level",
+          "sensor.joe_tablet_battery_level",
+          "sensor.kitchen_button_battery",
+          "sensor.kitchen_climate_battery",
+          "sensor.kitchen_coffee_machine_button_battery",
+          "sensor.kitchen_entry_button_battery",
+          "sensor.kitchen_living_button_battery",
+          "sensor.kitchen_thermostat_battery",
+          "sensor.kitchen_window_battery",
+          "sensor.living_climate_battery",
+          "sensor.living_thermostat_1_battery",
+          "sensor.living_thermostat_2_battery",
+          "sensor.living_vacuum_battery",
+          "sensor.living_window_battery",
+          "sensor.office_button_1_battery",
+          "sensor.office_button_2_battery",
+          "sensor.office_button_3_battery",
+          "sensor.office_climate_battery",
+          "sensor.office_switch_battery",
+          "sensor.office_thermostat_battery",
+          "sensor.office_window_battery",
+          "sensor.outside_temperature_battery",
+          "sensor.toilet_climate_battery",
+          "sensor.toilet_switch_battery",
+          "sensor.toilet_thermostat_battery"
+        ],
+        "leaks": ["binary_sensor.basement_floor_wet", "binary_sensor.hall_laundry_water_leak"],
+        "people": ["person.demo", "person.jane", "person.joe"],
+        "smoke": ["binary_sensor.hall_smoke", "binary_sensor.kitchen_smoke"],
+        "updates": [
+          "update.bathroom_climate_firmware",
+          "update.bathroom_thermostat_firmware",
+          "update.bedroom_climate_firmware",
+          "update.bedroom_thermostat_1_firmware",
+          "update.bedroom_thermostat_2_firmware",
+          "update.bedroom_window_firmware",
+          "update.demo_add_on",
+          "update.demo_living_room_bulb_update",
+          "update.demo_no_update",
+          "update.demo_update_no_install",
+          "update.demo_update_with_decimal_progress",
+          "update.demo_update_with_progress",
+          "update.dressing_climate_firmware",
+          "update.entry_climate_firmware",
+          "update.entry_door_firmware",
+          "update.hall_climate_firmware",
+          "update.hall_laundry_water_leak_firmware",
+          "update.infrastructure_adguard_home",
+          "update.infrastructure_advanced_ssh_web_terminal_update",
+          "update.infrastructure_ap_firmware",
+          "update.infrastructure_better_thermostat_update",
+          "update.infrastructure_car_data_update",
+          "update.infrastructure_file_editor_update",
+          "update.infrastructure_hacs_update",
+          "update.infrastructure_home_assistant_connect_zbt_2_firmware",
+          "update.infrastructure_home_assistant_core_update",
+          "update.infrastructure_home_assistant_operating_system_update",
+          "update.infrastructure_home_assistant_supervisor_update",
+          "update.infrastructure_let_s_encrypt_update",
+          "update.infrastructure_matter_server_update",
+          "update.infrastructure_mitsubishi_air_conditioner_update",
+          "update.infrastructure_openthread_border_router_update",
+          "update.infrastructure_plex_update",
+          "update.infrastructure_roborock_local_server_update",
+          "update.infrastructure_router_firmware",
+          "update.infrastructure_server_outlet_firmware",
+          "update.infrastructure_switch_1_firmware",
+          "update.infrastructure_switch_2_firmware",
+          "update.kitchen_climate_firmware",
+          "update.kitchen_coffee_machine_outlet_firmware",
+          "update.kitchen_extractor_outlet_firmware",
+          "update.kitchen_thermostat_firmware",
+          "update.kitchen_window_firmware",
+          "update.living_climate_firmware",
+          "update.living_thermostat_1_firmware",
+          "update.living_thermostat_2_firmware",
+          "update.living_window_firmware",
+          "update.office_3d_printer_outlet_firmware",
+          "update.office_climate_firmware",
+          "update.office_thermostat_firmware",
+          "update.office_window_firmware",
+          "update.toilet_climate_firmware",
+          "update.toilet_thermostat_firmware"
+        ],
+        "weather": "weather.demo_weather_north"
+      },
+      "living": {
+        "alarm": "alarm_control_panel.infrastructure_home_alarm",
+        "batteries": [
+          "sensor.bathroom_climate_battery",
+          "sensor.bathroom_switch_battery",
+          "sensor.bathroom_thermostat_battery",
+          "sensor.bedroom_climate_battery",
+          "sensor.bedroom_switch_battery",
+          "sensor.bedroom_thermostat_1_battery",
+          "sensor.bedroom_thermostat_2_battery",
+          "sensor.bedroom_window_battery",
+          "sensor.carbon_dioxide_battery",
+          "sensor.dressing_climate_battery",
+          "sensor.dressing_switch_battery",
+          "sensor.entry_climate_battery",
+          "sensor.entry_door_battery",
+          "sensor.entry_door_lock_battery",
+          "sensor.entry_switch_1_battery",
+          "sensor.entry_switch_2_battery",
+          "sensor.fixture_battery_a",
+          "sensor.fixture_battery_b",
+          "sensor.hall_climate_battery",
+          "sensor.hall_laundry_water_leak_battery",
+          "sensor.hall_switch_battery",
+          "sensor.infrastructure_energy_battery",
+          "sensor.jane_phone_battery_level",
+          "sensor.joe_phone_battery_level",
+          "sensor.joe_tablet_battery_level",
+          "sensor.kitchen_button_battery",
+          "sensor.kitchen_climate_battery",
+          "sensor.kitchen_coffee_machine_button_battery",
+          "sensor.kitchen_entry_button_battery",
+          "sensor.kitchen_living_button_battery",
+          "sensor.kitchen_thermostat_battery",
+          "sensor.kitchen_window_battery",
+          "sensor.living_climate_battery",
+          "sensor.living_thermostat_1_battery",
+          "sensor.living_thermostat_2_battery",
+          "sensor.living_vacuum_battery",
+          "sensor.living_window_battery",
+          "sensor.office_button_1_battery",
+          "sensor.office_button_2_battery",
+          "sensor.office_button_3_battery",
+          "sensor.office_climate_battery",
+          "sensor.office_switch_battery",
+          "sensor.office_thermostat_battery",
+          "sensor.office_window_battery",
+          "sensor.outside_temperature_battery",
+          "sensor.toilet_climate_battery",
+          "sensor.toilet_switch_battery",
+          "sensor.toilet_thermostat_battery"
+        ],
+        "leaks": ["binary_sensor.basement_floor_wet", "binary_sensor.hall_laundry_water_leak"],
+        "people": ["person.demo", "person.jane", "person.joe"],
+        "smoke": ["binary_sensor.hall_smoke", "binary_sensor.kitchen_smoke"],
+        "updates": [
+          "update.bathroom_climate_firmware",
+          "update.bathroom_thermostat_firmware",
+          "update.bedroom_climate_firmware",
+          "update.bedroom_thermostat_1_firmware",
+          "update.bedroom_thermostat_2_firmware",
+          "update.bedroom_window_firmware",
+          "update.demo_add_on",
+          "update.demo_living_room_bulb_update",
+          "update.demo_no_update",
+          "update.demo_update_no_install",
+          "update.demo_update_with_decimal_progress",
+          "update.demo_update_with_progress",
+          "update.dressing_climate_firmware",
+          "update.entry_climate_firmware",
+          "update.entry_door_firmware",
+          "update.hall_climate_firmware",
+          "update.hall_laundry_water_leak_firmware",
+          "update.infrastructure_adguard_home",
+          "update.infrastructure_advanced_ssh_web_terminal_update",
+          "update.infrastructure_ap_firmware",
+          "update.infrastructure_better_thermostat_update",
+          "update.infrastructure_car_data_update",
+          "update.infrastructure_file_editor_update",
+          "update.infrastructure_hacs_update",
+          "update.infrastructure_home_assistant_connect_zbt_2_firmware",
+          "update.infrastructure_home_assistant_core_update",
+          "update.infrastructure_home_assistant_operating_system_update",
+          "update.infrastructure_home_assistant_supervisor_update",
+          "update.infrastructure_let_s_encrypt_update",
+          "update.infrastructure_matter_server_update",
+          "update.infrastructure_mitsubishi_air_conditioner_update",
+          "update.infrastructure_openthread_border_router_update",
+          "update.infrastructure_plex_update",
+          "update.infrastructure_roborock_local_server_update",
+          "update.infrastructure_router_firmware",
+          "update.infrastructure_server_outlet_firmware",
+          "update.infrastructure_switch_1_firmware",
+          "update.infrastructure_switch_2_firmware",
+          "update.kitchen_climate_firmware",
+          "update.kitchen_coffee_machine_outlet_firmware",
+          "update.kitchen_extractor_outlet_firmware",
+          "update.kitchen_thermostat_firmware",
+          "update.kitchen_window_firmware",
+          "update.living_climate_firmware",
+          "update.living_thermostat_1_firmware",
+          "update.living_thermostat_2_firmware",
+          "update.living_window_firmware",
+          "update.office_3d_printer_outlet_firmware",
+          "update.office_climate_firmware",
+          "update.office_thermostat_firmware",
+          "update.office_window_firmware",
+          "update.toilet_climate_firmware",
+          "update.toilet_thermostat_firmware"
+        ],
+        "weather": "weather.demo_weather_north"
+      },
+      "living_room": {
+        "alarm": "alarm_control_panel.infrastructure_home_alarm",
+        "batteries": [
+          "sensor.bathroom_climate_battery",
+          "sensor.bathroom_switch_battery",
+          "sensor.bathroom_thermostat_battery",
+          "sensor.bedroom_climate_battery",
+          "sensor.bedroom_switch_battery",
+          "sensor.bedroom_thermostat_1_battery",
+          "sensor.bedroom_thermostat_2_battery",
+          "sensor.bedroom_window_battery",
+          "sensor.carbon_dioxide_battery",
+          "sensor.dressing_climate_battery",
+          "sensor.dressing_switch_battery",
+          "sensor.entry_climate_battery",
+          "sensor.entry_door_battery",
+          "sensor.entry_door_lock_battery",
+          "sensor.entry_switch_1_battery",
+          "sensor.entry_switch_2_battery",
+          "sensor.fixture_battery_a",
+          "sensor.fixture_battery_b",
+          "sensor.hall_climate_battery",
+          "sensor.hall_laundry_water_leak_battery",
+          "sensor.hall_switch_battery",
+          "sensor.infrastructure_energy_battery",
+          "sensor.jane_phone_battery_level",
+          "sensor.joe_phone_battery_level",
+          "sensor.joe_tablet_battery_level",
+          "sensor.kitchen_button_battery",
+          "sensor.kitchen_climate_battery",
+          "sensor.kitchen_coffee_machine_button_battery",
+          "sensor.kitchen_entry_button_battery",
+          "sensor.kitchen_living_button_battery",
+          "sensor.kitchen_thermostat_battery",
+          "sensor.kitchen_window_battery",
+          "sensor.living_climate_battery",
+          "sensor.living_thermostat_1_battery",
+          "sensor.living_thermostat_2_battery",
+          "sensor.living_vacuum_battery",
+          "sensor.living_window_battery",
+          "sensor.office_button_1_battery",
+          "sensor.office_button_2_battery",
+          "sensor.office_button_3_battery",
+          "sensor.office_climate_battery",
+          "sensor.office_switch_battery",
+          "sensor.office_thermostat_battery",
+          "sensor.office_window_battery",
+          "sensor.outside_temperature_battery",
+          "sensor.toilet_climate_battery",
+          "sensor.toilet_switch_battery",
+          "sensor.toilet_thermostat_battery"
+        ],
+        "leaks": ["binary_sensor.basement_floor_wet", "binary_sensor.hall_laundry_water_leak"],
+        "people": ["person.demo", "person.jane", "person.joe"],
+        "smoke": ["binary_sensor.hall_smoke", "binary_sensor.kitchen_smoke"],
+        "updates": [
+          "update.bathroom_climate_firmware",
+          "update.bathroom_thermostat_firmware",
+          "update.bedroom_climate_firmware",
+          "update.bedroom_thermostat_1_firmware",
+          "update.bedroom_thermostat_2_firmware",
+          "update.bedroom_window_firmware",
+          "update.demo_add_on",
+          "update.demo_living_room_bulb_update",
+          "update.demo_no_update",
+          "update.demo_update_no_install",
+          "update.demo_update_with_decimal_progress",
+          "update.demo_update_with_progress",
+          "update.dressing_climate_firmware",
+          "update.entry_climate_firmware",
+          "update.entry_door_firmware",
+          "update.hall_climate_firmware",
+          "update.hall_laundry_water_leak_firmware",
+          "update.infrastructure_adguard_home",
+          "update.infrastructure_advanced_ssh_web_terminal_update",
+          "update.infrastructure_ap_firmware",
+          "update.infrastructure_better_thermostat_update",
+          "update.infrastructure_car_data_update",
+          "update.infrastructure_file_editor_update",
+          "update.infrastructure_hacs_update",
+          "update.infrastructure_home_assistant_connect_zbt_2_firmware",
+          "update.infrastructure_home_assistant_core_update",
+          "update.infrastructure_home_assistant_operating_system_update",
+          "update.infrastructure_home_assistant_supervisor_update",
+          "update.infrastructure_let_s_encrypt_update",
+          "update.infrastructure_matter_server_update",
+          "update.infrastructure_mitsubishi_air_conditioner_update",
+          "update.infrastructure_openthread_border_router_update",
+          "update.infrastructure_plex_update",
+          "update.infrastructure_roborock_local_server_update",
+          "update.infrastructure_router_firmware",
+          "update.infrastructure_server_outlet_firmware",
+          "update.infrastructure_switch_1_firmware",
+          "update.infrastructure_switch_2_firmware",
+          "update.kitchen_climate_firmware",
+          "update.kitchen_coffee_machine_outlet_firmware",
+          "update.kitchen_extractor_outlet_firmware",
+          "update.kitchen_thermostat_firmware",
+          "update.kitchen_window_firmware",
+          "update.living_climate_firmware",
+          "update.living_thermostat_1_firmware",
+          "update.living_thermostat_2_firmware",
+          "update.living_window_firmware",
+          "update.office_3d_printer_outlet_firmware",
+          "update.office_climate_firmware",
+          "update.office_thermostat_firmware",
+          "update.office_window_firmware",
+          "update.toilet_climate_firmware",
+          "update.toilet_thermostat_firmware"
+        ],
+        "weather": "weather.demo_weather_north"
+      }
+    },
+    "home-assistant": {
+      "*": {
+        "all_firmware": [
+          "update.demo_living_room_bulb_update",
+          "update.demo_update_with_decimal_progress",
+          "update.demo_update_with_progress"
+        ]
+      },
+      "bedroom": {
+        "all_firmware": [
+          "update.demo_living_room_bulb_update",
+          "update.demo_update_with_decimal_progress",
+          "update.demo_update_with_progress"
+        ]
+      },
+      "kitchen": {
+        "all_firmware": [
+          "update.demo_living_room_bulb_update",
+          "update.demo_update_with_decimal_progress",
+          "update.demo_update_with_progress"
+        ]
+      },
+      "living": {
+        "all_firmware": [
+          "update.demo_living_room_bulb_update",
+          "update.demo_update_with_decimal_progress",
+          "update.demo_update_with_progress"
+        ]
+      },
+      "living_room": {
+        "all_firmware": [
+          "update.demo_living_room_bulb_update",
+          "update.demo_update_with_decimal_progress",
+          "update.demo_update_with_progress"
+        ]
+      }
+    },
+    "person": {
+      "bedroom": {
+        "key": "bedroom"
+      },
+      "kitchen": {
+        "key": "kitchen"
+      },
+      "living": {
+        "key": "living"
+      },
+      "living_room": {
+        "key": "living_room"
+      }
+    },
+    "room": {
+      "bedroom": {
+        "icon": "mdi:bed",
+        "key": "bedroom",
+        "name": "Bedroom"
+      },
+      "kitchen": {
+        "heating": {
+          "entity": "climate.heatpump"
+        },
+        "icon": "mdi:stove",
+        "key": "kitchen",
+        "leaks": ["binary_sensor.basement_floor_wet"],
+        "lights": {
+          "group": "light.kitchen_lights",
+          "members": [
+            {
+              "entity": "light.kitchen_lights"
+            }
+          ]
+        },
+        "name": "Kitchen",
+        "outlets": [
+          {
+            "entity": "switch.ac"
+          }
+        ]
+      },
+      "living": {
+        "batteries": ["sensor.outside_temperature_battery"],
+        "heating": {
+          "entity": "climate.hvac"
+        },
+        "humidity": "sensor.outside_humidity",
+        "icon": "mdi:sofa",
+        "key": "living",
+        "lights": {
+          "group": "light.ceiling_lights",
+          "members": [
+            {
+              "entity": "light.ceiling_lights"
+            },
+            {
+              "entity": "light.living_room_rgbww_lights"
+            }
+          ]
+        },
+        "name": "Living",
+        "temperature": "sensor.outside_temperature"
+      },
+      "living_room": {
+        "icon": "mdi:sofa",
+        "key": "living_room",
+        "name": "Living Room"
+      }
+    },
+    "system-popup": {
+      "*": {
+        "all_firmware": [
+          "update.demo_living_room_bulb_update",
+          "update.demo_update_with_decimal_progress",
+          "update.demo_update_with_progress"
+        ]
+      },
+      "bedroom": {
+        "all_firmware": [
+          "update.demo_living_room_bulb_update",
+          "update.demo_update_with_decimal_progress",
+          "update.demo_update_with_progress"
+        ]
+      },
+      "kitchen": {
+        "all_firmware": [
+          "update.demo_living_room_bulb_update",
+          "update.demo_update_with_decimal_progress",
+          "update.demo_update_with_progress"
+        ]
+      },
+      "living": {
+        "all_firmware": [
+          "update.demo_living_room_bulb_update",
+          "update.demo_update_with_decimal_progress",
+          "update.demo_update_with_progress"
+        ]
+      },
+      "living_room": {
+        "all_firmware": [
+          "update.demo_living_room_bulb_update",
+          "update.demo_update_with_decimal_progress",
+          "update.demo_update_with_progress"
+        ]
+      }
+    }
+  },
+  "labelled": {
+    "glances": {
+      "*": {
+        "batteries": ["sensor.multi_battery"]
+      },
+      "den": {
+        "batteries": ["sensor.multi_battery"]
+      },
+      "loft": {
+        "batteries": ["sensor.multi_battery"]
+      }
+    },
+    "person": {
+      "den": {
+        "key": "den"
+      },
+      "loft": {
+        "key": "loft"
+      }
+    },
+    "room": {
+      "*": {
+        "humidity": "sensor.den_unavailable_temperature",
+        "temperature": "sensor.multi_probe_temperature",
+        "window": "binary_sensor.den_window_b"
+      },
+      "den": {
+        "cameras": [
+          {
+            "entity": "camera.cams_front"
+          }
+        ],
+        "heating": {
+          "entity": "climate.ac"
+        },
+        "humidity": "sensor.den_unavailable_temperature",
+        "key": "den",
+        "lights": {
+          "group": "light.den_group"
+        },
+        "name": "Den",
+        "temperature": "sensor.multi_probe_temperature",
+        "window": "binary_sensor.den_window_b"
+      },
+      "loft": {
+        "batteries": ["sensor.multi_battery"],
+        "icon": "mdi:home-roof",
+        "key": "loft",
+        "name": "Loft"
+      }
+    }
+  },
+  "messy": {
+    "glances": {
+      "*": {
+        "batteries": ["sensor.multi_battery"]
+      },
+      "den": {
+        "batteries": ["sensor.multi_battery"]
+      },
+      "loft": {
+        "batteries": ["sensor.multi_battery"]
+      }
+    },
+    "person": {
+      "den": {
+        "key": "den"
+      },
+      "loft": {
+        "key": "loft"
+      }
+    },
+    "room": {
+      "den": {
+        "cameras": [
+          {
+            "entity": "camera.cams_front"
+          }
+        ],
+        "heating": {
+          "entity": "climate.ac"
+        },
+        "key": "den",
+        "lights": {
+          "group": "light.den_group"
+        },
+        "name": "Den",
+        "temperature": "sensor.multi_temperature",
+        "window": "binary_sensor.den_window_a"
+      },
+      "loft": {
+        "batteries": ["sensor.multi_battery"],
+        "icon": "mdi:home-roof",
+        "key": "loft",
+        "name": "Loft"
+      }
+    }
+  },
+  "systems": {
+    "glances": {
+      "*": {
+        "updates": ["update.ap_firmware", "update.gateway_firmware"]
+      }
+    },
+    "media-server": {
+      "*": {
+        "movies": {
+          "calendar": "calendar.radarr",
+          "count": "sensor.radarr_movies",
+          "health": "binary_sensor.radarr_health",
+          "queue": "sensor.radarr_queue"
+        },
+        "requests": {
+          "pending": "sensor.seerr_pending",
+          "processing": "sensor.seerr_processing"
+        },
+        "shows": {
+          "calendar": "calendar.sonarr",
+          "count": "sensor.sonarr_shows",
+          "queue": "sensor.sonarr_queue",
+          "upcoming": "sensor.sonarr_upcoming",
+          "wanted": "sensor.sonarr_wanted"
+        },
+        "streams": "sensor.jellyfin_clients"
+      }
+    },
+    "proxmox-server": {
+      "*": {
+        "backups": {
+          "last": "sensor.server_last_backup",
+          "problem": "binary_sensor.server_backup_status"
+        },
+        "cpu": "sensor.server_cpu",
+        "guests": [
+          {
+            "cpu": "sensor.router_vm_cpu",
+            "memory": "sensor.router_vm_memory",
+            "status": "binary_sensor.router_vm_status"
+          },
+          {
+            "cpu": "sensor.torrents_cpu",
+            "memory": "sensor.torrents_memory",
+            "status": "binary_sensor.torrents_status"
+          }
+        ],
+        "last_boot": "sensor.server_boot",
+        "memory": "sensor.server_memory"
+      }
+    },
+    "tailscale": {
+      "*": {
+        "devices": [
+          {
+            "connected": "binary_sensor.ts_phone_connected",
+            "expires": "sensor.ts_phone_expires",
+            "ip_address": "sensor.ts_phone_ip",
+            "last_seen": "sensor.ts_phone_last_seen",
+            "udp": "binary_sensor.ts_phone_udp",
+            "update": "binary_sensor.ts_phone_update"
+          },
+          {
+            "connected": "binary_sensor.ts_router_connected",
+            "expires": "sensor.ts_router_expires",
+            "ip_address": "sensor.ts_router_ip",
+            "last_seen": "sensor.ts_router_last_seen",
+            "udp": "binary_sensor.ts_router_udp",
+            "update": "binary_sensor.ts_router_update"
+          }
+        ]
+      }
+    },
+    "unifi-network": {
+      "*": {
+        "devices": ["sensor.ap_state", "sensor.gateway_state"],
+        "firmware": ["update.ap_firmware", "update.gateway_firmware"],
+        "latency": ["sensor.gateway_cloudflare", "sensor.gateway_google"],
+        "router": {
+          "cpu": "sensor.gateway_cpu",
+          "temperature": "sensor.gateway_cpu_temperature"
+        }
+      }
+    }
+  },
+  "tidy": {
+    "glances": {
+      "*": {
+        "batteries": ["sensor.desk_battery", "sensor.window_battery"],
+        "leaks": ["binary_sensor.kitchen_leak"],
+        "updates": ["update.plug_firmware"]
+      },
+      "kitchen": {
+        "batteries": ["sensor.desk_battery", "sensor.window_battery"],
+        "leaks": ["binary_sensor.kitchen_leak"],
+        "updates": ["update.plug_firmware"]
+      },
+      "living": {
+        "batteries": ["sensor.desk_battery", "sensor.window_battery"],
+        "leaks": ["binary_sensor.kitchen_leak"],
+        "updates": ["update.plug_firmware"]
+      },
+      "office": {
+        "batteries": ["sensor.desk_battery", "sensor.window_battery"],
+        "leaks": ["binary_sensor.kitchen_leak"],
+        "updates": ["update.plug_firmware"]
+      }
+    },
+    "home-assistant": {
+      "*": {
+        "all_firmware": ["update.plug_firmware"],
+        "room_firmware": [
+          {
+            "firmware": ["update.plug_firmware"],
+            "name": "Kitchen"
+          }
+        ]
+      },
+      "kitchen": {
+        "all_firmware": ["update.plug_firmware"],
+        "room_firmware": [
+          {
+            "firmware": ["update.plug_firmware"],
+            "name": "Kitchen"
+          }
+        ]
+      },
+      "living": {
+        "all_firmware": ["update.plug_firmware"],
+        "room_firmware": [
+          {
+            "firmware": ["update.plug_firmware"],
+            "name": "Kitchen"
+          }
+        ]
+      },
+      "office": {
+        "all_firmware": ["update.plug_firmware"],
+        "room_firmware": [
+          {
+            "firmware": ["update.plug_firmware"],
+            "name": "Kitchen"
+          }
+        ]
+      }
+    },
+    "person": {
+      "kitchen": {
+        "key": "kitchen"
+      },
+      "living": {
+        "key": "living"
+      },
+      "office": {
+        "key": "office"
+      }
+    },
+    "room": {
+      "kitchen": {
+        "icon": "mdi:fridge",
+        "key": "kitchen",
+        "leaks": ["binary_sensor.kitchen_leak"],
+        "name": "Kitchen",
+        "outlets": [
+          {
+            "entity": "switch.kettle"
+          }
+        ]
+      },
+      "living": {
+        "batteries": ["sensor.window_battery"],
+        "cameras": [
+          {
+            "entity": "camera.doorbell"
+          }
+        ],
+        "covers": [
+          {
+            "entity": "cover.blind"
+          }
+        ],
+        "door": "binary_sensor.living_door",
+        "heating": {
+          "entity": "climate.radiator"
+        },
+        "humidity": "sensor.living_humidity",
+        "icon": "mdi:sofa",
+        "key": "living",
+        "lights": {
+          "group": "light.living_group",
+          "members": [
+            {
+              "entity": "light.floor_lamp"
+            },
+            {
+              "entity": "light.strip"
+            }
+          ],
+          "scenes": ["scene.living_relax"]
+        },
+        "lock": "lock.front_door",
+        "media": [
+          {
+            "entity": "media_player.arc"
+          }
+        ],
+        "name": "Living",
+        "temperature": "sensor.living_temperature",
+        "window": "binary_sensor.living_window"
+      },
+      "office": {
+        "batteries": ["sensor.desk_battery"],
+        "humidity": "sensor.desk_humidity",
+        "key": "office",
+        "name": "Office",
+        "temperature": "sensor.desk_temperature"
+      }
+    },
+    "system-popup": {
+      "*": {
+        "all_firmware": ["update.plug_firmware"],
+        "room_firmware": [
+          {
+            "firmware": ["update.plug_firmware"],
+            "name": "Kitchen"
+          }
+        ]
+      },
+      "kitchen": {
+        "all_firmware": ["update.plug_firmware"],
+        "room_firmware": [
+          {
+            "firmware": ["update.plug_firmware"],
+            "name": "Kitchen"
+          }
+        ]
+      },
+      "living": {
+        "all_firmware": ["update.plug_firmware"],
+        "room_firmware": [
+          {
+            "firmware": ["update.plug_firmware"],
+            "name": "Kitchen"
+          }
+        ]
+      },
+      "office": {
+        "all_firmware": ["update.plug_firmware"],
+        "room_firmware": [
+          {
+            "firmware": ["update.plug_firmware"],
+            "name": "Kitchen"
+          }
+        ]
+      }
+    }
+  }
+}

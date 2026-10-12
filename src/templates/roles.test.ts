@@ -25,6 +25,7 @@ test('the shipped tiles are the templates no other template uses, pop-ups aside'
       'proxmox-server',
       'room',
       'section-heading',
+      'tailscale',
       'unifi-network',
     ],
   );

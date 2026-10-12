@@ -74,6 +74,18 @@ async function paint(failed: string, batteries: string[], calls: Call[] = []) {
   return mounted(made);
 }
 
+test('the glances are pills on the page: the card paints no surface, edge or divider of its own', () => {
+  const css = MnmlGlancesCard.styles
+    .flat()
+    .map((sheet) => ('cssText' in sheet ? sheet.cssText : ''))
+    .join('\n');
+  assert.match(css, /\.glances\.card\s*\{[^}]*background:\s*none/);
+  assert.match(css, /\.glances\.card\s*\{[^}]*box-shadow:\s*none/);
+  assert.match(css, /\.glances\.card\s*\{[^}]*overflow:\s*visible/);
+  assert.match(css, /\.glances\.card::after\s*\{[^}]*content:\s*none/);
+  assert.doesNotMatch(css, /border-left/, 'and no divider between the groups');
+});
+
 test('what does not need you is not drawn: no failed checks, no low battery', async () => {
   const root = await paint('0', []);
   assert.deepEqual(

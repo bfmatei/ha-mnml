@@ -41,11 +41,6 @@ export const SECTION_STYLE = css`
   .heading.fold:active .chevron {
     transform: scale(0.9);
   }
-  @media (hover: hover) {
-    .heading.fold:hover .chevron {
-      box-shadow: inset 0 0 0 999px var(--m-hover);
-    }
-  }
 `;
 
 export interface HeadingState {
