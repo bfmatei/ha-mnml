@@ -60,6 +60,8 @@ proxmox-server:
         warnings: { kind: entity }
         last_run: { kind: entity, required: true }
         overdue: { kind: entity, required: true }
+        run: { kind: entity }
+        stop: { kind: entity }
     notifications:
       kind: object
       group: Health
@@ -253,6 +255,8 @@ proxmox-popup:
         warnings: { kind: entity }
         last_run: { kind: entity, required: true }
         overdue: { kind: entity, required: true }
+        run: { kind: entity }
+        stop: { kind: entity }
     notifications:
       kind: object
       fields:
@@ -342,6 +346,21 @@ proxmox-popup:
             flag: true
             color: orange
             show: { is: ['on'] }
+      - id: checks-run
+        if: checks.run
+        type: custom:mnml-button-card
+        entity: '[[checks.run]]'
+        service: button.press
+      - id: checks-stop
+        if: checks.stop
+        type: custom:mnml-button-card
+        entity: '[[checks.stop]]'
+        service: button.press
+        visibility:
+          - id: checks-stop-shown
+            condition: state
+            entity: '[[checks.stop]]'
+            state_not: unavailable
       - id: checks-failures
         if: checks
         type: custom:mnml-report-card

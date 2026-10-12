@@ -198,6 +198,14 @@ export const TRAITS: Record<string, Trait> = {
     name: 'Window',
     device_class: 'window',
   },
+  'button.infrastructure_server_checks_run': {
+    icon: 'mdi:clipboard-play-outline',
+    name: 'Run checks',
+  },
+  'button.infrastructure_server_checks_stop': {
+    icon: 'mdi:clipboard-remove-outline',
+    name: 'Stop checks',
+  },
   'button.living_vacuum_dock_reset_strainer': {
     icon: 'mdi:filter',
     name: 'Reset strainer',

@@ -4,6 +4,7 @@ import { test } from 'vitest';
 
 import { DEMO } from '../../demo/home.ts';
 
+import type { Home } from './types.ts';
 import { build, drawn } from './view.ts';
 
 type Json = Record<string, unknown>;
@@ -67,7 +68,7 @@ test('every table row fills exactly the columns its card declares', () => {
 const SURFACE: Record<string, string> = {
   'custom:mnml-popups-card': 'open, popups, type, width',
   'custom:mnml-agenda-card': 'icon, sources, title, type',
-  'custom:mnml-button-card': 'entity, service, type',
+  'custom:mnml-button-card': 'entity, service, type, visibility',
   'custom:mnml-car-plan-card':
     'doors, hood, icon, sunroof, tailgate, title, type, tyre_low_share, tyre_targets, tyre_warn_share, tyres, windows',
   'custom:mnml-clients-card': 'entity, fold, names, networks, type',
@@ -164,4 +165,50 @@ test('the untitled outlook comes first, the titled sections in the order the hom
     DEMO.sections.people,
     undefined,
   ]);
+});
+
+function checksButtons(home: Home, suffix: string): Json[] {
+  const found: Json[] = [];
+  walk(drawn(home), (node) => {
+    if (
+      node['type'] === 'custom:mnml-button-card' &&
+      node['service'] === 'button.press' &&
+      typeof node['entity'] === 'string' &&
+      node['entity'].endsWith(suffix)
+    ) {
+      found.push(node);
+    }
+  });
+  return found;
+}
+
+test('the server and checks pop-ups draw a button that runs the checks only when the home gives one', () => {
+  assert.deepEqual(
+    checksButtons(DEMO, '_checks_run').map((node) => node['entity']),
+    ['button.infrastructure_server_checks_run', 'button.infrastructure_server_checks_run'],
+  );
+  const without = structuredClone(DEMO);
+  const checks = without.system.proxmox?.checks;
+  assert.ok(checks);
+  delete checks.run;
+  assert.deepEqual(checksButtons(without, '_checks_run'), []);
+});
+
+test('the same pop-ups draw a stop button that shows only while its entity is available', () => {
+  const stops = checksButtons(DEMO, '_checks_stop');
+  assert.equal(stops.length, 2);
+  for (const node of stops) {
+    assert.deepEqual(node['visibility'], [
+      {
+        condition: 'state',
+        entity: 'button.infrastructure_server_checks_stop',
+        state_not: 'unavailable',
+      },
+    ]);
+  }
+  const without = structuredClone(DEMO);
+  const checks = without.system.proxmox?.checks;
+  assert.ok(checks);
+  delete checks.stop;
+  assert.deepEqual(checksButtons(without, '_checks_stop'), []);
 });

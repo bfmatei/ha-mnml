@@ -348,6 +348,8 @@ export interface ServerChecks {
   warnings?: SensorId;
   lastRun: SensorId;
   overdue: BinarySensorId;
+  run?: ButtonId;
+  stop?: ButtonId;
 }
 
 export interface NotificationSource {

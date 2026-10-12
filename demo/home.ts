@@ -159,6 +159,8 @@ const SYSTEM: System = {
       warnings: 'sensor.infrastructure_server_checks_warnings',
       lastRun: 'sensor.infrastructure_server_checks_last_run',
       overdue: 'binary_sensor.infrastructure_server_checks_overdue',
+      run: 'button.infrastructure_server_checks_run',
+      stop: 'button.infrastructure_server_checks_stop',
     },
     notifications: {
       messages: 'sensor.infrastructure_proxmox_notifications',

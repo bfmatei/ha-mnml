@@ -1300,6 +1300,8 @@ A Proxmox VE server's tile, its CPU and memory, and its guests, checks, backups 
 | `checks.warnings`              | entity   |                     |          |
 | `checks.last_run`              | entity   | required            |          |
 | `checks.overdue`               | entity   | required            |          |
+| `checks.run`                   | entity   |                     |          |
+| `checks.stop`                  | entity   |                     |          |
 | `notifications`                | object   |                     |          |
 | `notifications.messages`       | entity   | required            |          |
 | `notifications.clear`          | entity   | required            |          |
@@ -1365,6 +1367,8 @@ The server's pop-up, its notifications, stopped guests, checks, host, disks, sto
 | `checks.warnings`              | entity   |                     |          |
 | `checks.last_run`              | entity   | required            |          |
 | `checks.overdue`               | entity   | required            |          |
+| `checks.run`                   | entity   |                     |          |
+| `checks.stop`                  | entity   |                     |          |
 | `notifications`                | object   |                     |          |
 | `notifications.messages`       | entity   | required            |          |
 | `notifications.clear`          | entity   |                     |          |
@@ -1659,6 +1663,8 @@ The strip of the home's overall statuses, one line across the section: the weath
 | `checks.warnings`     | entity   |                     |                                                                   |
 | `checks.last_run`     | entity   | required            |                                                                   |
 | `checks.overdue`      | entity   | required            |                                                                   |
+| `checks.run`          | entity   |                     |                                                                   |
+| `checks.stop`         | entity   |                     |                                                                   |
 | `batteries`           | entities |                     | domain sensor, device_class battery, anywhere in the home         |
 | `leaks`               | entities |                     | domain binary_sensor, device_class moisture, anywhere in the home |
 | `smoke`               | entities |                     | domain binary_sensor, device_class smoke, anywhere in the home    |
@@ -1691,6 +1697,8 @@ The daily checks: what failed, the warnings, when they last ran, and the details
 | `checks.warnings` | entity |                     |          |
 | `checks.last_run` | entity | required            |          |
 | `checks.overdue`  | entity | required            |          |
+| `checks.run`      | entity |                     |          |
+| `checks.stop`     | entity |                     |          |
 
 ### `batteries-popup`
 
