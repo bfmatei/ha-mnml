@@ -41,7 +41,7 @@ const SYSTEM: System = {
     'update.infrastructure_let_s_encrypt_update',
     'update.infrastructure_matter_server_update',
     'update.infrastructure_openthread_border_router_update',
-    'update.infrastructure_roborock_local_server_beta_update',
+    'update.infrastructure_roborock_local_server_update',
     'update.infrastructure_better_thermostat_update',
     'update.infrastructure_car_data_update',
     'update.infrastructure_hacs_update',

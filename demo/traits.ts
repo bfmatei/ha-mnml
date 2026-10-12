@@ -2814,8 +2814,8 @@ export const TRAITS: Record<string, Trait> = {
   'update.infrastructure_plex_update': {
     name: 'Plex',
   },
-  'update.infrastructure_roborock_local_server_beta_update': {
-    name: 'Roborock Local Server Beta',
+  'update.infrastructure_roborock_local_server_update': {
+    name: 'Roborock Local Server',
   },
   'update.infrastructure_router_firmware': {
     name: 'Router',
