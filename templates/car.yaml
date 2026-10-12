@@ -95,6 +95,7 @@ car:
         type: status
         name: Doors
         icon: mdi:car-door
+        silent: true
         rules:
           - id: lock
             if: lock
@@ -110,6 +111,7 @@ car:
         type: status
         name: Windows
         icon: mdi:car-windshield-outline
+        silent: true
         rules:
           - id: windows
             entities: ['[[windows]]', '[[sunroof]]']
@@ -120,24 +122,31 @@ car:
         type: status
         name: Alarm
         icon: mdi:shield-car
+        silent: true
         rules:
           - id: alarm-active
             if: alarm_active
             entities: ['[[alarm_active]]']
             color: red
-            is: ['on']
+            is: [on, unavailable]
           - id: alarm
             if: alarm
             entities: ['[[alarm]]']
             words: '[[alarm_words]]'
-            color: amber
-            not: '[[disarmed]]'
+            color: red
+            is: '[[disarmed]]'
+          - id: alarm-unavailable
+            if: alarm
+            entities: ['[[alarm]]']
+            color: red
+            is: [unavailable]
       - id: tyres
         type: tyres
         tyres: '[[tyres]]'
         targets: '[[tyre_targets]]'
         low_share: '[[tyre_low_share]]'
         warn_share: '[[tyre_warn_share]]'
+        silent: true
     grid_options: { columns: 12 }
   popups:
     - id: car-popup

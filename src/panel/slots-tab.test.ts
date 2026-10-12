@@ -4,6 +4,7 @@ import { render } from 'lit';
 import { test } from 'vitest';
 
 import type { Template } from '../contract/templates.ts';
+import { homes } from '../templates/corpus.ts';
 import { drawn } from '../test/render.ts';
 
 import { drawSlots } from './slots-tab.ts';
@@ -152,4 +153,78 @@ test('a choice shows the value the template holds after a redraw, even one the u
   kind.dispatchEvent(new Event('change'));
   draw();
   assert.equal(kind.value, 'text');
+});
+
+function messyHass(): SlotsActions['hass'] {
+  const registries = homes()['messy'];
+  assert.ok(registries);
+  return {
+    areas: registries.areas,
+    devices: registries.devices,
+    entities: registries.entities,
+    states: Object.fromEntries(
+      Object.entries(registries.states).map(([id, state]) => [
+        id,
+        { entity_id: id, state: 'on', ...state },
+      ]),
+    ),
+  } as unknown as SlotsActions['hass'];
+}
+
+test('trying a rule in an area explains the matches, the pick and what almost matched', () => {
+  const template: Template = {
+    slots: {
+      window: { kind: 'entity', discover: { domain: 'binary_sensor', device_class: 'window' } },
+      lock: { kind: 'entity', discover: { domain: 'lock' } },
+    },
+    card: { type: 'x' },
+  };
+  const box = drawn(
+    drawSlots(() => template, {
+      ...actions(() => {}),
+      hass: messyHass(),
+      areas: [{ value: 'den', label: 'Den' }],
+    }),
+  );
+  const traces = [...box.querySelectorAll('.trace')].map((trace) => trace.textContent ?? '');
+  assert.equal(traces.length, 2, 'each slot with a rule explains itself');
+  const [window, lock] = traces;
+  assert.match(
+    window ?? '',
+    /binary_sensor, device class window: 2 matches, took binary_sensor\.den_window_a/,
+  );
+  assert.match(window ?? '', /tied with binary_sensor\.den_window_b/);
+  assert.match(window ?? '', /binary_sensor\.den_vent has no device class/);
+  assert.match(lock ?? '', /no lock in Den/);
+});
+
+test('a rule with the newer filters is drawn as a sentence, and the rest can be added as words', () => {
+  const template: Template = {
+    slots: {
+      power: {
+        kind: 'entity',
+        discover: {
+          domain: 'sensor',
+          unit: 'W',
+          label: 'main',
+          exclude: { entity_category: 'diagnostic' },
+        },
+      },
+    },
+    card: { type: 'x' },
+  };
+  const box = drawn(
+    drawSlots(() => template, {
+      ...actions(() => {}),
+      hass: messyHass(),
+      areas: [{ value: 'den', label: 'Den' }],
+    }),
+  );
+  assert.equal(box.querySelector('.rule-yaml'), null, 'the form can draw it');
+  const text = box.querySelector('.finding')?.textContent ?? '';
+  assert.match(text, /with unit/);
+  assert.match(text, /labelled/);
+  for (const word of ['in the category', 'with state class', 'named like', 'made by', 'of model']) {
+    assert.ok(box.querySelector(`button[aria-label="Add: ${word}"]`), `${word} can be added`);
+  }
 });

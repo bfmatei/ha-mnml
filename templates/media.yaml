@@ -1,7 +1,11 @@
 media-server:
   description: A media server's tile, what is being watched, and its requests, downloads, health and update chips; it brings its pop-up. The parts are Plex, Jellyfin, Seerr, Radarr and Sonarr.
   slots:
-    streams: { kind: entity, required: true, help: 'The number of streams playing.' }
+    streams:
+      kind: entity
+      required: true
+      help: 'The number of streams playing.'
+      discover: { domain: sensor, platform: jellyfin, translation_key: watching, scope: all }
     more_streams:
       kind: entities
       label: Other media servers
@@ -9,11 +13,28 @@ media-server:
     update: { kind: entity }
     requests:
       kind: object
+      discover:
+        fields:
+          pending:
+            { domain: sensor, platform: overseerr, translation_key: pending_requests, scope: all }
+          processing:
+            {
+              domain: sensor,
+              platform: overseerr,
+              translation_key: processing_requests,
+              scope: all,
+            }
       fields:
         pending: { kind: entity, required: true }
         processing: { kind: entity, required: true }
     movies:
       kind: object
+      discover:
+        fields:
+          queue: { domain: sensor, platform: radarr, translation_key: queue, scope: all }
+          count: { domain: sensor, platform: radarr, translation_key: movies, scope: all }
+          health: { domain: binary_sensor, platform: radarr, translation_key: health, scope: all }
+          calendar: { domain: calendar, platform: radarr, scope: all }
       fields:
         queue: { kind: entity, required: true }
         count: { kind: entity, required: true }
@@ -22,6 +43,13 @@ media-server:
         calendar: { kind: entity }
     shows:
       kind: object
+      discover:
+        fields:
+          queue: { domain: sensor, platform: sonarr, translation_key: queue, scope: all }
+          count: { domain: sensor, platform: sonarr, translation_key: series, scope: all }
+          wanted: { domain: sensor, platform: sonarr, translation_key: wanted, scope: all }
+          upcoming: { domain: sensor, platform: sonarr, translation_key: upcoming, scope: all }
+          calendar: { domain: calendar, platform: sonarr, scope: all }
       fields:
         queue: { kind: entity, required: true }
         count: { kind: entity, required: true }
@@ -43,6 +71,7 @@ media-server:
         type: status
         name: Requests
         icon: mdi:account-clock-outline
+        silent: true
         rules:
           [
             {
@@ -57,6 +86,7 @@ media-server:
         type: status
         name: Downloads
         icon: mdi:download
+        silent: true
         rules:
           [
             {
@@ -72,6 +102,7 @@ media-server:
         type: status
         name: Health
         icon: mdi:heart-pulse
+        silent: true
         rules:
           [
             {
@@ -87,6 +118,7 @@ media-server:
         type: status
         name: Update
         icon: mdi:package-up
+        silent: true
         rules:
           [
             {

@@ -1,0 +1,580 @@
+{
+  "areas": {},
+  "devices": {
+    "jf": {
+      "area_id": null,
+      "id": "jf",
+      "name": "Jellyfin"
+    },
+    "pve_ct": {
+      "area_id": null,
+      "id": "pve_ct",
+      "name": "Torrents"
+    },
+    "pve_node": {
+      "area_id": null,
+      "id": "pve_node",
+      "name": "Server"
+    },
+    "pve_vm": {
+      "area_id": null,
+      "id": "pve_vm",
+      "name": "Router VM"
+    },
+    "ra": {
+      "area_id": null,
+      "id": "ra",
+      "name": "Radarr"
+    },
+    "so": {
+      "area_id": null,
+      "id": "so",
+      "name": "Sonarr"
+    },
+    "sr": {
+      "area_id": null,
+      "id": "sr",
+      "name": "Seerr"
+    },
+    "ts_phone": {
+      "area_id": null,
+      "id": "ts_phone",
+      "name": "Phone"
+    },
+    "ts_router": {
+      "area_id": null,
+      "id": "ts_router",
+      "name": "Router"
+    },
+    "uni_ap": {
+      "area_id": null,
+      "id": "uni_ap",
+      "name": "Access point"
+    },
+    "uni_router": {
+      "area_id": null,
+      "id": "uni_router",
+      "name": "Gateway"
+    }
+  },
+  "entities": {
+    "binary_sensor.radarr_health": {
+      "area_id": null,
+      "device_id": "ra",
+      "entity_category": "diagnostic",
+      "entity_id": "binary_sensor.radarr_health",
+      "platform": "radarr",
+      "translation_key": "health"
+    },
+    "binary_sensor.router_vm_status": {
+      "area_id": null,
+      "device_id": "pve_vm",
+      "entity_category": "diagnostic",
+      "entity_id": "binary_sensor.router_vm_status",
+      "platform": "proxmoxve",
+      "translation_key": "status"
+    },
+    "binary_sensor.server_backup_status": {
+      "area_id": null,
+      "device_id": "pve_node",
+      "entity_category": "diagnostic",
+      "entity_id": "binary_sensor.server_backup_status",
+      "platform": "proxmoxve",
+      "translation_key": "node_backup_status"
+    },
+    "binary_sensor.torrents_status": {
+      "area_id": null,
+      "device_id": "pve_ct",
+      "entity_category": "diagnostic",
+      "entity_id": "binary_sensor.torrents_status",
+      "platform": "proxmoxve",
+      "translation_key": "status"
+    },
+    "binary_sensor.ts_phone_connected": {
+      "area_id": null,
+      "device_id": "ts_phone",
+      "entity_category": null,
+      "entity_id": "binary_sensor.ts_phone_connected",
+      "platform": "tailscale",
+      "translation_key": "connected_to_control"
+    },
+    "binary_sensor.ts_phone_udp": {
+      "area_id": null,
+      "device_id": "ts_phone",
+      "entity_category": null,
+      "entity_id": "binary_sensor.ts_phone_udp",
+      "platform": "tailscale",
+      "translation_key": "client_supports_udp"
+    },
+    "binary_sensor.ts_phone_update": {
+      "area_id": null,
+      "device_id": "ts_phone",
+      "entity_category": null,
+      "entity_id": "binary_sensor.ts_phone_update",
+      "platform": "tailscale",
+      "translation_key": "client"
+    },
+    "binary_sensor.ts_router_connected": {
+      "area_id": null,
+      "device_id": "ts_router",
+      "entity_category": null,
+      "entity_id": "binary_sensor.ts_router_connected",
+      "platform": "tailscale",
+      "translation_key": "connected_to_control"
+    },
+    "binary_sensor.ts_router_udp": {
+      "area_id": null,
+      "device_id": "ts_router",
+      "entity_category": null,
+      "entity_id": "binary_sensor.ts_router_udp",
+      "platform": "tailscale",
+      "translation_key": "client_supports_udp"
+    },
+    "binary_sensor.ts_router_update": {
+      "area_id": null,
+      "device_id": "ts_router",
+      "entity_category": null,
+      "entity_id": "binary_sensor.ts_router_update",
+      "platform": "tailscale",
+      "translation_key": "client"
+    },
+    "calendar.radarr": {
+      "area_id": null,
+      "device_id": "ra",
+      "entity_category": null,
+      "entity_id": "calendar.radarr",
+      "platform": "radarr",
+      "translation_key": null
+    },
+    "calendar.sonarr": {
+      "area_id": null,
+      "device_id": "so",
+      "entity_category": null,
+      "entity_id": "calendar.sonarr",
+      "platform": "sonarr",
+      "translation_key": null
+    },
+    "sensor.ap_state": {
+      "area_id": null,
+      "device_id": "uni_ap",
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.ap_state",
+      "platform": "unifi",
+      "translation_key": "device_state"
+    },
+    "sensor.gateway_cloudflare": {
+      "area_id": null,
+      "device_id": "uni_router",
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.gateway_cloudflare",
+      "platform": "unifi",
+      "translation_key": "wan_latency"
+    },
+    "sensor.gateway_cpu": {
+      "area_id": null,
+      "device_id": "uni_router",
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.gateway_cpu",
+      "platform": "unifi",
+      "translation_key": "device_cpu_utilization"
+    },
+    "sensor.gateway_cpu_temperature": {
+      "area_id": null,
+      "device_id": "uni_router",
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.gateway_cpu_temperature",
+      "platform": "unifi",
+      "translation_key": "device_sub_temperature"
+    },
+    "sensor.gateway_google": {
+      "area_id": null,
+      "device_id": "uni_router",
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.gateway_google",
+      "platform": "unifi",
+      "translation_key": "wan_latency"
+    },
+    "sensor.gateway_state": {
+      "area_id": null,
+      "device_id": "uni_router",
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.gateway_state",
+      "platform": "unifi",
+      "translation_key": "device_state"
+    },
+    "sensor.jellyfin_clients": {
+      "area_id": null,
+      "device_id": "jf",
+      "entity_category": null,
+      "entity_id": "sensor.jellyfin_clients",
+      "platform": "jellyfin",
+      "translation_key": "watching"
+    },
+    "sensor.radarr_movies": {
+      "area_id": null,
+      "device_id": "ra",
+      "entity_category": null,
+      "entity_id": "sensor.radarr_movies",
+      "platform": "radarr",
+      "translation_key": "movies"
+    },
+    "sensor.radarr_queue": {
+      "area_id": null,
+      "device_id": "ra",
+      "entity_category": null,
+      "entity_id": "sensor.radarr_queue",
+      "platform": "radarr",
+      "translation_key": "queue"
+    },
+    "sensor.router_vm_cpu": {
+      "area_id": null,
+      "device_id": "pve_vm",
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.router_vm_cpu",
+      "platform": "proxmoxve",
+      "translation_key": "vm_cpu"
+    },
+    "sensor.router_vm_memory": {
+      "area_id": null,
+      "device_id": "pve_vm",
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.router_vm_memory",
+      "platform": "proxmoxve",
+      "translation_key": "vm_memory_percentage"
+    },
+    "sensor.seerr_pending": {
+      "area_id": null,
+      "device_id": "sr",
+      "entity_category": null,
+      "entity_id": "sensor.seerr_pending",
+      "platform": "overseerr",
+      "translation_key": "pending_requests"
+    },
+    "sensor.seerr_processing": {
+      "area_id": null,
+      "device_id": "sr",
+      "entity_category": null,
+      "entity_id": "sensor.seerr_processing",
+      "platform": "overseerr",
+      "translation_key": "processing_requests"
+    },
+    "sensor.server_boot": {
+      "area_id": null,
+      "device_id": "pve_node",
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.server_boot",
+      "platform": "proxmoxve",
+      "translation_key": "node_uptime"
+    },
+    "sensor.server_cpu": {
+      "area_id": null,
+      "device_id": "pve_node",
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.server_cpu",
+      "platform": "proxmoxve",
+      "translation_key": "node_cpu"
+    },
+    "sensor.server_last_backup": {
+      "area_id": null,
+      "device_id": "pve_node",
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.server_last_backup",
+      "platform": "proxmoxve",
+      "translation_key": "node_backup_last_backup"
+    },
+    "sensor.server_memory": {
+      "area_id": null,
+      "device_id": "pve_node",
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.server_memory",
+      "platform": "proxmoxve",
+      "translation_key": "node_memory_percentage"
+    },
+    "sensor.sonarr_queue": {
+      "area_id": null,
+      "device_id": "so",
+      "entity_category": null,
+      "entity_id": "sensor.sonarr_queue",
+      "platform": "sonarr",
+      "translation_key": "queue"
+    },
+    "sensor.sonarr_shows": {
+      "area_id": null,
+      "device_id": "so",
+      "entity_category": null,
+      "entity_id": "sensor.sonarr_shows",
+      "platform": "sonarr",
+      "translation_key": "series"
+    },
+    "sensor.sonarr_upcoming": {
+      "area_id": null,
+      "device_id": "so",
+      "entity_category": null,
+      "entity_id": "sensor.sonarr_upcoming",
+      "platform": "sonarr",
+      "translation_key": "upcoming"
+    },
+    "sensor.sonarr_wanted": {
+      "area_id": null,
+      "device_id": "so",
+      "entity_category": null,
+      "entity_id": "sensor.sonarr_wanted",
+      "platform": "sonarr",
+      "translation_key": "wanted"
+    },
+    "sensor.torrents_cpu": {
+      "area_id": null,
+      "device_id": "pve_ct",
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.torrents_cpu",
+      "platform": "proxmoxve",
+      "translation_key": "container_cpu"
+    },
+    "sensor.torrents_memory": {
+      "area_id": null,
+      "device_id": "pve_ct",
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.torrents_memory",
+      "platform": "proxmoxve",
+      "translation_key": "container_memory_percentage"
+    },
+    "sensor.ts_phone_expires": {
+      "area_id": null,
+      "device_id": "ts_phone",
+      "entity_category": null,
+      "entity_id": "sensor.ts_phone_expires",
+      "platform": "tailscale",
+      "translation_key": "expires"
+    },
+    "sensor.ts_phone_ip": {
+      "area_id": null,
+      "device_id": "ts_phone",
+      "entity_category": null,
+      "entity_id": "sensor.ts_phone_ip",
+      "platform": "tailscale",
+      "translation_key": "ip"
+    },
+    "sensor.ts_phone_last_seen": {
+      "area_id": null,
+      "device_id": "ts_phone",
+      "entity_category": null,
+      "entity_id": "sensor.ts_phone_last_seen",
+      "platform": "tailscale",
+      "translation_key": "last_seen"
+    },
+    "sensor.ts_router_expires": {
+      "area_id": null,
+      "device_id": "ts_router",
+      "entity_category": null,
+      "entity_id": "sensor.ts_router_expires",
+      "platform": "tailscale",
+      "translation_key": "expires"
+    },
+    "sensor.ts_router_ip": {
+      "area_id": null,
+      "device_id": "ts_router",
+      "entity_category": null,
+      "entity_id": "sensor.ts_router_ip",
+      "platform": "tailscale",
+      "translation_key": "ip"
+    },
+    "sensor.ts_router_last_seen": {
+      "area_id": null,
+      "device_id": "ts_router",
+      "entity_category": null,
+      "entity_id": "sensor.ts_router_last_seen",
+      "platform": "tailscale",
+      "translation_key": "last_seen"
+    },
+    "update.ap_firmware": {
+      "area_id": null,
+      "device_id": "uni_ap",
+      "entity_category": "config",
+      "entity_id": "update.ap_firmware",
+      "platform": "unifi",
+      "translation_key": null
+    },
+    "update.gateway_firmware": {
+      "area_id": null,
+      "device_id": "uni_router",
+      "entity_category": "config",
+      "entity_id": "update.gateway_firmware",
+      "platform": "unifi",
+      "translation_key": null
+    }
+  },
+  "states": {
+    "binary_sensor.radarr_health": {
+      "attributes": {},
+      "state": "1"
+    },
+    "binary_sensor.router_vm_status": {
+      "attributes": {},
+      "state": "1"
+    },
+    "binary_sensor.server_backup_status": {
+      "attributes": {},
+      "state": "1"
+    },
+    "binary_sensor.torrents_status": {
+      "attributes": {},
+      "state": "1"
+    },
+    "binary_sensor.ts_phone_connected": {
+      "attributes": {},
+      "state": "on"
+    },
+    "binary_sensor.ts_phone_udp": {
+      "attributes": {},
+      "state": "on"
+    },
+    "binary_sensor.ts_phone_update": {
+      "attributes": {},
+      "state": "on"
+    },
+    "binary_sensor.ts_router_connected": {
+      "attributes": {},
+      "state": "on"
+    },
+    "binary_sensor.ts_router_udp": {
+      "attributes": {},
+      "state": "on"
+    },
+    "binary_sensor.ts_router_update": {
+      "attributes": {},
+      "state": "on"
+    },
+    "calendar.radarr": {
+      "attributes": {},
+      "state": "1"
+    },
+    "calendar.sonarr": {
+      "attributes": {},
+      "state": "1"
+    },
+    "sensor.ap_state": {
+      "attributes": {},
+      "state": "connected"
+    },
+    "sensor.gateway_cloudflare": {
+      "attributes": {},
+      "state": "1"
+    },
+    "sensor.gateway_cpu": {
+      "attributes": {},
+      "state": "1"
+    },
+    "sensor.gateway_cpu_temperature": {
+      "attributes": {},
+      "state": "1"
+    },
+    "sensor.gateway_google": {
+      "attributes": {},
+      "state": "1"
+    },
+    "sensor.gateway_state": {
+      "attributes": {},
+      "state": "connected"
+    },
+    "sensor.jellyfin_clients": {
+      "attributes": {},
+      "state": "1"
+    },
+    "sensor.radarr_movies": {
+      "attributes": {},
+      "state": "1"
+    },
+    "sensor.radarr_queue": {
+      "attributes": {},
+      "state": "1"
+    },
+    "sensor.router_vm_cpu": {
+      "attributes": {},
+      "state": "1"
+    },
+    "sensor.router_vm_memory": {
+      "attributes": {},
+      "state": "1"
+    },
+    "sensor.seerr_pending": {
+      "attributes": {},
+      "state": "1"
+    },
+    "sensor.seerr_processing": {
+      "attributes": {},
+      "state": "1"
+    },
+    "sensor.server_boot": {
+      "attributes": {},
+      "state": "1"
+    },
+    "sensor.server_cpu": {
+      "attributes": {},
+      "state": "1"
+    },
+    "sensor.server_last_backup": {
+      "attributes": {},
+      "state": "1"
+    },
+    "sensor.server_memory": {
+      "attributes": {},
+      "state": "1"
+    },
+    "sensor.sonarr_queue": {
+      "attributes": {},
+      "state": "1"
+    },
+    "sensor.sonarr_shows": {
+      "attributes": {},
+      "state": "1"
+    },
+    "sensor.sonarr_upcoming": {
+      "attributes": {},
+      "state": "1"
+    },
+    "sensor.sonarr_wanted": {
+      "attributes": {},
+      "state": "1"
+    },
+    "sensor.torrents_cpu": {
+      "attributes": {},
+      "state": "1"
+    },
+    "sensor.torrents_memory": {
+      "attributes": {},
+      "state": "1"
+    },
+    "sensor.ts_phone_expires": {
+      "attributes": {},
+      "state": "on"
+    },
+    "sensor.ts_phone_ip": {
+      "attributes": {},
+      "state": "on"
+    },
+    "sensor.ts_phone_last_seen": {
+      "attributes": {},
+      "state": "on"
+    },
+    "sensor.ts_router_expires": {
+      "attributes": {},
+      "state": "on"
+    },
+    "sensor.ts_router_ip": {
+      "attributes": {},
+      "state": "on"
+    },
+    "sensor.ts_router_last_seen": {
+      "attributes": {},
+      "state": "on"
+    },
+    "update.ap_firmware": {
+      "attributes": {},
+      "state": "1"
+    },
+    "update.gateway_firmware": {
+      "attributes": {},
+      "state": "1"
+    }
+  }
+}

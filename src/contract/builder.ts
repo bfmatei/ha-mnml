@@ -101,6 +101,7 @@ export const SYSTEM_TEMPLATES: readonly string[] = [
   'home-assistant',
   'proxmox-server',
   'unifi-network',
+  'tailscale',
   'adguard',
   'media-server',
 ];
@@ -109,6 +110,7 @@ export const SYSTEM_NAMES: Readonly<Record<string, string>> = {
   'home-assistant': 'Home Assistant',
   'proxmox-server': 'Proxmox VE server',
   'unifi-network': 'UniFi network',
+  tailscale: 'Tailscale',
   adguard: 'AdGuard Home',
   'media-server': 'Media server',
 };

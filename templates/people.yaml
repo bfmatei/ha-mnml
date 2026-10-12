@@ -53,6 +53,7 @@ person:
         type: status
         name: Driving
         icon: mdi:steering
+        silent: true
         rules:
           [
             {
@@ -68,6 +69,7 @@ person:
         type: status
         name: Do not disturb
         icon: mdi:moon-waning-crescent
+        silent: true
         rules: [{ id: focuses, if: focuses, entities: ['[[focuses]]'], color: amber, is: ['on'] }]
       - id: batteries
         if: batteries

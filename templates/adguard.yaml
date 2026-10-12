@@ -64,6 +64,7 @@ adguard:
         type: status
         name: Update
         icon: mdi:package-up
+        silent: true
         rules:
           [
             {

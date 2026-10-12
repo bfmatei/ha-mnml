@@ -25,30 +25,31 @@ A list of entries, printed with `•` between them:
 | `entity`                      | the entity's state, as Home Assistant words it |
 | `entity`, `attribute: <name>` | an attribute's value                           |
 | `entity`, `minutes: true`     | a counter of seconds, in minutes               |
+| `entity`, `relative: true`    | a timestamp, as a relative time (3 hours ago)  |
 | `entity`, `serial: true`      | the serial number of the entity's device       |
 | `entity`, `name: true`        | the entity's name                              |
 | `text: <words>`               | the words                                      |
 
-In a card that has an entity of its own (an item, a header, a tile), an entry's `entity` may be left out. `icon: true` puts the entity's icon in front of a state, an attribute or minutes. Every entry takes `when`, an entity rule, and is printed only while it holds.
+In a card that has an entity of its own (an item, a header, a tile), an entry's `entity` may be left out. `icon: true` puts the entity's icon in front of a state, an attribute, minutes or a relative time. Every entry takes `when`, an entity rule, and is printed only while it holds.
 
 ### Controls (`controls`, `chips`)
 
 A list of controls, each with a `type`:
 
-| `type`      | Required                                                          | Optional                                                     |
-| ----------- | ----------------------------------------------------------------- | ------------------------------------------------------------ |
-| `toggle`    | `entity`                                                          | `icon`, `color`, `when`, `primary`                           |
-| `slider`    | `entity`, `slider` (a kind, below), `name`, `icon`                | `color`                                                      |
-| `select`    | `entity` (a `select` or a `climate`)                              | `attribute` (a mode list, below), `color`, `when`, `primary` |
-| `service`   | `entity`, `service` (`domain.service`), `name`, `icon`            | `primary`                                                    |
-| `nav`       | `entity`, `popup`                                                 | `color`, `when`                                              |
-| `indicator` | `entity`, `color`                                                 |                                                              |
-| `status`    | `name`, `icon`, `silent`, `rules`                                 |                                                              |
-| `tyres`     | `tyres`, `targets` (four sensors each), `low_share`, `warn_share` |                                                              |
-| `scenes`    | `scenes` (scene entities), `name`, `icon`                         | `active_scene` (a select whose state names the active scene) |
+| `type`      | Required                                                                    | Optional                                                     |
+| ----------- | --------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `toggle`    | `entity`                                                                    | `icon`, `color`, `when`, `primary`                           |
+| `slider`    | `entity`, `slider` (a kind, below), `name`, `icon`                          | `color`                                                      |
+| `select`    | `entity` (a `select` or a `climate`)                                        | `attribute` (a mode list, below), `color`, `when`, `primary` |
+| `service`   | `entity`, `service` (`domain.service`), `name`, `icon`                      | `primary`                                                    |
+| `nav`       | `entity`, `popup`                                                           | `color`, `when`                                              |
+| `indicator` | `entity`, `color`                                                           |                                                              |
+| `status`    | `name`, `icon`, `silent`, `rules`                                           |                                                              |
+| `tyres`     | `tyres`, `targets` (four sensors each), `low_share`, `warn_share`, `silent` |                                                              |
+| `scenes`    | `scenes` (scene entities), `name`, `icon`                                   | `active_scene` (a select whose state names the active scene) |
 
 - Every control takes `show`. `primary: true` marks the control as the card's main one: brighter than the others, and filled in a tile chip.
-- A `status` control's `rules` are tried in order, and the first that any of its `entities` matches colours it. Each rule has `entities`, `color` and `is`, `not` or `below` (the entities under a number), and may add `label: device` and `words` for the tooltip. A `silent` status control is drawn only while a rule holds or an entity is unavailable.
+- A `status` control's `rules` are tried in order, and the first that any of its `entities` matches colours it. Each rule has `entities`, `color` and `is`, `not`, `below` (the entities under a number) or `within_days` (the entities whose state is a timestamp that many days off or less, or already past, which flags a key about to expire), and may add `label: device` and `words` for the tooltip. An unavailable entity is orange, unless a rule's `is` names `unavailable`, which gives it that rule's colour. A `silent` status control is drawn only while a rule holds or an entity is unavailable, and so is a `silent` tyres control, only while a tyre is dropping or low or a sensor is unavailable.
 - Four sensors are listed front left, front right, rear left, rear right. A tyre is orange under `warn_share` of its target and red under `low_share`.
 - The slider kinds are `brightness`, `color_temp` and `hue` for a light, `temperature` for a climate unit, `value` for a `number` or `input_number`, `volume` for a media player, `position` for a cover, `percentage` for a fan, and `humidity` for a humidifier.
 - The mode lists are `hvac_modes`, `preset_modes`, `fan_modes`, `swing_modes` and `swing_horizontal_modes`.

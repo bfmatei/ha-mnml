@@ -27,7 +27,16 @@ const GLANCES_STYLE = css`
     flex-wrap: wrap;
     align-items: center;
     gap: 4px 6px;
-    padding: 4px 6px;
+  }
+  .glances.card {
+    overflow: visible;
+    background: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: none;
+  }
+  .glances.card::after {
+    content: none;
   }
   .group {
     display: flex;
@@ -37,10 +46,6 @@ const GLANCES_STYLE = css`
   }
   .group.problems {
     margin-left: auto;
-  }
-  .group.calm + .group.problems {
-    padding-left: 8px;
-    border-left: 1px solid color-mix(in srgb, var(--primary-text-color) 14%, transparent);
   }
   .glance {
     display: flex;
@@ -57,7 +62,7 @@ const GLANCES_STYLE = css`
     -webkit-tap-highlight-color: transparent;
   }
   .calm .glance {
-    background: color-mix(in srgb, var(--m-pill) 55%, transparent);
+    background: color-mix(in srgb, var(--m-pill) 80%, transparent);
     box-shadow: none;
     color: var(--secondary-text-color);
   }
@@ -133,22 +138,13 @@ const GLANCES_STYLE = css`
     .group.problems {
       margin-left: 0;
     }
-    .group.calm + .group.problems {
-      padding-left: 0;
-      border-left: 0;
-    }
     .glance {
       gap: 6px;
       padding: 0 8px 0 7px;
     }
   }
-  @media (hover: hover) {
-    .glance.link:hover {
-      background-image: linear-gradient(var(--m-hover), var(--m-hover));
-    }
-  }
-  .glance.link:active {
-    background-image: linear-gradient(var(--m-hover), var(--m-hover));
+  .glance.link:active::before {
+    opacity: 1;
   }
 `;
 

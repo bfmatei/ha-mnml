@@ -14,8 +14,9 @@ import { icon, quietly } from '../ha/templates.ts';
 import { SHIPPED_TEMPLATES } from '../store/shipped.ts';
 import { onShared, resolvedTemplates, sharedTemplates } from '../store/store.ts';
 import type { SharedState } from '../store/store.ts';
-import { discover } from '../templates/discover.ts';
 import { filled, toValue } from '../templates/expand.ts';
+import { explain } from '../templates/explain.ts';
+import type { Trace } from '../templates/explain.ts';
 import { OWNER } from '../templates/families.ts';
 import { rolesOf } from '../templates/roles.ts';
 
@@ -58,6 +59,7 @@ const AREA_SCHEMA: readonly FormItem[] = [{ name: 'area', required: true, select
 interface Origin {
   readonly source: Source;
   readonly found: Readonly<Record<string, Value>>;
+  readonly traces: Readonly<Record<string, Trace>>;
   readonly own: Readonly<Record<string, Value>>;
   readonly where: string;
 }
@@ -422,11 +424,11 @@ export class MnmlTemplateCardEditor extends LitElement {
     });
   }
 
-  private foundFor(template: Template, area: string | undefined): Record<string, Value> {
+  private tracesFor(template: Template, area: string | undefined): Record<string, Trace> {
     const hass = this.hass;
     return hass === undefined
       ? {}
-      : discover(template, area === '' ? undefined : area, {
+      : explain(template, area === '' ? undefined : area, {
           areas: hass.areas,
           devices: hass.devices,
           entities: hass.entities,
@@ -434,17 +436,30 @@ export class MnmlTemplateCardEditor extends LitElement {
         });
   }
 
+  private foundFor(template: Template, area: string | undefined): Record<string, Value> {
+    return Object.fromEntries(
+      Object.entries(this.tracesFor(template, area)).flatMap(([name, trace]) =>
+        trace.value === undefined ? [] : [[name, trace.value]],
+      ),
+    );
+  }
+
   private origin(template: Template): Origin {
     const source = this.pendingArea ? 'area' : sourceOf(this.config);
     const area = typeof this.config['area'] === 'string' ? this.config['area'] : undefined;
     const placeless = source === 'area' && (area === undefined || area === '');
-    const found =
+    const traces =
       source === 'yourself' || placeless
         ? {}
-        : this.foundFor(template, source === 'home' ? undefined : area);
+        : this.tracesFor(template, source === 'home' ? undefined : area);
+    const found = Object.fromEntries(
+      Object.entries(traces).flatMap(([name, trace]) =>
+        trace.value === undefined ? [] : [[name, trace.value]],
+      ),
+    );
     const own = isMapping(this.config['slots']) ? this.config['slots'] : {};
     const where = area === undefined || area === '' ? '' : (this.hass?.areas[area]?.name ?? area);
-    return { source, found, own, where };
+    return { source, found, traces, own, where };
   }
 
   private chosen(name: string, template: Template): TemplateResult {
@@ -644,6 +659,7 @@ export class MnmlTemplateCardEditor extends LitElement {
         );
       }
     }
+    drawn.push(...this.alternatives(names, template.slots ?? {}, slot, origin));
     if (origin.source === 'area') {
       const back = 'Use what the area found';
       drawn.push(
@@ -671,6 +687,43 @@ export class MnmlTemplateCardEditor extends LitElement {
       );
     }
     return drawn;
+  }
+
+  private alternatives(
+    names: readonly string[],
+    specs: Readonly<Record<string, SlotSpec>>,
+    slot: Slot,
+    origin: Origin,
+  ): TemplateResult[] {
+    return names.flatMap((name) => {
+      const tied = origin.traces[name]?.steps.find((step) => step.tied !== undefined)?.tied;
+      if (tied === undefined) {
+        return [];
+      }
+      const using = Object.hasOwn(origin.own, name) ? origin.own[name] : origin.found[name];
+      return [
+        html`<div class="alternatives" role="group" aria-label=${`${name} choices`}>
+          <span class="alt-note"
+            >${slotLabel(name, specs[name] ?? { kind: 'entity' })}: ${tied.length} fit equally. Pick
+            one:</span
+          >
+          ${tied.map(
+            (id) =>
+              html`<button
+                type="button"
+                class="alt"
+                aria-label=${`Use ${id}`}
+                aria-pressed=${String(id === using)}
+                @click=${quietly(() => {
+                  slot.set({ ...slot.get(), [name]: id }, true);
+                })}
+              >
+                ${id}
+              </button>`,
+          )}
+        </div>`,
+      ];
+    });
   }
 
   private slotsForm(

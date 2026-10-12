@@ -55,6 +55,12 @@ export const STATE_ITEM = marked(
       icon: flag(),
       when: rule(true),
     }),
+    relative: plain<Extract<StateItem, { relative: true }>>('state-relative', 'Relative time', {
+      entity: entity(),
+      relative: need(flag()),
+      icon: flag(),
+      when: rule(true),
+    }),
     serial: plain<Extract<StateItem, { serial: true }>>('state-serial', 'Serial', {
       entity: entity(),
       serial: need(flag()),
@@ -69,7 +75,14 @@ export const STATE_ITEM = marked(
   plain<
     Extract<
       StateItem,
-      { text?: never; attribute?: never; minutes?: never; serial?: never; name?: never }
+      {
+        text?: never;
+        attribute?: never;
+        minutes?: never;
+        relative?: never;
+        serial?: never;
+        name?: never;
+      }
     >
   >('state-value', 'Value', { entity: entity(), icon: flag(), when: rule(true) }),
 );
@@ -85,6 +98,7 @@ const STATUS_RULE = plain<Extract<Control, { type: 'status' }>['rules'][number]>
     is: texts(),
     not: texts(),
     below: number(),
+    within_days: number(),
   },
 );
 
@@ -145,6 +159,7 @@ export const CONTROL = tagged<Control>('control', 'Control', {
     targets: need(corners(['sensor'])),
     low_share: need(share()),
     warn_share: need(share()),
+    silent: flag(),
     show: rule(true),
   }),
   scenes: plain<Extract<Control, { type: 'scenes' }>>('control-scenes', 'Scenes', {

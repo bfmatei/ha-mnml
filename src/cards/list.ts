@@ -68,11 +68,6 @@ const LIST_STYLE = css`
   .reset:active {
     transform: scale(0.9);
   }
-  @media (hover: hover) {
-    .reset:hover {
-      box-shadow: inset 0 0 0 999px var(--m-hover);
-    }
-  }
   .grid.table {
     grid-template-columns: 20px minmax(0, 1fr) repeat(var(--values), auto);
   }

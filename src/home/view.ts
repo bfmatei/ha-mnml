@@ -12,6 +12,7 @@ import {
   roomSlots,
   snake,
   systemSlots,
+  tailscaleSlots,
 } from './slots.ts';
 import type { Card, Dashboard, Home, SectionName } from './types.ts';
 
@@ -42,11 +43,12 @@ export function build(home: Home): Dashboard {
     ...home.cars.map((car) => instance('car', snake(car))),
   ];
 
-  const { proxmox, adguard, network, media } = home.system;
+  const { proxmox, adguard, network, tailscale, media } = home.system;
   const infrastructure: Card[] = [
     instance('section-heading', headingSlots(home.sections.infrastructure, 'mdi:server-network')),
     ...(proxmox ? [instance('proxmox-server', proxmoxSlots(proxmox))] : []),
     ...(network ? [instance('unifi-network', snake(network))] : []),
+    ...(tailscale ? [instance('tailscale', tailscaleSlots(tailscale))] : []),
     ...(adguard ? [instance('adguard', snake(adguard))] : []),
     instance('home-assistant', systemSlots(home.system, home.rooms)),
     ...(media ? [instance('media-server', snake(media))] : []),

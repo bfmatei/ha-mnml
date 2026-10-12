@@ -124,11 +124,35 @@ A part's id, once released, stays: `src/templates/ids.json` lists every released
 A slot's `discover:` rule runs in the browser on Home Assistant's areas, devices, entities and states:
 
 - `area.name`, `area.icon`, `area.id`, `area.temperature`, `area.humidity`: the area's own values, the last two the sensors chosen in its settings.
-- A filter with any of `domain`, `device_class`, `platform` (the integration) and `translation_key`. An entity is in the area when its own area is the area, or when it has none and its device's is; hidden entities are skipped. An `entity` slot takes the first match by entity id, an entity without a category before a diagnostic or configuration one; an `entities` slot takes every match.
+- A filter with any of these keys, all of which must hold:
+
+  | Key               | Holds when                                                                  |
+  | ----------------- | --------------------------------------------------------------------------- |
+  | `domain`          | the entity id starts with it (`light`)                                      |
+  | `device_class`    | the state's `device_class` is it                                            |
+  | `platform`        | the entity comes from that integration                                      |
+  | `translation_key` | the integration's own kind of entity (`protection`, `connected_to_control`) |
+  | `entity_category` | `none` (a primary entity), `diagnostic` or `config`                         |
+  | `unit`            | the state's `unit_of_measurement` is it (`W`)                               |
+  | `state_class`     | the state's `state_class` is it (`measurement`, `total_increasing`)         |
+  | `name`            | every word is in the entity's friendly name, in any case and any order      |
+  | `manufacturer`    | the device's manufacturer contains it, in any case                          |
+  | `model`           | the device's model contains it, in any case                                 |
+  | `label`           | the entity, or its device, has that Home Assistant label (by its id)        |
+  | `exclude`         | the entity does not match the filter inside it                              |
+
+  An entity is in the area when its own area is the area, or when it has none and its device's is; hidden entities are skipped. An `entity` slot ranks its matches and takes the best: a primary entity before a diagnostic or configuration one, then one with a usable state before one whose state is `unknown` or `unavailable` before one with no state at all, then one without a name of its own (the main entity of its device) before one with, then the lowest entity id. When the best are alike on all of that, the slot has a _tie_: the trace lists them, and the card editor offers them as choices. An `entities` slot takes every match, in the order of their ids.
+
 - A list of rules is tried in order, the first that finds something winning.
 - `fields:` fills an `object` slot field by field.
 - `per: device` fills an `objects` slot with one object per device that has a match (`where:`), in the order of the devices' names, each field found within that device; an entity without a device, such as a group or a template helper, is in no device's object. `per: area` gives one per area. `scope: all` searches the whole home rather than the area.
 - Without an area, the area values and the rules over the area find nothing; only `scope: all` rules run.
+
+**The system tiles find their own entities.** `tailscale`, `unifi-network`, `proxmox-server` and `media-server` have `scope: all` rules on the integration's `platform` and `translation_key`: a tile placed with no `area` and no `slots` is filled from the home. What the integrations do not expose stays unfilled and is set in `slots`: which Tailscale devices are `essential`, the UniFi `wifi` and `clients`, the Proxmox outlet, storage, disks and checks, and the Radarr free space, which has no translation key.
+
+**Labels steer discovery.** An entity, or its device, that carries the Home Assistant label `mnml_<slot>` is that slot's value, ahead of any rule: label a window sensor `mnml_window` and it is the `window` of its room, whatever the rule would have picked; label several entities `mnml_batteries` and an `entities` slot takes them all. The label is looked for in the area, or in the whole home when the template has no area. It applies to `entity` and `entities` slots, and leaves a slot's own rules for the others. This is the way for someone who does not edit templates to say "this one" in Home Assistant itself.
+
+**Explaining.** `explain(template, area, registries)` (`src/templates/explain.ts`) returns, for every slot with a rule, the value `discover()` gives and the steps behind it, from the same code, so the two cannot differ (`explain.test.ts` checks that for every template, area and home of the corpus). A step is one rule tried: the rule in words, the entities that matched, the ones taken, and up to five that nearly matched, each with its reason ("has no device class", "has device class battery, not window"). A slot that ends up empty says why: nothing of that kind in the area, or where it found one in another area. The panel's slot editor shows it under "Try it in", and the card editor of a template card offers the tied candidates of a slot under its fields ("Temperature: 2 fit equally. Pick one"), the one in use marked; picking one writes it into the card's `slots`, where it stays whatever the registries do, and "Use what the area found" gives it back.
 
 The same registries always give the same values; the card discovers again when Home Assistant replaces its registries, not on a state change. A rule that finds nothing leaves its slot unfilled.
 
@@ -193,6 +217,17 @@ A coloured chip that opens a pop-up.
 | `popup`  | text                            | required            |          |
 | `color`  | text                            | required            |          |
 | `when`   | object, as the control's `when` |                     |          |
+
+### `checks-actions`
+
+The daily checks' Run and Stop controls, Run shown while they are not running and Stop while they are.
+
+| Slot              | Kind   | Required or default | Found by |
+| ----------------- | ------ | ------------------- | -------- |
+| `actions`         | object | required            |          |
+| `actions.run`     | entity | required            |          |
+| `actions.stop`    | entity | required            |          |
+| `actions.running` | entity | required            |          |
 
 ### `while-not-off`
 
@@ -1263,64 +1298,68 @@ From `templates/server.yaml`.
 
 A Proxmox VE server's tile, its CPU and memory, and its guests, checks, backups and notifications chips; it brings the server's and the notifications' pop-ups. The checks, backups and notifications read sensors that the server's own jobs keep.
 
-| Slot                           | Kind     | Required or default | Found by |
-| ------------------------------ | -------- | ------------------- | -------- |
-| `outlet`                       | object   |                     |          |
-| `outlet.entity`                | entity   | required            |          |
-| `outlet.energy`                | object   |                     |          |
-| `outlet.energy.power`          | entity   | required            |          |
-| `outlet.energy.today`          | entity   |                     |          |
-| `outlet.energy.total`          | entity   |                     |          |
-| `cpu`                          | entity   |                     |          |
-| `memory`                       | entity   |                     |          |
-| `last_boot`                    | entity   |                     |          |
-| `uplink`                       | entity   |                     |          |
-| `temperatures`                 | object   |                     |          |
-| `temperatures.cpu`             | entity   | required            |          |
-| `temperatures.root_disk`       | entity   | required            |          |
-| `storage`                      | entities |                     |          |
-| `disks`                        | object   |                     |          |
-| `disks.pool`                   | entity   | required            |          |
-| `disks.failing`                | entity   | required            |          |
-| `disks.life_left`              | entity   | required            |          |
-| `guests`                       | objects  |                     |          |
-| `guests.host`                  | text     |                     |          |
-| `guests.status`                | entity   | required            |          |
-| `guests.cpu`                   | entity   |                     |          |
-| `guests.memory`                | entity   |                     |          |
-| `guests.disk`                  | object   |                     |          |
-| `guests.disk.used`             | entity   |                     |          |
-| `guests.disk.size`             | entity   |                     |          |
-| `backups`                      | object   |                     |          |
-| `backups.last`                 | entity   | required            |          |
-| `backups.problem`              | entity   | required            |          |
-| `backups.bucket`               | entity   |                     |          |
-| `checks`                       | object   |                     |          |
-| `checks.failed`                | entity   | required            |          |
-| `checks.warnings`              | entity   |                     |          |
-| `checks.last_run`              | entity   | required            |          |
-| `checks.overdue`               | entity   | required            |          |
-| `notifications`                | object   |                     |          |
-| `notifications.messages`       | entity   | required            |          |
-| `notifications.clear`          | entity   | required            |          |
-| `notifications.sources`        | objects  |                     |          |
-| `notifications.sources.source` | text     |                     |          |
-| `notifications.sources.name`   | text     |                     |          |
-| `guest_statuses`               | entities |                     |          |
-| `message_sources`              | objects  |                     |          |
-| `message_sources.source`       | text     |                     |          |
-| `message_sources.name`         | text     |                     |          |
-| `message_sources.entity`       | entity   |                     |          |
-| `disk_high`                    | number   | `80`                |          |
-| `disk_full`                    | number   | `90`                |          |
-| `disk_life_low`                | number   | `20`                |          |
-| `disk_life_critical`           | number   | `10`                |          |
-| `cpu_hot`                      | number   | `85`                |          |
-| `cpu_critical`                 | number   | `95`                |          |
-| `root_disk_hot`                | number   | `70`                |          |
-| `root_disk_critical`           | number   | `80`                |          |
-| `bucket_high`                  | number   | `18`                |          |
-| `bucket_full`                  | number   | `19`                |          |
+| Slot                           | Kind     | Required or default | Found by                                                                                                |
+| ------------------------------ | -------- | ------------------- | ------------------------------------------------------------------------------------------------------- |
+| `outlet`                       | object   |                     |                                                                                                         |
+| `outlet.entity`                | entity   | required            |                                                                                                         |
+| `outlet.energy`                | object   |                     |                                                                                                         |
+| `outlet.energy.power`          | entity   | required            |                                                                                                         |
+| `outlet.energy.today`          | entity   |                     |                                                                                                         |
+| `outlet.energy.total`          | entity   |                     |                                                                                                         |
+| `cpu`                          | entity   |                     | domain sensor, platform proxmoxve, translation_key node_cpu in the whole home                           |
+| `memory`                       | entity   |                     | domain sensor, platform proxmoxve, translation_key node_memory_percentage in the whole home             |
+| `last_boot`                    | entity   |                     | domain sensor, platform proxmoxve, translation_key node_uptime in the whole home                        |
+| `uplink`                       | entity   |                     |                                                                                                         |
+| `temperatures`                 | object   |                     |                                                                                                         |
+| `temperatures.cpu`             | entity   | required            |                                                                                                         |
+| `temperatures.root_disk`       | entity   | required            |                                                                                                         |
+| `storage`                      | entities |                     |                                                                                                         |
+| `disks`                        | object   |                     |                                                                                                         |
+| `disks.pool`                   | entity   | required            |                                                                                                         |
+| `disks.failing`                | entity   | required            |                                                                                                         |
+| `disks.life_left`              | entity   | required            |                                                                                                         |
+| `guests`                       | objects  |                     | one per device with domain binary_sensor, platform proxmoxve, translation_key status, in the whole home |
+| `guests.host`                  | text     |                     |                                                                                                         |
+| `guests.status`                | entity   | required            | domain binary_sensor, platform proxmoxve, translation_key status in the whole home                      |
+| `guests.cpu`                   | entity   |                     | platform proxmoxve, translation_key vm_cpu, then container_cpu                                          |
+| `guests.memory`                | entity   |                     | platform proxmoxve, translation_key vm_memory_percentage, then container_memory_percentage              |
+| `guests.disk`                  | object   |                     |                                                                                                         |
+| `guests.disk.used`             | entity   |                     |                                                                                                         |
+| `guests.disk.size`             | entity   |                     |                                                                                                         |
+| `backups`                      | object   |                     |                                                                                                         |
+| `backups.last`                 | entity   | required            | domain sensor, platform proxmoxve, translation_key node_backup_last_backup in the whole home            |
+| `backups.problem`              | entity   | required            | domain binary_sensor, platform proxmoxve, translation_key node_backup_status in the whole home          |
+| `backups.bucket`               | entity   |                     |                                                                                                         |
+| `checks`                       | object   |                     |                                                                                                         |
+| `checks.failed`                | entity   | required            |                                                                                                         |
+| `checks.warnings`              | entity   |                     |                                                                                                         |
+| `checks.last_run`              | entity   | required            |                                                                                                         |
+| `checks.overdue`               | entity   | required            |                                                                                                         |
+| `checks.actions`               | entity   |                     |                                                                                                         |
+| `checks.actions.run`           | entity   | required            |                                                                                                         |
+| `checks.actions.stop`          | entity   | required            |                                                                                                         |
+| `checks.actions.running`       | entity   | required            |                                                                                                         |
+| `notifications`                | object   |                     |                                                                                                         |
+| `notifications.messages`       | entity   | required            |                                                                                                         |
+| `notifications.clear`          | entity   | required            |                                                                                                         |
+| `notifications.sources`        | objects  |                     |                                                                                                         |
+| `notifications.sources.source` | text     |                     |                                                                                                         |
+| `notifications.sources.name`   | text     |                     |                                                                                                         |
+| `guest_statuses`               | entities |                     |                                                                                                         |
+| `message_sources`              | objects  |                     |                                                                                                         |
+| `message_sources.source`       | text     |                     |                                                                                                         |
+| `message_sources.name`         | text     |                     |                                                                                                         |
+| `message_sources.entity`       | entity   |                     |                                                                                                         |
+| `disk_high`                    | number   | `80`                |                                                                                                         |
+| `disk_full`                    | number   | `90`                |                                                                                                         |
+| `disk_life_low`                | number   | `20`                |                                                                                                         |
+| `disk_life_critical`           | number   | `10`                |                                                                                                         |
+| `cpu_hot`                      | number   | `85`                |                                                                                                         |
+| `cpu_critical`                 | number   | `95`                |                                                                                                         |
+| `root_disk_hot`                | number   | `70`                |                                                                                                         |
+| `root_disk_critical`           | number   | `80`                |                                                                                                         |
+| `bucket_high`                  | number   | `18`                |                                                                                                         |
+| `bucket_full`                  | number   | `19`                |                                                                                                         |
 
 Brings `proxmox-popup`, `notifications-popup` (with notifications).
 
@@ -1365,6 +1404,10 @@ The server's pop-up, its notifications, stopped guests, checks, host, disks, sto
 | `checks.warnings`              | entity   |                     |          |
 | `checks.last_run`              | entity   | required            |          |
 | `checks.overdue`               | entity   | required            |          |
+| `checks.actions`               | entity   |                     |          |
+| `checks.actions.run`           | entity   | required            |          |
+| `checks.actions.stop`          | entity   | required            |          |
+| `checks.actions.running`       | entity   | required            |          |
 | `notifications`                | object   |                     |          |
 | `notifications.messages`       | entity   | required            |          |
 | `notifications.clear`          | entity   |                     |          |
@@ -1410,31 +1453,30 @@ From `templates/network.yaml`.
 
 ### `unifi-network`
 
-A UniFi network's tile, its latency, and its devices, VPN and firmware chips; it brings the network's pop-up and one per Wi-Fi network.
+A UniFi network's tile, its latency, and its devices and firmware chips; it brings the network's pop-up and one per Wi-Fi network.
 
-| Slot                      | Kind     | Required or default                        | Found by |
-| ------------------------- | -------- | ------------------------------------------ | -------- |
-| `latency`                 | entities |                                            |          |
-| `wan`                     | entity   |                                            |          |
-| `devices`                 | entities |                                            |          |
-| `wifi`                    | objects  |                                            |          |
-| `wifi.key`                | text     | required                                   |          |
-| `wifi.enabled`            | entity   | required                                   |          |
-| `wifi.qr`                 | entity   |                                            |          |
-| `wifi.switchable`         | flag     |                                            |          |
-| `vpn`                     | entities |                                            |          |
-| `clients`                 | object   |                                            |          |
-| `clients.entity`          | entity   | required                                   |          |
-| `clients.names`           | entity   |                                            |          |
-| `clients.networks`        | objects  | required                                   |          |
-| `clients.networks.name`   | text     |                                            |          |
-| `clients.networks.icon`   | icon     |                                            |          |
-| `clients.networks.subnet` | text     | required                                   |          |
-| `router`                  | object   |                                            |          |
-| `router.cpu`              | entity   | required                                   |          |
-| `router.temperature`      | entity   | required                                   |          |
-| `firmware`                | entities |                                            |          |
-| `device_up`               | texts    | `['connected','upgrading','provisioning']` |          |
+| Slot                      | Kind     | Required or default                        | Found by                                                                                |
+| ------------------------- | -------- | ------------------------------------------ | --------------------------------------------------------------------------------------- |
+| `latency`                 | entities |                                            | domain sensor, platform unifi, translation_key wan_latency in the whole home            |
+| `wan`                     | entity   |                                            |                                                                                         |
+| `devices`                 | entities |                                            | domain sensor, platform unifi, translation_key device_state in the whole home           |
+| `wifi`                    | objects  |                                            |                                                                                         |
+| `wifi.key`                | text     | required                                   |                                                                                         |
+| `wifi.enabled`            | entity   | required                                   |                                                                                         |
+| `wifi.qr`                 | entity   |                                            |                                                                                         |
+| `wifi.switchable`         | flag     |                                            |                                                                                         |
+| `clients`                 | object   |                                            |                                                                                         |
+| `clients.entity`          | entity   | required                                   |                                                                                         |
+| `clients.names`           | entity   |                                            |                                                                                         |
+| `clients.networks`        | objects  | required                                   |                                                                                         |
+| `clients.networks.name`   | text     |                                            |                                                                                         |
+| `clients.networks.icon`   | icon     |                                            |                                                                                         |
+| `clients.networks.subnet` | text     | required                                   |                                                                                         |
+| `router`                  | object   |                                            |                                                                                         |
+| `router.cpu`              | entity   | required                                   | domain sensor, platform unifi, translation_key device_cpu_utilization in the whole home |
+| `router.temperature`      | entity   | required                                   | domain sensor, platform unifi, translation_key device_sub_temperature in the whole home |
+| `firmware`                | entities |                                            | domain update, platform unifi in the whole home                                         |
+| `device_up`               | texts    | `['connected','upgrading','provisioning']` |                                                                                         |
 
 Brings `network-popup`, `wifi-popup` (one per wifi).
 
@@ -1452,7 +1494,7 @@ A Wi-Fi network as an item, its switch when it may be switched from the dashboar
 
 ### `network-popup`
 
-The network's pop-up, its internet, devices, router, VPN, Wi-Fi networks, clients and firmware.
+The network's pop-up, its internet, devices, router, Wi-Fi networks, clients and firmware.
 
 | Slot                      | Kind     | Required or default                        | Found by |
 | ------------------------- | -------- | ------------------------------------------ | -------- |
@@ -1464,7 +1506,6 @@ The network's pop-up, its internet, devices, router, VPN, Wi-Fi networks, client
 | `wifi.enabled`            | entity   | required                                   |          |
 | `wifi.qr`                 | entity   |                                            |          |
 | `wifi.switchable`         | flag     |                                            |          |
-| `vpn`                     | entities |                                            |          |
 | `clients`                 | object   |                                            |          |
 | `clients.entity`          | entity   | required                                   |          |
 | `clients.names`           | entity   |                                            |          |
@@ -1493,6 +1534,63 @@ A Wi-Fi network's pop-up, its switch and the QR code to join it while it is on.
 ## AdGuard Home
 
 From `templates/adguard.yaml`.
+
+### `tailscale`
+
+A tailnet's tile, and its offline, relayed and update chips; it brings the tailnet's pop-up.
+
+| Slot                 | Kind     | Required or default | Found by                                                                                                              |
+| -------------------- | -------- | ------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `devices`            | objects  | required            | one per device with domain binary_sensor, platform tailscale, translation_key connected_to_control, in the whole home |
+| `devices.connected`  | entity   | required            | domain binary_sensor, platform tailscale, translation_key connected_to_control in the whole home                      |
+| `devices.essential`  | flag     |                     |                                                                                                                       |
+| `devices.ip_address` | entity   |                     | domain sensor, platform tailscale, translation_key ip in the whole home                                               |
+| `devices.last_seen`  | entity   |                     | domain sensor, platform tailscale, translation_key last_seen in the whole home                                        |
+| `devices.expires`    | entity   |                     | domain sensor, platform tailscale, translation_key expires in the whole home                                          |
+| `devices.update`     | entity   |                     | domain binary_sensor, platform tailscale, translation_key client in the whole home                                    |
+| `devices.udp`        | entity   |                     | domain binary_sensor, platform tailscale, translation_key client_supports_udp in the whole home                       |
+| `essential`          | entities |                     |                                                                                                                       |
+| `personal`           | entities |                     |                                                                                                                       |
+| `updates`            | entities |                     |                                                                                                                       |
+| `soon_days`          | number   | `14`                |                                                                                                                       |
+| `direct`             | entities |                     |                                                                                                                       |
+
+Brings `tailscale-popup`.
+
+### `tailscale-popup`
+
+The tailnet's pop-up, a card per device, the essential ones under Infrastructure and the others under Devices.
+
+| Slot                 | Kind     | Required or default | Found by |
+| -------------------- | -------- | ------------------- | -------- |
+| `devices`            | objects  | required            |          |
+| `devices.connected`  | entity   | required            |          |
+| `devices.essential`  | flag     |                     |          |
+| `devices.ip_address` | entity   |                     |          |
+| `devices.last_seen`  | entity   |                     |          |
+| `devices.expires`    | entity   |                     |          |
+| `devices.update`     | entity   |                     |          |
+| `devices.udp`        | entity   |                     |          |
+| `essential`          | entities |                     |          |
+| `personal`           | entities |                     |          |
+| `soon_days`          | number   | `14`                |          |
+
+### `tailscale-device`
+
+A tailnet device's card, its name, Connected or when it was last seen, and icons for a pending update, a key about to expire and how it connects.
+
+| Slot                | Kind   | Required or default | Found by |
+| ------------------- | ------ | ------------------- | -------- |
+| `device`            | object | required            |          |
+| `device.connected`  | entity | required            |          |
+| `device.essential`  | flag   |                     |          |
+| `device.ip_address` | entity |                     |          |
+| `device.last_seen`  | entity |                     |          |
+| `device.expires`    | entity |                     |          |
+| `device.update`     | entity |                     |          |
+| `device.udp`        | entity |                     |          |
+| `alert`             | text   |                     |          |
+| `soon_days`         | number | `14`                |          |
 
 ### `adguard`
 
@@ -1582,27 +1680,27 @@ From `templates/media.yaml`.
 
 A media server's tile, what is being watched, and its requests, downloads, health and update chips; it brings its pop-up. The parts are Plex, Jellyfin, Seerr, Radarr and Sonarr; `streams` is the main server's count and `more_streams` the others', such as Jellyfin's `watching` sensor beside Plex's.
 
-| Slot                  | Kind     | Required or default             | Found by |
-| --------------------- | -------- | ------------------------------- | -------- |
-| `streams`             | entity   | required                        |          |
-| `more_streams`        | entities |                                 |          |
-| `update`              | entity   |                                 |          |
-| `requests`            | object   |                                 |          |
-| `requests.pending`    | entity   | required                        |          |
-| `requests.processing` | entity   | required                        |          |
-| `movies`              | object   |                                 |          |
-| `movies.queue`        | entity   | required                        |          |
-| `movies.count`        | entity   | required                        |          |
-| `movies.health`       | entity   |                                 |          |
-| `movies.space`        | entity   |                                 |          |
-| `movies.calendar`     | entity   |                                 |          |
-| `shows`               | object   |                                 |          |
-| `shows.queue`         | entity   | required                        |          |
-| `shows.count`         | entity   | required                        |          |
-| `shows.wanted`        | entity   |                                 |          |
-| `shows.upcoming`      | entity   |                                 |          |
-| `shows.calendar`      | entity   |                                 |          |
-| `none`                | texts    | `['0','unknown','unavailable']` |          |
+| Slot                  | Kind     | Required or default             | Found by                                                                                 |
+| --------------------- | -------- | ------------------------------- | ---------------------------------------------------------------------------------------- |
+| `streams`             | entity   | required                        | domain sensor, platform jellyfin, translation_key watching in the whole home             |
+| `more_streams`        | entities |                                 |                                                                                          |
+| `update`              | entity   |                                 |                                                                                          |
+| `requests`            | object   |                                 |                                                                                          |
+| `requests.pending`    | entity   | required                        | domain sensor, platform overseerr, translation_key pending_requests in the whole home    |
+| `requests.processing` | entity   | required                        | domain sensor, platform overseerr, translation_key processing_requests in the whole home |
+| `movies`              | object   |                                 |                                                                                          |
+| `movies.queue`        | entity   | required                        | domain sensor, platform radarr, translation_key queue in the whole home                  |
+| `movies.count`        | entity   | required                        | domain sensor, platform radarr, translation_key movies in the whole home                 |
+| `movies.health`       | entity   |                                 | domain binary_sensor, platform radarr, translation_key health in the whole home          |
+| `movies.space`        | entity   |                                 |                                                                                          |
+| `movies.calendar`     | entity   |                                 | domain calendar, platform radarr in the whole home                                       |
+| `shows`               | object   |                                 |                                                                                          |
+| `shows.queue`         | entity   | required                        | domain sensor, platform sonarr, translation_key queue in the whole home                  |
+| `shows.count`         | entity   | required                        | domain sensor, platform sonarr, translation_key series in the whole home                 |
+| `shows.wanted`        | entity   |                                 | domain sensor, platform sonarr, translation_key wanted in the whole home                 |
+| `shows.upcoming`      | entity   |                                 | domain sensor, platform sonarr, translation_key upcoming in the whole home               |
+| `shows.calendar`      | entity   |                                 | domain calendar, platform sonarr in the whole home                                       |
+| `none`                | texts    | `['0','unknown','unavailable']` |                                                                                          |
 
 Brings `media-popup`.
 
@@ -1639,36 +1737,40 @@ From `templates/glances.yaml` and `templates/energy.yaml`.
 
 The strip of the home's overall statuses, one line across the section: the weather, the alarm, the vacation toggle, and whatever needs you: failed checks, low batteries, a leak, smoke. What does not need you is not drawn.
 
-| Slot                  | Kind     | Required or default | Found by                                                          |
-| --------------------- | -------- | ------------------- | ----------------------------------------------------------------- |
-| `weather`             | entity   |                     | domain weather, anywhere in the home                              |
-| `alarm`               | entity   |                     | domain alarm_control_panel, anywhere in the home                  |
-| `vacation`            | entity   |                     |                                                                   |
-| `people`              | entities |                     | domain person, anywhere in the home                               |
-| `energy`              | object   |                     |                                                                   |
-| `energy.usage`        | entity   | required            |                                                                   |
-| `energy.grid`         | entity   | required            |                                                                   |
-| `energy.solar`        | entity   |                     |                                                                   |
-| `energy.battery`      | entity   |                     |                                                                   |
-| `energy.ev`           | entity   |                     |                                                                   |
-| `energy.grid_today`   | entity   |                     |                                                                   |
-| `energy.solar_today`  | entity   |                     |                                                                   |
-| `energy.export_today` | entity   |                     |                                                                   |
-| `checks`              | object   |                     |                                                                   |
-| `checks.failed`       | entity   | required            |                                                                   |
-| `checks.warnings`     | entity   |                     |                                                                   |
-| `checks.last_run`     | entity   | required            |                                                                   |
-| `checks.overdue`      | entity   | required            |                                                                   |
-| `batteries`           | entities |                     | domain sensor, device_class battery, anywhere in the home         |
-| `leaks`               | entities |                     | domain binary_sensor, device_class moisture, anywhere in the home |
-| `smoke`               | entities |                     | domain binary_sensor, device_class smoke, anywhere in the home    |
-| `notifications`       | entity   |                     |                                                                   |
-| `updates`             | entities |                     | domain update, anywhere in the home                               |
-| `services`            | entities |                     |                                                                   |
-| `disks`               | entity   |                     |                                                                   |
-| `backup`              | entity   |                     |                                                                   |
-| `low`                 | number   | `20`                |                                                                   |
-| `critical`            | number   | `5`                 |                                                                   |
+| Slot                     | Kind     | Required or default | Found by                                                          |
+| ------------------------ | -------- | ------------------- | ----------------------------------------------------------------- |
+| `weather`                | entity   |                     | domain weather, anywhere in the home                              |
+| `alarm`                  | entity   |                     | domain alarm_control_panel, anywhere in the home                  |
+| `vacation`               | entity   |                     |                                                                   |
+| `people`                 | entities |                     | domain person, anywhere in the home                               |
+| `energy`                 | object   |                     |                                                                   |
+| `energy.usage`           | entity   | required            |                                                                   |
+| `energy.grid`            | entity   | required            |                                                                   |
+| `energy.solar`           | entity   |                     |                                                                   |
+| `energy.battery`         | entity   |                     |                                                                   |
+| `energy.ev`              | entity   |                     |                                                                   |
+| `energy.grid_today`      | entity   |                     |                                                                   |
+| `energy.solar_today`     | entity   |                     |                                                                   |
+| `energy.export_today`    | entity   |                     |                                                                   |
+| `checks`                 | object   |                     |                                                                   |
+| `checks.failed`          | entity   | required            |                                                                   |
+| `checks.warnings`        | entity   |                     |                                                                   |
+| `checks.last_run`        | entity   | required            |                                                                   |
+| `checks.overdue`         | entity   | required            |                                                                   |
+| `checks.actions`         | entity   |                     |                                                                   |
+| `checks.actions.run`     | entity   | required            |                                                                   |
+| `checks.actions.stop`    | entity   | required            |                                                                   |
+| `checks.actions.running` | entity   | required            |                                                                   |
+| `batteries`              | entities |                     | domain sensor, device_class battery, anywhere in the home         |
+| `leaks`                  | entities |                     | domain binary_sensor, device_class moisture, anywhere in the home |
+| `smoke`                  | entities |                     | domain binary_sensor, device_class smoke, anywhere in the home    |
+| `notifications`          | entity   |                     |                                                                   |
+| `updates`                | entities |                     | domain update, anywhere in the home                               |
+| `services`               | entities |                     |                                                                   |
+| `disks`                  | entity   |                     |                                                                   |
+| `backup`                 | entity   |                     |                                                                   |
+| `low`                    | number   | `20`                |                                                                   |
+| `critical`               | number   | `5`                 |                                                                   |
 
 Brings `weather-popup` (with weather), `checks-popup` (with checks), `batteries-popup` (with batteries) and `energy-popup` (with energy). The checks item counts the failed checks and the warnings together, red while a check failed and orange while there are only warnings.
 
@@ -1684,13 +1786,17 @@ The weather now, its conditions and its forecast.
 
 The daily checks: what failed, the warnings, when they last ran, and the details.
 
-| Slot              | Kind   | Required or default | Found by |
-| ----------------- | ------ | ------------------- | -------- |
-| `checks`          | object | required            |          |
-| `checks.failed`   | entity | required            |          |
-| `checks.warnings` | entity |                     |          |
-| `checks.last_run` | entity | required            |          |
-| `checks.overdue`  | entity | required            |          |
+| Slot                     | Kind   | Required or default | Found by |
+| ------------------------ | ------ | ------------------- | -------- |
+| `checks`                 | object | required            |          |
+| `checks.failed`          | entity | required            |          |
+| `checks.warnings`        | entity |                     |          |
+| `checks.last_run`        | entity | required            |          |
+| `checks.overdue`         | entity | required            |          |
+| `checks.actions`         | entity |                     |          |
+| `checks.actions.run`     | entity | required            |          |
+| `checks.actions.stop`    | entity | required            |          |
+| `checks.actions.running` | entity | required            |          |
 
 ### `batteries-popup`
 

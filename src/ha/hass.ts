@@ -18,6 +18,7 @@ interface EntityRegistryEntry {
   translation_key?: string | null;
   entity_category?: string | null;
   hidden?: boolean;
+  labels?: string[];
   display_precision?: number;
 }
 
@@ -27,6 +28,9 @@ interface DeviceRegistryEntry {
   name?: string | null;
   name_by_user?: string | null;
   serial_number?: string | null;
+  manufacturer?: string | null;
+  model?: string | null;
+  labels?: string[];
 }
 
 interface ServiceTarget {

@@ -3,7 +3,14 @@ import type { Value } from '../contract/templates.ts';
 import { TemplateError, expand } from '../templates/expand.ts';
 import { SHIPPED } from '../templates/shipped.ts';
 
-import { personSlots, proxmoxSlots, roomSlots, snake, systemSlots } from './slots.ts';
+import {
+  personSlots,
+  proxmoxSlots,
+  roomSlots,
+  snake,
+  systemSlots,
+  tailscaleSlots,
+} from './slots.ts';
 import type { Home } from './types.ts';
 import { SECTION_NAMES, drawn } from './view.ts';
 
@@ -75,13 +82,14 @@ function producible(home: Home): string[] {
     ...standIn('printer3d'),
     ...standIn('speakers'),
   };
-  const { proxmox, network, adguard, media } = home.system;
+  const { proxmox, network, tailscale, adguard, media } = home.system;
   const all = [
     ...home.rooms.flatMap((room) => hashes('room', { ...roomSlots(room), ...full })),
     ...home.people.flatMap((person) => hashes('person', personSlots(person))),
     ...home.cars.flatMap((car) => hashes('car', snake(car))),
     ...(proxmox ? hashes('proxmox-server', proxmoxSlots(proxmox)) : []),
     ...(network ? hashes('unifi-network', snake(network)) : []),
+    ...(tailscale ? hashes('tailscale', tailscaleSlots(tailscale)) : []),
     ...(adguard ? hashes('adguard', snake(adguard)) : []),
     ...hashes('home-assistant', systemSlots(home.system, home.rooms)),
     ...(media ? hashes('media-server', snake(media)) : []),

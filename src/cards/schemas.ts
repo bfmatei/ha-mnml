@@ -32,6 +32,10 @@ export const STATE_ITEMS = marked(
       { when: true, entity: true, minutes: true, icon: true },
       { when: ENTITY_RULE },
     ),
+    relative: variant<Extract<StateItem, { relative: true }>>(
+      { when: true, entity: true, relative: true, icon: true },
+      { when: ENTITY_RULE },
+    ),
     serial: variant<Extract<StateItem, { serial: true }>>(
       { when: true, entity: true, serial: true },
       { when: ENTITY_RULE },
@@ -44,7 +48,14 @@ export const STATE_ITEMS = marked(
   variant<
     Extract<
       StateItem,
-      { text?: never; attribute?: never; minutes?: never; serial?: never; name?: never }
+      {
+        text?: never;
+        attribute?: never;
+        minutes?: never;
+        relative?: never;
+        serial?: never;
+        name?: never;
+      }
     >
   >({ when: true, entity: true, icon: true }, { when: ENTITY_RULE }),
 );
@@ -53,6 +64,7 @@ const STATUS_RULE = schema<Extract<Control, { type: 'status' }>['rules'][number]
   is: true,
   not: true,
   below: true,
+  within_days: true,
   entities: true,
   label: true,
   words: true,
@@ -97,7 +109,15 @@ export const CONTROLS = tagged<Control>({
     { show: ENTITY_RULE, rules: STATUS_RULE },
   ),
   tyres: variant<Extract<Control, { type: 'tyres' }>>(
-    { type: true, show: true, tyres: true, targets: true, low_share: true, warn_share: true },
+    {
+      type: true,
+      show: true,
+      tyres: true,
+      targets: true,
+      low_share: true,
+      warn_share: true,
+      silent: true,
+    },
     { show: ENTITY_RULE },
   ),
   scenes: variant<Extract<Control, { type: 'scenes' }>>(

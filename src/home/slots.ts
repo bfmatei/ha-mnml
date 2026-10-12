@@ -2,7 +2,17 @@ import type { Control, StateItem } from '../contract/cards.ts';
 import type { Value } from '../contract/templates.ts';
 import { toValue } from '../templates/expand.ts';
 
-import type { Ac, Heating, Home, Lights, Person, Proxmox, Room, System } from './types.ts';
+import type {
+  Ac,
+  Heating,
+  Home,
+  Lights,
+  Person,
+  Proxmox,
+  Room,
+  System,
+  Tailscale,
+} from './types.ts';
 
 export function headingSlots(
   title: string,
@@ -147,6 +157,19 @@ export function proxmoxSlots(proxmox: Proxmox): Record<string, Value> {
           host === undefined ? [] : [{ source: host, entity: status }],
         ),
       ],
+    }),
+  };
+}
+
+export function tailscaleSlots(tailscale: Tailscale): Record<string, Value> {
+  const { devices } = tailscale;
+  return {
+    ...snake(tailscale),
+    ...record({
+      essential: devices.flatMap((device) => (device.essential === true ? [device.connected] : [])),
+      personal: devices.flatMap((device) => (device.essential === true ? [] : [device.connected])),
+      updates: devices.flatMap((device) => (device.update === undefined ? [] : [device.update])),
+      direct: devices.flatMap((device) => (device.udp === undefined ? [] : [device.udp])),
     }),
   };
 }

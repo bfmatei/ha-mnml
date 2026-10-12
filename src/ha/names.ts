@@ -47,7 +47,13 @@ function stripped(name: string, naming: Naming): string {
   if (naming.strip_word === undefined) {
     return withoutSuffix;
   }
-  return withoutSuffix.replace(new RegExp(` ?${naming.strip_word}s?(?= |$)`, 'i'), '');
+  const found = new RegExp(` ?${naming.strip_word}s?(?= |$)`, 'i').exec(withoutSuffix);
+  if (found === null) {
+    return withoutSuffix;
+  }
+  const rest = `${withoutSuffix.slice(0, found.index)}${withoutSuffix.slice(found.index + found[0].length)}`;
+  const first = rest.trimStart();
+  return found.index === 0 ? `${first.charAt(0).toUpperCase()}${first.slice(1)}` : rest;
 }
 
 export function nameOf(hass: HomeAssistant, entityId: string, naming: Naming): string {

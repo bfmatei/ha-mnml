@@ -55,6 +55,7 @@ interface StateText extends StateBase {
   text: string;
   attribute?: never;
   minutes?: never;
+  relative?: never;
   serial?: never;
   name?: never;
   icon?: never;
@@ -65,6 +66,7 @@ interface StateAttribute extends StateBase {
   text?: never;
   attribute: string;
   minutes?: never;
+  relative?: never;
   serial?: never;
   name?: never;
   icon?: true;
@@ -75,6 +77,18 @@ interface StateMinutes extends StateBase {
   text?: never;
   attribute?: never;
   minutes: true;
+  relative?: never;
+  serial?: never;
+  name?: never;
+  icon?: true;
+}
+
+interface StateRelative extends StateBase {
+  entity?: EntityId;
+  text?: never;
+  attribute?: never;
+  minutes?: never;
+  relative: true;
   serial?: never;
   name?: never;
   icon?: true;
@@ -85,6 +99,7 @@ interface StateSerial extends StateBase {
   text?: never;
   attribute?: never;
   minutes?: never;
+  relative?: never;
   serial: true;
   name?: never;
   icon?: never;
@@ -95,6 +110,7 @@ interface StateName extends StateBase {
   text?: never;
   attribute?: never;
   minutes?: never;
+  relative?: never;
   serial?: never;
   name: true;
   icon?: never;
@@ -105,6 +121,7 @@ interface StateValue extends StateBase {
   text?: never;
   attribute?: never;
   minutes?: never;
+  relative?: never;
   serial?: never;
   name?: never;
   icon?: true;
@@ -114,6 +131,7 @@ export type StateItem =
   | StateText
   | StateAttribute
   | StateMinutes
+  | StateRelative
   | StateSerial
   | StateName
   | StateValue;
@@ -192,6 +210,7 @@ export interface IndicatorControl extends ControlBase {
 interface StatusRule extends StateRule {
   entities: EntityId[];
   below?: number;
+  within_days?: number;
   label?: 'device';
   words?: Record<string, string>;
   color: Color;
@@ -211,6 +230,7 @@ export interface TyresControl extends ControlBase {
   targets: Corners<SensorId>;
   low_share: number;
   warn_share: number;
+  silent?: true;
 }
 
 export interface ScenesControl extends ControlBase {

@@ -195,6 +195,21 @@ test('it opens the pop-up whose hash is current, and only that one', async () =>
   assert.equal(body?.children.length, 1, 'and everything else inside it');
 });
 
+test('the scroller ends 5px short of the panel edge and keeps 6px clear of its content, so its scrollbar sits between the cards and the edge and never over a card', () => {
+  const css = MnmlPopupsCard.styles
+    .flatMap((sheet) => (Array.isArray(sheet) ? sheet : [sheet]))
+    .map((sheet) => (typeof sheet === 'object' && 'cssText' in sheet ? sheet.cssText : ''))
+    .join('\n');
+  const rule = [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)].find(
+    ([, selector]) => selector?.trim() === '.body',
+  );
+  assert.ok(rule, 'the body has a rule');
+  const declarations = rule[2] ?? '';
+  assert.match(declarations, /margin-inline-end:\s*calc\(5px - var\(--mnml-popup-gap, 8px\)\)/);
+  assert.match(declarations, /padding-inline-end:\s*6px/);
+  assert.match(declarations, /scrollbar-width:\s*thin/);
+});
+
 test('the body says there is more to scroll to until it has been scrolled to the end', async () => {
   const { router, shadow } = await mount('');
   router.hass = hassOf({});

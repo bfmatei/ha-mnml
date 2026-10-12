@@ -78,6 +78,47 @@ export const BASE_STYLE = css`
       inset 0 1px 0 var(--mnml-card-highlight-color, transparent);
     pointer-events: none;
   }
+  .tile,
+  .card.button,
+  .glance.link,
+  .row.link,
+  .control:not(.inert),
+  .reset,
+  .heading.fold .chevron,
+  .header .round:not(.inert) {
+    position: relative;
+    isolation: isolate;
+  }
+  .tile::before,
+  .card.button::before,
+  .glance.link::before,
+  .row.link::before,
+  .control:not(.inert)::before,
+  .reset::before,
+  .heading.fold .chevron::before,
+  .header .round:not(.inert)::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: var(--m-hover);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease-out;
+  }
+  @media (hover: hover) {
+    .card.button:hover::before,
+    .glance.link:hover::before,
+    .control:not(.inert):hover::before,
+    .reset:hover::before,
+    .header .round:not(.inert):hover::before,
+    .tile:hover::before,
+    .row.link:hover::before,
+    .heading.fold:hover .chevron::before {
+      opacity: 1;
+    }
+  }
   .hidden {
     display: none !important;
   }
@@ -249,16 +290,10 @@ export const ROW_STYLE = css`
   }
   .row.link {
     cursor: pointer;
-    transition: box-shadow 120ms ease-out;
     -webkit-tap-highlight-color: transparent;
   }
-  .row.link:active:not(:has(.control:active)) {
-    box-shadow: inset 0 0 0 999px var(--m-hover);
-  }
-  @media (hover: hover) {
-    .row.link:hover:not(:has(.control:hover)) {
-      box-shadow: inset 0 0 0 999px var(--m-hover);
-    }
+  .row.link:active:not(:has(.control:active))::before {
+    opacity: 1;
   }
 `;
 
@@ -303,9 +338,7 @@ export const CONTROL_STYLE = css`
     cursor: default;
   }
   .control:not(.inert) {
-    transition:
-      transform 90ms ease-out,
-      box-shadow 120ms ease-out;
+    transition: transform 90ms ease-out;
   }
   .control:not(.inert):active {
     transform: scale(0.94);
@@ -314,16 +347,6 @@ export const CONTROL_STYLE = css`
   .control ha-state-icon,
   .control ha-attribute-icon {
     --mdc-icon-size: 20px;
-  }
-  @media (hover: hover) {
-    .control:not(.inert):hover {
-      box-shadow: inset 0 0 0 999px var(--m-hover);
-    }
-    .control.primary:not(.inert):hover {
-      box-shadow:
-        inset 0 0 0 999px var(--m-hover),
-        var(--m-well);
-    }
   }
 `;
 
@@ -352,6 +375,7 @@ export const SELECT_STYLE = css`
     font: inherit;
     font-size: 14px;
     cursor: pointer;
+    transition: border-color 120ms ease-out;
   }
   select:hover {
     border-color: var(--secondary-text-color);

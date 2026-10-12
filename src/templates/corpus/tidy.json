@@ -1,0 +1,232 @@
+{
+  "areas": {
+    "kitchen": {
+      "area_id": "kitchen",
+      "humidity_entity_id": null,
+      "icon": "mdi:fridge",
+      "name": "Kitchen",
+      "temperature_entity_id": null
+    },
+    "living": {
+      "area_id": "living",
+      "humidity_entity_id": null,
+      "icon": "mdi:sofa",
+      "name": "Living",
+      "temperature_entity_id": "sensor.living_temperature"
+    },
+    "office": {
+      "area_id": "office",
+      "humidity_entity_id": null,
+      "icon": null,
+      "name": "Office",
+      "temperature_entity_id": null
+    }
+  },
+  "devices": {
+    "blind": {
+      "area_id": "living",
+      "id": "blind",
+      "name": "Blind"
+    },
+    "desk": {
+      "area_id": "office",
+      "id": "desk",
+      "name": "Desk sensor"
+    },
+    "door_cam": {
+      "area_id": "living",
+      "id": "door_cam",
+      "name": "Doorbell"
+    },
+    "hue_lamp": {
+      "area_id": "living",
+      "id": "hue_lamp",
+      "name": "Floor lamp"
+    },
+    "hue_strip": {
+      "area_id": "living",
+      "id": "hue_strip",
+      "name": "Strip"
+    },
+    "plug": {
+      "area_id": "kitchen",
+      "id": "plug",
+      "name": "Kettle plug"
+    },
+    "sonos": {
+      "area_id": "living",
+      "id": "sonos",
+      "name": "Sonos Arc"
+    },
+    "tado": {
+      "area_id": "living",
+      "id": "tado",
+      "name": "Radiator"
+    }
+  },
+  "entities": {
+    "binary_sensor.kitchen_leak": {
+      "area_id": "kitchen",
+      "entity_id": "binary_sensor.kitchen_leak",
+      "platform": "zha"
+    },
+    "binary_sensor.living_door": {
+      "area_id": "living",
+      "entity_id": "binary_sensor.living_door",
+      "platform": "zha"
+    },
+    "binary_sensor.living_window": {
+      "area_id": "living",
+      "entity_id": "binary_sensor.living_window",
+      "platform": "zha"
+    },
+    "camera.doorbell": {
+      "device_id": "door_cam",
+      "entity_id": "camera.doorbell",
+      "platform": "unifiprotect"
+    },
+    "climate.radiator": {
+      "device_id": "tado",
+      "entity_id": "climate.radiator",
+      "platform": "tado"
+    },
+    "cover.blind": {
+      "device_id": "blind",
+      "entity_id": "cover.blind",
+      "platform": "zha"
+    },
+    "light.floor_lamp": {
+      "device_id": "hue_lamp",
+      "entity_id": "light.floor_lamp",
+      "platform": "hue"
+    },
+    "light.living_group": {
+      "area_id": "living",
+      "entity_id": "light.living_group",
+      "platform": "group"
+    },
+    "light.strip": {
+      "device_id": "hue_strip",
+      "entity_id": "light.strip",
+      "platform": "hue"
+    },
+    "lock.front_door": {
+      "area_id": "living",
+      "entity_id": "lock.front_door",
+      "platform": "nuki"
+    },
+    "media_player.arc": {
+      "device_id": "sonos",
+      "entity_id": "media_player.arc",
+      "platform": "sonos"
+    },
+    "scene.living_relax": {
+      "area_id": "living",
+      "entity_id": "scene.living_relax",
+      "platform": "hue"
+    },
+    "sensor.desk_battery": {
+      "device_id": "desk",
+      "entity_id": "sensor.desk_battery",
+      "platform": "zha"
+    },
+    "sensor.desk_humidity": {
+      "device_id": "desk",
+      "entity_id": "sensor.desk_humidity",
+      "platform": "zha"
+    },
+    "sensor.desk_temperature": {
+      "device_id": "desk",
+      "entity_id": "sensor.desk_temperature",
+      "platform": "zha"
+    },
+    "sensor.kettle_energy": {
+      "device_id": "plug",
+      "entity_category": null,
+      "entity_id": "sensor.kettle_energy",
+      "platform": "tplink"
+    },
+    "sensor.living_humidity": {
+      "area_id": "living",
+      "entity_id": "sensor.living_humidity",
+      "platform": "mqtt"
+    },
+    "sensor.living_temperature": {
+      "area_id": "living",
+      "entity_id": "sensor.living_temperature",
+      "platform": "mqtt"
+    },
+    "sensor.window_battery": {
+      "area_id": "living",
+      "entity_id": "sensor.window_battery",
+      "platform": "zha"
+    },
+    "switch.kettle": {
+      "device_id": "plug",
+      "entity_id": "switch.kettle",
+      "platform": "tplink"
+    },
+    "update.plug_firmware": {
+      "device_id": "plug",
+      "entity_id": "update.plug_firmware",
+      "platform": "tplink"
+    }
+  },
+  "states": {
+    "binary_sensor.kitchen_leak": {
+      "attributes": {
+        "device_class": "moisture"
+      }
+    },
+    "binary_sensor.living_door": {
+      "attributes": {
+        "device_class": "door"
+      }
+    },
+    "binary_sensor.living_window": {
+      "attributes": {
+        "device_class": "window"
+      }
+    },
+    "sensor.desk_battery": {
+      "attributes": {
+        "device_class": "battery"
+      }
+    },
+    "sensor.desk_humidity": {
+      "attributes": {
+        "device_class": "humidity"
+      }
+    },
+    "sensor.desk_temperature": {
+      "attributes": {
+        "device_class": "temperature"
+      }
+    },
+    "sensor.living_humidity": {
+      "attributes": {
+        "device_class": "humidity"
+      }
+    },
+    "sensor.living_temperature": {
+      "attributes": {
+        "device_class": "temperature"
+      }
+    },
+    "sensor.window_battery": {
+      "attributes": {
+        "device_class": "battery"
+      }
+    },
+    "switch.kettle": {
+      "attributes": {
+        "device_class": "outlet"
+      }
+    },
+    "update.plug_firmware": {
+      "attributes": {
+        "device_class": "firmware"
+      }
+    }
+  }
+}

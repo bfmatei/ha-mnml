@@ -46,10 +46,6 @@ const HEADER_STYLE = css`
     box-shadow: var(--round-shadow);
     color: var(--primary-text-color);
   }
-  .header .round:not(.inert):hover {
-    background-image: linear-gradient(var(--m-hover), var(--m-hover));
-    box-shadow: var(--round-shadow);
-  }
   .header .round ha-icon {
     --mdc-icon-size: 22px;
   }

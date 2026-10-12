@@ -1,0 +1,161 @@
+{
+  "areas": {
+    "den": {
+      "area_id": "den",
+      "humidity_entity_id": null,
+      "icon": null,
+      "name": "Den",
+      "temperature_entity_id": null
+    },
+    "loft": {
+      "area_id": "loft",
+      "humidity_entity_id": null,
+      "icon": "mdi:home-roof",
+      "name": "Loft",
+      "temperature_entity_id": null
+    }
+  },
+  "devices": {
+    "ac": {
+      "area_id": "den",
+      "id": "ac",
+      "name": "Aircon"
+    },
+    "cams": {
+      "area_id": "den",
+      "id": "cams",
+      "name": "Two-lens camera"
+    },
+    "multi": {
+      "area_id": "den",
+      "id": "multi",
+      "name": "Multi sensor"
+    },
+    "orphan": {
+      "area_id": null,
+      "id": "orphan",
+      "name": "Unplaced gadget"
+    }
+  },
+  "entities": {
+    "binary_sensor.den_vent": {
+      "area_id": "den",
+      "entity_id": "binary_sensor.den_vent",
+      "platform": "mqtt"
+    },
+    "binary_sensor.den_window_a": {
+      "area_id": "den",
+      "entity_id": "binary_sensor.den_window_a",
+      "platform": "zha"
+    },
+    "binary_sensor.den_window_b": {
+      "area_id": "den",
+      "entity_id": "binary_sensor.den_window_b",
+      "platform": "zha"
+    },
+    "binary_sensor.den_window_old": {
+      "area_id": "den",
+      "entity_id": "binary_sensor.den_window_old",
+      "hidden": true,
+      "platform": "zha"
+    },
+    "camera.cams_front": {
+      "device_id": "cams",
+      "entity_id": "camera.cams_front",
+      "platform": "generic"
+    },
+    "camera.cams_rear": {
+      "device_id": "cams",
+      "entity_id": "camera.cams_rear",
+      "platform": "generic"
+    },
+    "climate.ac": {
+      "device_id": "ac",
+      "entity_id": "climate.ac",
+      "platform": "daikin"
+    },
+    "climate.ac_extra": {
+      "device_id": "ac",
+      "entity_id": "climate.ac_extra",
+      "platform": "daikin"
+    },
+    "light.den_group": {
+      "area_id": "den",
+      "entity_id": "light.den_group",
+      "platform": "group"
+    },
+    "light.den_lamp": {
+      "area_id": "den",
+      "entity_id": "light.den_lamp",
+      "platform": "hue"
+    },
+    "light.floating": {
+      "entity_id": "light.floating",
+      "platform": "template"
+    },
+    "sensor.den_unavailable_temperature": {
+      "area_id": "den",
+      "entity_id": "sensor.den_unavailable_temperature",
+      "platform": "zha"
+    },
+    "sensor.multi_battery": {
+      "area_id": "loft",
+      "device_id": "multi",
+      "entity_id": "sensor.multi_battery",
+      "platform": "zha"
+    },
+    "sensor.multi_probe_temperature": {
+      "device_id": "multi",
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.multi_probe_temperature",
+      "platform": "zha"
+    },
+    "sensor.multi_temperature": {
+      "device_id": "multi",
+      "entity_id": "sensor.multi_temperature",
+      "platform": "zha"
+    },
+    "sensor.orphan_temperature": {
+      "device_id": "orphan",
+      "entity_id": "sensor.orphan_temperature",
+      "platform": "zha"
+    }
+  },
+  "states": {
+    "binary_sensor.den_window_a": {
+      "attributes": {
+        "device_class": "window"
+      }
+    },
+    "binary_sensor.den_window_b": {
+      "attributes": {
+        "device_class": "window"
+      }
+    },
+    "binary_sensor.den_window_old": {
+      "attributes": {
+        "device_class": "window"
+      }
+    },
+    "sensor.multi_battery": {
+      "attributes": {
+        "device_class": "battery"
+      }
+    },
+    "sensor.multi_probe_temperature": {
+      "attributes": {
+        "device_class": "temperature"
+      }
+    },
+    "sensor.multi_temperature": {
+      "attributes": {
+        "device_class": "temperature"
+      }
+    },
+    "sensor.orphan_temperature": {
+      "attributes": {
+        "device_class": "temperature"
+      }
+    }
+  }
+}

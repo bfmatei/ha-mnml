@@ -10,7 +10,7 @@ import type { HassEntity, HomeAssistant } from './hass.ts';
 import { deviceSerial, entityName } from './names.ts';
 import { partOf } from './part.ts';
 import { UNAVAILABLE, normalise, shown } from './rules.ts';
-import { colorStyle, stateIcon } from './templates.ts';
+import { colorStyle, relativeTime, stateIcon } from './templates.ts';
 
 export const SEPARATOR = ' • ';
 
@@ -114,6 +114,9 @@ function itemPart(
   }
   if (!hasValue(stateObj)) {
     return undefined;
+  }
+  if (item.relative) {
+    return valuePart(hass, stateObj, item, relativeTime(hass, stateObj.state));
   }
   const text = formatItem(hass, stateObj, item);
   return text === '' ? undefined : valuePart(hass, stateObj, item, text);

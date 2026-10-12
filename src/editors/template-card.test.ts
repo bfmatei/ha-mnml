@@ -852,3 +852,55 @@ test('another template picked starts with its own folds, not the ones opened on 
   await click(labelled(root, 'Use basic-two'));
   assert.equal(panelHeads(root)['Basics'], 'false');
 });
+
+function tiedHass(): Record<string, unknown> {
+  const hass = roomHass();
+  const entities = hass['entities'] as Record<string, unknown>;
+  const states = hass['states'] as Record<string, unknown>;
+  entities['sensor.living_temperature_b'] = {
+    entity_id: 'sensor.living_temperature_b',
+    area_id: 'living',
+  };
+  states['sensor.living_temperature_b'] = {
+    entity_id: 'sensor.living_temperature_b',
+    state: '22',
+    attributes: { device_class: 'temperature', friendly_name: 'Living Temperature B' },
+  };
+  return hass;
+}
+
+test('when several fit a slot equally, they are offered, and picking one sets it', async () => {
+  const opened = await openWith(
+    { type: 'custom:mnml-template-card', template: 'room-like', area: 'living', slots: {} },
+    tiedHass(),
+  );
+  const { root, dispatched } = opened;
+  await click(labelled(root, 'Change what it found'));
+  assert.match(text(root), /Temperature: 2 fit equally/);
+  const first = labelled(root, 'Use sensor.living_temperature');
+  const second = labelled(root, 'Use sensor.living_temperature_b');
+  assert.equal(first?.getAttribute('aria-pressed'), 'true', 'the one in use is marked');
+  assert.equal(second?.getAttribute('aria-pressed'), 'false');
+  await click(second);
+  assert.deepEqual(lastConfig(dispatched)['slots'], { temperature: 'sensor.living_temperature_b' });
+  await again(opened);
+  assert.equal(
+    labelled(root, 'Use sensor.living_temperature_b')?.getAttribute('aria-pressed'),
+    'true',
+  );
+  assert.equal(
+    labelled(root, 'Use sensor.living_temperature')?.getAttribute('aria-pressed'),
+    'false',
+  );
+});
+
+test('a slot with one match offers no choice', async () => {
+  const single = await openRoom({
+    type: 'custom:mnml-template-card',
+    template: 'room-like',
+    area: 'living',
+    slots: {},
+  });
+  await click(labelled(single.root, 'Change what it found'));
+  assert.doesNotMatch(text(single.root), /fit equally/);
+});
