@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 
 import { test } from 'vitest';
 
+import { announce, withdraw } from '../cards/parts/popup-registry.ts';
 import { define, mounted } from '../test/render.ts';
 
 import { MnmlCardEditor, hashesOf } from './card-editor.ts';
@@ -198,4 +199,45 @@ test("the dashboard's pop-ups reach the pop-up picker", async () => {
     JSON.stringify(each instanceof FakeForm ? each.schema : undefined),
   );
   assert.ok(schemas.some((schema) => schema.includes('#living')));
+});
+
+test('an edit leaves the rest of the card as it is, an empty list over a default included', async () => {
+  const car = {
+    type: 'custom:mnml-car-plan-card',
+    title: 'Car',
+    doors: ['binary_sensor.a', 'binary_sensor.b', 'binary_sensor.c', 'binary_sensor.d'],
+    hood: 'binary_sensor.hood',
+    tailgate: 'binary_sensor.tailgate',
+    windows: ['sensor.a', 'sensor.b', 'sensor.c', 'sensor.d'],
+    half_states: [],
+    tyres: ['sensor.a', 'sensor.b', 'sensor.c', 'sensor.d'],
+    tyre_targets: ['sensor.a', 'sensor.b', 'sensor.c', 'sensor.d'],
+    tyre_low_share: 0.9,
+    tyre_warn_share: 0.95,
+  };
+  const { root, dispatched } = await open(car);
+  fire(form(root), { title: 'My car' });
+  assert.deepEqual(dispatched.at(-1), { config: { ...car, title: 'My car' } });
+});
+
+test('the pop-ups the template cards announce reach the pop-up picker, as they come and go', async () => {
+  const owner = {};
+  announce(owner, [{ hash: '#tailnet', cards: [] }]);
+  const { editor, root } = await open({
+    type: 'custom:mnml-media-card',
+    entity: 'media_player.tv',
+  });
+  const offered = (): string =>
+    [...root.querySelectorAll('ha-form')]
+      .map((each) => JSON.stringify(each instanceof FakeForm ? each.schema : undefined))
+      .join(' ');
+  assert.match(offered(), /#tailnet/);
+  const later = {};
+  announce(later, [{ hash: '#living', cards: [] }]);
+  await editor.updateComplete;
+  assert.match(offered(), /#living/);
+  withdraw(owner);
+  withdraw(later);
+  await editor.updateComplete;
+  assert.doesNotMatch(offered(), /#tailnet|#living/);
 });

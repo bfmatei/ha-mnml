@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { basename, dirname, join, relative, resolve } from 'node:path';
+import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 
 import { minifyHTMLLiterals } from 'minify-literals';
 import { build } from 'rolldown';
@@ -8,7 +8,7 @@ import type { Plugin } from 'rolldown';
 
 import type { Value } from '../contract/templates.ts';
 import { COMMON_FAMILY } from '../templates/families.ts';
-import { familyNames, readFamily, shapeOf } from '../templates/shipped.ts';
+import { familyNames, readFamily, readShapes, shapeOf } from '../templates/shipped.ts';
 
 const ROOT = resolve(import.meta.dirname, '../..');
 const SOURCES = resolve(ROOT, 'src');
@@ -20,6 +20,12 @@ const LOADER_ENTRY = resolve(ROOT, 'src/cards/loader.ts');
 const PANEL_ENTRY = resolve(ROOT, 'src/panel/main.ts');
 
 const hash = (text: string): string => createHash('sha256').update(text).digest('hex').slice(0, 8);
+
+export function sourceOf(path: string): string {
+  const parts = relative(ROOT, path).split(sep);
+  const at = parts.lastIndexOf('node_modules');
+  return (at === -1 ? parts : parts.slice(at)).join('/');
+}
 
 function writeFamilies(
   dir: string,
@@ -58,6 +64,7 @@ export function familiesModule(
     `export const COMMON = ${JSON.stringify(readFamily(COMMON_FAMILY))};`,
     `export const OWNER = ${JSON.stringify(owner)};`,
     `export const SHAPES = ${JSON.stringify(shapes)};`,
+    `export const SLOT_SHAPES = ${JSON.stringify(readShapes())};`,
     `const FILES = ${JSON.stringify(files)};`,
     'export function loadFamily(family) {',
     '  const file = FILES[family];',
@@ -128,7 +135,7 @@ export async function buildBundle(file: string): Promise<number> {
       sourcemap: 'hidden',
       entryFileNames: (chunk) => (fixed.has(chunk.name) ? '[name].js' : `${stem}-[name]-[hash].js`),
       chunkFileNames: `${stem}-[name]-[hash].js`,
-      sourcemapPathTransform: (source, map) => relative(ROOT, resolve(dirname(map), source)),
+      sourcemapPathTransform: (source, map) => sourceOf(resolve(dirname(map), source)),
     },
     write: false,
     logLevel: 'warn',

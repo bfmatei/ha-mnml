@@ -11,37 +11,15 @@ person:
         help: "Names the person's pop-ups: jane gives #person-jane.",
       }
     entity: { kind: entity, required: true, label: Person, group: Basics, help: 'The person.' }
-    health:
-      kind: object
-      group: Health
-      fields:
-        steps: { kind: entity, required: true }
-        distance: { kind: entity, required: true }
-        flights_climbed: { kind: entity, required: true }
-        active_energy: { kind: entity, required: true }
-        resting_energy: { kind: entity, required: true }
+    health: { shape: health, group: Health }
     devices:
+      shape: person_device_popup
       kind: objects
       group: Devices
-      fields:
-        key: { kind: text, required: true }
-        name: { kind: text }
-        icon: { kind: icon }
-        tracker: { kind: entity, required: true }
-        battery: { kind: entity, required: true }
-        battery_state: { kind: entity, required: true }
-        connection: { kind: entity, required: true }
-        network: { kind: entity, required: true }
-        storage: { kind: entity, required: true }
-        focus: { kind: entity, required: true }
-        focus_name: { kind: entity }
-        activity: { kind: entity, required: true }
-        permission: { kind: entity, required: true }
-    activities: { kind: entities, group: Status }
-    focuses: { kind: entities, group: Status }
-    batteries: { kind: entities, group: Devices }
+      fields: { tracker: { required: true } }
     low: { kind: number, default: 20, label: Low battery, group: Devices }
     critical: { kind: number, default: 5, label: Critical battery, group: Devices }
+  retired: [activities, focuses, batteries]
   card:
     type: custom:mnml-tile-card
     entity: '[[entity]]'
@@ -49,7 +27,7 @@ person:
     state: [{ id: part }]
     chips:
       - id: driving
-        if: activities
+        if: devices.*.activity
         type: status
         name: Driving
         icon: mdi:steering
@@ -58,21 +36,30 @@ person:
           [
             {
               id: activities,
-              if: activities,
-              entities: ['[[activities]]'],
+              if: devices.*.activity,
+              entities: ['[[devices.*.activity]]'],
               color: amber,
               is: [automotive],
             },
           ]
       - id: do-not-disturb
-        if: focuses
+        if: devices.*.focus
         type: status
         name: Do not disturb
         icon: mdi:moon-waning-crescent
         silent: true
-        rules: [{ id: focuses, if: focuses, entities: ['[[focuses]]'], color: amber, is: ['on'] }]
+        rules:
+          [
+            {
+              id: focuses,
+              if: devices.*.focus,
+              entities: ['[[devices.*.focus]]'],
+              color: amber,
+              is: ['on'],
+            },
+          ]
       - id: batteries
-        if: batteries
+        if: devices.*.battery
         type: status
         name: Batteries
         icon: mdi:battery-alert-variant-outline
@@ -80,12 +67,20 @@ person:
         rules:
           - {
               id: critical,
-              entities: '[[batteries]]',
+              if: critical,
+              entities: '[[devices.*.battery]]',
               below: '[[critical]]',
               color: red,
               label: device,
             }
-          - { id: low, entities: '[[batteries]]', below: '[[low]]', color: orange, label: device }
+          - {
+              id: low,
+              if: low,
+              entities: '[[devices.*.battery]]',
+              below: '[[low]]',
+              color: orange,
+              label: device,
+            }
     grid_options: { columns: 12 }
   popups:
     - id: person-popup
@@ -95,7 +90,12 @@ person:
       each: devices
       as: device
       template: device-popup
-      slots: { key: '[[key]]', entity: '[[entity]]', device: '[[device]]' }
+      slots:
+        key: '[[key]]'
+        entity: '[[entity]]'
+        device: '[[device]]'
+        low: '[[low]]'
+        critical: '[[critical]]'
   example:
     key: alex
     entity: person.alex
@@ -116,37 +116,22 @@ person:
           permission: sensor.alex_phone_location_permission,
         },
       ]
-    activities: [sensor.alex_phone_activity]
-    focuses: [binary_sensor.alex_phone_focus]
-    batteries: [sensor.alex_phone_battery]
 
 device-card:
   description: A person's device as an item, its place and battery, opening its pop-up.
   slots:
     key: { kind: text, required: true }
-    device:
-      kind: object
-      required: true
-      fields:
-        key: { kind: text, required: true }
-        name: { kind: text }
-        icon: { kind: icon }
-        tracker: { kind: entity, required: true }
-        battery: { kind: entity }
-        battery_state: { kind: entity }
-        connection: { kind: entity }
-        network: { kind: entity }
-        storage: { kind: entity }
-        focus: { kind: entity }
-        focus_name: { kind: entity }
-        activity: { kind: entity }
-        permission: { kind: entity }
+    device: { shape: person_device, required: true, fields: { tracker: { required: true } } }
   card:
     type: custom:mnml-entity-card
     entity: '[[device.tracker]]'
     name: '[[device.name]]'
     icon: '[[device.icon]]'
-    state: [{ id: part }, { id: device-battery, entity: '[[device.battery]]', icon: true }]
+    state:
+      [
+        { id: part },
+        { id: device-battery, if: device.battery, entity: '[[device.battery]]', icon: true },
+      ]
     popup: '#person-[[key]]-[[device.key]]'
   example:
     key: alex
@@ -164,30 +149,11 @@ person-popup:
   slots:
     key: { kind: text, required: true }
     entity: { kind: entity, required: true }
-    health:
-      kind: object
-      fields:
-        steps: { kind: entity, required: true }
-        distance: { kind: entity, required: true }
-        flights_climbed: { kind: entity, required: true }
-        active_energy: { kind: entity, required: true }
-        resting_energy: { kind: entity, required: true }
+    health: { shape: health }
     devices:
+      shape: person_device
       kind: objects
-      fields:
-        key: { kind: text, required: true }
-        name: { kind: text }
-        icon: { kind: icon }
-        tracker: { kind: entity, required: true }
-        battery: { kind: entity }
-        battery_state: { kind: entity }
-        connection: { kind: entity }
-        network: { kind: entity }
-        storage: { kind: entity }
-        focus: { kind: entity }
-        focus_name: { kind: entity }
-        activity: { kind: entity }
-        permission: { kind: entity, required: true }
+      fields: { tracker: { required: true }, permission: { required: true } }
   card:
     hash: '#person-[[key]]'
     cards:
@@ -259,23 +225,9 @@ device-popup:
   slots:
     key: { kind: text, required: true }
     entity: { kind: entity }
-    device:
-      kind: object
-      required: true
-      fields:
-        key: { kind: text, required: true }
-        name: { kind: text }
-        icon: { kind: icon }
-        tracker: { kind: entity }
-        battery: { kind: entity, required: true }
-        battery_state: { kind: entity, required: true }
-        connection: { kind: entity, required: true }
-        network: { kind: entity, required: true }
-        storage: { kind: entity, required: true }
-        focus: { kind: entity, required: true }
-        focus_name: { kind: entity }
-        activity: { kind: entity, required: true }
-        permission: { kind: entity, required: true }
+    device: { shape: person_device_popup, required: true }
+    low: { kind: number, default: 20 }
+    critical: { kind: number, default: 5 }
   card:
     hash: '#person-[[key]]-[[device.key]]'
     cards:
@@ -294,8 +246,8 @@ device-popup:
           - id: device-battery
             entity: '[[device.battery]]'
             bar: true
-            low: 20
-            critical: 5
+            low: '[[low]]'
+            critical: '[[critical]]'
           - id: device-battery_state
             entity: '[[device.battery_state]]'
       - id: details

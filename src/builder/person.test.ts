@@ -29,9 +29,6 @@ test("a person's devices are their companion-app trackers, with the app's sensor
         permission: 'sensor.jane_phone_location_permission',
       },
     ],
-    activities: ['sensor.jane_phone_activity'],
-    focuses: ['binary_sensor.jane_phone_focus'],
-    batteries: ['sensor.jane_phone_battery_level'],
   });
 });
 

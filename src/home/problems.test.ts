@@ -20,13 +20,10 @@ test('a room keyed like a fixed pop-up is a duplicate hash', () => {
 });
 
 test('an order that skips or repeats a section is named', () => {
-  assert.deepEqual(
-    problems({ ...DEMO, order: ['rooms', 'garage', 'infrastructure', 'people'] }),
-    [],
-  );
+  assert.deepEqual(problems({ ...DEMO, order: ['rooms', 'garage', 'system', 'people'] }), []);
   for (const order of [
-    ['rooms', 'garage', 'infrastructure'],
-    ['rooms', 'rooms', 'garage', 'infrastructure'],
+    ['rooms', 'garage', 'system'],
+    ['rooms', 'rooms', 'garage', 'system'],
   ] as const) {
     assert.ok(
       problems({ ...DEMO, order }).some((problem) => problem.startsWith('order must list')),

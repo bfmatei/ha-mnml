@@ -16,31 +16,11 @@ unifi-network:
         help: "The network's devices, for their state.",
         discover: { domain: sensor, platform: unifi, translation_key: device_state, scope: all },
       }
-    wifi:
-      kind: objects
-      label: Wi-Fi networks
-      group: Wi-Fi
-      fields:
-        key: { kind: text, required: true }
-        enabled: { kind: entity, required: true }
-        qr: { kind: entity, label: QR code }
-        switchable: { kind: flag }
-    clients:
-      kind: object
-      group: Wi-Fi
-      fields:
-        entity: { kind: entity, required: true }
-        names: { kind: entity }
-        networks:
-          kind: objects
-          required: true
-          fields:
-            name: { kind: text }
-            icon: { kind: icon }
-            subnet: { kind: text, required: true }
+    wifi: { shape: wifi, kind: objects, label: Wi-Fi networks, group: Wi-Fi }
+    clients: { shape: clients, group: Wi-Fi }
     router:
+      shape: router
       help: "The router's processor use and temperature."
-      kind: object
       group: Basics
       discover:
         fields:
@@ -48,9 +28,6 @@ unifi-network:
             { domain: sensor, platform: unifi, translation_key: device_cpu_utilization, scope: all }
           temperature:
             { domain: sensor, platform: unifi, translation_key: device_sub_temperature, scope: all }
-      fields:
-        cpu: { kind: entity, required: true, label: CPU }
-        temperature: { kind: entity, required: true }
     firmware:
       {
         kind: entities,
@@ -82,7 +59,7 @@ unifi-network:
           [
             {
               id: devices,
-              if: devices,
+              if: device_up,
               entities: ['[[devices]]'],
               label: device,
               color: red,
@@ -133,14 +110,7 @@ unifi-network:
 wifi-item:
   description: A Wi-Fi network as an item, its switch when it may be switched from the dashboard, opening its pop-up.
   slots:
-    wifi:
-      kind: object
-      required: true
-      fields:
-        key: { kind: text, required: true }
-        enabled: { kind: entity, required: true }
-        qr: { kind: entity, label: QR code }
-        switchable: { kind: flag }
+    wifi: { shape: wifi, required: true }
   card:
     type: custom:mnml-entity-card
     entity: '[[wifi.enabled]]'
@@ -160,30 +130,9 @@ network-popup:
     latency: { kind: entities }
     wan: { kind: entity }
     devices: { kind: entities }
-    wifi:
-      kind: objects
-      fields:
-        key: { kind: text, required: true }
-        enabled: { kind: entity, required: true }
-        qr: { kind: entity, label: QR code }
-        switchable: { kind: flag }
-    clients:
-      kind: object
-      fields:
-        entity: { kind: entity, required: true }
-        names: { kind: entity }
-        networks:
-          kind: objects
-          required: true
-          fields:
-            name: { kind: text }
-            icon: { kind: icon }
-            subnet: { kind: text, required: true }
-    router:
-      kind: object
-      fields:
-        cpu: { kind: entity, required: true, label: CPU }
-        temperature: { kind: entity, required: true }
+    wifi: { shape: wifi, kind: objects }
+    clients: { shape: clients }
+    router: { shape: router }
     firmware: { kind: entities }
     device_up: { kind: texts, default: [connected, upgrading, provisioning] }
   card:
@@ -215,10 +164,17 @@ network-popup:
           - id: each-devices
             each: devices
             as: device
+            if: device_up
             entity: '[[device]]'
             label: device
             color: red
             when: { not: '[[device_up]]' }
+          - id: each-devices-2
+            each: devices
+            as: device
+            unless: device_up
+            entity: '[[device]]'
+            label: device
       - id: router
         if: router
         type: custom:mnml-list-card
@@ -264,14 +220,7 @@ network-popup:
 wifi-popup:
   description: A Wi-Fi network's pop-up, its switch and the QR code to join it while it is on.
   slots:
-    wifi:
-      kind: object
-      required: true
-      fields:
-        key: { kind: text, required: true }
-        enabled: { kind: entity, required: true }
-        qr: { kind: entity, label: QR code }
-        switchable: { kind: flag }
+    wifi: { shape: wifi, required: true }
   card:
     hash: '#network-[[wifi.key]]'
     cards:
@@ -287,11 +236,13 @@ wifi-popup:
             slots: { entity: '[[wifi.enabled]]' }
         back: true
       - id: heading
+        if: wifi.qr
         type: custom:mnml-heading-card
         title: Scan to join
         icon: mdi:qrcode-scan
         visibility: { template: while-not-off, slots: { entity: '[[wifi.enabled]]' } }
       - id: picture-entity
+        if: wifi.qr
         type: picture-entity
         entity: '[[wifi.qr]]'
         show_name: false

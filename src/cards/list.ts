@@ -2,6 +2,7 @@ import { css, html, nothing } from 'lit';
 import type { TemplateResult } from 'lit';
 import { state } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
+import type { ClassInfo } from 'lit/directives/class-map.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
 import type { Color, ListCard, ListRow, ListSummary } from '../contract/cards.ts';
@@ -15,15 +16,12 @@ import { colorStyle, icon, quietly, relativeTime, stateIcon } from '../ha/templa
 
 import { MnmlCard, requireList, requireString } from './base.ts';
 import type { Host } from './base.ts';
-import { schema } from './keys.ts';
 import type { KeySchema } from './keys.ts';
 import { SECTION_STYLE, section } from './parts/section.ts';
 import type { Fold, HeadingState } from './parts/section.ts';
 import { tip } from './parts/tooltip.ts';
-import { LIST_ROW } from './schemas.ts';
+import { LIST_CARD } from './schemas.ts';
 import { BASE_STYLE, HEADING_STYLE } from './styles.ts';
-
-const VALUE_SHARE = 50;
 
 const LIST_STYLE = css`
   .list {
@@ -101,7 +99,7 @@ const LIST_STYLE = css`
     line-height: 32px;
     text-align: end;
     min-width: 44px;
-    max-width: ${VALUE_SHARE}cqi;
+    max-width: 50cqi;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -155,13 +153,13 @@ interface Rendered {
 }
 
 function cell(
-  className: string,
+  names: ClassInfo,
   content: Content = nothing,
   color?: Color,
   part: string | typeof nothing = nothing,
 ): TemplateResult {
   return html`<div
-    class=${color === undefined ? `cell ${className}` : `cell ${className} colored`}
+    class=${classMap({ cell: true, ...names, colored: color !== undefined })}
     style=${styleMap(colorStyle(color))}
     data-part=${part}
   >
@@ -257,9 +255,9 @@ function barCell(
 
 function tableCell(hass: HomeAssistant, stateObj: HassEntity | undefined): TemplateResult {
   if (isUnavailable(stateObj)) {
-    return cell('value', unavailableValue(hass, stateObj), UNAVAILABLE);
+    return cell({ value: true }, unavailableValue(hass, stateObj), UNAVAILABLE);
   }
-  return cell('value', hasValue(stateObj) ? formatState(hass, stateObj) : DASH);
+  return cell({ value: true }, hasValue(stateObj) ? formatState(hass, stateObj) : DASH);
 }
 
 function shareCell(
@@ -276,24 +274,24 @@ function shareCell(
     : above(row.high, number)
       ? 'orange'
       : undefined;
-  return cell('value', share(hass, number), color);
+  return cell({ value: true }, share(hass, number), color);
 }
 
 function resetCell(hass: HomeAssistant, row: ListRow, host: Host): TemplateResult {
   const id = row.reset;
   if (id === undefined) {
-    return cell('');
+    return cell({});
   }
   const label = `Reset ${nameOf(hass, row.entity, row)}`;
   return cell(
-    '',
+    {},
     html`<button
       type="button"
       class="reset"
       aria-label=${label}
       ${tip(label)}
       @click=${quietly(() => {
-        run(host, callService(hass, id, 'button.press'));
+        run(host, callService(host.hass ?? hass, id, 'button.press'));
       })}
     >
       ${icon('mdi:restart')}
@@ -330,7 +328,7 @@ function renderRow(
   }
   const stateObj = emptyAsZero(row, stateOf(hass, row.entity));
   const part = partOf(row);
-  const label = cell('label', nameOf(hass, row.entity, row), undefined, part);
+  const label = cell({ label: true }, nameOf(hass, row.entity, row), undefined, part);
   if (mode === 'table') {
     const values = Array.from({ length: columns }, (_, index) =>
       stateOf(hass, row.values?.[index]),
@@ -343,7 +341,7 @@ function renderRow(
         ? UNAVAILABLE
         : undefined;
     const iconCell = cell(
-      'icon-cell',
+      { 'icon-cell': true },
       stateIcon(hass, stateObj),
       isUnavailable(stateObj) ? UNAVAILABLE : undefined,
       part,
@@ -370,10 +368,10 @@ function renderRow(
   const number = rowNumber(hass, row, stateObj);
   const color = rowColor(row, stateObj, number);
   const cells = [
-    cell('icon-cell', stateIcon(hass, stateObj), color, part),
+    cell({ 'icon-cell': true }, stateIcon(hass, stateObj), color, part),
     label,
     ...(mode === 'bars' ? [barCell(row, number, color)] : []),
-    cell('value', valueOf(hass, row, stateObj, number), color, part),
+    cell({ value: true }, valueOf(hass, row, stateObj, number), color, part),
     ...(resets ? [resetCell(hass, row, host)] : []),
   ];
   return { row, stateObj, cells, number, color };
@@ -456,27 +454,13 @@ function summarise(
   return total(hass, rendered, summary.sum, headers?.[summary.sum + 1]);
 }
 
-const SCHEMA = schema<ListCard>(
-  {
-    type: true,
-    lowest_first: true,
-    fold: true,
-    summary: true,
-    title: true,
-    icon: true,
-    headers: true,
-    rows: true,
-  },
-  { rows: LIST_ROW },
-);
-
 export class MnmlListCard extends MnmlCard<ListCard> {
   static override styles = [BASE_STYLE, HEADING_STYLE, SECTION_STYLE, LIST_STYLE];
 
   @state() private choice: boolean | undefined;
 
   protected schema(): KeySchema {
-    return SCHEMA;
+    return LIST_CARD;
   }
 
   protected override validate(config: ListCard): void {
@@ -510,12 +494,12 @@ export class MnmlListCard extends MnmlCard<ListCard> {
       nameHeader === undefined
         ? []
         : [
-            cell('header label', nameHeader),
-            ...valueHeaders.map((header) => cell('header value', header)),
+            cell({ header: true, label: true }, nameHeader),
+            ...valueHeaders.map((header) => cell({ header: true, value: true }, header)),
           ];
     const card = html`<div class="card list">
       <div
-        class=${resets ? `grid ${mode} resets` : `grid ${mode}`}
+        class=${classMap({ grid: true, [mode]: true, resets })}
         style=${styleMap({ '--values': String(valueHeaders.length) })}
       >
         ${headers}${ordered.map((entry) => entry.cells)}

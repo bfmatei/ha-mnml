@@ -2,13 +2,14 @@ import assert from 'node:assert/strict';
 
 import { test } from 'vitest';
 
+import { originOf } from '../ha/navigation.ts';
 import { define, mounted, text } from '../test/render.ts';
 
-import { MnmlSlider } from './parts/slider.ts';
+import { MnmlEntityCard } from './entity.ts';
 import { MnmlTileCard } from './tile.ts';
 
 define('mnml-tile-card', MnmlTileCard);
-define('mnml-slider', MnmlSlider);
+define('mnml-entity-card', MnmlEntityCard);
 
 const JANE = {
   entity_id: 'person.jane',
@@ -229,20 +230,6 @@ test('a silent status control with a rule for unarmed shows while unarmed and hi
   assert.equal((await alarmChips([UNARMED], 'doorsTiltCabin')).length, 0);
 });
 
-test("the tile washes on hover wherever the pointer is, over its item row and that row's controls too, and its row changes no shadow", () => {
-  const css = MnmlTileCard.styles
-    .flat()
-    .map((sheet) => ('cssText' in sheet ? sheet.cssText : ''))
-    .join('\n');
-  assert.match(css, /\.tile:hover::before/, 'the shared overlay washes the tile');
-  assert.doesNotMatch(css, /\.tile:hover:not\(/, 'with no exemption of its own');
-  assert.doesNotMatch(css, /\.tile > \.row\.link:hover/, 'so the row keeps its well as it is');
-  assert.match(
-    css,
-    /\.tile:active:not\(:has\(\.control:active, \.pill\.link:active, \.row\.link:active\)\)::before/,
-  );
-});
-
 const DAY = 86_400_000;
 
 function expiryChips(state: string, withinDays = 14): Promise<Element[]> {
@@ -357,44 +344,131 @@ test('each state part keeps its text in a box of its own, so a narrow tile can c
   );
 });
 
-test('the slider of the lights row opens over that row, and not over the whole tile', async () => {
-  const light = {
-    entity_id: 'light.a',
-    state: 'on',
-    attributes: { friendly_name: 'A', brightness: 128, supported_color_modes: ['brightness'] },
-  };
-  const out = await paint(
+const LIGHT = {
+  entity_id: 'light.a',
+  state: 'on',
+  attributes: { friendly_name: 'Lights', brightness: 80, supported_color_modes: ['brightness'] },
+};
+
+const RELAX = { entity_id: 'scene.relax', state: '2026-10-12T07:00:00+00:00', attributes: {} };
+
+const LIGHTS_HASS = {
+  ...HASS,
+  states: { ...HASS.states, 'light.a': LIGHT, 'scene.relax': RELAX },
+  formatEntityAttributeValue: (_stateObj: unknown, _name: string, value: unknown): string =>
+    `${String(value)}%`,
+};
+
+const LIGHT_ITEM = {
+  entity: 'light.a',
+  popup: '#jane-lights',
+  state: [{ when: { is: ['off'] } }, { attribute: 'brightness' }],
+  controls: [
+    { type: 'scenes', scenes: ['scene.relax'], name: 'Scenes', icon: 'mdi:palette-swatch' },
     {
-      type: 'custom:mnml-tile-card',
-      entity: 'person.jane',
-      popup: '#jane',
-      item: {
-        entity: 'light.a',
-        controls: [
-          {
-            type: 'slider',
-            entity: 'light.a',
-            slider: 'brightness',
-            name: 'Brightness',
-            icon: 'mdi:brightness-6',
-          },
-        ],
-      },
+      type: 'slider',
+      entity: 'light.a',
+      slider: 'brightness',
+      name: 'Brightness',
+      icon: 'mdi:brightness-6',
     },
-    {
-      ...HASS,
-      states: { ...HASS.states, 'light.a': light },
-      formatEntityAttributeValue: (_stateObj: unknown, _name: string, value: unknown): string =>
-        String(value),
-    },
-  );
+    { type: 'toggle', entity: 'light.a', icon: 'mdi:power', primary: true },
+  ],
+};
+
+const WITH_LIGHTS = {
+  type: 'custom:mnml-tile-card',
+  entity: 'person.jane',
+  popup: '#jane',
+  item: LIGHT_ITEM,
+};
+
+test('the item row of a tile is its item minified: a small icon, the name and the state on one line, and every control of the item at a smaller size', async () => {
+  const out = await paint(WITH_LIGHTS, LIGHTS_HASS);
   const row = out.querySelector('.tile > .row');
   assert.ok(row, 'the lights row');
-  const button = row.querySelector<HTMLButtonElement>('button.control');
-  assert.ok(button);
-  button.click();
-  assert.equal(row.querySelector('.overlay')?.parentElement, row, 'in the row');
-  assert.equal(out.querySelector('.tile > .overlay'), null, 'not over the tile');
+  assert.equal(text(row.querySelector('.line')), 'Lights • 80%', 'one line');
+  assert.equal(row.querySelector('.text'), null, 'not the two lines of an item');
+  assert.ok(row.querySelector('[aria-haspopup]'), 'the scenes button');
+  const brightness = row.querySelector('[aria-label="Brightness"]');
+  assert.ok(brightness, 'the brightness slider button');
+  const controls = [...row.querySelectorAll<HTMLElement>('.control')];
+  assert.equal(controls.length, 3, 'scenes, brightness and power');
+  assert.equal(controls.at(-1)?.getAttribute('aria-pressed'), 'true', 'power last');
+  for (const control of controls) {
+    assert.deepEqual(
+      [getComputedStyle(control).height, getComputedStyle(control).borderRadius],
+      ['28px', '50%'],
+      'a 28 px round',
+    );
+  }
+  const pill = row.querySelector('.pill');
+  assert.ok(pill);
+  const look = getComputedStyle(pill);
+  assert.deepEqual([look.width, look.height], ['28px', '28px'], 'a small icon');
+  assert.equal(look.backgroundColor, 'rgba(0, 0, 0, 0)', 'with no tile under it');
+  assert.equal(getComputedStyle(row).minHeight, '36px', 'one slim line');
+});
+
+test("a slider button on a tile's item row opens its slider over that row alone, so the tile's header stays", async () => {
+  const out = await paint(WITH_LIGHTS, LIGHTS_HASS);
+  const row = out.querySelector<HTMLElement>('.tile > .row');
+  assert.ok(row);
+  row.querySelector<HTMLElement>('[aria-label="Brightness"]')?.click();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const overlay = out.querySelector('.overlay');
+  assert.ok(overlay, 'a slider opened');
+  assert.equal(overlay.parentElement, row, 'inside the row');
+  assert.equal(getComputedStyle(row).position, 'relative');
+});
+
+test('the item row of a tile reads its state on the same line while the light is off', async () => {
+  const out = await paint(WITH_LIGHTS, {
+    ...LIGHTS_HASS,
+    states: {
+      ...LIGHTS_HASS.states,
+      'light.a': { ...LIGHT, state: 'off', attributes: { friendly_name: 'Lights' } },
+    },
+  });
+  assert.equal(text(out.querySelector('.tile > .row .line')), 'Lights • off');
+});
+
+test("tapping the item row of a tile opens the item's pop-up, not the tile's", async () => {
+  history.replaceState(null, '', location.pathname);
+  const out = await paint(WITH_LIGHTS, LIGHTS_HASS);
+  const row = out.querySelector<HTMLElement>('.tile > .row');
+  assert.ok(row);
+  row.click();
+  assert.equal(location.hash, '#jane-lights');
+  history.replaceState(null, '', location.pathname);
+});
+
+test("the same item in a pop-up's entity card keeps every control", async () => {
+  const made = document.createElement('mnml-entity-card');
+  assert.ok(made instanceof MnmlEntityCard);
+  made.setConfig({ type: 'custom:mnml-entity-card', ...LIGHT_ITEM } as never);
+  made.hass = LIGHTS_HASS as never;
+  const out = await mounted(made);
+  assert.deepEqual(
+    [...out.querySelectorAll('.row .control')].map((control) => control.getAttribute('aria-label')),
+    ['Scenes', 'Brightness', 'Lights'],
+  );
+  assert.equal(text(out.querySelector('.row .text .name')), 'Lights', 'and its two lines');
+});
+
+test('a nav chip opens its pop-up from the chip itself, not from the whole tile', async () => {
+  const out = await paint({
+    type: 'custom:mnml-tile-card',
+    entity: 'person.jane',
+    popup: '#jane',
+    chips: [{ type: 'nav', entity: 'person.jane', popup: '#jane-phone' }],
+  });
+  const chip = out.querySelector<HTMLElement>('.chips button.control');
+  assert.ok(chip);
+  chip.click();
+  assert.equal(location.hash, '#jane-phone');
+  assert.equal(originOf('#jane-phone'), chip);
+  history.replaceState(null, '', location.pathname);
 });
 
 test('a part the template marked carries its path on the card, its chips, its state and its item, and a card without marks carries none', async () => {

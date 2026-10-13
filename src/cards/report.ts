@@ -9,9 +9,9 @@ import type { HomeAssistant } from '../ha/hass.ts';
 import { colorStyle, icon } from '../ha/templates.ts';
 
 import { MnmlCard, requireString } from './base.ts';
-import { schema } from './keys.ts';
 import type { KeySchema } from './keys.ts';
 import { SECTION_STYLE, section } from './parts/section.ts';
+import { REPORT_CARD } from './schemas.ts';
 import { BASE_STYLE, HEADING_STYLE } from './styles.ts';
 
 const REPORT_STYLE = css`
@@ -114,19 +114,11 @@ function group({ label, word, entries }: Group, colors: Record<string, Color>): 
   </div>`;
 }
 
-const SCHEMA = schema<ReportCard>({
-  type: true,
-  entity: true,
-  title: true,
-  icon: true,
-  colors: true,
-});
-
 export class MnmlReportCard extends MnmlCard<ReportCard> {
   static override styles = [BASE_STYLE, HEADING_STYLE, SECTION_STYLE, REPORT_STYLE];
 
   protected schema(): KeySchema {
-    return SCHEMA;
+    return REPORT_CARD;
   }
 
   protected override validate(config: ReportCard): void {

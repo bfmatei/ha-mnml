@@ -124,6 +124,31 @@ test('text that is not a dashboard template is refused with what it is', () => {
   assert.equal(readRecipe(`${base}  sections:\n    rooms: {}\n`, SHIPPED).title, 'Home');
 });
 
+test('a bundled template the store would refuse is refused when the recipe is read', () => {
+  const base = 'mnml_dashboard:\n  title: Home\n  icon: mdi:home\n  open: {}\n  templates:\n';
+  assert.throws(
+    () => readRecipe(`${base}    parts:\n      card:\n        - type: toggle\n`, SHIPPED),
+    /parts in the dashboard template is not a template/,
+  );
+  assert.throws(
+    () =>
+      readRecipe(
+        `${base}    garden:\n      card: { type: custom:mnml-heading-card }\n      popups: [one]\n`,
+        SHIPPED,
+      ),
+    /garden in the dashboard template is not a template/,
+  );
+});
+
+test('a bundled change to a shipped fragment keeps its list card', () => {
+  const base = 'mnml_dashboard:\n  title: Home\n  icon: mdi:home\n  open: {}\n  templates:\n';
+  const recipe = readRecipe(
+    `${base}    batteries:\n      card:\n        - type: toggle\n`,
+    SHIPPED,
+  );
+  assert.deepEqual(recipe.templates['batteries']?.card, [{ type: 'toggle' }]);
+});
+
 test('a bundled template brought in under another name is the name its recipe uses', () => {
   const recipe = recipeOf(
     {
@@ -188,4 +213,21 @@ test("a recipe keeps its sections' order, and refills it", () => {
       ),
     /order/,
   );
+});
+
+test("a recipe keeps whether the Glances strip shows, without the strip's slots, and refills it", () => {
+  const plan: Plan = {
+    ...defaultPlan(HOME, SHIPPED),
+    glances: { slots: { weather: 'weather.home' } },
+  };
+  const recipe = recipeOf(plan, SHIPPED, SHIPPED);
+  assert.equal(recipe.glances, true);
+  const back = planFrom(readRecipe(recipeText(recipe), SHIPPED), HOME, SHIPPED);
+  assert.deepEqual(back.glances, {});
+  const plain = recipeOf(defaultPlan(HOME, SHIPPED), SHIPPED, SHIPPED);
+  assert.equal('glances' in plain, false);
+  const read = planFrom(readRecipe(recipeText(plain), SHIPPED), HOME, SHIPPED);
+  assert.equal('glances' in read, false);
+  const head = 'mnml_dashboard:\n  title: Home\n  icon: mdi:home\n';
+  assert.throws(() => readRecipe(`${head}  glances: yes please\n`, SHIPPED), /Glances/);
 });

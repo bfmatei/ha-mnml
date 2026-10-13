@@ -173,7 +173,7 @@ test('in the stage a click on a part picks it, and nothing the card would do', a
     picked.push(key);
   };
   const root = await mounted(stage);
-  await new Promise((done) => setTimeout(done, 20));
+  await new Promise((done) => setTimeout(done, 0));
   const card = root.querySelector('.cards > div');
   const chip = card?.shadowRoot?.querySelector('button');
   assert.ok(chip);
@@ -300,7 +300,7 @@ async function staged(extra: (stage: MnmlPreview) => void): Promise<{
   stage.staged = true;
   extra(stage);
   const root = await mounted(stage);
-  await new Promise((done) => setTimeout(done, 20));
+  await new Promise((done) => setTimeout(done, 0));
   return { stage, root };
 }
 
@@ -439,10 +439,15 @@ test('a native card inside a native card is picked by the configuration it was g
   assert.ok(stage instanceof MnmlPreview);
   stage.trial = () => trial({ type: 'vertical-stack', _part: 'card' });
   stage.staged = true;
-  const root = await mounted(stage);
-  await new Promise((done) => setTimeout(done, 1000));
-  const inner = root.querySelector('.cards > div')?.shadowRoot?.querySelector('div');
-  assert.equal(inner?.getAttribute('data-part'), 'card/cards/#camera');
-  stage.remove();
-  Reflect.deleteProperty(window, 'loadCardHelpers');
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  try {
+    const root = await mounted(stage);
+    await vi.advanceTimersByTimeAsync(1000);
+    const inner = root.querySelector('.cards > div')?.shadowRoot?.querySelector('div');
+    assert.equal(inner?.getAttribute('data-part'), 'card/cards/#camera');
+  } finally {
+    vi.useRealTimers();
+    stage.remove();
+    Reflect.deleteProperty(window, 'loadCardHelpers');
+  }
 });

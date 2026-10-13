@@ -1,11 +1,10 @@
 import { isMapping } from '../contract/templates.ts';
 import type { Templates, Value } from '../contract/templates.ts';
 
-import { filled } from './expand.ts';
+import { OVER, PATH, filled } from './expand.ts';
 
 type Mapping = Record<string, Value>;
 
-const PATH = '[a-z_][a-z0-9_]*(?:\\.[a-z0-9_]+)*';
 const WHOLE = new RegExp(`^\\[\\[(${PATH})\\]\\]$`);
 const PART = new RegExp(`\\[\\[(${PATH})\\]\\]`, 'g');
 const DROP = Symbol('drop');
@@ -41,6 +40,8 @@ function resolve(path: string, scope: Scope): Resolved {
     const outer = typeof value === 'string' ? WHOLE.exec(value)?.[1] : undefined;
     if (outer !== undefined) {
       value = `[[${outer}.${name}]]`;
+    } else if (OVER.test(name) && value !== undefined && value !== null) {
+      throw new Unsupported('a projection over a list written out');
     } else if (Array.isArray(value)) {
       value = value[Number(name)];
     } else {
@@ -246,7 +247,10 @@ export function detach(
     return undefined;
   }
   const slots = new Map<string, Value | undefined>(
-    Object.entries(inner.slots ?? {}).map(([slot, spec]) => [slot, given[slot] ?? spec.default]),
+    Object.entries(inner.slots ?? {}).map(([slot, spec]) => [
+      slot,
+      Object.hasOwn(given, slot) ? given[slot] : spec.default,
+    ]),
   );
   const scope: Scope = { given: slots, aliases: new Set(), taken };
   const id = use['id'];

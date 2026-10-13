@@ -7,13 +7,14 @@
 **Shape and type, in both designs.**
 
 - **The font** is the system stack.
-  **In the glass theme,**
+
+**In the glass theme,**
 
 - **Cards** have a 22 px radius, and no border of the theme's own. The cards draw their 1 px hairline and highlight, and their shadow, from the variables below.
 - **Glass.** Cards, pills and pop-ups are translucent and blur what is behind them. Behind them is the view's background (`lovelace-background`): a diagonal gradient under five soft glows, fixed to the window. The glows are in the model, so a change to their colour or strength is held to the contrast claims below.
 - **Pop-ups** have a 22 px radius, the cards', so a pop-up that unfolds in a tile's place keeps its corners.
 
-**In the flat theme,** cards are the card colour, opaque, on a 1 px hairline in the `edge` colour, with no blur, no backdrop and no shadow of their own; pills, trays and the thumbs on the Lights strip are opaque colours of their own, and pop-ups are the card colour. Everything else (the radii, the wells, the palettes and the type) is the glass theme's.
+**In the flat theme,** cards are the card colour, opaque, on a 1 px hairline in the `edge` colour, with no blur, no backdrop and no shadow of their own; pills and trays are opaque colours of their own, and pop-ups are the card colour. Everything else (the radii, the wells, the palettes and the type) is the glass theme's.
 
 **Two palettes under `modes`.** HA switches between them with the operating system when a profile's dark mode is set to Auto. They are [Monokai Pro](https://monokai.pro)'s: Filter Spectrum in the dark, Monokai Pro Light in the light.
 
@@ -33,29 +34,29 @@
 
 The theme also sets the gaps of a sections view to 12 px (`ha-view-sections-column-gap`, `-row-gap`).
 
-A `Palette` has two opaque surfaces (the page and the card, which HA's menus and dialogs keep), five greys, the text colour for a primary fill, six accents and its `Material`. Every colour is a `Hex`, because HA derives the `--rgb-*` variants from hex values only; the material has a tint (a `Hex` and an alpha) for each of the card, the pill, the raised pill (a pill on a pill), the shadow, the pop-up, the edge, the highlight and the scrim, the blur and saturation, the base gradient, and the glows. Swapping in another Monokai Pro filter is a matter of replacing these values.
+A `Palette` has two opaque surfaces (the page and the card, which HA's menus and dialogs keep), five greys, the text colour for a primary fill, six accents and its `Material`. Every colour is a `Hex`, because HA derives the `--rgb-*` variants from hex values only; the material has a tint (a `Hex` and an alpha) for each of the card, the pill, the section (the trays of a pop-up), the raised pill (a pill on a pill), the well and its lip (the recess of a pill or a chip), the scroll shade of a pop-up, the overlay (a slider control's overlay, the tooltip), the shadow, the edge, the highlight and the scrim, the blur and saturation, the base gradient, and the glows. The pop-up's fill is the card's tint. Swapping in another Monokai Pro filter is a matter of replacing these values.
 
 ## Where each palette value goes
 
 `buildTheme()` in `src/theme/theme.ts` spells the mapping:
 
-| Palette     | Home Assistant variables                                                                                                                                     |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `page`      | `primary-background-color`, `secondary-background-color`, the app header, the sidebar, and the base of `lovelace-background`                                 |
-| `card`      | `card-background-color` (menus, dialogs), `text-accent-color` (the sidebar's unread badge on `accent-color`)                                                 |
-| `material`  | `ha-card-background`, `ha-card-backdrop-filter`, `lovelace-background`, and the `mnml-*` variables below: the card, pill, section, edge, highlight and scrim |
-| `text`      | `primary-text-color`, the header and sidebar text                                                                                                            |
-| `dimmed`    | `secondary-text-color`, the sidebar icons                                                                                                                    |
-| `disabled`  | `disabled-text-color`, the disabled line of a text field                                                                                                     |
-| `divider`   | `divider-color`                                                                                                                                              |
-| `icon`      | `state-icon-color` and `grey-color`. HA derives `--state-inactive-color` from the latter, so its own inactive icons take the theme's neutral                 |
-| `onPrimary` | `text-primary-color`: text on a fill in the primary colour                                                                                                   |
-| `yellow`    | `primary-color`, Monokai's accent; also `amber-color`, `yellow-color`, the sidebar's selected icon, `ha-color-focus`                                         |
-| `purple`    | `accent-color`, the fill of a slider with no colour of its own; also `purple-color`, `deep-purple-color`, `indigo-color`                                     |
-| `red`       | `red-color`, `pink-color`, `error-color`                                                                                                                     |
-| `orange`    | `orange-color`, `deep-orange-color`, `warning-color`                                                                                                         |
-| `green`     | `green-color`, `light-green-color`, `success-color`                                                                                                          |
-| `blue`      | `blue-color`, `light-blue-color`, `cyan-color`, `teal-color`, `info-color`                                                                                   |
+| Palette     | Home Assistant variables                                                                                                                                                                          |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `page`      | `primary-background-color`, `secondary-background-color`, the app header, the sidebar, and the base of `lovelace-background`                                                                      |
+| `card`      | `card-background-color` (menus, dialogs), `text-accent-color` (the sidebar's unread badge on `accent-color`)                                                                                      |
+| `material`  | `ha-card-background`, `ha-card-backdrop-filter`, `lovelace-background`, and the `mnml-*` variables below: the card, pill, raised pill, section, overlay, edge, highlight, shadows, well and scrim |
+| `text`      | `primary-text-color`, the header and sidebar text                                                                                                                                                 |
+| `dimmed`    | `secondary-text-color`, the sidebar icons                                                                                                                                                         |
+| `disabled`  | `disabled-text-color`, the disabled line of a text field                                                                                                                                          |
+| `divider`   | `divider-color`                                                                                                                                                                                   |
+| `icon`      | `state-icon-color` and `grey-color`. HA derives `--state-inactive-color` from the latter, so its own inactive icons take the theme's neutral                                                      |
+| `onPrimary` | `text-primary-color`: text on a fill in the primary colour                                                                                                                                        |
+| `yellow`    | `primary-color`, Monokai's accent; also `amber-color`, `yellow-color`, the sidebar's selected icon, `ha-color-focus`                                                                              |
+| `purple`    | `accent-color`, the fill of a slider with no colour of its own; also `purple-color`, `deep-purple-color`, `indigo-color`                                                                          |
+| `red`       | `red-color`, `pink-color`, `error-color`                                                                                                                                                          |
+| `orange`    | `orange-color`, `deep-orange-color`, `warning-color`                                                                                                                                              |
+| `green`     | `green-color`, `light-green-color`, `success-color`                                                                                                                                               |
+| `blue`      | `blue-color`, `light-blue-color`, `cyan-color`, `teal-color`, `info-color`                                                                                                                        |
 
 The semantic colours (`error`, `warning`, `success`, `info`) follow the accents, so HA's own dialogs match them too.
 
@@ -110,22 +111,27 @@ When a palette changes, fix the claim or the colour. The build won't let them di
 
 ## What the cards read
 
-The cards read the variables below of their own. The theme sets each; without it, each card falls back as below.
+The cards read eighteen variables of their own, below. The theme sets each; without it, each card falls back as below.
 
-| Variable                      | Read by                                                                         | Without the theme                          |
-| ----------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------ |
-| `mnml-pill-color`             | pills, filled controls, slider tracks                                           | an 8 % mix of the text colour (`--m-pill`) |
-| `mnml-card-background-color`  | every card's surface (`--m-card`)                                               | `--card-background-color`                  |
-| `mnml-card-backdrop-filter`   | every card's blur of what is behind it                                          | none: the card is opaque                   |
-| `mnml-card-edge-color`        | every card's hairline                                                           | a 12 % mix of the text colour (`--m-edge`) |
-| `mnml-card-highlight-color`   | the 1 px light line along a card's top edge                                     | none                                       |
-| `mnml-popup-background-color` | the pop-up shell: a card's fill                                                 | `--primary-background-color`               |
-| `mnml-popup-section-color`    | the cards inside a pop-up: the trays it holds                                   | the pill colour                            |
-| `mnml-popup-backdrop-filter`  | the pop-up shell's blur                                                         | none                                       |
-| `mnml-popup-scrim-color`      | the dimming behind a pop-up                                                     | `rgb(0 0 0 / 0.55)`                        |
-| `mnml-popup-scrim-filter`     | the blur of the page behind a pop-up                                            | none                                       |
-| `mnml-popup-shadow`           | the pop-up shell's elevation                                                    | none                                       |
-| `mnml-popup-border-radius`    | the pop-up shell                                                                | a fallback radius                          |
-| `mnml-popup-gap`              | the pop-up shell, and the gap between the clients and messages cards' own cards | a fallback gap                             |
+| Variable                        | Read by                                                                                                                       | Without the theme                          |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| `mnml-pill-color`               | pills, filled controls, slider tracks                                                                                         | an 8 % mix of the text colour (`--m-pill`) |
+| `mnml-pill-raised-color`        | a pill on a pill: every pill inside a pop-up                                                                                  | `--card-background-color`                  |
+| `mnml-card-background-color`    | every card's surface (`--m-card`)                                                                                             | `--card-background-color`                  |
+| `mnml-card-backdrop-filter`     | every card's blur of what is behind it                                                                                        | none: the card is opaque                   |
+| `mnml-card-edge-color`          | every card's hairline                                                                                                         | a 12 % mix of the text colour (`--m-edge`) |
+| `mnml-card-highlight-color`     | the 1 px light line along a card's top edge                                                                                   | none                                       |
+| `mnml-card-shadow`              | every card's elevation                                                                                                        | none                                       |
+| `mnml-button-shadow`            | the well of a pill, a chip, the Lights row and a slider track: an inner shadow along its top and a light lip along its bottom | none                                       |
+| `mnml-overlay-background-color` | a slider control's overlay and the tooltip                                                                                    | `--card-background-color`                  |
+| `mnml-popup-background-color`   | the pop-up shell: a card's fill                                                                                               | `--primary-background-color`               |
+| `mnml-popup-section-color`      | the cards inside a pop-up: the trays it holds                                                                                 | the pill colour                            |
+| `mnml-popup-backdrop-filter`    | the pop-up shell's blur                                                                                                       | none                                       |
+| `mnml-popup-scrim-color`        | the dimming behind a pop-up                                                                                                   | `rgb(0 0 0 / 0.55)`                        |
+| `mnml-popup-scrim-filter`       | the blur of the page behind a pop-up                                                                                          | none                                       |
+| `mnml-popup-shadow`             | the pop-up shell's elevation                                                                                                  | none                                       |
+| `mnml-popup-scroll-shadow`      | the shade at the foot of a pop-up with more below                                                                             | none                                       |
+| `mnml-popup-border-radius`      | the pop-up shell                                                                                                              | a fallback radius                          |
+| `mnml-popup-gap`                | the pop-up shell, and the gap between the clients and messages cards' own cards                                               | a fallback gap                             |
 
 Beyond the two slider gradients, the cards write three colours of their own (see [Design](design.md#colour)).

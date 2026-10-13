@@ -65,74 +65,6 @@ test('every table row fills exactly the columns its card declares', () => {
   assert.ok(checked > 0, 'there are table rows to check');
 });
 
-const SURFACE: Record<string, string> = {
-  'custom:mnml-popups-card': 'open, popups, type, width',
-  'custom:mnml-agenda-card': 'icon, sources, title, type',
-  'custom:mnml-button-card': 'entity, service, type',
-  'custom:mnml-car-plan-card':
-    'doors, hood, icon, sunroof, tailgate, title, type, tyre_low_share, tyre_targets, tyre_warn_share, tyres, windows',
-  'custom:mnml-clients-card': 'entity, fold, names, networks, type',
-  'custom:mnml-entity-card':
-    'color, controls, entity, icon, items, label, name, popup, state, strip_word, type, visibility, when',
-  'custom:mnml-header-card': 'back, color, controls, entity, icon, label, name, state, type, when',
-  'custom:mnml-glances-card': 'grid_options, items, type',
-  'custom:mnml-heading-card': 'grid_options, icon, state, title, type, visibility',
-  'custom:mnml-list-card': 'fold, headers, icon, lowest_first, rows, summary, title, type',
-  'custom:mnml-media-card': 'entity, popup, type',
-  'custom:mnml-messages-card': 'clear, entity, sources, type',
-  'custom:mnml-report-card': 'colors, entity, icon, title, type',
-  'custom:mnml-weather-card': 'entity, title, type',
-  'custom:mnml-select-card':
-    'active_scene, attribute, entity, icon, name, scenes, type, visibility',
-  'custom:mnml-slider-card': 'color, entity, icon, name, slider, turn_on, type, visibility',
-  'custom:mnml-tile-card':
-    'chips, entity, grid_options, icon, item, label, name, popup, state, type',
-  grid_options: 'columns',
-  indicator: 'color, entity, show, type',
-  item: 'color, controls, entity, popup, state',
-  items:
-    'alert, bare, below, color, controls, critical, entities, entity, icon, is, name, people, popup, quiet, show, state, strip_word, sum, toggle, when',
-  nav: 'color, entity, popup, show, type, when',
-  networks: 'icon, name, subnet',
-  popups: 'cards, hash',
-  rows: 'bar, color, critical, critical_high, entity, flag, high, label, low, low_only, name, of, relative, reset, show, strip, values, when, words, zero_when_empty',
-  rules: 'below, color, entities, is, label, not, within_days, words',
-  scenes: 'active_scene, icon, name, scenes, type',
-  select: 'attribute, color, entity, primary, show, type, when',
-  service: 'entity, icon, name, primary, service, show, type',
-  show: 'entity, is, not',
-  slider: 'color, entity, icon, name, show, slider, type',
-  sources: 'entity, kind, name, source',
-  state: 'attribute, entity, icon, minutes, name, relative, serial, text, when',
-  status: 'icon, name, rules, silent, type',
-  toggle: 'color, entity, icon, primary, show, type, when',
-  tyres: 'low_share, silent, targets, type, tyres, warn_share',
-  visibility: 'condition, entity, state_not',
-  when: 'entity, is, not',
-};
-
-test('the contract surface the generator writes has not drifted', () => {
-  const found = new Map<string, Set<string>>();
-  walk(dashboard, (node, parentKey) => {
-    const bucket = typeof node['type'] === 'string' ? node['type'] : parentKey;
-    let keys = found.get(bucket);
-    if (keys === undefined) {
-      keys = new Set();
-      found.set(bucket, keys);
-    }
-    for (const [key, value] of Object.entries(node)) {
-      if (value !== undefined) {
-        keys.add(key);
-      }
-    }
-  });
-  for (const [bucket, expected] of Object.entries(SURFACE)) {
-    const keys = found.get(bucket);
-    assert.ok(keys, `${bucket} is still written`);
-    assert.equal([...keys].sort().join(', '), expected, bucket);
-  }
-});
-
 test('build() is a pure function of the home', () => {
   assert.equal(JSON.stringify(build(DEMO)), JSON.stringify(build(DEMO)));
 });
@@ -154,14 +86,14 @@ test('the untitled outlook comes first, the titled sections in the order the hom
     DEMO.sections.rooms,
     DEMO.sections.people,
     DEMO.sections.garage,
-    DEMO.sections.infrastructure,
+    DEMO.sections.system,
     undefined,
   ]);
-  assert.deepEqual(titles({ ...DEMO, order: ['rooms', 'garage', 'infrastructure', 'people'] }), [
+  assert.deepEqual(titles({ ...DEMO, order: ['rooms', 'garage', 'system', 'people'] }), [
     undefined,
     DEMO.sections.rooms,
     DEMO.sections.garage,
-    DEMO.sections.infrastructure,
+    DEMO.sections.system,
     DEMO.sections.people,
     undefined,
   ]);
@@ -331,7 +263,7 @@ function tiles(home: Home): Json[] {
   return under(home, 'cards').filter((card) => card['type'] === 'custom:mnml-tile-card');
 }
 
-test('Tailscale is its own tile in the infrastructure section, right after Network, with its pop-up', () => {
+test('Tailscale is its own tile in the system section, right after Network, with its pop-up', () => {
   const names = tiles(DEMO).map((tile) => tile['name']);
   const at = names.indexOf('Tailscale');
   assert.ok(at > 0, 'there is a Tailscale tile');
@@ -396,6 +328,52 @@ test('only the essential devices, the router and the exit node, can make the Tai
   const rules = chips[0]['rules'];
   assert.ok(Array.isArray(rules) && isJson(rules[0]));
   assert.deepEqual(rules[0]['entities'], ESSENTIAL);
+});
+
+test("the Tailscale tile's Update counts only the essential devices, and the pop-up still shows every device's update", () => {
+  const chips = tailscale().tile['chips'];
+  assert.ok(Array.isArray(chips));
+  const update = chips.filter(isJson).find((chip) => chip['name'] === 'Update');
+  const tailnet = DEMO.system.tailscale;
+  assert.ok(tailnet);
+  assert.deepEqual(
+    rulesOf(update).flatMap((rule) => rule['entities']),
+    tailnet.devices.flatMap((device) =>
+      device.essential === true && device.update !== undefined ? [device.update] : [],
+    ),
+  );
+  const shown = new Set<unknown>();
+  walk(tailscale().popup, (node) => {
+    if (node['type'] === 'status' && node['name'] === 'Update') {
+      for (const rule of rulesOf(node)) {
+        for (const entity of Array.isArray(rule['entities']) ? rule['entities'] : []) {
+          shown.add(entity);
+        }
+      }
+    }
+  });
+  assert.deepEqual(
+    [...shown],
+    tailnet.devices.flatMap((device) => (device.update === undefined ? [] : [device.update])),
+  );
+});
+
+test("AdGuard's protection chip is neutral while on and orange while off, as its pop-up's header", () => {
+  const tile = tiles(DEMO).find((card) => card['entity'] === DEMO.system.adguard?.protection);
+  const chips = tile?.['chips'];
+  assert.ok(Array.isArray(chips));
+  assert.deepEqual(
+    chips.filter(isJson).find((chip) => chip['type'] === 'toggle'),
+    {
+      type: 'toggle',
+      entity: DEMO.system.adguard?.protection,
+      color: 'orange',
+      when: { is: ['off'] },
+    },
+  );
+  const [header] = popupCards(DEMO, '#adguard');
+  assert.equal(header?.['color'], 'orange');
+  assert.deepEqual(header?.['when'], { is: ['off'] });
 });
 
 test('the Tailscale pop-up is a card per device: the essential two under Infrastructure, the other four under Devices', () => {
@@ -485,4 +463,127 @@ test('a device card has icons for a pending update, a key that expires soon, and
       ['blue', { on: 'Direct' }],
     ],
   );
+});
+
+const ALONE: Home = { ...DEMO, people: [], cars: [] };
+
+test('a section with no tiles is left out, its heading too', () => {
+  assert.deepEqual(titles(ALONE), [
+    undefined,
+    DEMO.sections.rooms,
+    DEMO.sections.system,
+    undefined,
+  ]);
+});
+
+test('a section heading is given its title and icon, and nothing else', () => {
+  const [view] = build(DEMO).views;
+  const heading = view?.sections[1]?.cards[0];
+  assert.ok(heading !== undefined && 'slots' in heading);
+  assert.deepEqual(heading.slots, { title: DEMO.sections.rooms, icon: 'mdi:floor-plan' });
+});
+
+function glanceItems(home: Home): Json[] {
+  const found: Json[] = [];
+  walk(drawn(home), (node) => {
+    if (node['type'] === 'custom:mnml-glances-card' && Array.isArray(node['items'])) {
+      found.push(...node['items'].filter(isJson));
+    }
+  });
+  return found;
+}
+
+test('the Glances count every lock, car, network device, essential Tailscale device, guest and media health problem, each opening its pop-up', () => {
+  const counts = glanceItems(DEMO)
+    .filter((item) => Array.isArray(item['entities']))
+    .map(({ entities, is, not, popup }) => ({ entities, is, not, popup }));
+  const room = DEMO.rooms.find((one) => one.lock !== undefined);
+  assert.ok(room);
+  const [sedan, suv] = DEMO.cars;
+  assert.ok(sedan && suv);
+  const { proxmox, network, tailscale, media } = DEMO.system;
+  assert.ok(proxmox && network && tailscale && media?.movies?.health);
+  const words = ['unlocked', 'selectivelocked', 'unarmed'];
+  for (const expected of [
+    {
+      entities: [room.lock],
+      is: ['unlocked', 'open', 'jammed'],
+      not: undefined,
+      popup: `#${room.key}`,
+    },
+    { entities: [sedan.lock, sedan.alarm], is: words, not: undefined, popup: `#car-${sedan.key}` },
+    { entities: [suv.lock, suv.alarm], is: words, not: undefined, popup: `#car-${suv.key}` },
+    {
+      entities: network.devices,
+      is: undefined,
+      not: ['connected', 'upgrading', 'provisioning'],
+      popup: '#network',
+    },
+    {
+      entities: tailscale.devices.flatMap((device) =>
+        device.essential === true ? [device.connected] : [],
+      ),
+      is: ['off'],
+      not: undefined,
+      popup: '#tailscale',
+    },
+    {
+      entities: proxmox.guests.map((guest) => guest.status),
+      is: ['off'],
+      not: undefined,
+      popup: '#proxmox',
+    },
+    { entities: [media.movies.health], is: ['on'], not: undefined, popup: '#media' },
+  ]) {
+    assert.ok(
+      counts.some((count) => JSON.stringify(count) === JSON.stringify(expected)),
+      JSON.stringify(expected),
+    );
+  }
+});
+
+test('a home without locks, cars or systems has none of their counts', () => {
+  const {
+    proxmox: _proxmox,
+    network: _network,
+    tailscale: _tailscale,
+    media: _media,
+    ...system
+  } = DEMO.system;
+  const bare: Home = {
+    ...DEMO,
+    rooms: DEMO.rooms.map(({ lock: _lock, ...room }) => room),
+    cars: [],
+    system,
+  };
+  const named = new Set(glanceItems(bare).map((item) => item['name']));
+  for (const name of [
+    'Unlocked',
+    'Car security',
+    'Network devices down',
+    'Tailscale offline',
+    'Stopped guests',
+    'Media health',
+  ]) {
+    assert.equal(named.has(name), false, name);
+  }
+});
+
+function plainSpeakers(): Home {
+  const home = structuredClone(DEMO);
+  for (const room of home.rooms) {
+    room.media = room.media?.map((member) =>
+      typeof member === 'string' ? member : { key: member.key, entity: member.entity },
+    );
+  }
+  return home;
+}
+
+test('a speaker with only its key and its player draws its pop-up with the volume and nothing else', () => {
+  const cards = popupCards(plainSpeakers(), '#living-sonos');
+  assert.deepEqual(
+    cards.map((card) => card['type']),
+    ['custom:mnml-header-card', 'custom:mnml-heading-card', 'custom:mnml-slider-card'],
+  );
+  assert.ok(!JSON.stringify(cards).includes('[['));
 });

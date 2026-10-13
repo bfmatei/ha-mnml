@@ -116,3 +116,22 @@ test('a card with a key outside the contract is unsupported', () => {
     /tap_action is not a key the editor knows/,
   );
 });
+
+test("the report card's colours take only the colours of the contract", () => {
+  const report = DESCRIPTIONS['custom:mnml-report-card'];
+  assert.ok(report);
+  checkValue(report, {
+    type: 'custom:mnml-report-card',
+    entity: 'sensor.report',
+    colors: { warnings: 'orange' },
+  });
+  assert.throws(
+    () =>
+      checkValue(report, {
+        type: 'custom:mnml-report-card',
+        entity: 'sensor.report',
+        colors: { warnings: 'purple' },
+      }),
+    /colors is not a mapping of words to one of red, orange, amber, blue/,
+  );
+});

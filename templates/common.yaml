@@ -53,13 +53,7 @@ nav-chip:
 checks-actions:
   description: The daily checks' Run and Stop controls, Run shown while they are not running and Stop while they are.
   slots:
-    actions:
-      kind: object
-      required: true
-      fields:
-        run: { kind: entity, required: true }
-        stop: { kind: entity, required: true }
-        running: { kind: entity, required: true }
+    actions: { shape: checks_actions, required: true }
   card:
     - id: run
       type: service
@@ -120,14 +114,9 @@ batteries:
     batteries: [sensor.window_battery, sensor.door_battery]
 
 energy-table:
-  description: A folding table of meters, now, today and in total, the heading summing what they draw now.
+  description: A folding table of meters, now, today and in total, the heading summing what they used today.
   slots:
-    meters:
-      kind: objects
-      fields:
-        power: { kind: entity, required: true }
-        today: { kind: entity }
-        total: { kind: entity }
+    meters: { shape: meter, kind: objects, fields: { power: { required: true } } }
   card:
     type: custom:mnml-list-card
     fold: true

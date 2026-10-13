@@ -1,27 +1,67 @@
 import type { PopupOpen } from './cards.ts';
 import type { MdiIcon, PersonId } from './entities.ts';
+import { OPENINGS } from './structure.ts';
 import { isMapping } from './templates.ts';
 import type { Template, Value } from './templates.ts';
 
-export interface RoomChoice {
+interface AreaRoom {
   area: string;
   slots?: Record<string, Value>;
+  spelled?: never;
 }
 
-export interface PersonChoice {
+interface SpelledRoom {
+  area?: never;
+  slots: Record<string, Value>;
+  spelled: true;
+}
+
+export type RoomChoice = AreaRoom | SpelledRoom;
+
+interface FoundPerson {
   entity: PersonId;
   slots?: Record<string, Value>;
+  spelled?: never;
 }
+
+interface SpelledPerson {
+  entity: PersonId;
+  slots: Record<string, Value>;
+  spelled: true;
+}
+
+export type PersonChoice = FoundPerson | SpelledPerson;
 
 export interface CarChoice {
   key: string;
   slots: Record<string, Value>;
 }
 
-export interface SystemChoice {
+interface FoundSystem {
   template: string;
   slots?: Record<string, Value>;
+  spelled?: never;
 }
+
+interface SpelledSystem {
+  template: string;
+  slots: Record<string, Value>;
+  spelled: true;
+}
+
+export type SystemChoice = FoundSystem | SpelledSystem;
+
+interface FoundGlances {
+  slots?: Record<string, Value>;
+  spelled?: never;
+}
+
+interface SpelledGlances {
+  slots: Record<string, Value>;
+  spelled: true;
+}
+
+export type GlancesChoice = FoundGlances | SpelledGlances;
 
 export type SectionKey = 'rooms' | 'people' | 'garage' | 'system';
 
@@ -34,6 +74,7 @@ export interface SectionLook {
 export interface Plan {
   title: string;
   icon: MdiIcon;
+  glances?: GlancesChoice;
   rooms: RoomChoice[];
   people: PersonChoice[];
   cars: CarChoice[];
@@ -42,6 +83,19 @@ export interface Plan {
   sections?: Partial<Record<SectionKey, SectionLook>>;
   order?: SectionKey[];
 }
+
+const PLAN_KEYS: Readonly<Record<keyof Plan, true>> = {
+  title: true,
+  icon: true,
+  glances: true,
+  rooms: true,
+  people: true,
+  cars: true,
+  system: true,
+  open: true,
+  sections: true,
+  order: true,
+};
 
 export const SECTION_ORDER: readonly SectionKey[] = ['rooms', 'people', 'garage', 'system'];
 
@@ -68,6 +122,7 @@ export interface RecipeSection extends SectionLook {
 export interface Recipe {
   title: string;
   icon: MdiIcon;
+  glances?: true;
   open: PopupOpen;
   sections: Partial<Record<SectionKey, RecipeSection>>;
   order?: SectionKey[];
@@ -115,7 +170,7 @@ export const SYSTEM_NAMES: Readonly<Record<string, string>> = {
   'media-server': 'Media server',
 };
 
-const OPENINGS = new Set(['sheet', 'dialog', 'unfold']);
+const OPENING_NAMES: ReadonlySet<string> = new Set(OPENINGS);
 const DEVICES = new Set(['phone', 'tablet', 'desktop']);
 
 const NAME = /^[a-z0-9][a-z0-9_-]{0,63}$/;
@@ -127,8 +182,29 @@ export function isPersonId(value: unknown): value is PersonId {
   return typeof value === 'string' && /^person\.[a-z0-9_]+$/.test(value);
 }
 
-function slotsOk(value: unknown): boolean {
-  return value === undefined || isMapping(value);
+function only(value: Record<string, Value>, keys: readonly string[]): boolean {
+  return Object.keys(value).every((key) => keys.includes(key));
+}
+
+function slotsOk(each: Record<string, Value>): boolean {
+  const { slots, spelled } = each;
+  return spelled === undefined
+    ? slots === undefined || isMapping(slots)
+    : spelled === true && isMapping(slots);
+}
+
+function roomOk(room: Record<string, Value>): boolean {
+  return (
+    only(room, ['area', 'slots', 'spelled']) &&
+    (room['spelled'] === undefined ? text(room['area']) : room['area'] === undefined) &&
+    slotsOk(room)
+  );
+}
+
+function glancesOk(value: unknown): boolean {
+  return (
+    value === undefined || (isMapping(value) && only(value, ['slots', 'spelled']) && slotsOk(value))
+  );
 }
 
 const ICON = /^mdi:[a-z0-9-]+$/;
@@ -164,19 +240,34 @@ export function isPlan(value: unknown): value is Plan {
   }
   const open = value['open'];
   return (
+    Object.keys(value).every((key) => Object.hasOwn(PLAN_KEYS, key)) &&
     text(value['title']) &&
     typeof value['icon'] === 'string' &&
     ICON.test(value['icon']) &&
+    glancesOk(value['glances']) &&
     sectionsOk(value['sections']) &&
     (value['order'] === undefined || isOrder(value['order'])) &&
-    listOf(value['rooms'], (room) => text(room['area']) && slotsOk(room['slots'])) &&
-    listOf(value['people'], (person) => isPersonId(person['entity']) && slotsOk(person['slots'])) &&
-    listOf(value['cars'], (car) => named(car['key']) && isMapping(car['slots'])) &&
-    listOf(value['system'], (each) => named(each['template']) && slotsOk(each['slots'])) &&
+    listOf(value['rooms'], roomOk) &&
+    listOf(
+      value['people'],
+      (person) =>
+        only(person, ['entity', 'slots', 'spelled']) &&
+        isPersonId(person['entity']) &&
+        slotsOk(person),
+    ) &&
+    listOf(
+      value['cars'],
+      (car) => only(car, ['key', 'slots']) && named(car['key']) && isMapping(car['slots']),
+    ) &&
+    listOf(
+      value['system'],
+      (each) =>
+        only(each, ['template', 'slots', 'spelled']) && named(each['template']) && slotsOk(each),
+    ) &&
     isMapping(open) &&
     Object.entries(open).every(
       ([device, opening]) =>
-        DEVICES.has(device) && typeof opening === 'string' && OPENINGS.has(opening),
+        DEVICES.has(device) && typeof opening === 'string' && OPENING_NAMES.has(opening),
     )
   );
 }

@@ -2,6 +2,7 @@ import type { Host } from '../base.ts';
 
 interface DismissOptions {
   scroll?: true;
+  trigger?: HTMLElement;
   keys?(event: KeyboardEvent): void;
   closed(refocus: boolean): void;
 }
@@ -30,7 +31,11 @@ export function dismissable(
     close();
   });
   const outside = (event: Event): void => {
-    if (!event.composedPath().includes(node)) {
+    const path = event.composedPath();
+    if (
+      !path.includes(node) &&
+      (options.trigger === undefined || !path.includes(options.trigger))
+    ) {
       close();
     }
   };

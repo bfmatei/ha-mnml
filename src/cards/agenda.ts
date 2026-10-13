@@ -6,6 +6,7 @@ import { styleMap } from 'lit/directives/style-map.js';
 
 import type { AgendaCard, AgendaSource } from '../contract/cards.ts';
 import type { MdiIcon } from '../contract/entities.ts';
+import { AGENDA_KINDS } from '../contract/structure.ts';
 import { SEPARATOR } from '../ha/format.ts';
 import { isUnavailable, stateOf } from '../ha/hass.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
@@ -15,11 +16,10 @@ import { UNAVAILABLE } from '../ha/rules.ts';
 import { scrollableAncestors } from '../ha/scroll.ts';
 import { colorStyle, icon, quietly } from '../ha/templates.ts';
 
-import { MnmlCard, requireList, requireString } from './base.ts';
-import { schema } from './keys.ts';
+import { MnmlCard, requireList, requireOneOf, requireString } from './base.ts';
 import type { KeySchema } from './keys.ts';
 import { SECTION_STYLE, section } from './parts/section.ts';
-import { AGENDA_SOURCE } from './schemas.ts';
+import { AGENDA_CARD } from './schemas.ts';
 import { BASE_STYLE, CONTROL_STYLE, HEADING_STYLE } from './styles.ts';
 
 const WINDOW_WEEKS = 13;
@@ -98,8 +98,6 @@ const EPISODE_ICON: MdiIcon = 'mdi:television-classic';
 const MOVIE_ICON: MdiIcon = 'mdi:movie-open-outline';
 
 const EPISODE = /^(.+) - S(\d+)E(\d+) - (.*)$/;
-
-const KINDS = new Set(['episodes', 'movies']);
 
 type Kind = AgendaSource['kind'];
 
@@ -315,11 +313,6 @@ function releaseRow(language: string, row: Row): TemplateResult {
   </div>`;
 }
 
-const SCHEMA = schema<AgendaCard>(
-  { type: true, title: true, icon: true, sources: true },
-  { sources: AGENDA_SOURCE },
-);
-
 export class MnmlAgendaCard extends MnmlCard<AgendaCard> {
   static override styles = [BASE_STYLE, HEADING_STYLE, SECTION_STYLE, CONTROL_STYLE, AGENDA_STYLE];
 
@@ -332,16 +325,14 @@ export class MnmlAgendaCard extends MnmlCard<AgendaCard> {
   private readonly loading = new Set<number>();
 
   protected schema(): KeySchema {
-    return SCHEMA;
+    return AGENDA_CARD;
   }
 
   protected override validate(config: AgendaCard): void {
     requireList('sources', config.sources);
     for (const source of config.sources) {
       requireString('sources entity', source.entity);
-      if (!KINDS.has(source.kind)) {
-        throw new Error('sources kind must be episodes or movies');
-      }
+      requireOneOf('sources kind', source.kind, AGENDA_KINDS);
     }
   }
 

@@ -17,6 +17,7 @@ import type {
   TyresControl,
 } from '../../contract/cards.ts';
 import type { EntityId, MdiIcon } from '../../contract/entities.ts';
+import { CONTROL_TYPES } from '../../contract/structure.ts';
 import { formatState } from '../../ha/format.ts';
 import {
   callService,
@@ -29,16 +30,17 @@ import {
 } from '../../ha/hass.ts';
 import type { HassEntity, HomeAssistant } from '../../ha/hass.ts';
 import { entityName, nameOf } from '../../ha/names.ts';
-import { navigate, openedFrom, prebuild } from '../../ha/navigation.ts';
+import { navigate, prebuild } from '../../ha/navigation.ts';
 import { partOf } from '../../ha/part.ts';
-import { UNAVAILABLE, active, matches, shown, tint, tyreBand } from '../../ha/rules.ts';
+import { UNAVAILABLE, matches, shown, tint, tyreBand } from '../../ha/rules.ts';
 import { colorStyle, icon, quietly, stateIcon } from '../../ha/templates.ts';
 import { requireList, requireOneOf } from '../base.ts';
 import type { Host } from '../base.ts';
 
 import { modeChoice, openMenu, optionChoice, sceneChoice } from './menu.ts';
 import type { Choice } from './menu.ts';
-import { openSliderOverlay, sliderSpec } from './slider.ts';
+import { sliderSpec } from './slider-spec.ts';
+import { openSliderOverlay } from './slider.ts';
 import { tip } from './tooltip.ts';
 
 export interface ControlContext {
@@ -114,6 +116,19 @@ function menuOpener(choice: Choice, ctx: ControlContext): (event: Event) => void
   };
 }
 
+const AT_REST: Readonly<Record<string, string>> = {
+  lock: 'locked',
+  alarm_control_panel: 'disarmed',
+  cover: 'closed',
+};
+
+function isOn(entityId: EntityId, stateObj: HassEntity | undefined): boolean {
+  if (!hasValue(stateObj) || stateObj.state === 'off') {
+    return false;
+  }
+  return stateObj.state !== AT_REST[entityId.split('.')[0] ?? ''];
+}
+
 function toggle(control: ToggleControl, ctx: ControlContext): TemplateResult {
   const stateObj = stateOf(ctx.hass, control.entity);
   return pressed(
@@ -128,7 +143,7 @@ function toggle(control: ToggleControl, ctx: ControlContext): TemplateResult {
       const hass = ctx.host.hass ?? ctx.hass;
       run(ctx.host, toggleEntity(hass, control.entity));
     },
-    { pressed: active(control.when, stateObj) },
+    { pressed: isOn(control.entity, stateObj) },
   );
 }
 
@@ -140,8 +155,9 @@ function slider(control: SliderControl, ctx: ControlContext): TemplateResult {
       ? sliderSpec(hass, control.entity, stateObj, control.slider)
       : undefined;
     const surface = anchorOf(event)?.closest('.tile > .row, .card, .heading');
+    const keyboard = event instanceof UIEvent && event.detail === 0;
     if (spec !== undefined && surface instanceof HTMLElement) {
-      openSliderOverlay(surface, spec, control, control.color, ctx.host);
+      openSliderOverlay(surface, spec, control, control.color, ctx.host, keyboard);
     }
   });
 }
@@ -196,7 +212,7 @@ function nav(control: NavControl, ctx: ControlContext): TemplateResult {
       prebuild(control.popup);
     })}
     @click=${quietly((event) => {
-      navigate(control.popup, openedFrom(event));
+      navigate(control.popup, anchorOf(event));
     })}
   >
     ${stateIcon(ctx.hass, stateObj)}
@@ -221,15 +237,51 @@ function namesUnavailable(rule: StatusControl['rules'][number]): boolean {
 }
 
 const DAY = 86_400_000;
+const HOUR = 3_600_000;
 
-function holds(rule: StatusControl['rules'][number], stateObj: HassEntity): boolean {
+interface Wake {
+  due: number;
+  cancel: () => void;
+}
+
+const wakes = new WeakMap<Host, Wake>();
+
+function wakeAt(host: Host, at: number): void {
+  const due = Math.min(at, Date.now() + HOUR);
+  const pending = wakes.get(host);
+  if (!host.isConnected || (pending !== undefined && pending.due <= due)) {
+    return;
+  }
+  pending?.cancel();
+  const timer = setTimeout(() => {
+    wake.cancel();
+    host.refresh();
+  }, due - Date.now());
+  const wake: Wake = {
+    due,
+    cancel: () => {
+      clearTimeout(timer);
+      unregister();
+      if (wakes.get(host) === wake) {
+        wakes.delete(host);
+      }
+    },
+  };
+  const unregister = host.register(wake.cancel);
+  wakes.set(host, wake);
+}
+
+function holds(rule: StatusControl['rules'][number], stateObj: HassEntity, host: Host): boolean {
   if (rule.below !== undefined) {
     const level = numericState(stateObj);
     return level !== undefined && level < rule.below;
   }
   if (rule.within_days !== undefined) {
-    const at = Date.parse(stateObj.state);
-    return Number.isFinite(at) && at - Date.now() < rule.within_days * DAY;
+    const from = Date.parse(stateObj.state) - rule.within_days * DAY;
+    if (from > Date.now()) {
+      wakeAt(host, from);
+    }
+    return from <= Date.now();
   }
   return matches(rule, stateObj.state);
 }
@@ -245,7 +297,10 @@ function status(control: StatusControl, ctx: ControlContext): TemplateResult | u
           entityId,
           `${nameOf(ctx.hass, entityId, rule)}: ${formatState(ctx.hass, stateObj)}`,
         );
-      } else if ((isUnavailable(stateObj) || hasValue(stateObj)) && holds(rule, stateObj)) {
+      } else if (
+        (isUnavailable(stateObj) || hasValue(stateObj)) &&
+        holds(rule, stateObj, ctx.host)
+      ) {
         lines.push(
           `${nameOf(ctx.hass, entityId, rule)}: ${formatState(ctx.hass, stateObj, rule.words)}`,
         );
@@ -396,18 +451,6 @@ function renderControl(control: Control, ctx: ControlContext): TemplateResult | 
       return undefined;
   }
 }
-
-const CONTROL_TYPES = Object.keys({
-  toggle: true,
-  slider: true,
-  select: true,
-  service: true,
-  nav: true,
-  indicator: true,
-  status: true,
-  tyres: true,
-  scenes: true,
-} satisfies Record<Control['type'], true>);
 
 export function requireControls(name: string, controls: readonly Control[] | undefined): void {
   for (const [index, control] of (controls ?? []).entries()) {

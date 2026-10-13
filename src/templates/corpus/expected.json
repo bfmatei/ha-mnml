@@ -707,6 +707,444 @@
       }
     }
   },
+  "devices": {
+    "glances": {
+      "*": {
+        "batteries": [
+          "sensor.desk_sensor_battery",
+          "sensor.radiator_valve_battery",
+          "sensor.roborock_s8_battery"
+        ],
+        "updates": ["update.kettle_plug_firmware", "update.radiator_valve_firmware"]
+      },
+      "bedroom": {
+        "batteries": [
+          "sensor.desk_sensor_battery",
+          "sensor.radiator_valve_battery",
+          "sensor.roborock_s8_battery"
+        ],
+        "updates": ["update.kettle_plug_firmware", "update.radiator_valve_firmware"]
+      },
+      "hall": {
+        "batteries": [
+          "sensor.desk_sensor_battery",
+          "sensor.radiator_valve_battery",
+          "sensor.roborock_s8_battery"
+        ],
+        "updates": ["update.kettle_plug_firmware", "update.radiator_valve_firmware"]
+      },
+      "kitchen": {
+        "batteries": [
+          "sensor.desk_sensor_battery",
+          "sensor.radiator_valve_battery",
+          "sensor.roborock_s8_battery"
+        ],
+        "updates": ["update.kettle_plug_firmware", "update.radiator_valve_firmware"]
+      },
+      "laundry": {
+        "batteries": [
+          "sensor.desk_sensor_battery",
+          "sensor.radiator_valve_battery",
+          "sensor.roborock_s8_battery"
+        ],
+        "updates": ["update.kettle_plug_firmware", "update.radiator_valve_firmware"]
+      },
+      "living": {
+        "batteries": [
+          "sensor.desk_sensor_battery",
+          "sensor.radiator_valve_battery",
+          "sensor.roborock_s8_battery"
+        ],
+        "updates": ["update.kettle_plug_firmware", "update.radiator_valve_firmware"]
+      },
+      "office": {
+        "batteries": [
+          "sensor.desk_sensor_battery",
+          "sensor.radiator_valve_battery",
+          "sensor.roborock_s8_battery"
+        ],
+        "updates": ["update.kettle_plug_firmware", "update.radiator_valve_firmware"]
+      }
+    },
+    "home-assistant": {
+      "*": {
+        "all_firmware": ["update.kettle_plug_firmware", "update.radiator_valve_firmware"],
+        "room_firmware": [
+          {
+            "firmware": ["update.radiator_valve_firmware"],
+            "name": "Bedroom"
+          },
+          {
+            "firmware": ["update.kettle_plug_firmware"],
+            "name": "Kitchen"
+          }
+        ]
+      },
+      "bedroom": {
+        "all_firmware": ["update.kettle_plug_firmware", "update.radiator_valve_firmware"],
+        "room_firmware": [
+          {
+            "firmware": ["update.radiator_valve_firmware"],
+            "name": "Bedroom"
+          },
+          {
+            "firmware": ["update.kettle_plug_firmware"],
+            "name": "Kitchen"
+          }
+        ]
+      },
+      "hall": {
+        "all_firmware": ["update.kettle_plug_firmware", "update.radiator_valve_firmware"],
+        "room_firmware": [
+          {
+            "firmware": ["update.radiator_valve_firmware"],
+            "name": "Bedroom"
+          },
+          {
+            "firmware": ["update.kettle_plug_firmware"],
+            "name": "Kitchen"
+          }
+        ]
+      },
+      "kitchen": {
+        "all_firmware": ["update.kettle_plug_firmware", "update.radiator_valve_firmware"],
+        "room_firmware": [
+          {
+            "firmware": ["update.radiator_valve_firmware"],
+            "name": "Bedroom"
+          },
+          {
+            "firmware": ["update.kettle_plug_firmware"],
+            "name": "Kitchen"
+          }
+        ]
+      },
+      "laundry": {
+        "all_firmware": ["update.kettle_plug_firmware", "update.radiator_valve_firmware"],
+        "room_firmware": [
+          {
+            "firmware": ["update.radiator_valve_firmware"],
+            "name": "Bedroom"
+          },
+          {
+            "firmware": ["update.kettle_plug_firmware"],
+            "name": "Kitchen"
+          }
+        ]
+      },
+      "living": {
+        "all_firmware": ["update.kettle_plug_firmware", "update.radiator_valve_firmware"],
+        "room_firmware": [
+          {
+            "firmware": ["update.radiator_valve_firmware"],
+            "name": "Bedroom"
+          },
+          {
+            "firmware": ["update.kettle_plug_firmware"],
+            "name": "Kitchen"
+          }
+        ]
+      },
+      "office": {
+        "all_firmware": ["update.kettle_plug_firmware", "update.radiator_valve_firmware"],
+        "room_firmware": [
+          {
+            "firmware": ["update.radiator_valve_firmware"],
+            "name": "Bedroom"
+          },
+          {
+            "firmware": ["update.kettle_plug_firmware"],
+            "name": "Kitchen"
+          }
+        ]
+      }
+    },
+    "person": {
+      "bedroom": {
+        "key": "bedroom"
+      },
+      "hall": {
+        "key": "hall"
+      },
+      "kitchen": {
+        "key": "kitchen"
+      },
+      "laundry": {
+        "key": "laundry"
+      },
+      "living": {
+        "key": "living"
+      },
+      "office": {
+        "key": "office"
+      }
+    },
+    "room": {
+      "bedroom": {
+        "ac": {
+          "energy": {
+            "power": "sensor.bedroom_ac_estimated_power_consumption",
+            "today": "sensor.bedroom_ac_energy_today",
+            "total": "sensor.bedroom_ac_energy_consumption"
+          },
+          "entity": "climate.bedroom_ac"
+        },
+        "batteries": ["sensor.radiator_valve_battery"],
+        "heating": {
+          "entity": "climate.bedroom_heating",
+          "thermostats": [
+            {
+              "battery": "sensor.radiator_valve_battery",
+              "valve": "sensor.radiator_valve_valve_position"
+            }
+          ]
+        },
+        "icon": "mdi:bed",
+        "key": "bedroom",
+        "name": "Bedroom",
+        "temperature": "sensor.bedroom_ac_inside_temperature"
+      },
+      "hall": {
+        "heating": {
+          "entity": "climate.hall_heater"
+        },
+        "key": "hall",
+        "name": "Hall"
+      },
+      "kitchen": {
+        "icon": "mdi:fridge",
+        "key": "kitchen",
+        "name": "Kitchen",
+        "outlets": [
+          {
+            "energy": {
+              "power": "sensor.kettle_plug_power",
+              "today": "sensor.kettle_plug_energy_today",
+              "total": "sensor.kettle_plug_energy"
+            },
+            "entity": "switch.kettle_plug"
+          },
+          {
+            "entity": "switch.radio_plug"
+          }
+        ]
+      },
+      "laundry": {
+        "appliances": [
+          {
+            "entity": "sensor.washer_operation_state",
+            "remaining": "sensor.washer_program_finish_time"
+          }
+        ],
+        "icon": "mdi:washing-machine",
+        "key": "laundry",
+        "name": "Laundry"
+      },
+      "living": {
+        "batteries": ["sensor.roborock_s8_battery"],
+        "icon": "mdi:sofa",
+        "key": "living",
+        "media": [
+          {
+            "entity": "media_player.living_room",
+            "key": "media_player.living_room"
+          },
+          {
+            "entity": "media_player.living_room_tv"
+          }
+        ],
+        "name": "Living",
+        "speakers": [
+          {
+            "balance": "number.living_room_balance",
+            "bass": "number.living_room_bass",
+            "entity": "media_player.living_room",
+            "key": "media_player.living_room",
+            "loudness": "switch.living_room_loudness",
+            "subwoofer": {
+              "enabled": "switch.living_room_subwoofer_enabled",
+              "gain": "number.living_room_sub_gain"
+            },
+            "surround": {
+              "enabled": "switch.living_room_surround_enabled",
+              "level": "number.living_room_surround_level",
+              "music_full_volume": "switch.living_room_surround_music_full_volume",
+              "music_level": "number.living_room_music_surround_level"
+            },
+            "treble": "number.living_room_treble",
+            "tv": {
+              "audio_delay": "number.living_room_audio_delay",
+              "input_format": "sensor.living_room_audio_input_format",
+              "night_sound": "switch.living_room_night_sound",
+              "speech_enhancement": "switch.living_room_speech_enhancement"
+            }
+          }
+        ],
+        "vacuum": {
+          "area": "sensor.roborock_s8_cleaning_area",
+          "battery": "sensor.roborock_s8_battery",
+          "current_room": "sensor.roborock_s8_current_room",
+          "dock": {
+            "dust_emptying": "switch.roborock_s8_dock_dust_emptying",
+            "error": "sensor.roborock_s8_dock_dock_error",
+            "mop_drying": "switch.roborock_s8_dock_mop_drying",
+            "mop_drying_time_left": "sensor.roborock_s8_dock_mop_drying_remaining_time",
+            "mop_washing": "switch.roborock_s8_dock_mop_washing",
+            "warnings": [
+              "binary_sensor.roborock_s8_dock_clean_water_box",
+              "binary_sensor.roborock_s8_dock_dirty_water_box"
+            ]
+          },
+          "entity": "vacuum.roborock_s8",
+          "error": "sensor.roborock_s8_vacuum_error",
+          "last_clean": "sensor.roborock_s8_last_clean_end",
+          "map": "image.roborock_s8_downstairs",
+          "mop_attached": "binary_sensor.roborock_s8_mop_attached",
+          "progress": "sensor.roborock_s8_cleaning_progress",
+          "routines": ["button.roborock_s8_daily_clean"],
+          "settings": ["select.roborock_s8_mop_intensity", "select.roborock_s8_mop_mode"],
+          "status": "sensor.roborock_s8_status",
+          "time": "sensor.roborock_s8_cleaning_time",
+          "totals": {
+            "area": "sensor.roborock_s8_total_cleaning_area",
+            "count": "sensor.roborock_s8_total_cleaning_count",
+            "time": "sensor.roborock_s8_total_cleaning_time"
+          },
+          "warnings": ["binary_sensor.roborock_s8_water_shortage"],
+          "water_box_attached": "binary_sensor.roborock_s8_water_box_attached"
+        }
+      },
+      "office": {
+        "batteries": ["sensor.desk_sensor_battery"],
+        "cameras": [
+          {
+            "entity": "camera.prusa_mk4_preview"
+          }
+        ],
+        "humidity": "sensor.desk_sensor_humidity",
+        "icon": "mdi:desk",
+        "key": "office",
+        "name": "Office",
+        "printer3d": {
+          "actions": {
+            "cancel": "button.prusa_mk4_cancel_job",
+            "pause": "button.prusa_mk4_pause_job",
+            "resume": "button.prusa_mk4_resume_job"
+          },
+          "bed": {
+            "target": "sensor.prusa_mk4_heatbed_target_temperature",
+            "temperature": "sensor.prusa_mk4_heatbed_temperature"
+          },
+          "camera": "camera.prusa_mk4_preview",
+          "entity": "sensor.prusa_mk4",
+          "filename": "sensor.prusa_mk4_filename",
+          "finish": "sensor.prusa_mk4_print_finish",
+          "material": "sensor.prusa_mk4_material",
+          "nozzle": {
+            "target": "sensor.prusa_mk4_nozzle_target_temperature",
+            "temperature": "sensor.prusa_mk4_nozzle_temperature"
+          },
+          "progress": "sensor.prusa_mk4_progress",
+          "speed": "sensor.prusa_mk4_print_speed",
+          "start": "sensor.prusa_mk4_print_start"
+        },
+        "temperature": "sensor.desk_sensor_temperature"
+      }
+    },
+    "system-popup": {
+      "*": {
+        "all_firmware": ["update.kettle_plug_firmware", "update.radiator_valve_firmware"],
+        "room_firmware": [
+          {
+            "firmware": ["update.radiator_valve_firmware"],
+            "name": "Bedroom"
+          },
+          {
+            "firmware": ["update.kettle_plug_firmware"],
+            "name": "Kitchen"
+          }
+        ]
+      },
+      "bedroom": {
+        "all_firmware": ["update.kettle_plug_firmware", "update.radiator_valve_firmware"],
+        "room_firmware": [
+          {
+            "firmware": ["update.radiator_valve_firmware"],
+            "name": "Bedroom"
+          },
+          {
+            "firmware": ["update.kettle_plug_firmware"],
+            "name": "Kitchen"
+          }
+        ]
+      },
+      "hall": {
+        "all_firmware": ["update.kettle_plug_firmware", "update.radiator_valve_firmware"],
+        "room_firmware": [
+          {
+            "firmware": ["update.radiator_valve_firmware"],
+            "name": "Bedroom"
+          },
+          {
+            "firmware": ["update.kettle_plug_firmware"],
+            "name": "Kitchen"
+          }
+        ]
+      },
+      "kitchen": {
+        "all_firmware": ["update.kettle_plug_firmware", "update.radiator_valve_firmware"],
+        "room_firmware": [
+          {
+            "firmware": ["update.radiator_valve_firmware"],
+            "name": "Bedroom"
+          },
+          {
+            "firmware": ["update.kettle_plug_firmware"],
+            "name": "Kitchen"
+          }
+        ]
+      },
+      "laundry": {
+        "all_firmware": ["update.kettle_plug_firmware", "update.radiator_valve_firmware"],
+        "room_firmware": [
+          {
+            "firmware": ["update.radiator_valve_firmware"],
+            "name": "Bedroom"
+          },
+          {
+            "firmware": ["update.kettle_plug_firmware"],
+            "name": "Kitchen"
+          }
+        ]
+      },
+      "living": {
+        "all_firmware": ["update.kettle_plug_firmware", "update.radiator_valve_firmware"],
+        "room_firmware": [
+          {
+            "firmware": ["update.radiator_valve_firmware"],
+            "name": "Bedroom"
+          },
+          {
+            "firmware": ["update.kettle_plug_firmware"],
+            "name": "Kitchen"
+          }
+        ]
+      },
+      "office": {
+        "all_firmware": ["update.kettle_plug_firmware", "update.radiator_valve_firmware"],
+        "room_firmware": [
+          {
+            "firmware": ["update.radiator_valve_firmware"],
+            "name": "Bedroom"
+          },
+          {
+            "firmware": ["update.kettle_plug_firmware"],
+            "name": "Kitchen"
+          }
+        ]
+      }
+    }
+  },
   "labelled": {
     "glances": {
       "*": {
@@ -808,6 +1246,9 @@
   "systems": {
     "glances": {
       "*": {
+        "guests": ["binary_sensor.router_vm_status", "binary_sensor.torrents_status"],
+        "media_health": "binary_sensor.radarr_health",
+        "network_devices": ["sensor.ap_state", "sensor.gateway_state"],
         "updates": ["update.ap_firmware", "update.gateway_firmware"]
       }
     },
@@ -895,21 +1336,45 @@
       "*": {
         "batteries": ["sensor.desk_battery", "sensor.window_battery"],
         "leaks": ["binary_sensor.kitchen_leak"],
+        "locks": [
+          {
+            "entity": "lock.front_door",
+            "room": "living"
+          }
+        ],
         "updates": ["update.plug_firmware"]
       },
       "kitchen": {
         "batteries": ["sensor.desk_battery", "sensor.window_battery"],
         "leaks": ["binary_sensor.kitchen_leak"],
+        "locks": [
+          {
+            "entity": "lock.front_door",
+            "room": "living"
+          }
+        ],
         "updates": ["update.plug_firmware"]
       },
       "living": {
         "batteries": ["sensor.desk_battery", "sensor.window_battery"],
         "leaks": ["binary_sensor.kitchen_leak"],
+        "locks": [
+          {
+            "entity": "lock.front_door",
+            "room": "living"
+          }
+        ],
         "updates": ["update.plug_firmware"]
       },
       "office": {
         "batteries": ["sensor.desk_battery", "sensor.window_battery"],
         "leaks": ["binary_sensor.kitchen_leak"],
+        "locks": [
+          {
+            "entity": "lock.front_door",
+            "room": "living"
+          }
+        ],
         "updates": ["update.plug_firmware"]
       }
     },
@@ -1008,10 +1473,17 @@
         "lock": "lock.front_door",
         "media": [
           {
-            "entity": "media_player.arc"
+            "entity": "media_player.arc",
+            "key": "media_player.arc"
           }
         ],
         "name": "Living",
+        "speakers": [
+          {
+            "entity": "media_player.arc",
+            "key": "media_player.arc"
+          }
+        ],
         "temperature": "sensor.living_temperature",
         "window": "binary_sensor.living_window"
       },

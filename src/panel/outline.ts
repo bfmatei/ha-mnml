@@ -1,4 +1,4 @@
-import { html, nothing } from 'lit';
+import { css, html, nothing } from 'lit';
 import type { TemplateResult } from 'lit';
 import { classMap } from 'lit/directives/class-map.js';
 
@@ -9,6 +9,7 @@ import { rowMenu } from '../editors/row-menu.ts';
 import { labelOf, variantOf } from '../editors/shape.ts';
 import type { Field, PlainShape, Shape } from '../editors/shape.ts';
 import { icon } from '../ha/templates.ts';
+import type { Change } from '../templates/changes.ts';
 
 import type { Path } from './tree.ts';
 
@@ -189,6 +190,31 @@ export function startersOf(group: Group): Starter[] {
 
 const key = (path: Path): string => path.join('/');
 
+function partKey(path: Path): string {
+  const last = path.findLastIndex((segment) => segment.startsWith('#'));
+  return last === -1 ? (path[0] ?? '') : key(path.slice(0, last + 1));
+}
+
+export function changedParts(changes: readonly Change[]): Set<string> {
+  const keys = new Set<string>();
+  for (const change of changes) {
+    if (change.op === 'insert') {
+      const id =
+        isMapping(change.value) && typeof change.value['id'] === 'string'
+          ? change.value['id']
+          : undefined;
+      keys.add(id === undefined ? partKey(change.path) : key([...change.path, `#${id}`]));
+    } else if (change.op === 'move') {
+      keys.add(key([...change.path, `#${change.id}`]));
+    } else if (change.op === 'remove') {
+      keys.add(partKey(change.path.slice(0, -1)));
+    } else {
+      keys.add(partKey(change.path));
+    }
+  }
+  return keys;
+}
+
 const KIND_ICONS = {
   fragment: 'mdi:puzzle-outline',
   card: 'mdi:card-outline',
@@ -360,3 +386,61 @@ export function chainTo(root: Part | Group, where: string): Part[] {
   }
   return [];
 }
+
+export const OUTLINE_STYLE = css`
+  .outline-group {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-left: 12px;
+  }
+  .outline > .outline-part > .outline-group {
+    margin-left: 0;
+  }
+  .outline-heading {
+    color: var(--secondary-text-color);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 8px 4px 2px;
+  }
+  .outline-row {
+    display: flex;
+    align-items: center;
+    border-radius: 8px;
+  }
+  .outline-row.selected {
+    background: color-mix(in srgb, var(--primary-text-color) 8%, transparent);
+  }
+  .outline-row.selected .outline-label {
+    color: var(--primary-color);
+  }
+  .outline-name {
+    all: unset;
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 4px;
+    cursor: pointer;
+    flex-wrap: wrap;
+  }
+  .outline-name ha-icon {
+    color: var(--secondary-text-color);
+    --mdc-icon-size: 18px;
+  }
+  .outline-label {
+    font-size: 14px;
+  }
+  .outline-add {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding-left: 4px;
+  }
+  .add-label {
+    color: var(--secondary-text-color);
+    font-size: 13px;
+  }
+`;

@@ -1,16 +1,29 @@
-import { Document, visit } from 'yaml';
+import { Document, parse, visit } from 'yaml';
 
-const YAML_1_1_BOOLEANS = /^(?:yes|Yes|YES|no|No|NO|on|On|ON|off|Off|OFF)$/;
-const YAML_1_1_SEXAGESIMALS = /^[-+]?[0-9][0-9_]*(?::[0-5]?[0-9])+(?:\.[0-9_]*)?$/;
+const MERGE = 'tag:yaml.org,2002:merge';
+const YAML_1_1_SPECIALS = new Set(['=', '<<']);
+
+function readsAsString(text: string): boolean {
+  try {
+    return typeof parse(text) === 'string';
+  } catch {
+    return false;
+  }
+}
 
 export function toYaml(value: unknown): string {
-  const doc = new Document(value, { aliasDuplicateObjects: false });
+  const doc = new Document(value, {
+    version: '1.1',
+    aliasDuplicateObjects: false,
+    customTags: (tags) =>
+      tags.filter((tag) => (typeof tag === 'string' ? tag !== 'merge' : tag.tag !== MERGE)),
+  });
   visit(doc, {
     Scalar(_key, node) {
-      if (typeof node.value !== 'string') {
-        return;
-      }
-      if (YAML_1_1_BOOLEANS.test(node.value) || YAML_1_1_SEXAGESIMALS.test(node.value)) {
+      if (
+        typeof node.value === 'string' &&
+        (YAML_1_1_SPECIALS.has(node.value) || !readsAsString(node.value))
+      ) {
         node.type = 'QUOTE_SINGLE';
       }
     },

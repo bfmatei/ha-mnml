@@ -1,6 +1,6 @@
 # The home dashboard
 
-What `build(home)` draws for a `Home`, every tile and pop-up, and why. The templates that draw them are named in parentheses ([Templates](templates.md)); `src/home/slots.ts` fills their slots from the home, and `src/home/view.ts` places them. The demo home, `demo/home.ts`, draws every one of them. For the look, see [Design](design.md).
+What `build(home)` draws for a `Home`, every tile and pop-up, and why. The templates that draw them are named in parentheses ([Templates](templates.md)); `src/home/slots.ts` fills their slots from the home, `src/home/plan.ts` makes the home a plan of the panel's builder, and the builder places them ([Stack](#stack)). The demo home, `demo/home.ts`, draws every one of them. For the look, see [Design](design.md).
 
 ## Contents
 
@@ -25,7 +25,7 @@ What `build(home)` draws for a `Home`, every tile and pop-up, and why. The templ
 
 ## At a glance
 
-What the generator writes: one `sections` view with four sections of tiles and an untitled section that holds every pop-up.
+What the generator writes: one `sections` view with the Glances strip, four sections of tiles one under another ([Layout](#layout)), and an untitled section that holds every pop-up.
 
 | Section        | Tiles                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -47,7 +47,7 @@ What the generator writes: one `sections` view with four sections of tiles and a
 | `#<room>-ac`             | The target, fan, swing, horizontal swing, power saving, dehumidifier, energy                                                                                                                                                           |
 | `#<room>-vacuum`         | Routines, the map, details, settings, the dock, maintenance, totals                                                                                                                                                                    |
 | `#car-<key>`             | The VIN, security, a plan of the car from above with its openings and tyres, details, its location                                                                                                                                     |
-| `#<room>-<speaker>`      | The speaker's sound: volume, bass, treble, balance, loudness, then its TV, subwoofer and surround settings                                                                                                                             |
+| `#<room>-<speaker>`      | The speaker's sound: volume, and the bass, treble, balance and loudness it has, then its TV, subwoofer and surround settings                                                                                                           |
 | `#person-<key>`          | Devices, and location permissions that aren't "always"                                                                                                                                                                                 |
 | `#person-<key>-<device>` | The battery, and the companion app's details                                                                                                                                                                                           |
 | `#system`                | Resources, services, updates, firmware (the system's, then one list per room)                                                                                                                                                          |
@@ -65,7 +65,7 @@ What the generator writes: one `sections` view with four sections of tiles and a
 
 - Red: water, an unlocked lock or car, a car alarm, a low tyre, a critical battery, a full container disk, blocklists that failed to download, a degraded pool or a failing disk, a server running hot, a bucket at its free limit.
 - Orange: an open window or door, a low battery, a tyre that is dropping, a filling container disk, a link below 10 Gbps, a worn disk, a warm server, a bucket nearing the 20 GB it may hold.
-- Amber: on.
+- Amber: on. AdGuard's protection is the exception: on is how it should always be, so its chip is neutral while on and orange while off, as its pop-up's header is.
 
 Every threshold has two stages, so a slow drift and a fault don't look alike. There are no graphs: history lives in HA's more-info dialogs.
 
@@ -74,6 +74,7 @@ Every threshold has two stages, so a slow drift and a fault don't look alike. Th
 - **Almost everything is a custom card.** Everything the dashboard shows comes from `mnml-cards.js`, the pop-up shell included. The few native HA cards are the vacuum map, the 3D printer's camera and the Wi-Fi QR codes (`picture-entity`), the car's location (`map`) and the routine buttons (`grid`).
 - **No other HACS card.** Everything is MNML's or native.
 - **Template instances, every slot spelled.** The dashboard is MNML template cards, one per tile, each with every slot written from the home and no `area`, so nothing is discovered. Repetition is the templates' job (`room` per room); spelling is the generator's. No decluttering card.
+- **One generator.** `homePlan(home)` is the home as a plan of the panel's builder ([Building a dashboard](editors.md#building-a-dashboard)): the Glances strip, each room, person and system tile spelled (`spelled: true`, its slots all of them), each car, the section titles, the order and the openings. `build(home)` is that plan drawn by the builder's `dashboardOf()`, with no registries to discover from, so a home in code and a dashboard the panel builds are drawn by the same code.
 - **Where new things go:**
   - a read-only value: a row of a list card, or an entry of a state line;
   - a control: a `Control` in a lane;
@@ -82,7 +83,7 @@ Every threshold has two stages, so a slow drift and a fault don't look alike. Th
 
 ## Layout
 
-- **One view.** It is a `sections` view with `max_columns: 3`. Four titled sections come first, each `column_span: 3`: Rooms, People, Garage, Infrastructure, or in the order of the home's `order` (a list of `rooms`, `people`, `garage` and `infrastructure`, each once), which `problems()` checks. The titles are `mnml-heading-card`s with `grid_options.columns: full`, from the home's `sections`. Last comes an untitled section holding the pop-up shell.
+- **One view.** It is a `sections` view with `max_columns: 3`. The Glances strip comes first, across the whole width. Then four titled sections, each `column_span: 3`: Rooms, People, Garage, Infrastructure, or in the order of the home's `order` (a list of `rooms`, `people`, `garage` and `system`, each once), which `problems()` checks. The titles are `mnml-heading-card`s with `grid_options.columns: full`, from the home's `sections`. A section with no tiles, the Garage of a home with no car, is left out with its heading. Last comes an untitled section holding the pop-up shell.
 - **Section headings.** A heading has its title and icon at the left, and a trailing group (`.trail`) at the right with a state line, controls, or both. A folding list's heading ends in a chevron after its summary, and the whole heading is the tap target; folded, the heading stands alone, with no surface under it.
 - **Tile width.** Every tile writes `grid_options: { columns: 12 }` over MNML's default of half a section, so each takes 12 grid columns. The Garage and the Infrastructure keep the rhythm of the Rooms: at three columns, three infrastructure tiles fill a row and the other two take the next.
   - Each view column is twelve grid columns, so a section is 36 wide when three columns fit and 24 when two do.
@@ -146,17 +147,17 @@ Every read-only section is one `mnml-list-card`. The card's title is drawn above
 
 **Row semantics.** A row carries the section's meaning through the fields of `ListRow` and nothing else:
 
-| Row           | Written as                                                                                                                                                                             |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A battery     | `{ entity, label: 'device', bar: true, low: BATTERY_LOW, critical: BATTERY_CRITICAL }`: orange under the first, red under the second                                                   |
-| A share       | `{ entity, label: 'device', bar: true, of, high, critical_high }`: the entity's share of `of`, bar and value, in the same unit or a dash; orange over `high`, red over `critical_high` |
-| A consumable  | `{ entity, strip: ' time left', reset }`. `reset` draws a 28 px restart button that presses the button entity: the one action a list row carries                                       |
-| A warning     | `{ entity, flag: true, color: 'orange', show: { is: ['on'] } }`                                                                                                                        |
-| A progress    | `{ entity, bar: true, show: { entity: vacuum, is: ['cleaning'] } }`                                                                                                                    |
-| A daily total | `{ entity, zero_when_empty: true }`: no value yet today reads "0 floors", in the entity's own unit and precision, uncoloured; any threshold applies to the 0                           |
-| A timestamp   | `{ entity, relative: true }`, shown as "6 hours ago"                                                                                                                                   |
-| A link        | `link-row`: a port's link speed, orange while it isn't 10 Gbps (its `speed` default)                                                                                                   |
-| A raw word    | `{ entity, words: '[[lock_words]]', color: red, when: { is: '[[unlocked]]' } }`                                                                                                        |
+| Row           | Written as                                                                                                                                                                                   |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A battery     | `{ entity, label: 'device', bar: true, low, critical }`: orange under `low`, red under `critical`, the room's or the person's `low` and `critical` slots, 20 and 5 unless the home sets them |
+| A share       | `{ entity, label: 'device', bar: true, of, high, critical_high }`: the entity's share of `of`, bar and value, in the same unit or a dash; orange over `high`, red over `critical_high`       |
+| A consumable  | `{ entity, strip: ' time left', reset }`. `reset` draws a 28 px restart button that presses the button entity: the one action a list row carries                                             |
+| A warning     | `{ entity, flag: true, color: 'orange', show: { is: ['on'] } }`                                                                                                                              |
+| A progress    | `{ entity, bar: true, show: { entity: vacuum, is: ['cleaning'] } }`                                                                                                                          |
+| A daily total | `{ entity, zero_when_empty: true }`: no value yet today reads "0 floors", in the entity's own unit and precision, uncoloured; any threshold applies to the 0                                 |
+| A timestamp   | `{ entity, relative: true }`, shown as "6 hours ago"                                                                                                                                         |
+| A link        | `link-row`: a port's link speed, orange while it isn't 10 Gbps (its `speed` default)                                                                                                         |
+| A raw word    | `{ entity, words: '[[lock_words]]', color: red, when: { is: ['[[unlocked]]'] } }`                                                                                                            |
 
 `batteries` and `energy-table` (`templates/common.yaml`) draw the two lists every room shares. Both fold: Batteries lowest first, summed up by its lowest; Energy by today's total.
 
@@ -292,15 +293,15 @@ Both pop-ups are built from the same cards:
 
 **The header** has the room's name as its line, and Dock / Locate and Start / Stop next to it. The vacuum's line (`vacuum-card`: its error while it has one, the status, the current room while cleaning, the battery, then the dock's error while it is not `Ok` and the mop drying time left in minutes while drying) is the entity card's in the room pop-up, not the header's.
 
-| Section     | Contents                                                                                                                                                                                                                                                                               |
-| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Routines    | A `grid` of `mnml-button-card`s pressing the `button.` entities, two per row so that a routine's full name fits. A tap colours the pill for 600 ms                                                                                                                                     |
-| Map         | `picture-entity` on the vacuum's `image` entity                                                                                                                                                                                                                                        |
-| Details     | The progress as a bar, the area and the time while `cleaning`; the last clean as a relative time while not; mop attached, and water box attached where the model has it                                                                                                                |
-| Settings    | The `settings` selects as `mnml-select-card`s: cleaning mode, mop mode, mop intensity                                                                                                                                                                                                  |
-| Dock        | `vacuum-popup`: the dust emptying, mop drying and mop washing switches, one item each with a power button                                                                                                                                                                              |
-| Maintenance | `vacuum-popup`: the consumables of the vacuum and of the dock together, labelled without " time left" and formatted by HA ("38h 5m"), then both sets of warnings as orange flags shown while on. It folds, and opens while a warning shows                                             |
-| Totals      | `vacuum-popup`: the lifetime cleaning count, area and time, where the model has `totals`. HA names the area and the time "Cleaning area (total)" and "Cleaning time (total)", apart from the current clean's; the rows strip " (total)" (`TOTAL`), since the heading says it. It folds |
+| Section     | Contents                                                                                                                                                                                                                                                                     |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Routines    | A `grid` of `mnml-button-card`s pressing the `button.` entities, two per row so that a routine's full name fits. A tap colours the pill for 600 ms                                                                                                                           |
+| Map         | `picture-entity` on the vacuum's `image` entity                                                                                                                                                                                                                              |
+| Details     | The progress as a bar, the area and the time while `cleaning`; the last clean as a relative time while not; mop attached, and water box attached where the model has it                                                                                                      |
+| Settings    | The `settings` selects as `mnml-select-card`s: cleaning mode, mop mode, mop intensity                                                                                                                                                                                        |
+| Dock        | `vacuum-popup`: the dust emptying, mop drying and mop washing switches, one item each with a power button                                                                                                                                                                    |
+| Maintenance | `vacuum-popup`: the consumables of the vacuum and of the dock together, labelled without " time left" and formatted by HA ("38h 5m"), then both sets of warnings as orange flags shown while on. It folds, and opens while a warning shows                                   |
+| Totals      | `vacuum-popup`: the lifetime cleaning count, area and time, where the model has `totals`. HA names the area and the time "Cleaning area (total)" and "Cleaning time (total)", apart from the current clean's; the rows strip " (total)", since the heading says it. It folds |
 
 **The dock has no pop-up and no item of its own.** It isn't a thing you go to; it is part of the vacuum. So its switches are a section of the vacuum pop-up, and its consumables and warnings share the vacuum's list. The model's `dock` block still holds its entities, because which entity belongs where follows the HA device.
 
@@ -342,6 +343,12 @@ The room's tile and pop-up take these from the room's `cameras`, `covers`, `fans
   - services that are down and pending updates and firmware: `#system`;
   - the power the home uses: `#energy`, which lists the power now (home, solar, grid, EV charger, battery) and the energy today;
   - low batteries, a count of the room's, the heating's and the people's, orange under 20 % and red under 5 %: `#batteries`, which lists those under 20 %, lowest first;
+  - stopped guests: `#proxmox`;
+  - network devices that are down, in none of the network's up states (`device_up`): `#network`;
+  - essential Tailscale devices that are offline: `#tailscale`;
+  - the media server's health, while Radarr reports a problem: `#media`;
+  - a lock that is unlocked, open or jammed, one item per lock: its room's pop-up;
+  - a car that is unlocked or unarmed, one item per car, counting its lock and its arming state in the car template's words (`unlocked`, `disarmed`): `#car-<key>`;
   - leaks and smoke, which open nothing: the room's tile has its Leak chip.
 
   A strip with nothing to show is not drawn. An item is an icon and its value, with no title: the name is its tooltip, and a count's tooltip lists what it counts. The calm statuses sit on the left and what needs you on the right, behind a hairline, in wells that are louder than the calm ones. The vacation item is its dimmed icon alone until it is on. The weather is the temperature beside an icon that follows the conditions.
@@ -360,14 +367,14 @@ The room's tile and pop-up take these from the room's `cameras`, `covers`, `fans
 
 **The header** is the player, with the room's name as its line and a back button. The transport stays on the media card in the room pop-up: this pop-up is for how the speaker sounds.
 
-| Section   | Contents                                                                                                                                                     |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Sound     | The volume, as a slider card on the player; the bass, the treble and, where the model has it, the balance, as `number` sliders; loudness, an item with power |
-| TV        | The input format on the heading's line ("Dolby Atmos"), where the model has it; night sound and speech enhancement, items with power; the audio delay        |
-| Subwoofer | Whether the sub plays, and its gain, shown only while it does                                                                                                |
-| Surround  | Whether the surrounds play, and while they do, their level for TV and for music, and whether music plays through them at full volume                         |
+| Section   | Contents                                                                                                                                                             |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sound     | The volume, as a slider card on the player; the bass, the treble and the balance, as `number` sliders, and loudness, an item with power, each where the model has it |
+| TV        | The input format on the heading's line ("Dolby Atmos"), where the model has it; night sound and speech enhancement, items with power; the audio delay                |
+| Subwoofer | Whether the sub plays, and its gain, shown only while it does                                                                                                        |
+| Surround  | Whether the surrounds play, and while they do, their level for TV and for music, and whether music plays through them at full volume                                 |
 
-- **Only what the speaker has is written.** `tv`, `subwoofer` and `surround` are optional, for a speaker that isn't a soundbar or has no sub or surrounds bonded.
+- **Only what the speaker has is written.** A `Speaker` needs only its `key` and its player (`entity`): `bass`, `treble`, `balance` and `loudness` are optional, for a speaker without those settings, and `tv`, `subwoofer` and `surround` for one that isn't a soundbar or has no sub or surrounds bonded.
 - **A level shows only while its part plays.** The sub's gain and the surrounds' levels are hidden while the sub or the surrounds are off (`while-not-off`), as a light's sliders are while it is off.
 - **What Sonos reports besides** (crossfade, the status light, touch controls, autoplay, the microphone) stays disabled in Home Assistant.
 
@@ -388,7 +395,7 @@ A chip is drawn only while it is an issue, so a car with nothing wrong has none.
 
 **The BMW states are raw words** with no translation: `SECURED` / `LOCKED` / `SELECTIVE-LOCKED` / `UNLOCKED`, `unarmed` / `doorsOnly` / `doorsTiltCabin`, `CLOSED` / `INTERMEDIATE` / `OPEN`.
 
-- The `car` template holds, as slot defaults, the state lists that the tile's rules and the pop-up's rows share (`unlocked`, `disarmed`, `open_states`).
+- The `car` template holds, as slot defaults, the state lists that the tile's rules and the pop-up's rows share (`unlocked`, `disarmed`, `open_states`). The plan takes `open_states` as its half open states, so a part in one of them is drawn at least half open.
 - It also holds the dictionaries the list card's `words` renders them with: `lock_words` ("Locked", "Partly locked") and `alarm_words` ("Doors only", "Armed").
 - A word the dictionaries don't list comes out lower-cased, without hyphens and capitalised ("Unarmed").
 
@@ -479,14 +486,14 @@ And nothing else. A tile is the glance, and a phone's readings are not what you 
 ### The device pop-up, `#person-<key>-<device>`
 
 - **The header** shows the device's icon and name, the person's name as its line, and a back button to the person. Neither the tracker's state nor the battery is repeated there: the first row below is the battery, and where the person is belongs to the person pop-up.
-- **Battery.** The level as a bar, orange under `BATTERY_LOW` and red under `BATTERY_CRITICAL`, then the charging state.
+- **Battery.** The level as a bar, orange under the person's `low` and red under their `critical`, 20 % and 5 % unless the home sets them, then the charging state.
 - **Details.** Free storage, connection type, network, activity, Focus (and its name where the device reports one), and the location permission, orange while it is not `authorized always`.
 
 Everything else the companion app reports lives here rather than on the row above it: a phone has a dozen readings, and none of them is what you open a person's card to see.
 
 ## Infrastructure
 
-Five tiles, one per system the house runs on, each with its own pop-up, in this order, each before what depends on it: the server, the network, AdGuard, Home Assistant and the media server. They take the default width, so three share a row at three columns and Home Assistant and the media server take the next one. The home's `system` holds all five; `proxmox`, `adguard`, `network` and `media` are optional, and their tile and pop-up exist only when the model has them.
+Six tiles, one per system the house runs on, each with its own pop-up, in this order, each before what depends on it: the server, the network, Tailscale, AdGuard, Home Assistant and the media server. They take the default width, so three share a row at three columns and the six fill two rows. The home's `system` holds all six; `proxmox`, `network`, `tailscale`, `adguard` and `media` are optional, and their tile and pop-up exist only when the model has them.
 
 **Each system reads its own entities.** Proxmox owns the server and every guest on it, AdGuard its filtering, the network its devices, Tailscale the tailnet's devices, the media server Plex and Jellyfin, Seerr, Radarr and Sonarr, and Home Assistant its virtual machine, services, updates and firmware. The one entity two cards share is Home Assistant's own guest, whose CPU and memory are both the Home Assistant tile's and a row of the guests table, so it is one `Guest` constant.
 
@@ -549,7 +556,7 @@ The tile has Home Assistant's memory percentage and free disk under it. Home Ass
 
 ### AdGuard, `#adguard`
 
-The tile takes its name from the protection switch's device, "AdGuard Home", and its icon from the switch, so the shield shows whether blocking is on. Under it are the share of queries blocked and the average processing time. Its chips are Update, amber while AdGuard has one, and the protection switch itself, amber while on.
+The tile takes its name from the protection switch's device, "AdGuard Home", and its icon from the switch, so the shield shows whether blocking is on. Under it are the share of queries blocked and the average processing time. Its chips are Update, amber while AdGuard has one, and the protection switch itself, neutral while on and orange while off, as the pop-up's header is: protection on is the normal state, so it reads calm.
 
 **Protection is the only control.** It is for when a site breaks and blocking has to pause. It is a toggle chip on the tile and the power button of the pop-up's header, whose icon turns orange while protection is off.
 
@@ -580,7 +587,7 @@ The tile has the first internet latency under it, and two chips: Devices, red wh
 
 ### Tailscale, `#tailscale`
 
-One tile and one pop-up for the tailnet, with the devices spelled in the model, each with the sensors Tailscale reports for it. A device marked `essential`, the router and the exit node, is one that must stay connected; the others, phones, a laptop, a tablet, come and go, so their being offline is not a problem. The tile has no line under its name, and three chips, each drawn only while it holds: Offline, red while an essential device is not connected to Tailscale's control server; Relayed, orange while the router or exit node, the devices that carry traffic, cannot connect directly (`udp` off); and Update, amber while any device has a newer client. A tooltip lists the devices behind a chip, by their names.
+One tile and one pop-up for the tailnet, with the devices spelled in the model, each with the sensors Tailscale reports for it. A device marked `essential`, the router and the exit node, is one that must stay connected; the others, phones, a laptop, a tablet, come and go, so their being offline is not a problem. The tile has no line under its name, and three chips, each drawn only while it holds: Offline, red while an essential device is not connected to Tailscale's control server; Relayed, orange while the router or exit node, the devices that carry traffic, cannot connect directly (`udp` off); and Update, amber while an essential device has a newer client. A personal device's update shows only on its card in the pop-up, since a phone or a laptop updates when its owner gets to it. A tooltip lists the devices behind a chip, by their names.
 
 The pop-up is a card per device (`tailscale-device`), in two sections: **Infrastructure**, the essential devices, and **Devices**, the others, each in the model's order. Either heading is drawn only while it has a device under it.
 
@@ -601,7 +608,7 @@ The QR code a phone scans to join one network: UniFi's `image` entity for it, as
 
 ### Media, `#media`
 
-The media server: Plex, and Jellyfin beside it while one replaces the other, which stream, Seerr, where requests come in, and Radarr and Sonarr, which fetch them. The tile has the streams playing under it, one count for each server with its own icon, and up to four chips: Requests, amber while a request waits for approval; Downloads, amber while Radarr's or Sonarr's queue is not empty; Health, red while Radarr reports a problem; and Update, amber while Plex has one.
+The media server: Plex, and Jellyfin beside it, which stream, Seerr, where requests come in, and Radarr and Sonarr, which fetch them. The tile has the streams playing under it, one count for each server with its own icon, and up to four chips: Requests, amber while a request waits for approval; Downloads, amber while Radarr's or Sonarr's queue is not empty; Health, red while Radarr reports a problem; and Update, amber while Plex has one.
 
 | Section   | Contents                                                                                                                                                                                                    |
 | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

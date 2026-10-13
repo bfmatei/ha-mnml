@@ -13,7 +13,7 @@ The two are the two MNML themes, which set the same variables to other values, a
 
 ## Principles
 
-- **One row, everywhere.** An item is a rounded rectangle with a square icon tile and generous padding, in a tile's Lights strip and in a pop-up alike. Its buttons have no background: the primary one is only brighter.
+- **A card is its pop-up, minified.** An item in a pop-up is a rounded rectangle with a square icon tile and generous padding, its name over its state line, and all its controls. The same item in a tile's Lights strip is one slim line: its icon alone, its name and state line after it, and the same controls, smaller; a slider it opens covers that line alone. Its buttons have no background: the primary one is only brighter.
 - **Cards are raised, what sits in them is recessed.** A pill, a chip, the tile's Lights strip and a slider track are wells (`mnml-button-shadow`); an item's icon tile is a light fill in it, like a segmented control's thumb.
 - **A state colours an icon, and tints the pill behind it.** No other surface takes a state colour.
 - **Headings, not separators.** A heading sits above a card, never inside one.
@@ -47,7 +47,7 @@ Besides Home Assistant's variables, the cards read eighteen of their own, each w
 
 ## Surfaces and the hairline
 
-**The glass.** In the glass material a card is the card colour at 60 to 62 % over what is behind it, which the theme blurs (`--mnml-card-backdrop-filter`) and saturates. What is behind it is the view's own background (`lovelace-background`, fixed, so the page moves over it): a diagonal gradient under five large, soft glows in different hues, so every card picks up a little of the colour behind it and nothing in it has an edge. A pop-up is a card of the same material, larger, with a deeper shadow. What it holds is recessed, as a card's contents are: its cards are trays in the pop-up's own section colour (`--mnml-popup-section-color`) with the recess (`--mnml-button-shadow`) and no rim, shadow or blur of their own, and the pills and filled controls in them are the light fills of the Lights strip's thumbs. The page behind a pop-up is veiled and blurred (`--mnml-popup-scrim-color`, `--mnml-popup-scrim-filter`): a light veil in the light palette, a dark one in the dark.
+**The glass.** In the glass material a card is the card colour at 60 to 62 % over what is behind it, which the theme blurs (`--mnml-card-backdrop-filter`) and saturates. What is behind it is the view's own background (`lovelace-background`, fixed, so the page moves over it): a diagonal gradient under five large, soft glows in different hues, so every card picks up a little of the colour behind it and nothing in it has an edge. A pop-up is a card of the same material, larger, with a deeper shadow. What it holds is recessed, as a card's contents are: its cards are trays in the pop-up's own section colour (`--mnml-popup-section-color`) with the recess (`--mnml-button-shadow`) and no rim, shadow or blur of their own, and the pills and filled controls in them are light fills, like a segmented control's thumb. The page behind a pop-up is veiled and blurred (`--mnml-popup-scrim-color`, `--mnml-popup-scrim-filter`): a light veil in the light palette, a dark one in the dark.
 
 **The edge.** In both designs, each card draws a 1 px inset hairline (`--m-edge`: `--mnml-card-edge-color`, or a 12 % mix of the text colour without it), and a 1 px highlight along its top (`--mnml-card-highlight-color`).
 
@@ -59,41 +59,43 @@ The hairline is on `.card` and on the full-width slider card, except a gradient 
 
 ## Sizes
 
-| Element                        | Size                                                                                                |
-| ------------------------------ | --------------------------------------------------------------------------------------------------- |
-| Item row                       | 56 px                                                                                               |
-| Pill (an icon's tile)          | 40 px, a 12 px rounded square                                                                       |
-| Name / state line              | 16 px semibold, tracked slightly tighter / 13 px in the secondary colour, one line (`ROW_STYLE`)    |
-| Control                        | 36 px button, 20 px icon (`CONTROL_STYLE`)                                                          |
-| Heading                        | 36 px, 12 px semibold capitals tracked 0.07em in the secondary colour, 16 px icon (`HEADING_STYLE`) |
-| Heading to its card            | 8 px, as the pop-up shell spaces its cards                                                          |
-| List row / table header row    | 32 px / 24 px, the header in 12 px text                                                             |
-| List bar column / reset button | 72 px / 28 px                                                                                       |
-| Tile's Lights row              | 56 px, as any item row, in the pill colour; its icon tile 40 px in the raised colour                |
-| Slider track / slider card     | 40 px / 56 px                                                                                       |
-| Client row                     | 40 px: the name over its 12 px FQDN, the IP right-aligned                                           |
-| Menu row                       | 36 px                                                                                               |
-| Header back / close            | 40 px rounded squares in the card colour                                                            |
+| Element                        | Size                                                                                                                                                                                                  |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Item row                       | 56 px                                                                                                                                                                                                 |
+| Pill (an icon's tile)          | 40 px, a 12 px rounded square                                                                                                                                                                         |
+| Name / state line              | 16 px semibold, tracked slightly tighter / 13 px in the secondary colour, one line (`ROW_STYLE`)                                                                                                      |
+| Control                        | 36 px button, 20 px icon (`CONTROL_STYLE`)                                                                                                                                                            |
+| Heading                        | 36 px, 12 px semibold capitals tracked 0.07em in the secondary colour, 16 px icon (`HEADING_STYLE`)                                                                                                   |
+| Heading to its card            | 8 px, as the pop-up shell spaces its cards                                                                                                                                                            |
+| List row / table header row    | 32 px / 24 px, the header in 12 px text                                                                                                                                                               |
+| List bar column / reset button | 72 px / 28 px                                                                                                                                                                                         |
+| Tile's Lights row              | 36 px, one line in the pill colour: its icon with no tile, its name in 14 px semibold, then a `•` and its state line; each of its controls a 28 px round, a slider opened from one 36 px over the row |
+| Slider track / slider card     | 40 px / 56 px                                                                                                                                                                                         |
+| Client row                     | 40 px: the name over its 12 px FQDN, the IP right-aligned                                                                                                                                             |
+| Menu row                       | 36 px                                                                                                                                                                                                 |
+| Header back / close            | 40 px rounded squares in the card colour                                                                                                                                                              |
 
-| Radius         | Where                                                                                                                          |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| The card's own | `--ha-card-border-radius`, 22 px in both themes and as the fallback. Also the slider cards                                     |
-| 22 px          | The pop-up (`mnml-popup-border-radius`), as the card's own. Under 600 px its bottom corners square off, so it reads as a sheet |
-| 14 px          | The tile's Lights strip, and a card inside a pop-up                                                                            |
-| 14 px          | A menu                                                                                                                         |
-| 12 px          | A control, a slider track, and every pill: rounded squares                                                                     |
-| 10 px          | A menu row                                                                                                                     |
-| 8 px           | A list row's reset button                                                                                                      |
-| 2 px           | A bar, a slider marker                                                                                                         |
+| Radius         | Where                                                                                                                                                        |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| The card's own | `--ha-card-border-radius`, 22 px in both themes and as the fallback. Also the slider cards                                                                   |
+| 22 px          | The pop-up (`mnml-popup-border-radius`), as the card's own. Opened as a sheet, a phone's opening unless `open` says otherwise, its bottom corners square off |
+| 14 px          | The tile's Lights strip, and a card inside a pop-up                                                                                                          |
+| 14 px          | A menu                                                                                                                                                       |
+| Round          | The tile's Lights row: its icon's tap target and its controls                                                                                                |
+| 12 px          | A control, a slider track, and every pill: rounded squares                                                                                                   |
+| 10 px          | A menu row                                                                                                                                                   |
+| 8 px           | A list row's reset button                                                                                                                                    |
+| 2 px           | A bar, a slider marker                                                                                                                                       |
 
 | Icon  | Where                                                                                    |
 | ----- | ---------------------------------------------------------------------------------------- |
 | 22 px | In a pill, in a header round                                                             |
-| 20 px | In a control, in a slider label, in a menu row, in a list row, in the tile's Lights pill |
-| 16 px | On a reset button, in a heading, in a heading's state line                               |
+| 20 px | In a control, in a slider label, in a menu row, in a list row                            |
+| 18 px | The icon of the tile's Lights row                                                        |
+| 16 px | On a reset button, in a heading, in a heading's state line, on the Lights row's controls |
 | 15 px | In a state line, matched to its 13 px text                                               |
 
-**The state line** is one line. Its items are separated by `•`, each preceded by its entity's state icon when `icon: true`. Only in a tile may it wrap, so that a phone shows both of a car's values. Text that overflows is cut with an ellipsis, never scrolled.
+**The state line** is one line. Its items are separated by `•`, each preceded by its entity's state icon when `icon: true`, centred on its value 3 px before it. A line with no item to show takes no space. Only in a tile may it wrap, so that a long line shows whole; in the tile's Lights row it follows the name on the same line, after a `•`. Text that overflows is cut with an ellipsis, never scrolled.
 
 ## Controls
 
@@ -110,13 +112,13 @@ Everything else has no background, with one exception: **a tile's chips** sit on
 
 **Colour is a variable, never a literal, and it colours an icon or text. A state colour also tints the pill behind its icon (16 % over the pill colour); no other surface takes one.** `colorStyle()` sets `--m-color` to `var(--<color>-color)`, and the `colored` class reads it. The `Color` type is the four semantic colours: `red`, `orange`, `amber`, `blue`.
 
-| Colour  | Means                                                                                                                                                                                                                                                                               |
-| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Red     | A fault: a list value past `critical` or `critical_high`; a battery under `BATTERY_CRITICAL`; a tyre under `tyre_low_share` of its target; a message of severity `error`, on its envelope. A configuration gives it to what it treats as a fault, such as water or an unlocked lock |
-| Orange  | A warning: a list value past `low` or `high`; a battery under `BATTERY_LOW`; a tyre under `tyre_warn_share`; an unavailable entity, wherever it is shown; a message of severity `warning`. A configuration gives it to what it treats as a warning, such as an open window          |
-| Amber   | On, by convention: a light, a switch, a playing media player                                                                                                                                                                                                                        |
-| Blue    | A message of severity `info` or `notice`; by convention, a climate unit while it cools                                                                                                                                                                                              |
-| Neutral | Everything else. A message of any other severity is grey: its envelope in the secondary text colour                                                                                                                                                                                 |
+| Colour  | Means                                                                                                                                                                                                                                                                                                                                          |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Red     | A fault: a list value past `critical` or `critical_high`; a battery under its `critical` threshold (5 % by default); a tyre under `tyre_low_share` of its target; a message of severity `error`, on its envelope. A configuration gives it to what it treats as a fault, such as water or an unlocked lock                                     |
+| Orange  | A warning: a list value past `low` or `high`; a battery under its `low` threshold (20 % by default); a tyre under `tyre_warn_share`; an unavailable entity, wherever it is shown; a message of severity `warning`. A configuration gives it to what it treats as a warning, such as an open window                                             |
+| Amber   | On, by convention: a light, a switch, a playing media player. A switch whose on is the normal state, such as AdGuard Home's protection, is neutral while on and orange while off, so a calm home shows no amber for it; a count of updates counts only what the home depends on (Tailscale's essential devices), the rest listed in its pop-up |
+| Blue    | A message of severity `info` or `notice`; by convention, a climate unit while it cools                                                                                                                                                                                                                                                         |
+| Neutral | Everything else. A message of any other severity is grey: its envelope in the secondary text colour                                                                                                                                                                                                                                            |
 
 Every threshold has two stages, so that a slow drift and a fault don't look alike. Red and orange are also the two colours of a tile's battery chip.
 
@@ -153,13 +155,14 @@ Every colour a card names has a value in both modes of the theme.
 **Sliders.** A slider is a 40 px track in the pill colour with a translucent fill: `--m-color` at 38 %, or the accent. A 2 px solid border in the same colour closes the fill.
 
 - **Why the border.** The fill alone sits at 1.5 to 2.7:1 against its track, and a translucent accent over that track cannot reach 3:1 and stay translucent. The border carries the value's position instead, at 3.1 to 3.5:1 in light and 4.2 to 9.6:1 in dark.
+- **Over a heading**, the overlay is the heading's 36 px with no inset, so its slider is as tall as the heading's controls, and its label is in the text colour, without the heading's capitals and tracking.
 - **Gradient sliders** hide the fill. They show a white marker, and a label with a halo in the card colour so that it stays legible.
 
 **Menus** are popovers in the card colour, under their anchor. Rows are 36 px, and the selected one is in the primary colour.
 
 ## Tooltips
 
-An icon with no text beside it (a chip, a round button, a chevron, a glance) explains itself in a tooltip of the cards' own, not the browser's `title`: one `mnml-tooltip`, drawn in the top layer so it shows over pop-ups. It opens 400 ms after the pointer rests on the element, at once when the pointer moves to a neighbour, and on keyboard focus; it never opens for a touch. It sits above the element, below when there is no room, kept inside the screen, and closes when the pointer leaves, on a press, on a scroll and on Escape. The first line is the name, in bold; the lines after it are the details, such as the batteries a chip counts. Text that a label already shows beside its icon gets none.
+An icon with no text beside it (a chip, a round button, a chevron, a glance) explains itself in a tooltip of the cards' own, not the browser's `title`: one `mnml-tooltip`, drawn in the top layer so it shows over pop-ups. It opens 400 ms after the pointer rests on the element, at once when the pointer moves to a neighbour, and on keyboard focus; it never opens for a touch. It sits above the element, below when there is no room, kept inside the screen, and closes when the pointer leaves, on a press, on a scroll, on Escape, and when a redraw takes its element away. The first line is the name, in bold; the lines after it are the details, such as the batteries a chip counts. Text that a label already shows beside its icon gets none. A tooltip is not a name: a glance that acts is a `button` named with what its tooltip says, its value included (`aria-label`), and the car plan's drawing is an image named with its parts' states.
 
 ## Feedback
 

@@ -5,6 +5,7 @@ import { test, vi } from 'vitest';
 import { fakeStore } from '../test/fake-hass.ts';
 import { define, mounted, text } from '../test/render.ts';
 
+import { MnmlTemplateGallery } from './gallery.ts';
 import { MnmlTemplateCardEditor } from './template-card.ts';
 
 vi.mock('../templates/families.ts', async () => {
@@ -25,6 +26,7 @@ vi.mock('../templates/families.ts', async () => {
 });
 
 define('ha-form', class extends HTMLElement {});
+define('mnml-template-gallery', MnmlTemplateGallery);
 define('mnml-template-card-editor', MnmlTemplateCardEditor);
 
 const settle = async (rounds = 6): Promise<void> => {
@@ -51,7 +53,8 @@ test('when the families cannot be fetched, the gallery keeps the common template
     } as never;
     const root = await mounted(editor);
     await settle();
-    assert.ok(root.querySelector('[aria-label="Use section-heading"]'));
+    const gallery = root.querySelector('mnml-template-gallery')?.shadowRoot;
+    assert.ok(gallery?.querySelector('[aria-label="Use section-heading"]'));
     assert.match(text(root), /the shipped templates could not be loaded/);
   } finally {
     quiet.mockRestore();

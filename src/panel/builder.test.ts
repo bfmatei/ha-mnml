@@ -2,15 +2,15 @@ import assert from 'node:assert/strict';
 
 import { test, vi } from 'vitest';
 
-import type { Template } from '../contract/templates.ts';
+import type { Template, WrittenTemplate } from '../contract/templates.ts';
 import { MnmlRowMenu } from '../editors/row-menu.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
-import { applyChanges, baseOf, changesOf } from '../templates/changes.ts';
+import { applyChanges } from '../templates/changes.ts';
 import { define, mounted, text } from '../test/render.ts';
 
-import { changedParts, entryOf, MnmlBuilder, roundTrips, storedAs } from './builder.ts';
-import type { BuilderHost, Entry } from './builder.ts';
-import type { Draft } from './data.ts';
+import { MnmlBuilder } from './builder.ts';
+import type { BuilderHost } from './builder.ts';
+import type { Draft, Entry } from './data.ts';
 
 define('mnml-builder', MnmlBuilder);
 define('mnml-row-menu', MnmlRowMenu);
@@ -35,87 +35,6 @@ const edited = (change: (template: Template) => void): Template => {
 };
 const chips = (template: Template): Record<string, unknown>[] =>
   (template.card as { 'chips?': Record<string, unknown>[] })['chips?'];
-
-test("a template of the home's own is saved whole", () => {
-  assert.deepEqual(entryOf(ROOM, undefined), { kind: 'own', template: ROOM });
-});
-
-test('a shipped template left as it was saves no change, so an edit undone resets it', () => {
-  assert.equal(entryOf(structuredClone(ROOM), ROOM), undefined);
-  const recoloured = edited((template) => {
-    Object.assign(chips(template)[1] ?? {}, { color: 'amber' });
-  });
-  const entry = entryOf(recoloured, ROOM);
-  assert.equal(entry?.kind, 'changes');
-  assert.equal(entryOf(structuredClone(ROOM), ROOM), undefined, 'and back to the shipped one');
-});
-
-test('a shipped template edited is saved as the changes that turn the shipped one into the draft', () => {
-  const draft = edited((template) => {
-    chips(template).splice(1, 1);
-    Object.assign(template.card as object, { name: 'Hall' });
-  });
-  const entry = entryOf(draft, ROOM);
-  assert.ok(entry?.kind === 'changes');
-  assert.deepEqual(applyChanges(ROOM, entry.changes).template, draft);
-});
-
-test('the parts a change touches are marked in the outline: the part, the inserted one, the moved one, the parent of a removed one', () => {
-  const lock = ['card', 'chips?', '#lock'];
-  const marks = changedParts([
-    { op: 'set', path: lock, key: 'color', value: 'amber', base: '' },
-    { op: 'insert', path: ['card', 'chips?'], after: null, value: { id: 'door' }, base: '' },
-    { op: 'move', path: ['card', 'chips?'], id: 'window', after: 'door', base: '' },
-    { op: 'remove', path: ['card', 'name'], base: '' },
-    { op: 'set', path: [...lock, 'tap_action'], key: 'action', value: 'none', base: '' },
-  ]);
-  assert.deepEqual([...marks].toSorted(), [
-    'card',
-    'card/chips?/#door',
-    'card/chips?/#lock',
-    'card/chips?/#window',
-  ]);
-});
-
-test('a customised template whose part a release removed saves only the changes that still apply', () => {
-  const recolour = {
-    op: 'set',
-    path: ['card', 'chips?', '#lock'],
-    key: 'color',
-    value: 'amber',
-    base: '',
-  } as const;
-  const rename = { op: 'set', path: ['card'], key: 'name', value: 'Hall', base: '' } as const;
-  const changes = [
-    { ...recolour, base: baseOf(ROOM, recolour) },
-    { ...rename, base: baseOf(ROOM, rename) },
-  ];
-  const released = edited((template) => {
-    chips(template).splice(1, 1);
-  });
-  const { template: draft, conflicts } = applyChanges(released, changes);
-  assert.deepEqual(conflicts, [{ index: 0, reason: 'gone' }]);
-  const entry = entryOf(draft, released);
-  assert.ok(entry?.kind === 'changes');
-  assert.deepEqual(entry.changes, changesOf(released, draft));
-  assert.deepEqual(
-    entry.changes.map((change) => change.op === 'set' && change.key),
-    ['name'],
-  );
-});
-
-test('a draft whose changes would not give it back, such as two parts with one id, is not kept as those changes', () => {
-  const twice = edited((template) => {
-    chips(template).push({ id: 'lock', if: 'lock', type: 'toggle', color: 'blue' });
-  });
-  const entry = entryOf(twice, ROOM);
-  assert.equal(roundTrips(entry, twice, ROOM), false);
-  const fine = edited((template) => {
-    Object.assign(chips(template)[1] ?? {}, { color: 'amber' });
-  });
-  assert.equal(roundTrips(entryOf(fine, ROOM), fine, ROOM), true);
-  assert.equal(roundTrips(undefined, structuredClone(ROOM), ROOM), true);
-});
 
 interface Calls {
   saved: [string, Entry | undefined][];
@@ -290,29 +209,6 @@ test('History puts the version chosen in the draft, to be saved', async () => {
   assert.equal(name, 'mine');
   assert.equal(entry?.kind === 'own' ? entry.template.description : undefined, 'An older room.');
   builder.remove();
-});
-
-test('a save that would store what MNML keeps already is not sent', () => {
-  const recolour = edited((template) => {
-    Object.assign(chips(template)[1] ?? {}, { color: 'amber' });
-  });
-  const entry = entryOf(recolour, ROOM);
-  assert.ok(entry?.kind === 'changes');
-  assert.equal(storedAs(entry, { own: {}, changes: { room: entry.changes } }, 'room'), true);
-  assert.equal(storedAs(entry, { own: {}, changes: {} }, 'room'), false);
-  assert.equal(
-    storedAs(
-      { kind: 'own', template: ROOM },
-      { own: { room: structuredClone(ROOM) }, changes: {} },
-      'room',
-    ),
-    true,
-  );
-  assert.equal(
-    storedAs(undefined, { own: {}, changes: {} }, 'room'),
-    true,
-    'no entry and none kept',
-  );
 });
 
 test('a new hass reaches the forms and the preview without drawing the builder again', async () => {
@@ -492,6 +388,41 @@ test('a look cleared and left empty in Design shows its value again', async () =
   builder.remove();
 });
 
+test('an edit made while a save is on its way is not taken as saved', async () => {
+  const calls: Calls = { saved: [], left: 0 };
+  const { builder, root } = await opened(
+    { name: 'room', template: structuredClone(ROOM), shipped: ROOM, conflicts: [] },
+    calls,
+  );
+  const { promise, resolve } = Promise.withResolvers<undefined>();
+  builder.host = { ...host(calls), save: () => promise };
+  await picked(builder, root, 'card/chips?/#window');
+  const colour = (): HTMLSelectElement => {
+    const found = root.querySelector('select[data-path="card/chips?/#window/color"]');
+    assert.ok(found instanceof HTMLSelectElement);
+    return found;
+  };
+  colour().value = 'red';
+  colour().dispatchEvent(new Event('change'));
+  await builder.updateComplete;
+  pressed(root, 'Save');
+  await builder.updateComplete;
+  const other = [...colour().options].find((option) => !['orange', 'red'].includes(option.value));
+  assert.ok(other);
+  colour().value = other.value;
+  colour().dispatchEvent(new Event('change'));
+  await builder.updateComplete;
+  resolve(undefined);
+  await new Promise((done) => setTimeout(done, 0));
+  await builder.updateComplete;
+  assert.equal(builder.dirty(), true);
+  assert.equal(saveOff(root), false);
+  pressed(root, 'Undo');
+  await builder.updateComplete;
+  assert.equal(builder.dirty(), false);
+  builder.remove();
+});
+
 test("a save the integration refuses says the integration's reason", async () => {
   const calls: Calls = { saved: [], left: 0 };
   const { builder, root } = await opened(
@@ -551,7 +482,7 @@ test('a new template asks what to make, and the choice is what the template then
   const save = root.querySelector('button[aria-label="Save"]');
   assert.ok(save instanceof HTMLButtonElement);
   save.click();
-  await new Promise((done) => setTimeout(done, 10));
+  await builder.updateComplete;
   const saved = calls.saved[0]?.[1];
   assert.equal(saved?.kind, 'own');
   assert.match(JSON.stringify(saved?.template?.card), /mnml-list-card/);
@@ -613,12 +544,105 @@ test('a shared piece can be written out in the card, which then no longer follow
   assert.ok(save instanceof HTMLButtonElement);
   assert.equal(save.disabled, false, 'it is a change to save');
   save.click();
-  await new Promise((done) => setTimeout(done, 10));
+  await builder.updateComplete;
   const saved = calls.saved[0]?.[1];
   const card = saved?.template?.card;
   assert.ok(typeof card === 'object' && card !== null && !Array.isArray(card));
   assert.deepEqual(card['chips'], [
     { id: 'my-ac', type: 'nav', entity: '[[ac]]', popup: '#x', color: 'blue' },
   ]);
+  builder.remove();
+});
+
+const YARD: WrittenTemplate = {
+  description: 'A yard.',
+  slots: {
+    energy: { shape: 'meter', label: 'Energy', fields: { power: { required: true } } },
+    lamp: { kind: 'entity' },
+  },
+  card: { type: 'custom:mnml-heading-card', title: 'Yard', icon: 'mdi:barn' },
+  example: { energy: { power: 'sensor.yard_power' } },
+};
+
+test("a template of the home's own written with shapes previews, and is saved as written", async () => {
+  const calls: Calls = { saved: [], left: 0 };
+  const { builder, root } = await opened(
+    { name: 'yard', template: structuredClone(YARD), shipped: undefined, conflicts: [] },
+    calls,
+  );
+  const stage = root.querySelector('mnml-preview');
+  assert.ok(stage);
+  const trial: unknown = Reflect.get(stage, 'trial');
+  assert.equal(typeof trial, 'function');
+  assert.doesNotThrow(() => Reflect.apply(trial as () => unknown, undefined, []));
+  await picked(builder, root, 'card');
+  const title = root.querySelector<HTMLInputElement>('input[data-path="card/title"]');
+  assert.ok(title);
+  title.value = 'Back yard';
+  title.dispatchEvent(new Event('change'));
+  await builder.updateComplete;
+  pressed(root, 'Save');
+  await builder.updateComplete;
+  await builder.updateComplete;
+  const [name, entry] = calls.saved[0] ?? [];
+  assert.equal(name, 'yard');
+  assert.equal(entry?.kind, 'own');
+  assert.equal(JSON.stringify(entry?.template?.slots), JSON.stringify(YARD.slots));
+  assert.deepEqual(entry?.template?.card, { ...(YARD.card as object), title: 'Back yard' });
+  assert.equal(builder.dirty(), false);
+  builder.remove();
+});
+
+async function yamlTab(builder: MnmlBuilder, root: ShadowRoot): Promise<Element> {
+  await moreTools(builder, root);
+  const yaml = [...root.querySelectorAll('[role="tab"]')].find(
+    (tab) => tab.textContent?.trim() === 'YAML',
+  );
+  assert.ok(yaml instanceof HTMLButtonElement);
+  yaml.click();
+  await builder.updateComplete;
+  const editor = root.querySelector('mnml-yaml');
+  assert.ok(editor);
+  return editor;
+}
+
+test('a shipped template given a slot that names a shape in YAML keeps it as changes with the shape resolved', async () => {
+  const calls: Calls = { saved: [], left: 0 };
+  const { builder, root } = await opened(
+    { name: 'room', template: structuredClone(ROOM), shipped: ROOM, conflicts: [] },
+    calls,
+  );
+  const editor = await yamlTab(builder, root);
+  const apply: unknown = Reflect.get(editor, 'apply');
+  assert.equal(typeof apply, 'function');
+  Reflect.apply(apply as (template: WrittenTemplate) => void, undefined, [
+    { ...structuredClone(ROOM), slots: { ...ROOM.slots, energy: { shape: 'meter' } } },
+  ]);
+  await builder.updateComplete;
+  assert.deepEqual(Reflect.get(root.querySelector('mnml-yaml') ?? {}, 'template'), {
+    ...ROOM,
+    slots: { ...ROOM.slots, energy: { shape: 'meter' } },
+  });
+  assert.equal(subtitle(root), '1 change to the shipped template');
+  pressed(root, 'Save');
+  await builder.updateComplete;
+  await builder.updateComplete;
+  const entry = calls.saved[0]?.[1];
+  assert.equal(entry?.kind, 'changes');
+  const kept = applyChanges(ROOM, entry?.changes ?? []).template;
+  assert.deepEqual(kept.slots?.['energy'], {
+    kind: 'object',
+    fields: { power: { kind: 'entity' }, today: { kind: 'entity' }, total: { kind: 'entity' } },
+  });
+  builder.remove();
+});
+
+test('the YAML tab shows a slot as written, with its shape', async () => {
+  const calls: Calls = { saved: [], left: 0 };
+  const { builder, root } = await opened(
+    { name: 'yard', template: structuredClone(YARD), shipped: undefined, conflicts: [] },
+    calls,
+  );
+  assert.deepEqual(Reflect.get(await yamlTab(builder, root), 'template'), YARD);
   builder.remove();
 });

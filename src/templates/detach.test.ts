@@ -50,6 +50,17 @@ const T: Templates = {
       { id: 'two', type: 'b' },
     ],
   },
+  updates: {
+    slots: {
+      devices: { kind: 'objects', fields: { update: { kind: 'entity' }, key: { kind: 'flag' } } },
+    },
+    card: {
+      id: 'update',
+      if: 'devices.*.update',
+      type: 'status',
+      entities: ['[[devices.?key.update]]'],
+    },
+  },
 };
 
 const use = (item: Record<string, Value>) => detach(item, T);
@@ -69,6 +80,15 @@ test('a use is replaced by what its template draws, its slots written in, and it
       color: 'blue',
     },
   ]);
+});
+
+test('a slot set to null is none, as expand reads it, not its default', () => {
+  const done = use({
+    id: 'ac',
+    template: 'chip',
+    slots: { entity: 'climate.a', popup: '#a', color: null },
+  });
+  assert.deepEqual(done?.items, [{ id: 'ac', type: 'nav', entity: 'climate.a', popup: '#a' }]);
 });
 
 test('what a use adds beside its slots stays, and its conditions stay with it', () => {
@@ -142,9 +162,29 @@ test('a list of its own is repeated over the list of the use, and a list drawn i
   ]);
 });
 
+test('a projection over a slot the use fills with one of its own becomes a projection over that one', () => {
+  assert.deepEqual(use({ id: 'x', template: 'updates', slots: { devices: '[[tailnet]]' } }), {
+    items: [
+      {
+        id: 'x',
+        if: 'tailnet.*.update',
+        type: 'status',
+        entities: ['[[tailnet.?key.update]]'],
+      },
+    ],
+    list: false,
+    popups: [],
+  });
+});
+
 test('what cannot be written out is not detached', () => {
   assert.equal(use({ id: 'x', template: 'nothing' }), undefined);
   assert.equal(use({ id: 'x', template: 'each', slots: { lights: ['light.a'] } }), undefined);
+  assert.equal(
+    use({ id: 'x', template: 'updates', slots: { devices: [{ update: 'update.a' }] } }),
+    undefined,
+    'a projection over a list written out',
+  );
   assert.equal(
     use({ id: 'x', template: 'optional', slots: { name: '[[missing]]' } }) !== undefined,
     true,

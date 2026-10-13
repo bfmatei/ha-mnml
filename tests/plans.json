@@ -1,0 +1,147 @@
+{
+  "base": {
+    "title": "Home",
+    "icon": "mdi:home-variant",
+    "rooms": [{ "area": "kitchen" }, { "area": "living", "slots": { "name": "Lounge" } }],
+    "people": [{ "entity": "person.jane" }],
+    "cars": [{ "key": "sedan", "slots": { "metadata": "sensor.sedan" } }],
+    "system": [{ "template": "home-assistant" }],
+    "open": { "tablet": "unfold", "desktop": "unfold" }
+  },
+  "valid": [
+    { "why": "rooms by area, people by entity, a car, a system card and the openings", "with": {} },
+    {
+      "why": "nothing chosen and no openings",
+      "with": { "rooms": [], "people": [], "cars": [], "system": [], "open": {} }
+    },
+    {
+      "why": "each section's own title, icon and template, and the system section's title and icon",
+      "with": {
+        "sections": {
+          "rooms": { "title": "Spaces", "icon": "mdi:home-floor-1", "template": "my-room" },
+          "people": { "template": "person" },
+          "garage": { "title": "Cars" },
+          "system": { "title": "Servers", "icon": "mdi:server" }
+        }
+      }
+    },
+    { "why": "no looks", "with": { "sections": {} } },
+    {
+      "why": "the sections in another order",
+      "with": { "order": ["people", "rooms", "system", "garage"] }
+    },
+    { "why": "an order that names some sections", "with": { "order": ["system"] } },
+    {
+      "why": "a spelled room, person and system card",
+      "with": {
+        "rooms": [{ "slots": { "key": "office", "name": "Office" }, "spelled": true }],
+        "people": [
+          {
+            "entity": "person.jane",
+            "slots": { "key": "jane", "entity": "person.jane" },
+            "spelled": true
+          }
+        ],
+        "system": [
+          { "template": "home-assistant", "slots": { "cpu": "sensor.cpu" }, "spelled": true }
+        ]
+      }
+    },
+    {
+      "why": "a system card with its overrides",
+      "with": { "system": [{ "template": "adguard", "slots": { "speed": "sensor.speed" } }] }
+    },
+    { "why": "the Glances strip, discovered", "with": { "glances": {} } },
+    {
+      "why": "the Glances strip with overrides",
+      "with": { "glances": { "slots": { "weather": "weather.home" } } }
+    },
+    {
+      "why": "the Glances strip spelled",
+      "with": {
+        "glances": {
+          "slots": { "weather": "weather.home", "people": ["person.jane"] },
+          "spelled": true
+        }
+      }
+    }
+  ],
+  "invalid": [
+    { "why": "no title", "with": { "title": "" } },
+    { "why": "an icon without mdi:", "with": { "icon": "home" } },
+    { "why": "an icon in capitals", "with": { "icon": "mdi:Home" } },
+    { "why": "a key MNML does not keep", "with": { "theme": "dark" } },
+    { "why": "a room with neither an area nor spelled", "with": { "rooms": [{ "slots": {} }] } },
+    {
+      "why": "a spelled room that names an area",
+      "with": { "rooms": [{ "area": "kitchen", "slots": {}, "spelled": true }] }
+    },
+    { "why": "a spelled room without slots", "with": { "rooms": [{ "spelled": true }] } },
+    {
+      "why": "spelled is true or left out",
+      "with": { "rooms": [{ "area": "kitchen", "spelled": false }] }
+    },
+    {
+      "why": "a room with a key it does not have",
+      "with": { "rooms": [{ "area": "kitchen", "icon": "mdi:stove" }] }
+    },
+    {
+      "why": "a person who is not a person entity",
+      "with": { "people": [{ "entity": "sensor.jane" }] }
+    },
+    {
+      "why": "a person entity with spaces",
+      "with": { "people": [{ "entity": "person.Jane Doe" }] }
+    },
+    {
+      "why": "a spelled person without slots",
+      "with": { "people": [{ "entity": "person.jane", "spelled": true }] }
+    },
+    {
+      "why": "a spelled person without an entity",
+      "with": { "people": [{ "slots": { "key": "jane" }, "spelled": true }] }
+    },
+    { "why": "a car without slots", "with": { "cars": [{ "key": "sedan" }] } },
+    { "why": "a car whose key is no name", "with": { "cars": [{ "key": "My car", "slots": {} }] } },
+    {
+      "why": "a system template whose name is no name",
+      "with": { "system": [{ "template": "Home Assistant" }] }
+    },
+    {
+      "why": "a system card whose slots are a list",
+      "with": { "system": [{ "template": "adguard", "slots": [] }] }
+    },
+    {
+      "why": "a spelled system card without slots",
+      "with": { "system": [{ "template": "adguard", "spelled": true }] }
+    },
+    { "why": "a screen that is no screen", "with": { "open": { "watch": "sheet" } } },
+    { "why": "an opening that is no opening", "with": { "open": { "phone": "drawer" } } },
+    { "why": "no openings at all", "without": ["open"] },
+    {
+      "why": "a template for the system section",
+      "with": { "sections": { "system": { "template": "home-assistant" } } }
+    },
+    {
+      "why": "a section that is no section",
+      "with": { "sections": { "attic": { "title": "Attic" } } }
+    },
+    {
+      "why": "a section icon without mdi:",
+      "with": { "sections": { "rooms": { "icon": "floor" } } }
+    },
+    {
+      "why": "a section template that is no name",
+      "with": { "sections": { "rooms": { "template": "My Room" } } }
+    },
+    { "why": "an empty section title", "with": { "sections": { "rooms": { "title": "" } } } },
+    { "why": "sections that are a list", "with": { "sections": [] } },
+    { "why": "a section ordered twice", "with": { "order": ["rooms", "rooms"] } },
+    { "why": "an order with a section that is no section", "with": { "order": ["attic"] } },
+    { "why": "an order that is no list", "with": { "order": "rooms" } },
+    { "why": "a spelled Glances strip without slots", "with": { "glances": { "spelled": true } } },
+    { "why": "Glances slots that are a list", "with": { "glances": { "slots": [] } } },
+    { "why": "a Glances strip with a template", "with": { "glances": { "template": "glances" } } },
+    { "why": "a Glances strip that is a flag", "with": { "glances": true } }
+  ]
+}

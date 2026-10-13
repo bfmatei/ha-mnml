@@ -1,30 +1,10 @@
-import type { Control, StateItem } from '../contract/cards.ts';
 import type { Value } from '../contract/templates.ts';
 import { toValue } from '../templates/expand.ts';
 
-import type {
-  Ac,
-  Heating,
-  Home,
-  Lights,
-  Person,
-  Proxmox,
-  Room,
-  System,
-  Tailscale,
-} from './types.ts';
+import type { Ac, Home, Lights, Proxmox, Room, System } from './types.ts';
 
-export function headingSlots(
-  title: string,
-  icon: string,
-  options: { state?: StateItem[]; controls?: Control[] } = {},
-): Record<string, Value> {
-  return {
-    title,
-    icon,
-    state: toValue(options.state ?? null),
-    controls: toValue(options.controls ?? null),
-  };
+export function headingSlots(title: string, icon: string): Record<string, Value> {
+  return { title, icon };
 }
 
 function record(input: Record<string, unknown>): Record<string, Value> {
@@ -46,15 +26,6 @@ function lightsSlots(lights: Lights): Record<string, Value> {
     ),
     scenes: lights.scenes,
     active_scene: lights.activeScene,
-  });
-}
-
-function heatingSlots(heating: Heating): Record<string, Value> {
-  return record({
-    entity: heating.entity,
-    preset: heating.preset,
-    thermostats: heating.thermostats.map(({ valve, battery }) => ({ valve, battery })),
-    batteries: heating.thermostats.map(({ battery }) => battery),
   });
 }
 
@@ -106,7 +77,7 @@ export function roomSlots(room: Room): Record<string, Value> {
     door: room.door,
     lock: room.lock,
     lights: lightsSlots(room.lights),
-    heating: room.heating && heatingSlots(room.heating),
+    heating: room.heating && snake(room.heating),
     ac: room.ac && acSlots(room.ac),
     vacuum: room.vacuum && snake(room.vacuum),
     printer3d: room.printer3d && snake(room.printer3d),
@@ -128,48 +99,19 @@ export function roomSlots(room: Room): Record<string, Value> {
       ...(room.heating?.thermostats ?? []).map((thermostat) => thermostat.battery),
     ].toSorted(),
     leaks: room.leaks,
-    meters: [
-      ...(room.outlets ?? []).flatMap((outlet) =>
-        outlet.energy === undefined ? [] : [outlet.energy],
-      ),
-      ...(room.ac?.energy === undefined ? [] : [room.ac.energy]),
-    ],
   });
-}
-
-export function personSlots(person: Person): Record<string, Value> {
-  return {
-    ...snake(person),
-    activities: person.devices.map((device) => device.activity),
-    focuses: person.devices.map((device) => device.focus),
-    batteries: person.devices.map((device) => device.battery),
-  };
 }
 
 export function proxmoxSlots(proxmox: Proxmox): Record<string, Value> {
   return {
     ...snake(proxmox),
     ...record({
-      guest_statuses: proxmox.guests.map((guest) => guest.status),
       message_sources: [
         ...(proxmox.notifications?.sources ?? []),
         ...proxmox.guests.flatMap(({ host, status }) =>
           host === undefined ? [] : [{ source: host, entity: status }],
         ),
       ],
-    }),
-  };
-}
-
-export function tailscaleSlots(tailscale: Tailscale): Record<string, Value> {
-  const { devices } = tailscale;
-  return {
-    ...snake(tailscale),
-    ...record({
-      essential: devices.flatMap((device) => (device.essential === true ? [device.connected] : [])),
-      personal: devices.flatMap((device) => (device.essential === true ? [] : [device.connected])),
-      updates: devices.flatMap((device) => (device.update === undefined ? [] : [device.update])),
-      direct: devices.flatMap((device) => (device.udp === undefined ? [] : [device.udp])),
     }),
   };
 }
@@ -218,5 +160,15 @@ export function glancesSlots(home: Home): Record<string, Value> {
     services: home.system.services,
     disks: home.system.proxmox?.disks?.failing,
     backup: home.system.proxmox?.backups?.problem,
+    guests: home.system.proxmox?.guests.map((guest) => guest.status),
+    network_devices: home.system.network?.devices,
+    tailscale: home.system.tailscale?.devices.flatMap((device) =>
+      device.essential === true ? [device.connected] : [],
+    ),
+    media_health: home.system.media?.movies?.health,
+    locks: home.rooms.flatMap((room) =>
+      room.lock === undefined ? [] : [{ entity: room.lock, room: room.key }],
+    ),
+    cars: home.cars.map((car) => ({ key: car.key, lock: car.lock, alarm: car.alarm })),
   });
 }

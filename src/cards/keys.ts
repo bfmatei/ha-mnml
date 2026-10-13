@@ -1,11 +1,6 @@
+import { chooseVariant } from '../contract/structure.ts';
+import type { Key, Structure } from '../contract/structure.ts';
 import { PART_KEY } from '../contract/templates.ts';
-
-export type AllKeys<T> = T extends unknown ? keyof T & string : never;
-
-type AllowedKeys<T> = {
-  [K in keyof T]-?: [Exclude<T[K], undefined>] extends [never] ? never : K;
-}[keyof T] &
-  string;
 
 export interface KeySchema {
   keys: ReadonlySet<string>;
@@ -22,50 +17,57 @@ export const LAYOUT: ReadonlySet<string> = new Set([
   'card_mod',
 ]);
 
-export function schema<T>(
-  keys: Record<AllKeys<T>, true>,
-  nested?: Record<string, KeySchema>,
-): KeySchema {
-  const known = new Set(Object.keys(keys));
-  return nested === undefined ? { keys: known } : { keys: known, nested };
+function plainKeys(keys: Readonly<Record<string, Key>>, own: readonly string[]): KeySchema {
+  const known = new Set([...own, ...Object.keys(keys)]);
+  const nested = Object.entries(keys).flatMap(([key, spec]): [string, KeySchema][] =>
+    spec.of === undefined ? [] : [[key, keysOf(spec.of)]],
+  );
+  return nested.length === 0
+    ? { keys: known }
+    : { keys: known, nested: Object.fromEntries(nested) };
 }
 
-export function variant<T>(
-  keys: Record<AllowedKeys<T>, true>,
-  nested?: Record<string, KeySchema>,
-): KeySchema {
-  const known = new Set(Object.keys(keys));
-  return nested === undefined ? { keys: known } : { keys: known, nested };
-}
-
-function union(
-  variants: readonly KeySchema[],
-  pick: (value: ReadonlyMap<string, unknown>) => KeySchema | undefined,
-): KeySchema {
+function variantKeys(structure: Structure, own: readonly string[]): KeySchema {
+  if (structure.kind === 'plain') {
+    return plainKeys(structure.keys, own);
+  }
+  const tags = structure.kind === 'tagged' ? ['type', ...own] : own;
+  const schemas = new Map(
+    structure.variants.map((variant) => [variant, plainKeys(variant.keys, tags)]),
+  );
+  const all = [...schemas.values()];
   return {
-    keys: new Set(variants.flatMap((one) => [...one.keys])),
-    nested: Object.fromEntries(variants.flatMap((one) => Object.entries(one.nested ?? {}))),
-    pick,
+    keys: new Set(all.flatMap((one) => [...one.keys])),
+    nested: Object.fromEntries(all.flatMap((one) => Object.entries(one.nested ?? {}))),
+    pick: (value) => {
+      const found = chooseVariant(structure, (key) => value.has(key), value.get('type'));
+      return found === undefined ? undefined : schemas.get(found);
+    },
   };
 }
 
-export function tagged<T extends { type: string }>(
-  variants: Record<T['type'], KeySchema>,
+const PARTS = new Map<Structure, KeySchema>();
+const CARDS = new Map<Structure, KeySchema>();
+const CARD_KEYS = ['type'];
+
+function remembered(
+  known: Map<Structure, KeySchema>,
+  structure: Structure,
+  own: readonly string[],
 ): KeySchema {
-  const byType = new Map<string, KeySchema>(Object.entries(variants));
-  return union([...byType.values()], (value) => {
-    const type = value.get('type');
-    return typeof type === 'string' ? byType.get(type) : undefined;
-  });
+  const found = known.get(structure);
+  if (found !== undefined) {
+    return found;
+  }
+  const made = variantKeys(structure, own);
+  known.set(structure, made);
+  return made;
 }
 
-export function marked(markers: Record<string, KeySchema>, otherwise: KeySchema): KeySchema {
-  const byMarker = Object.entries(markers);
-  return union(
-    [...byMarker.map(([, one]) => one), otherwise],
-    (value) => byMarker.find(([marker]) => value.has(marker))?.[1] ?? otherwise,
-  );
-}
+export const keysOf = (structure: Structure): KeySchema => remembered(PARTS, structure, []);
+
+export const cardKeysOf = (structure: Structure): KeySchema =>
+  remembered(CARDS, structure, CARD_KEYS);
 
 export function unknownKeys(value: unknown, of: KeySchema, path = ''): string[] {
   if (Array.isArray(value)) {

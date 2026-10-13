@@ -124,3 +124,35 @@ test('a family that failed for a passing reason is fetched again after 30 second
   }
   assert.deepEqual(calls.toSorted(), ['car', 'room', 'room']);
 });
+
+test('a family that failed for a passing reason is fetched again by the next need after 30 seconds', async () => {
+  let time = 0;
+  let tries = 0;
+  const shipped = createShipped(
+    () => {
+      tries += 1;
+      return tries === 1
+        ? Promise.reject(new Error('mnml-cards-room.json: Failed to fetch'))
+        : Promise.resolve(FAMILIES['room'] ?? {});
+    },
+    OWNER,
+    {},
+    () => time,
+  );
+  const original = console.error;
+  console.error = (): void => undefined;
+  try {
+    await shipped.need(['room']);
+    assert.match(shipped.failure(['room']) ?? '', /Failed to fetch/);
+    time = 29_000;
+    await shipped.need(['room']);
+    assert.equal(tries, 1, 'not again within 30 seconds');
+    time = 31_000;
+    await shipped.need(['room']);
+  } finally {
+    console.error = original;
+  }
+  assert.equal(tries, 2);
+  assert.equal(shipped.failure(['room']), undefined);
+  assert.deepEqual(Object.keys(shipped.templates()).toSorted(), ['room', 'room-popup']);
+});

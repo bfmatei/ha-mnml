@@ -10,8 +10,8 @@ import { entityName } from '../ha/names.ts';
 import { onPress, stateIcon } from '../ha/templates.ts';
 
 import { MnmlCard, requireString } from './base.ts';
-import { schema } from './keys.ts';
 import type { KeySchema } from './keys.ts';
+import { BUTTON_CARD } from './schemas.ts';
 import { BASE_STYLE, ROW_STYLE } from './styles.ts';
 
 const PRESS_FLASH = 600;
@@ -33,8 +33,6 @@ const BUTTON_STYLE = css`
   }
 `;
 
-const SCHEMA = schema<ButtonCard>({ type: true, entity: true, service: true });
-
 export class MnmlButtonCard extends MnmlCard<ButtonCard> {
   static override styles = [BASE_STYLE, ROW_STYLE, BUTTON_STYLE];
 
@@ -44,7 +42,7 @@ export class MnmlButtonCard extends MnmlCard<ButtonCard> {
   private timer: ReturnType<typeof setTimeout> | undefined;
 
   protected schema(): KeySchema {
-    return SCHEMA;
+    return BUTTON_CARD;
   }
 
   protected override validate(config: ButtonCard): void {
@@ -60,7 +58,7 @@ export class MnmlButtonCard extends MnmlCard<ButtonCard> {
       this.timer = setTimeout(() => {
         this.pressed = false;
       }, PRESS_FLASH);
-      run(this, callService(hass, config.entity, config.service));
+      run(this, callService(this.hass ?? hass, config.entity, config.service));
     };
     return html`<div
       class=${classMap({ card: true, row: true, button: true, pressed: this.pressed })}

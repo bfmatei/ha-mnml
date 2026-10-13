@@ -44,7 +44,7 @@ MNML is a Home Assistant integration. It brings the cards, their editors, the sh
 Then add **MNML** in Settings, Devices & services. The setup asks for two things, which the integration's options change later:
 
 - **Use the glass design.** On, MNML installs its glass theme: translucent, blurred cards over a soft gradient. Off, it installs the flat one: the same design, with opaque cards on a hairline edge and no blur. Either way, the theme is named MNML.
-- **Use MNML as the default theme,** for everyone who has not picked a theme in their profile, in light and dark mode.
+- **Use MNML as the default theme,** for everyone who has not picked a theme in their profile, in light and dark mode. MNML applies it when the answer changes, once Home Assistant loads the MNML theme, so a default set later with the `frontend.set_theme` action stays until the answer changes again.
 
 ![The integration's options: the glass design and the default theme](docs/screenshots/options.png)
 
@@ -137,7 +137,7 @@ Every card is in Home Assistant's card picker (**Add card**, **By card**, then s
 - **Shape.** Cards have a 22 px radius and no border of the theme's own; pop-ups the same.
 - **The font** is the system stack.
 - **Contrast it can prove.** Every accent reads at 4.5:1 or better as text on a card, every icon at 3:1 on its surface, and the build refuses to write a theme where one claim stops holding.
-- **The cards' variables:** the pill colour and its raised variant, the card's fill, blur, edge, highlight and shadow, the recess of a button, and the pop-up's background, section colour, blur, scrim, shadow, radius and gap. The cards work without them, under any theme, as the flat design; the glass theme sets them all, .
+- **The cards' variables:** the pill colour and its raised variant, the card's fill, blur, edge, highlight and shadow, the recess of a button, the overlay of a slider and a tooltip, and the pop-up's background, section colour, blur, scrim, shadow, scroll shade, radius and gap. The cards work without them, under any theme, as the flat design; both MNML themes set them all.
 
 [The theme](docs/theme.md) has the mapping onto Home Assistant's variables, and every contrast claim.
 
@@ -153,7 +153,7 @@ If you keep your dashboard in code, describe the home as one typed `Home` (`src/
 
 ## The demo
 
-The demo is a whole home: nine rooms, Joe and Jane, two cars, a server, the network, AdGuard Home, Home Assistant and a media server, so every tile and pop-up MNML has. It runs on a throwaway Home Assistant in Docker, with the `demo` integration, the entities `demo/entities.ts` makes for it, and MNML itself from this folder. With Docker running, `pnpm demo` starts it at `http://localhost:8124`, with the demo and the examples as dashboards; its first run makes the owner `demo`, password `demo`. [Architecture](docs/architecture.md#the-throwaway-home-assistant) has what it does.
+The demo is a whole home: nine rooms, Joe and Jane, two cars, a server, the network, a Tailscale tailnet, AdGuard Home, Home Assistant and a media server, so every tile and pop-up MNML has. It runs on a throwaway Home Assistant in Docker, with the `demo` integration, the entities `demo/entities.ts` makes for it, and MNML itself from this folder. With Docker running, `pnpm demo` starts it at `http://localhost:8124`, with the demo and the examples as dashboards; its first run makes the owner `demo`, password `demo`. [Architecture](docs/architecture.md#the-throwaway-home-assistant) has what it does.
 
 ## Working on MNML
 

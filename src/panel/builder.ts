@@ -1,24 +1,22 @@
-import { html, LitElement, nothing } from 'lit';
+import { css, html, LitElement, nothing } from 'lit';
 import type { PropertyValues, TemplateResult } from 'lit';
 import { property, state } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
 
 import { BASE_STYLE, CONTROL_STYLE } from '../cards/styles.ts';
 import { isMapping } from '../contract/templates.ts';
-import type { Template, Templates, Value } from '../contract/templates.ts';
+import type { Template, Templates, Value, WrittenTemplate } from '../contract/templates.ts';
 import { objectForm } from '../editors/draw.ts';
 import type { Context } from '../editors/draw.ts';
 import { rowMenu } from '../editors/row-menu.ts';
 import { slotsShape } from '../editors/slots.ts';
 import { EDITOR_STYLE } from '../editors/style.ts';
-import { field } from '../ha/field.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
+import { registriesOf } from '../ha/registries.ts';
 import { icon } from '../ha/templates.ts';
-import { applyChanges, changesOf, nodeHash } from '../templates/changes.ts';
+import { applyChanges, changesOf } from '../templates/changes.ts';
 import type { Change } from '../templates/changes.ts';
-import { detach } from '../templates/detach.ts';
 import { discover } from '../templates/discover.ts';
-import { toValue } from '../templates/expand.ts';
 
 import {
   automateField,
@@ -29,25 +27,33 @@ import {
   setPreview,
 } from './binding.ts';
 import { problemOf } from './check.ts';
-import type { Clash, Draft, Kept } from './data.ts';
-import { drawInspector, withCondition } from './inspector.ts';
-import { chainTo, drawOutline, groupOf, partOf, singlesOf } from './outline.ts';
+import { CONFLICTS_STYLE, drawConflicts } from './conflicts.ts';
+import { entryOf, readableOf, roundTrips } from './data.ts';
+import type { Clash, Draft, Entry } from './data.ts';
+import { detachedOf, withDetached } from './detached.ts';
+import { drawInspector, INSPECTOR_STYLE, withCondition } from './inspector.ts';
+import { messageOf } from './message.ts';
+import {
+  OUTLINE_STYLE,
+  chainTo,
+  changedParts,
+  drawOutline,
+  groupOf,
+  partOf,
+  singlesOf,
+} from './outline.ts';
 import type { Group, OutlineActions, Part, Starter } from './outline.ts';
 import { keepPicks, picksOf } from './picks.ts';
 import { richestArea, tryDraft } from './preview.ts';
 import type { Area, Trial, TrialOn } from './preview.ts';
 import { keptPart, simpleOf, switchedOff, switchedOn } from './simple.ts';
 import type { KeptPart, SimpleActions } from './simple.ts';
-import { drawSlots } from './slots-tab.ts';
-import { drawStagePanel, groupOfPart, titleOf } from './stage-panel.ts';
-import { STARTERS } from './starters.ts';
+import { drawSlots, SLOTS_STYLE } from './slots-tab.ts';
+import { drawStagePanel, groupOfPart, STAGE_STYLE, titleOf } from './stage-panel.ts';
+import { drawStarters, STARTERS_STYLE } from './starters.ts';
 import { PANEL_STYLE } from './style.ts';
-import { adoptIds, inserted, moved, uniqueId, valueAt, withValue } from './tree.ts';
+import { adoptIds, inserted, listAt, movedTo, uniqueId, valueAt, withValue } from './tree.ts';
 import type { Path } from './tree.ts';
-
-export type Entry =
-  | { kind: 'own'; template: Template; changes?: never }
-  | { kind: 'changes'; template?: never; changes: Change[] };
 
 export interface BuilderHost {
   templates: () => Templates;
@@ -55,8 +61,8 @@ export interface BuilderHost {
   save: (name: string, entry: Entry | undefined) => Promise<void>;
   leave: () => void;
   history: (name: string) => Promise<Entry | undefined>;
-  duplicate: (name: string, template: Template) => void;
-  exportOne: (name: string, template: Template) => void;
+  duplicate: (name: string, template: WrittenTemplate) => void;
+  exportOne: (name: string, template: WrittenTemplate) => void;
   open: (name: string) => void;
 }
 
@@ -79,62 +85,6 @@ const PANES: readonly { pane: Pane; label: string }[] = [
 
 const keyOf = (path: Path): string => path.join('/');
 
-function partKey(path: Path): string {
-  const last = path.findLastIndex((segment) => segment.startsWith('#'));
-  return last === -1 ? (path[0] ?? '') : keyOf(path.slice(0, last + 1));
-}
-
-export function changedParts(changes: readonly Change[]): Set<string> {
-  const keys = new Set<string>();
-  for (const change of changes) {
-    if (change.op === 'insert') {
-      const id =
-        isMapping(change.value) && typeof change.value['id'] === 'string'
-          ? change.value['id']
-          : undefined;
-      keys.add(id === undefined ? partKey(change.path) : keyOf([...change.path, `#${id}`]));
-    } else if (change.op === 'move') {
-      keys.add(keyOf([...change.path, `#${change.id}`]));
-    } else if (change.op === 'remove') {
-      keys.add(partKey(change.path.slice(0, -1)));
-    } else {
-      keys.add(partKey(change.path));
-    }
-  }
-  return keys;
-}
-
-export function roundTrips(
-  entry: Entry | undefined,
-  draft: Template,
-  shipped: Template | undefined,
-): boolean {
-  if (shipped === undefined || entry?.kind === 'own') {
-    return true;
-  }
-  const kept = entry === undefined ? shipped : applyChanges(shipped, entry.changes).template;
-  return nodeHash(toValue(kept)) === nodeHash(toValue(draft));
-}
-
-export function storedAs(entry: Entry | undefined, kept: Kept, name: string): boolean {
-  const own = kept.own[name];
-  const changes = kept.changes[name];
-  if (entry === undefined) {
-    return own === undefined && changes === undefined;
-  }
-  return entry.kind === 'own'
-    ? own !== undefined && nodeHash(toValue(own)) === nodeHash(toValue(entry.template))
-    : changes !== undefined && nodeHash(toValue(changes)) === nodeHash(toValue(entry.changes));
-}
-
-export function entryOf(draft: Template, shipped: Template | undefined): Entry | undefined {
-  if (shipped === undefined) {
-    return { kind: 'own', template: draft };
-  }
-  const changes = changesOf(shipped, draft);
-  return changes.length === 0 ? undefined : { kind: 'changes', changes };
-}
-
 function idFor(starter: Starter): string {
   const type = starter.value['type'];
   const template = starter.value['template'];
@@ -142,20 +92,6 @@ function idFor(starter: Starter): string {
     return type.replace(/^custom:mnml-/, '').replace(/-card$/, '');
   }
   return typeof template === 'string' && template !== '' ? template : 'part';
-}
-
-function describeClash(clash: Clash): string {
-  const where = clash.change.path.join(' / ') || 'the template';
-  const what =
-    clash.change.op === 'set'
-      ? `${clash.change.key} at ${where}`
-      : `${clash.change.op} at ${where}`;
-  if (clash.reason === 'gone') {
-    return `${what}: this part is gone from the shipped template, so the change is left out`;
-  }
-  return clash.reason === 'taken'
-    ? `${what}: the shipped template has a part of this id now, so yours is left out`
-    : `${what}: the shipped template changed here since; your change still applies`;
 }
 
 function findPart(root: Part, key: string): Part | undefined {
@@ -173,19 +109,153 @@ function findPart(root: Part, key: string): Part | undefined {
   return undefined;
 }
 
-const EMPTY: Template = { card: {} };
+const EMPTY: WrittenTemplate = { card: {} };
 
 const PREVIEW_DELAY = 300;
 const FED = 'ha-form, mnml-preview, mnml-binder, mnml-yaml';
 
+const BUILDER_STYLE = css`
+  .builder {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+  }
+  .builder-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--divider-color);
+  }
+  .builder-title {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .builder-title h1 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 400;
+    font-family: var(--ha-font-family-code, monospace);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .builder-title .muted {
+    font-size: 12px;
+  }
+  .panes {
+    padding-top: 0;
+  }
+  .work {
+    display: grid;
+    grid-template-columns: minmax(240px, 300px) minmax(0, 1fr) minmax(300px, 380px);
+    flex: 1;
+    min-height: 0;
+  }
+  .pane {
+    overflow: auto;
+    padding: 12px;
+    box-sizing: border-box;
+    max-height: calc(100vh - 170px);
+  }
+  .outline-pane {
+    border-right: 1px solid var(--divider-color);
+  }
+  .inspector-pane {
+    border-left: 1px solid var(--divider-color);
+  }
+  .work.narrow {
+    display: block;
+  }
+  .work.narrow .pane {
+    display: none;
+    max-height: none;
+    border: none;
+  }
+  .work.narrow.show-outline .outline-pane,
+  .work.narrow.show-preview .preview-pane,
+  .work.narrow.show-inspector .inspector-pane {
+    display: block;
+  }
+  .design {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    align-items: start;
+  }
+  .design.narrow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .design-stage {
+    min-width: 0;
+    padding: 16px;
+  }
+  .design-panel {
+    box-sizing: border-box;
+    border-left: 1px solid var(--divider-color);
+    padding: 16px;
+    position: sticky;
+    top: 0;
+    max-height: 100vh;
+    overflow: auto;
+  }
+  .design.narrow .design-panel {
+    position: static;
+    max-height: none;
+    border-left: none;
+    border-top: 1px solid var(--divider-color);
+  }
+  .tab.more {
+    margin-left: auto;
+    color: var(--secondary-text-color);
+  }
+  .example {
+    padding: 0 16px 16px;
+    max-width: 960px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .example h2 {
+    margin: 8px 0 0;
+    font-size: 18px;
+    font-weight: 500;
+  }
+  .example p {
+    margin: 0;
+  }
+  @media (max-width: 600px) {
+    .builder-head {
+      padding: 6px 8px;
+    }
+    .pane {
+      padding: 12px 8px;
+    }
+  }
+`;
+
 export class MnmlBuilder extends LitElement {
-  static override styles = [BASE_STYLE, CONTROL_STYLE, EDITOR_STYLE, PANEL_STYLE];
+  static override styles = [
+    BASE_STYLE,
+    CONTROL_STYLE,
+    EDITOR_STYLE,
+    PANEL_STYLE,
+    BUILDER_STYLE,
+    CONFLICTS_STYLE,
+    OUTLINE_STYLE,
+    INSPECTOR_STYLE,
+    STARTERS_STYLE,
+    STAGE_STYLE,
+    SLOTS_STYLE,
+  ];
 
   @property({ attribute: false }) host: BuilderHost | undefined;
   @property({ attribute: false }) draft: Draft | undefined;
   @property({ attribute: false }) narrow = false;
-  @state() private template: Template = EMPTY;
-  @state() private shown: Template = EMPTY;
+  @state() private template: WrittenTemplate = EMPTY;
+  @state() private shown: WrittenTemplate = EMPTY;
   @state() private tab: Tab = 'design';
   @state() private view = 'card';
   @state() private advanced = false;
@@ -195,12 +265,12 @@ export class MnmlBuilder extends LitElement {
   @state() private area: string | undefined;
   @state() private problem: string | undefined;
   @state() private saving = false;
-  private saved: Template = EMPTY;
+  private saved: WrittenTemplate = EMPTY;
   private chose = false;
   private picked = new Set<string>();
   private start = '';
-  private undos: Template[] = [];
-  private redos: Template[] = [];
+  private undos: WrittenTemplate[] = [];
+  private redos: WrittenTemplate[] = [];
   private unsaved = false;
   private clashes: readonly Clash[] = [];
   private readonly open = new Map<string, boolean>();
@@ -209,6 +279,7 @@ export class MnmlBuilder extends LitElement {
   private trial: (() => Trial) | undefined;
   private changes: Change[] | undefined;
   private current: HomeAssistant | undefined;
+  private read: { of: WrittenTemplate; as: Template } | undefined;
 
   get hass(): HomeAssistant | undefined {
     return this.current;
@@ -285,7 +356,7 @@ export class MnmlBuilder extends LitElement {
         this.area = richestArea(
           this.host.templates(),
           this.name,
-          this.template,
+          this.readable(),
           this.host.areas(),
           this.hass,
         );
@@ -293,7 +364,7 @@ export class MnmlBuilder extends LitElement {
     }
     if (changed.has('template')) {
       this.changes =
-        draft?.shipped === undefined ? undefined : changesOf(draft.shipped, this.template);
+        draft?.shipped === undefined ? undefined : changesOf(draft.shipped, this.readable());
     }
     if (
       changed.has('shown') ||
@@ -316,7 +387,7 @@ export class MnmlBuilder extends LitElement {
     }
   }
 
-  private onTrial(template: Template, area: string | undefined): TrialOn {
+  private onTrial(template: WrittenTemplate, area: string | undefined): TrialOn {
     const example = template.example ?? {};
     if (area === undefined) {
       return { slots: example };
@@ -337,16 +408,18 @@ export class MnmlBuilder extends LitElement {
     const found =
       this.area === undefined || hass === undefined
         ? {}
-        : discover(this.template, this.area, {
-            areas: hass.areas,
-            devices: hass.devices,
-            entities: hass.entities,
-            states: hass.states,
-          });
+        : discover(this.readable(), this.area, registriesOf(hass));
     return { ...found, ...on.slots };
   }
 
-  private marking(template: Template): { singles: Set<string> } {
+  private readable(): Template {
+    if (this.read?.of !== this.template) {
+      this.read = { of: this.template, as: readableOf(this.name, this.template) };
+    }
+    return this.read.as;
+  }
+
+  private marking(template: WrittenTemplate): { singles: Set<string> } {
     const card = template.card;
     const singles = singlesOf(partOf(isMapping(card) ? card : {}, ['card'], undefined, 0));
     for (const only of singlesOf(groupOf(template.popups ?? [], ['popups'], 'popups'))) {
@@ -355,7 +428,7 @@ export class MnmlBuilder extends LitElement {
     return { singles };
   }
 
-  private edit(next: Template, redraw: boolean): void {
+  private edit(next: WrittenTemplate, redraw: boolean): void {
     if (JSON.stringify(next) === JSON.stringify(this.template)) {
       return;
     }
@@ -373,7 +446,7 @@ export class MnmlBuilder extends LitElement {
     }
   }
 
-  private replace(next: Template): void {
+  private replace(next: WrittenTemplate): void {
     this.edit(next, true);
   }
 
@@ -400,13 +473,14 @@ export class MnmlBuilder extends LitElement {
     if (host === undefined) {
       return;
     }
-    const problem = problemOf(host.templates(), this.name, this.template);
+    const template = this.template;
+    const problem = problemOf(host.templates(), this.name, template);
     if (problem !== undefined) {
       this.problem = problem;
       return;
     }
-    const entry = entryOf(this.template, this.draft?.shipped);
-    if (!roundTrips(entry, this.template, this.draft?.shipped)) {
+    const entry = entryOf(this.name, template, this.draft?.shipped);
+    if (!roundTrips(this.name, entry, template, this.draft?.shipped)) {
       this.problem =
         'This draft cannot be kept as changes to the shipped template: check that no two parts of a list share an id.';
       return;
@@ -414,16 +488,17 @@ export class MnmlBuilder extends LitElement {
     this.saving = true;
     try {
       await host.save(this.name, entry);
-      this.undos = [];
-      this.redos = [];
-      this.saved = this.template;
-      this.start = JSON.stringify(this.template);
+      if (this.template === template) {
+        this.undos = [];
+        this.redos = [];
+      }
+      this.saved = template;
+      this.start = JSON.stringify(template);
       this.unsaved = false;
       this.clashes = [];
       this.problem = undefined;
     } catch (error) {
-      const said = field(error, 'message');
-      this.problem = `Not saved: ${typeof said === 'string' ? said : String(error)}`;
+      this.problem = `Not saved: ${messageOf(error)}`;
     } finally {
       this.saving = false;
     }
@@ -635,14 +710,6 @@ export class MnmlBuilder extends LitElement {
     return partOf(isMapping(card) ? card : {}, ['card'], undefined, 0);
   }
 
-  private listAt(path: Path): Value[] {
-    const found =
-      path.length === 1 && path[0] === 'popups'
-        ? (this.template.popups ?? [])
-        : valueAt(this.template, path);
-    return Array.isArray(found) ? found : [];
-  }
-
   private outlineActions(): OutlineActions {
     return {
       selected: this.selected,
@@ -655,14 +722,14 @@ export class MnmlBuilder extends LitElement {
         }
       },
       add: (group, starter): void => {
-        const list = this.listAt(group.path);
+        const list = listAt(this.template, group.path);
         const id = uniqueId(list, idFor(starter));
         this.selected = keyOf([...group.path, `#${id}`]);
         this.replace(withValue(this.template, group.path, [...list, { id, ...starter.value }]));
       },
       duplicate: (part): void => {
         const listPath = part.path.slice(0, -1);
-        const list = this.listAt(listPath);
+        const list = listAt(this.template, listPath);
         const index = list.findIndex(
           (item) =>
             isMapping(item) &&
@@ -686,7 +753,11 @@ export class MnmlBuilder extends LitElement {
       },
       move: (group, from, to): void => {
         this.replace(
-          withValue(this.template, group.path, moved(this.listAt(group.path), from, to)),
+          withValue(
+            this.template,
+            group.path,
+            movedTo(listAt(this.template, group.path), from, to),
+          ),
         );
       },
     };
@@ -700,19 +771,6 @@ export class MnmlBuilder extends LitElement {
       }
     }
     return undefined;
-  }
-
-  private drawConflicts(): TemplateResult | typeof nothing {
-    if (this.clashes.length === 0) {
-      return nothing;
-    }
-    return html`<div class="conflicts">
-      <strong>A release changed this template under your changes</strong>
-      <ul>
-        ${this.clashes.map((clash) => html`<li>${describeClash(clash)}</li>`)}
-      </ul>
-      <p class="muted">Saving keeps the changes that still apply.</p>
-    </div>`;
   }
 
   private readonly redraw = (): void => {
@@ -759,7 +817,7 @@ export class MnmlBuilder extends LitElement {
     return drawInspector(part, {
       hass: this.hass,
       open: this.open,
-      template: this.template,
+      template: this.readable(),
       templates: this.host?.templates() ?? {},
       value: (path): Record<string, Value> => {
         const found = valueAt(this.template, path);
@@ -770,69 +828,6 @@ export class MnmlBuilder extends LitElement {
       },
       redraw: this.redraw,
     });
-  }
-
-  private detached(chain: readonly Part[]): ReturnType<typeof detach> {
-    const part = chain.at(-1);
-    if (part === undefined) {
-      return undefined;
-    }
-    const taken = new Set([
-      ...Object.keys(this.template.slots ?? {}),
-      ...chain.flatMap((each) => {
-        const alias = each.value['as'];
-        return typeof alias === 'string' ? [alias] : [];
-      }),
-    ]);
-    return detach(part.value, this.host?.templates() ?? {}, taken);
-  }
-
-  private detachPart(chain: readonly Part[]): void {
-    const part = chain.at(-1);
-    const done = this.detached(chain);
-    if (part === undefined || done === undefined) {
-      return;
-    }
-    const last = part.path.at(-1) ?? '';
-    const listPath = part.path.slice(0, -1);
-    let next = this.template;
-    if (last.startsWith('#')) {
-      const list = this.listAt(listPath);
-      const index = list.findIndex((item) => isMapping(item) && item['id'] === last.slice(1));
-      const others = list.filter((_item, at) => at !== index);
-      const items: Value[] = [];
-      for (const item of done.items) {
-        if (isMapping(item)) {
-          const id = uniqueId(others, typeof item['id'] === 'string' ? item['id'] : 'part');
-          others.push({ id });
-          items.push({ ...item, id });
-        } else {
-          items.push(item);
-        }
-      }
-      next = withValue(next, listPath, [
-        ...list.slice(0, index),
-        ...items,
-        ...list.slice(index + 1),
-      ]);
-    } else {
-      next = withValue(next, part.path, done.list ? done.items : (done.items[0] ?? null));
-    }
-    if (done.popups.length > 0) {
-      const have = [...(next.popups ?? [])];
-      const added: Value[] = [];
-      for (const popup of done.popups) {
-        if (isMapping(popup)) {
-          const id = uniqueId(have, typeof popup['id'] === 'string' ? popup['id'] : 'popup');
-          have.push({ id });
-          added.push({ ...popup, id });
-        } else {
-          added.push(popup);
-        }
-      }
-      next = { ...next, popups: [...(next.popups ?? []), ...added] };
-    }
-    this.replace(next);
   }
 
   private act(root: Part | Group, action: 'remove' | 'earlier' | 'later'): void {
@@ -864,43 +859,14 @@ export class MnmlBuilder extends LitElement {
     }
   }
 
-  private drawStart(): TemplateResult {
-    return html`<div class="design-start">
-      <h2>What do you want to make?</h2>
-      <p class="muted">
-        Pick a starting point. You change everything afterwards by clicking what you see.
-      </p>
-      <div class="starts">
-        ${STARTERS.map(
-          (start) =>
-            html`<button
-              type="button"
-              class="start"
-              @click=${() => {
-                this.chosen = true;
-                this.replace(start.make(this.name, this.hass));
-              }}
-            >
-              ${icon(start.icon)}<strong>${start.label}</strong
-              ><span class="muted">${start.description}</span>
-            </button>`,
-        )}
-      </div>
-      <button
-        type="button"
-        class="chip"
-        @click=${() => {
-          this.chosen = true;
-        }}
-      >
-        Start with a heading
-      </button>
-    </div>`;
-  }
-
   private drawDesignTab(): TemplateResult {
     if (this.draft?.blank === true && !this.chosen) {
-      return this.drawStart();
+      return drawStarters(this.name, this.hass, (template) => {
+        this.chosen = true;
+        if (template !== undefined) {
+          this.replace(template);
+        }
+      });
     }
     const root = this.root();
     const chain = chainTo(root, this.selected);
@@ -942,14 +908,16 @@ export class MnmlBuilder extends LitElement {
           {
             root,
             selected: this.selected,
-            template: this.template,
+            template: this.readable(),
             templates: this.host?.templates() ?? {},
             values,
             data:
               part === undefined
                 ? []
-                : dataFields(part, this.template, this.host?.templates() ?? {}),
-            detachable: part?.kind === 'fragment' && this.detached(chain) !== undefined,
+                : dataFields(part, this.readable(), this.host?.templates() ?? {}),
+            detachable:
+              part?.kind === 'fragment' &&
+              detachedOf(this.template, chain, this.host?.templates() ?? {}) !== undefined,
             chain,
             rows: simpleOf(this.template, this.draft?.shipped, this.kept),
             hass: this.hass,
@@ -968,7 +936,10 @@ export class MnmlBuilder extends LitElement {
               this.host?.open(name);
             },
             detach: (): void => {
-              this.detachPart(chain);
+              const next = withDetached(this.template, chain, this.host?.templates() ?? {});
+              if (next !== undefined) {
+                this.replace(next);
+              }
             },
             pick: (data, entity): void => {
               if (data.slot === undefined) {
@@ -1012,6 +983,7 @@ export class MnmlBuilder extends LitElement {
     if (this.tab === 'slots') {
       const context: Context = { hass, hashes: [], open: this.open, redraw: this.redraw };
       return html`${drawSlots(() => this.template, {
+          name: this.name,
           hass,
           open: this.open,
           areas: this.host?.areas() ?? [],
@@ -1025,7 +997,7 @@ export class MnmlBuilder extends LitElement {
           <h2>Example values</h2>
           <p class="muted">They fill the slots for the preview, and for the check on save.</p>
           ${objectForm(
-            slotsShape(this.template.slots ?? {}, this.name, 'Example'),
+            slotsShape(this.readable().slots ?? {}, this.name, 'Example'),
             {
               get: (): Record<string, Value> => this.template.example ?? {},
               set: (next, redraw): void => {
@@ -1042,7 +1014,7 @@ export class MnmlBuilder extends LitElement {
       return html`<mnml-yaml
         .hass=${hass}
         .template=${this.template}
-        .apply=${(template: Template) => {
+        .apply=${(template: WrittenTemplate) => {
           this.replace(adoptIds(template, this.draft?.shipped));
         }}
       ></mnml-yaml>`;
@@ -1064,13 +1036,12 @@ export class MnmlBuilder extends LitElement {
     } catch (error) {
       work = html`<div class="problem">
         ${icon('mdi:alert-circle-outline')}<span
-          >The panel could not draw this:
-          ${error instanceof Error ? error.message : String(error)}</span
+          >The panel could not draw this: ${messageOf(error)}</span
         >
       </div>`;
     }
     return html`<div class="builder">
-      ${this.drawHead()} ${this.drawConflicts()}
+      ${this.drawHead()} ${drawConflicts(this.clashes)}
       ${
         this.problem === undefined
           ? nothing

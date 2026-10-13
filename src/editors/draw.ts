@@ -51,19 +51,29 @@ export function adder(
   </button>`;
 }
 
-function formOf(
+interface FormChoices {
+  readonly helper?: (name: string) => string | undefined;
+  readonly read?: typeof fromForm;
+}
+
+export function formOf(
   shape: PlainShape,
   keys: readonly string[],
   slot: Slot,
   context: Context,
+  choices: FormChoices = {},
 ): TemplateResult {
+  const { help } = shape;
+  const { helper = help === undefined ? undefined : (name) => help[name], read = fromForm } =
+    choices;
   return haForm({
     hass: context.hass,
     data: formData(shape, keys, slot.get()),
     schema: schemaOf(shape, keys, context.hashes),
     computeLabel: (item) => labelFor(shape, item.name),
+    computeHelper: helper === undefined ? undefined : (item) => helper(item.name),
     changed: (data) => {
-      slot.set(fromForm(shape, keys, data, slot.get()), false);
+      slot.set(read(shape, keys, data, slot.get()), false);
     },
   });
 }
@@ -169,6 +179,7 @@ function partsForm(
           type="button"
           class="part-title"
           aria-label=${label}
+          aria-expanded=${String(context.open.get(at) === true)}
           title=${label}
           @click=${quietly(() => {
             context.open.set(at, context.open.get(at) !== true);
@@ -263,13 +274,14 @@ function partsForm(
   </div>`;
 }
 
-function wordsForm(shape: PlainShape, key: string, slot: Slot): TemplateResult {
+function wordsForm(shape: PlainShape, key: string, spec: Field, slot: Slot): TemplateResult {
   const inner = slot.get()[key];
   const changed = (next: Record<string, string>, redraw: boolean): void => {
     slot.set(place(shape, slot.get(), key, next), redraw);
   };
   return html`<mnml-words
     .words=${isMapping(inner) ? inner : {}}
+    .options=${spec.options}
     .changed=${changed}
   ></mnml-words>`;
 }
@@ -283,11 +295,9 @@ function complexForm(
   path: string,
   titled: boolean,
 ): TemplateResult[] {
-  const heading = titled
-    ? [html`<div class="heading">${spec.label ?? labelFor(shape, key)}</div>`]
-    : [];
+  const heading = titled ? [html`<div class="heading">${labelFor(shape, key)}</div>`] : [];
   if (spec.kind === 'words') {
-    return [...heading, wordsForm(shape, key, slot)];
+    return [...heading, wordsForm(shape, key, spec, slot)];
   }
   if (spec.of === undefined) {
     return [];
@@ -354,6 +364,14 @@ function kindsForm(shape: ChoiceShape, slot: Slot): TemplateResult {
   </div>`;
 }
 
+function drawnKeys(shape: Shape, chosen: PlainShape, keys: readonly string[]): string[] {
+  if (shape.kind !== 'marked') {
+    return [...keys];
+  }
+  const marker = shape.variants.find((variant) => variant.shape === chosen)?.when;
+  return keys.filter((key) => key !== marker || chosen.fields[key]?.kind !== 'flag');
+}
+
 export function objectForm(
   shape: Shape,
   slot: Slot,
@@ -364,22 +382,23 @@ export function objectForm(
   const kinds = shape.kind === 'plain' ? nothing : kindsForm(shape, slot);
   const chosen = variantOf(shape, slot.get());
   if (!sectioned) {
-    return html`<div class="object">
-      ${kinds}${keysForm(chosen, Object.keys(chosen.fields), slot, context, path)}
-    </div>`;
+    const keys = drawnKeys(shape, chosen, Object.keys(chosen.fields));
+    return html`<div class="object">${kinds}${keysForm(chosen, keys, slot, context, path)}</div>`;
   }
   const keyOf = (title: string): string => `${path}#${title}`;
   return html`<div class="object">
     ${kinds}${repeat(
       chosen.sections,
       (section) => keyOf(section.title),
-      (section, index) =>
-        sectionPanel(context, keyOf(section.title), index === 0, {
+      (section, index) => {
+        const keys = drawnKeys(shape, chosen, section.keys);
+        return sectionPanel(context, keyOf(section.title), index === 0, {
           icon: iconFor(section.title),
           title: section.title,
-          summary: summarize(chosen, section.keys, slot.get(), context.hass),
-          body: () => keysForm(chosen, section.keys, slot, context, path),
-        }),
+          summary: summarize(chosen, keys, slot.get(), context.hass),
+          body: () => keysForm(chosen, keys, slot, context, path),
+        });
+      },
     )}
   </div>`;
 }

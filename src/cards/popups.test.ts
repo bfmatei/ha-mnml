@@ -1,17 +1,20 @@
 import assert from 'node:assert/strict';
 
+import { html } from 'lit';
 import { afterEach, test, vi } from 'vitest';
 
 import type { PopupsCard } from '../contract/cards.ts';
 import type { ChildCard } from '../ha/card-helpers.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
 import { PREBUILD_EVENT, closePopup, navigate, offerOrigin } from '../ha/navigation.ts';
-import { define, mounted } from '../test/render.ts';
+import { define, mounted, styled } from '../test/render.ts';
 
+import { MnmlGlancesCard } from './glances.ts';
 import { announce, withdraw } from './parts/popup-registry.ts';
 import { MnmlPopupsCard, SHEET } from './popups.ts';
 
 define('mnml-popups-card', MnmlPopupsCard);
+define('mnml-glances-card', MnmlGlancesCard);
 
 HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement): void {
   if (!this.isConnected) {
@@ -42,9 +45,26 @@ function allowMotion(): () => void {
 }
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   finishing.length = 0;
 });
+
+function frozen(): void {
+  vi.useFakeTimers({
+    toFake: [
+      'setTimeout',
+      'clearTimeout',
+      'requestAnimationFrame',
+      'cancelAnimationFrame',
+      'performance',
+    ],
+  });
+}
+
+async function later(ms: number): Promise<void> {
+  await vi.advanceTimersByTimeAsync(ms);
+}
 
 const CONFIG: PopupsCard = {
   type: 'custom:mnml-popups-card',
@@ -195,19 +215,15 @@ test('it opens the pop-up whose hash is current, and only that one', async () =>
   assert.equal(body?.children.length, 1, 'and everything else inside it');
 });
 
-test('the scroller ends 5px short of the panel edge and keeps 6px clear of its content, so its scrollbar sits between the cards and the edge and never over a card', () => {
-  const css = MnmlPopupsCard.styles
-    .flatMap((sheet) => (Array.isArray(sheet) ? sheet : [sheet]))
-    .map((sheet) => (typeof sheet === 'object' && 'cssText' in sheet ? sheet.cssText : ''))
-    .join('\n');
-  const rule = [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)].find(
-    ([, selector]) => selector?.trim() === '.body',
-  );
-  assert.ok(rule, 'the body has a rule');
-  const declarations = rule[2] ?? '';
-  assert.match(declarations, /margin-inline-end:\s*calc\(5px - var\(--mnml-popup-gap, 8px\)\)/);
-  assert.match(declarations, /padding-inline-end:\s*6px/);
-  assert.match(declarations, /scrollbar-width:\s*thin/);
+test('the scroller ends 5px short of the panel edge and keeps 6px clear of its content, so its scrollbar sits between the cards and the edge and never over a card', async () => {
+  const { router, shadow } = await mount('');
+  await routed(router, '#bathroom');
+  const body = slotsOf(shadow)[1];
+  assert.ok(body);
+  const scroller = getComputedStyle(body);
+  assert.equal(scroller.marginInlineEnd, 'calc(5px - var(--mnml-popup-gap, 8px))');
+  assert.equal(scroller.paddingInlineEnd, '6px');
+  assert.equal(scroller.getPropertyValue('scrollbar-width'), 'thin');
 });
 
 test('the body says there is more to scroll to until it has been scrolled to the end', async () => {
@@ -662,14 +678,15 @@ test('routing from one pop-up to another keeps the dialog, so its backdrop does 
 });
 
 test('the dialog draws no focus ring of its own, since it fills the whole viewport', () => {
-  const css = MnmlPopupsCard.styles.map((style) => style.cssText).join('\n');
-  assert.match(css, /dialog:focus(?:-visible)?\s*\{[^}]*outline:\s*none/);
+  const root = styled(MnmlPopupsCard.styles, html`<dialog open tabindex="-1"></dialog>`);
+  const dialog = root.querySelector('dialog');
+  assert.ok(dialog);
+  dialog.focus();
+  assert.equal(root.activeElement, dialog);
+  assert.equal(getComputedStyle(dialog).outline, 'none');
 });
 
-const settledLayout = (): Promise<void> =>
-  new Promise((resolve) => {
-    setTimeout(resolve, 300);
-  });
+const settledLayout = (): Promise<void> => later(300);
 
 async function openedAs(
   config: PopupsCard,
@@ -698,6 +715,7 @@ async function openedAs(
 
 const phone = (query: string): boolean => query === SHEET || query.includes('1024px');
 const desktop = (): boolean => false;
+const stillDesktop = (query: string): boolean => query.includes('reduce');
 
 async function classes(config: PopupsCard, width: (query: string) => boolean): Promise<string[]> {
   return [...((await openedAs(config, width)).querySelector('dialog')?.classList ?? [])];
@@ -709,16 +727,16 @@ test('a pop-up opens as a sheet on a phone and as a dialog elsewhere, unless ope
   assert.ok((await classes({ ...CONFIG, open: { phone: 'dialog' } }, phone)).includes('dialog'));
 });
 
-test('a pop-up set to unfold takes the place of its tile, growing down from it, and is a dialog without one', async () => {
+test("a pop-up set to unfold takes the place of its tile at the dialog's width, growing down from it, and is a dialog without one", async () => {
   const tile = document.createElement('div');
   document.body.append(tile);
-  tile.getBoundingClientRect = () => new DOMRect(400, 200, 360, 64);
+  tile.getBoundingClientRect = () => new DOMRect(100, 200, 600, 64);
   const config: PopupsCard = { ...CONFIG, open: { desktop: 'unfold' } };
   const shadow = await openedAs(config, desktop, tile);
   assert.ok(shadow.querySelector('dialog')?.classList.contains('unfold'));
   const panel = shadow.querySelector<HTMLElement>('.panel');
-  assert.equal(panel?.style.left, '400px', 'where the tile starts');
-  assert.equal(panel?.style.width, '360px', 'as wide as the tile');
+  assert.equal(panel?.style.left, '100px', 'where the tile starts');
+  assert.equal(panel?.style.width, '560px', "the dialog's width, not the tile's 600 px");
   assert.equal(panel?.style.top, '200px', 'from the top of the tile');
   tile.remove();
   closePopup();
@@ -726,19 +744,36 @@ test('a pop-up set to unfold takes the place of its tile, growing down from it, 
   assert.ok(without.querySelector('dialog')?.classList.contains('dialog'));
 });
 
+test("a pop-up unfolding from a tile narrower than the dialog takes the dialog's width, growing from the tile's edge nearer the window's", async () => {
+  const tile = document.createElement('div');
+  document.body.append(tile);
+  tile.getBoundingClientRect = () => new DOMRect(innerWidth - 400, 200, 300, 64);
+  const shadow = await openedAs({ ...CONFIG, open: { desktop: 'unfold' } }, desktop, tile);
+  const panel = shadow.querySelector<HTMLElement>('.panel');
+  assert.equal(panel?.style.width, '560px', "the dialog's width");
+  assert.equal(
+    panel?.style.left,
+    `${innerWidth - 100 - 560}px`,
+    "level with the tile's right edge",
+  );
+  assert.equal(panel?.style.top, '200px', 'from the top of the tile');
+  tile.remove();
+});
+
 test('a pop-up unfolding from a tile near the bottom grows up from the bottom of the tile', async () => {
   const tile = document.createElement('div');
   document.body.append(tile);
-  tile.getBoundingClientRect = () => new DOMRect(400, innerHeight - 120, 360, 64);
+  tile.getBoundingClientRect = () => new DOMRect(100, innerHeight - 120, 600, 64);
   const shadow = await openedAs({ ...CONFIG, open: { desktop: 'unfold' } }, desktop, tile);
   const panel = shadow.querySelector<HTMLElement>('.panel');
-  assert.equal(panel?.style.left, '400px');
+  assert.equal(panel?.style.left, '100px');
   assert.equal(panel?.style.top, '');
   assert.equal(panel?.style.bottom, '56px', 'level with the bottom of the tile');
   tile.remove();
 });
 
 test('a pop-up unfolding from a tile too low on the page scrolls the page until the tile has room below it', async () => {
+  frozen();
   const page = scrollable();
   const tile = document.createElement('div');
   page.append(tile);
@@ -753,9 +788,8 @@ test('a pop-up unfolding from a tile too low on the page scrolls the page until 
   };
   tile.getBoundingClientRect = () => new DOMRect(400, 400, 360, 64);
   const shadow = await openedAs({ ...CONFIG, open: { desktop: 'unfold' } }, desktop, tile);
-  await vi.waitFor(() => {
-    assert.ok(shadow.querySelector('.panel'));
-  });
+  await settledLayout();
+  assert.ok(shadow.querySelector('.panel'));
   assert.equal(scrolled.length, 1);
   assert.equal(
     scrolled[0]?.top,
@@ -792,6 +826,7 @@ test('an opening that is not sheet, dialog or unfold is refused', () => {
 });
 
 test('a page that loads with a pop-up in its address unfolds it from its tile once the tile is drawn', async () => {
+  frozen();
   vi.stubGlobal('matchMedia', () => ({ matches: false }));
   current?.remove();
   setHash('#bathroom');
@@ -803,7 +838,7 @@ test('a page that loads with a pop-up in its address unfolds it from its tile on
   const tile = document.createElement('div');
   document.body.append(tile);
   tile.getBoundingClientRect = () => new DOMRect(400, 180, 300, 64);
-  await new Promise((resolve) => setTimeout(resolve, 50));
+  await later(50);
   offerOrigin('#bathroom', tile);
   await settledLayout();
   await made.updateComplete;
@@ -813,6 +848,7 @@ test('a page that loads with a pop-up in its address unfolds it from its tile on
 });
 
 test('a pop-up in the address that a template announces after the page loads still unfolds from its tile', async () => {
+  frozen();
   vi.stubGlobal('matchMedia', () => ({ matches: false }));
   current?.remove();
   setHash('#announced-later');
@@ -829,7 +865,7 @@ test('a pop-up in the address that a template announces after the page loads sti
   const tile = document.createElement('div');
   document.body.append(tile);
   tile.getBoundingClientRect = () => new DOMRect(400, 180, 300, 64);
-  await new Promise((resolve) => setTimeout(resolve, 50));
+  await later(50);
   offerOrigin('#announced-later', tile);
   await settledLayout();
   await made.updateComplete;
@@ -839,6 +875,7 @@ test('a pop-up in the address that a template announces after the page loads sti
 });
 
 test('a pop-up in the address waits until its tile stops moving while the page lays out, then unfolds from where it settled', async () => {
+  frozen();
   vi.stubGlobal('matchMedia', () => ({ matches: false }));
   current?.remove();
   setHash('#bathroom');
@@ -852,9 +889,12 @@ test('a pop-up in the address waits until its tile stops moving while the page l
   let top = 120;
   tile.getBoundingClientRect = () => new DOMRect(400, top, 360, 64);
   offerOrigin('#bathroom', tile);
-  await new Promise((resolve) => setTimeout(resolve, 40));
+  await later(40);
+  assert.equal(shadow.querySelector('.panel'), null, 'nothing opens while the tile may still move');
   top = 240;
-  await new Promise((resolve) => setTimeout(resolve, 400));
+  await later(60);
+  assert.equal(shadow.querySelector('.panel'), null, 'nor until it has kept still');
+  await later(400);
   await made.updateComplete;
   await settle();
   assert.equal(shadow.querySelector<HTMLElement>('.panel')?.style.top, '240px');
@@ -862,41 +902,77 @@ test('a pop-up in the address waits until its tile stops moving while the page l
 });
 
 test('an unfolded pop-up follows its tile when the page lays out again, as on a resize', async () => {
+  frozen();
   const tile = document.createElement('div');
   document.body.append(tile);
-  let box = new DOMRect(400, 200, 360, 64);
+  let box = new DOMRect(100, 200, 600, 64);
   tile.getBoundingClientRect = () => box;
   const shadow = await openedAs({ ...CONFIG, open: { desktop: 'unfold' } }, desktop, tile);
   const panel = (): HTMLElement | null => shadow.querySelector<HTMLElement>('.panel');
-  assert.equal(panel()?.style.left, '400px');
-  box = new DOMRect(120, 260, 420, 64);
+  assert.equal(panel()?.style.left, '100px');
+  box = new DOMRect(120, 260, 620, 64);
   await settledLayout();
   await current?.updateComplete;
   assert.equal(panel()?.style.left, '120px');
   assert.equal(panel()?.style.top, '260px');
-  assert.equal(panel()?.style.width, '420px');
+  assert.equal(panel()?.style.width, '560px');
   closePopup();
   tile.remove();
 });
 
-test('a pop-up opened from inside an unfolded one stays in its place, and keeps following the first tile', async () => {
+test('an unfolded pop-up stops following its tile once it closes, and stays put while it folds back', async () => {
+  frozen();
   const tile = document.createElement('div');
   document.body.append(tile);
-  let box = new DOMRect(400, 200, 360, 64);
+  let box = new DOMRect(100, 200, 600, 64);
+  tile.getBoundingClientRect = () => box;
+  const shadow = await openedAs({ ...CONFIG, open: { desktop: 'unfold' } }, desktop, tile);
+  const panel = (): HTMLElement | null => shadow.querySelector<HTMLElement>('.panel');
+  assert.equal(panel()?.style.left, '100px');
+  setHash('');
+  fireRoute('location-changed');
+  await current?.updateComplete;
+  assert.ok(shadow.querySelector('dialog.leaving'), 'it is closing');
+  box = new DOMRect(120, 260, 420, 64);
+  await later(100);
+  await current?.updateComplete;
+  assert.equal(panel()?.style.left, '100px', 'and stays put while it closes');
+  assert.equal(vi.getTimerCount(), 0, 'with no frame waiting');
+  tile.remove();
+});
+
+test('an unfolded pop-up taken off the page leaves no frame waiting', async () => {
+  frozen();
+  const tile = document.createElement('div');
+  document.body.append(tile);
+  tile.getBoundingClientRect = () => new DOMRect(400, 200, 360, 64);
+  const shadow = await openedAs({ ...CONFIG, open: { desktop: 'unfold' } }, stillDesktop, tile);
+  assert.ok(shadow.querySelector('dialog.unfold'));
+  assert.equal(vi.getTimerCount(), 1, 'it follows its tile');
+  current?.remove();
+  assert.equal(vi.getTimerCount(), 0);
+  tile.remove();
+});
+
+test('a pop-up opened from inside an unfolded one stays in its place, and keeps following the first tile', async () => {
+  frozen();
+  const tile = document.createElement('div');
+  document.body.append(tile);
+  let box = new DOMRect(100, 200, 600, 64);
   tile.getBoundingClientRect = () => box;
   const shadow = await openedAs({ ...CONFIG, open: { desktop: 'unfold' } }, desktop, tile);
   const panel = (): HTMLElement | null => shadow.querySelector<HTMLElement>('.panel');
   const row = document.createElement('div');
   document.body.append(row);
-  row.getBoundingClientRect = () => new DOMRect(408, 330, 344, 56);
+  row.getBoundingClientRect = () => new DOMRect(108, 330, 344, 56);
   navigate('#bathroom-lights', row);
   fireRoute('location-changed');
   await settledLayout();
   await current?.updateComplete;
   assert.equal(location.hash, '#bathroom-lights');
-  assert.equal(panel()?.style.left, '400px', 'not where the row is');
+  assert.equal(panel()?.style.left, '100px', 'not where the row is');
   assert.equal(panel()?.style.top, '200px');
-  assert.equal(panel()?.style.width, '360px');
+  assert.equal(panel()?.style.width, '560px');
   box = new DOMRect(120, 260, 420, 64);
   await settledLayout();
   await current?.updateComplete;
@@ -904,4 +980,93 @@ test('a pop-up opened from inside an unfolded one stays in its place, and keeps 
   closePopup();
   row.remove();
   tile.remove();
+});
+
+test("a glance's well unfolds its pop-up from the well, at the dialog's width, and not from the whole strip", async () => {
+  vi.stubGlobal('matchMedia', () => ({ matches: false }));
+  current?.remove();
+  setHash('');
+  const made = router();
+  made.setConfig({ ...CONFIG, open: { desktop: 'unfold' } });
+  document.body.append(made);
+  current = made;
+  const shadow = await mounted(made);
+  const strip = document.createElement('mnml-glances-card');
+  assert.ok(strip instanceof MnmlGlancesCard);
+  strip.setConfig({
+    type: 'custom:mnml-glances-card',
+    items: [{ entity: 'light.a', popup: '#bathroom' }],
+  });
+  strip.hass = {
+    states: { 'light.a': { entity_id: 'light.a', state: 'on', attributes: {} } },
+    entities: {},
+    devices: {},
+    locale: { language: 'en' },
+    formatEntityState: (stateObj: { state: string }): string => stateObj.state,
+  } as never;
+  const wells = await mounted(strip);
+  const well = wells.querySelector<HTMLElement>('.glance');
+  assert.ok(well);
+  strip.getBoundingClientRect = () => new DOMRect(8, 20, 1008, 28);
+  well.getBoundingClientRect = () => new DOMRect(900, 20, 60, 28);
+  well.click();
+  await settle();
+  await made.updateComplete;
+  await settle();
+  assert.ok(shadow.querySelector('dialog')?.classList.contains('unfold'));
+  const panel = shadow.querySelector<HTMLElement>('.panel');
+  assert.equal(panel?.style.width, '560px', "the dialog's width, not the strip's");
+  assert.equal(panel?.style.left, `${900 + 60 - 560}px`, "level with the well's nearer edge");
+  assert.equal(panel?.style.top, '20px', 'from the top of the well');
+  closePopup();
+  strip.remove();
+});
+
+test('a pop-up in the address that is closed while it waits for its tile does not open after all', async () => {
+  frozen();
+  vi.stubGlobal('matchMedia', () => ({ matches: false }));
+  current?.remove();
+  setHash('#bathroom');
+  const made = router();
+  made.setConfig({ ...CONFIG, open: { desktop: 'unfold' } });
+  document.body.append(made);
+  current = made;
+  const shadow = await mounted(made);
+  await later(50);
+  setHash('');
+  fireRoute('hashchange');
+  const tile = document.createElement('div');
+  document.body.append(tile);
+  tile.getBoundingClientRect = () => new DOMRect(400, 180, 300, 64);
+  offerOrigin('#bathroom', tile);
+  await settledLayout();
+  await made.updateComplete;
+  assert.equal(shadow.querySelector('dialog'), null);
+  tile.remove();
+});
+
+test('the dialog is named by its header, by the name it is given or that of its entity', async () => {
+  const { router, shadow } = await mount('');
+  router.setConfig({
+    ...CONFIG,
+    popups: [
+      ...(CONFIG.popups ?? []),
+      { hash: '#kitchen', cards: [{ type: 'custom:mnml-header-card', entity: 'light.kitchen' }] },
+    ],
+  });
+  router.hass = {
+    states: {
+      'light.kitchen': {
+        entity_id: 'light.kitchen',
+        state: 'on',
+        attributes: { friendly_name: 'Kitchen' },
+      },
+    },
+    entities: {},
+    devices: {},
+  } as unknown as HomeAssistant;
+  await routed(router, '#bathroom');
+  assert.equal(shadow.querySelector('dialog')?.getAttribute('aria-label'), 'Bathroom');
+  await routed(router, '#kitchen');
+  assert.equal(shadow.querySelector('dialog')?.getAttribute('aria-label'), 'Kitchen');
 });

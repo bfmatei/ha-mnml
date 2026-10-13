@@ -1,28 +1,10 @@
 import { LAYOUT } from '../cards/keys.ts';
+import { chooseVariant } from '../contract/structure.ts';
+import type { KeyKind } from '../contract/structure.ts';
 import { isMapping } from '../contract/templates.ts';
 import type { Value } from '../contract/templates.ts';
 
-import { COLORS, SERVICES } from './lists.ts';
-
-type FieldKind =
-  | 'text'
-  | 'texts'
-  | 'number'
-  | 'share'
-  | 'flag'
-  | 'choice'
-  | 'entity'
-  | 'entities'
-  | 'icon'
-  | 'popup'
-  | 'service'
-  | 'color'
-  | 'words'
-  | 'corners'
-  | 'rule'
-  | 'summary'
-  | 'part'
-  | 'parts';
+type FieldKind = Exclude<KeyKind, 'cards' | 'slots'>;
 
 export interface Field {
   readonly kind: FieldKind;
@@ -36,29 +18,7 @@ export interface Field {
   readonly of?: Shape;
 }
 
-type Present<T> = {
-  [K in keyof T]-?: [Exclude<T[K], undefined>] extends [never] ? never : K;
-}[keyof T] &
-  string;
-
-type Needed<T> = {
-  [K in keyof T]-?: Record<never, never> extends Pick<T, K> ? never : K;
-}[keyof T] &
-  string;
-
-type TagKey<T> = 'type' extends keyof T
-  ? string extends T[Extract<'type', keyof T>]
-    ? never
-    : 'type'
-  : never;
-
-type Required = Field & { readonly required: true };
-type Optional = Field & { readonly required?: undefined };
-
-export type Fields<T> = Readonly<Record<Exclude<Needed<T>, TagKey<T>>, Required>> &
-  Readonly<Record<Exclude<Present<T>, Needed<T> | TagKey<T>>, Optional>>;
-
-interface Section {
+export interface Section {
   readonly title: string;
   readonly keys: readonly string[];
 }
@@ -69,6 +29,8 @@ export interface PlainShape {
   readonly label: string;
   readonly fields: Readonly<Record<string, Field>>;
   readonly sections: readonly Section[];
+  readonly labels?: Readonly<Record<string, string>>;
+  readonly help?: Readonly<Record<string, string>>;
   readonly variants?: never;
 }
 
@@ -92,119 +54,23 @@ export class Unsupported extends Error {}
 
 const ENTITY_ID = /^[a-z_]+\.[a-z0-9_]+$/;
 
-const isField = (value: unknown): value is Field =>
-  isMapping(value) && typeof value['kind'] === 'string';
-
-function erase(fields: object): Readonly<Record<string, Field>> {
-  const out: Record<string, Field> = {};
-  for (const [key, value] of Object.entries(fields)) {
-    if (isField(value)) {
-      out[key] = value;
-    }
-  }
-  return out;
-}
-
-export function plain<T>(
-  id: string,
-  label: string,
-  fields: Fields<T>,
-  sections?: readonly {
-    readonly title: string;
-    readonly keys: readonly (keyof Fields<T> & string)[];
-  }[],
-): PlainShape {
-  const erased = erase(fields);
-  return {
-    kind: 'plain',
-    id,
-    label,
-    fields: erased,
-    sections: sections ?? [{ title: label, keys: Object.keys(erased) }],
-  };
-}
-
-export function tagged<C extends { type: string }>(
-  id: string,
-  label: string,
-  variants: Readonly<Record<C['type'], PlainShape>>,
-): ChoiceShape {
-  return {
-    kind: 'tagged',
-    id,
-    label,
-    variants: Object.entries<PlainShape>(variants).map(([when, shape]) => ({ when, shape })),
-  };
-}
-
-export function marked(
-  id: string,
-  label: string,
-  markers: Readonly<Record<string, PlainShape>>,
-  otherwise: PlainShape,
-): ChoiceShape {
-  return {
-    kind: 'marked',
-    id,
-    label,
-    variants: [
-      ...Object.entries(markers).map(([when, shape]) => ({ when, shape })),
-      { when: undefined, shape: otherwise },
-    ],
-  };
-}
-
-export const text = (): Optional => ({ kind: 'text' });
-export const textOr = (fallback: string): Optional => ({ kind: 'text', default: fallback });
-export const texts = (fallback?: readonly string[]): Optional => ({
-  kind: 'texts',
-  default: fallback === undefined ? undefined : [...fallback],
-});
-export const number = (): Optional => ({ kind: 'number' });
-export const share = (): Optional => ({ kind: 'share' });
-export const flag = (writes?: string): Optional => ({ kind: 'flag', writes });
-export const choice = (options: readonly string[]): Optional => ({ kind: 'choice', options });
-export const entity = (domains?: readonly string[]): Optional => ({ kind: 'entity', domains });
-export const entities = (domains?: readonly string[]): Optional => ({ kind: 'entities', domains });
-export const icon = (): Optional => ({ kind: 'icon' });
-export const popup = (): Optional => ({ kind: 'popup' });
-export const service = (): Optional => ({ kind: 'service', options: SERVICES });
-export const color = (): Optional => ({ kind: 'color', options: COLORS });
-export const words = (): Optional => ({ kind: 'words' });
-export const corners = (domains: readonly string[]): Optional => ({ kind: 'corners', domains });
-export const rule = (withEntity?: true): Optional => ({ kind: 'rule', withEntity });
-export const summary = (): Optional => ({ kind: 'summary' });
-export const part = (of: Shape): Optional => ({ kind: 'part', of });
-export const parts = (of: Shape): Optional => ({ kind: 'parts', of });
-
-export function need(field: Field): Required {
-  return { ...field, required: true };
-}
-
 const at = (path: string, key: string): string => (path === '' ? key : `${path}.${key}`);
 
 export function variantOf(shape: Shape, value: Record<string, Value>, path = ''): PlainShape {
   if (shape.kind === 'plain') {
     return shape;
   }
-  if (shape.kind === 'tagged') {
-    const type = value['type'];
-    const found = shape.variants.find((variant) => variant.when === type);
-    if (found === undefined) {
-      const known = shape.variants.map((variant) => variant.when).join(', ');
-      throw new Unsupported(`${at(path, 'type')} is not one of ${known}`);
-    }
+  const found = chooseVariant(shape, (key) => Object.hasOwn(value, key), value['type']);
+  if (found !== undefined) {
     return found.shape;
   }
-  const found = shape.variants.find(
-    (variant) => variant.when === undefined || Object.hasOwn(value, variant.when),
-  );
-  if (found === undefined) {
-    throw new Unsupported(
-      `${path === '' ? 'the card' : path} is none of the kinds of ${shape.label}`,
-    );
+  if (shape.kind === 'tagged') {
+    const known = shape.variants.map((variant) => variant.when).join(', ');
+    throw new Unsupported(`${at(path, 'type')} is not one of ${known}`);
   }
-  return found.shape;
+  throw new Unsupported(
+    `${path === '' ? 'the card' : path} is none of the kinds of ${shape.label}`,
+  );
 }
 
 function isEntityOf(value: unknown, domains: readonly string[] | undefined): boolean {
@@ -309,8 +175,16 @@ function checkField(spec: Field, value: Value, where: string): void {
       return;
     }
     case 'words': {
-      if (!isMapping(value) || !Object.values(value).every((word) => typeof word === 'string')) {
-        fail(where, 'a mapping of states to words');
+      const options = spec.options;
+      const fits = (word: Value): boolean =>
+        typeof word === 'string' && (options === undefined || options.includes(word));
+      if (!isMapping(value) || !Object.values(value).every(fits)) {
+        fail(
+          where,
+          options === undefined
+            ? 'a mapping of states to words'
+            : `a mapping of words to one of ${options.join(', ')}`,
+        );
       }
       return;
     }
@@ -379,16 +253,29 @@ const emptied = (value: Value): boolean =>
   (Array.isArray(value) && value.length === 0) ||
   (isMapping(value) && Object.keys(value).length === 0);
 
-function cleanField(spec: Field, value: Value): Value | undefined {
+const same = (a: Value | undefined, b: Value | undefined): boolean =>
+  JSON.stringify(a) === JSON.stringify(b);
+
+function cleanItems(of: Shape, items: readonly Value[], before: Value | undefined): Value[] {
+  const old = Array.isArray(before) ? before : [];
+  return items.map((item, index) => {
+    if (!isMapping(item) || old.some((each) => same(each, item))) {
+      return item;
+    }
+    const was = old[index];
+    return cleanValue(of, item, isMapping(was) ? was : undefined);
+  });
+}
+
+export function cleanField(spec: Field, value: Value, before?: Value): Value | undefined {
   if (spec.kind === 'flag' && value !== (spec.writes ?? true)) {
     return undefined;
   }
   let kept = value;
   if (spec.kind === 'part' && spec.of !== undefined && isMapping(value)) {
-    kept = cleanValue(spec.of, value);
+    kept = cleanValue(spec.of, value, isMapping(before) ? before : undefined);
   } else if (spec.kind === 'parts' && spec.of !== undefined && Array.isArray(value)) {
-    const of = spec.of;
-    kept = value.map((item) => (isMapping(item) ? cleanValue(of, item) : item));
+    kept = cleanItems(spec.of, value, before);
   } else if (spec.kind === 'rule' && isMapping(value)) {
     kept = Object.fromEntries(Object.entries(value).filter(([, inner]) => !emptied(inner)));
   }
@@ -396,20 +283,27 @@ function cleanField(spec: Field, value: Value): Value | undefined {
     return kept;
   }
   if (emptied(kept)) {
-    return undefined;
+    return spec.default !== undefined && (spec.kind === 'texts' || spec.kind === 'entities')
+      ? kept
+      : undefined;
   }
-  if (spec.default !== undefined && JSON.stringify(kept) === JSON.stringify(spec.default)) {
+  if (spec.default !== undefined && same(kept, spec.default)) {
     return undefined;
   }
   return kept;
 }
 
-export function cleanValue(shape: Shape, value: Record<string, Value>): Record<string, Value> {
+export function cleanValue(
+  shape: Shape,
+  value: Record<string, Value>,
+  before?: Readonly<Record<string, Value>>,
+): Record<string, Value> {
   const chosen = variantOf(shape, value);
   const out: Record<string, Value> = {};
   for (const [key, inner] of Object.entries(value)) {
     const spec = chosen.fields[key];
-    const kept = spec === undefined ? inner : cleanField(spec, inner);
+    const unchanged = before !== undefined && same(inner, before[key]);
+    const kept = spec === undefined || unchanged ? inner : cleanField(spec, inner, before?.[key]);
     if (kept !== undefined) {
       out[key] = kept;
     }

@@ -15,10 +15,9 @@ import { active, matches, shown, tint } from '../ha/rules.ts';
 import { colorStyle, icon, onPress, stateIcon } from '../ha/templates.ts';
 
 import { MnmlCard, requireList, requireString } from './base.ts';
-import { schema } from './keys.ts';
 import type { KeySchema } from './keys.ts';
 import { tip } from './parts/tooltip.ts';
-import { GLANCE } from './schemas.ts';
+import { GLANCES_CARD } from './schemas.ts';
 import { BASE_STYLE } from './styles.ts';
 
 const GLANCES_STYLE = css`
@@ -148,15 +147,13 @@ const GLANCES_STYLE = css`
   }
 `;
 
-const SCHEMA = schema<GlancesCard>({ type: true, items: true }, { items: GLANCE });
-
 const COUNT_ICON: MdiIcon = 'mdi:alert-circle-outline';
 
 const COUNT_COLOR: Color = 'orange';
 
 interface Press {
   acts: boolean;
-  click?: () => void;
+  click?: (event: Event) => void;
   down?: () => void;
 }
 
@@ -177,7 +174,7 @@ function matching(hass: HomeAssistant, item: Extract<Glance, { entities: string[
     if (stateObj === undefined || isUnavailable(stateObj)) {
       return false;
     }
-    if (item.is !== undefined && item.is.includes(stateObj.state)) {
+    if ((item.is !== undefined || item.not !== undefined) && matches(item, stateObj.state)) {
       return true;
     }
     const level = numericState(stateObj);
@@ -189,7 +186,7 @@ export class MnmlGlancesCard extends MnmlCard<GlancesCard> {
   static override styles = [BASE_STYLE, GLANCES_STYLE];
 
   protected schema(): KeySchema {
-    return SCHEMA;
+    return GLANCES_CARD;
   }
 
   protected override validate(config: GlancesCard): void {
@@ -213,15 +210,15 @@ export class MnmlGlancesCard extends MnmlCard<GlancesCard> {
       return {
         acts: true,
         click: () => {
-          run(this, toggleEntity(hass, toggle));
+          run(this, toggleEntity(this.hass ?? hass, toggle));
         },
       };
     }
     if (popup !== undefined) {
       return {
         acts: true,
-        click: () => {
-          navigate(popup, this);
+        click: (event) => {
+          navigate(popup, event.currentTarget instanceof Element ? event.currentTarget : this);
         },
         down: () => {
           prebuild(popup);
@@ -233,7 +230,8 @@ export class MnmlGlancesCard extends MnmlCard<GlancesCard> {
 
   private well(
     look: Look,
-    title: string | undefined,
+    title: string,
+    spoken: string,
     press: Press,
     content: TemplateResult,
     part: string | typeof nothing,
@@ -252,9 +250,18 @@ export class MnmlGlancesCard extends MnmlCard<GlancesCard> {
       ${tip(title)}
       role=${acts ? 'button' : nothing}
       tabindex=${acts ? '0' : nothing}
+      aria-label=${acts ? spoken : nothing}
       @pointerdown=${down ?? nothing}
       @click=${click ?? nothing}
-      @keydown=${click === undefined ? nothing : onPress(click)}
+      @keydown=${
+        click === undefined
+          ? nothing
+          : (event: KeyboardEvent) => {
+              onPress(() => {
+                click(event);
+              })(event);
+            }
+      }
     >
       ${content}
     </div>`;
@@ -280,11 +287,13 @@ export class MnmlGlancesCard extends MnmlCard<GlancesCard> {
         ? ' with somebody home'
         : ' with everybody away'
       : '';
+    const said = value === undefined ? name : `${name}: ${value}${why}`;
     return {
       problem: item.show !== undefined,
       well: this.well(
         { color, ...(quiet ? { quiet } : {}) },
-        value === undefined || item.name === undefined ? name : `${name}: ${value}${why}`,
+        item.name === undefined ? name : said,
+        said,
         this.press(hass, item.popup, item.toggle === true ? item.entity : undefined),
         html`${stateIcon(hass, stateObj, item.icon)}${
           quiet || item.bare === true
@@ -321,6 +330,7 @@ export class MnmlGlancesCard extends MnmlCard<GlancesCard> {
           ...(critical ? { critical } : {}),
         },
         [item.name, ...lines].join('\n'),
+        [item.name, ...lines].join('. '),
         this.press(hass, item.popup, undefined),
         html`${icon(item.icon ?? COUNT_ICON)}<span class="state">${total}</span>`,
         partOf(item),
@@ -360,6 +370,7 @@ export class MnmlGlancesCard extends MnmlCard<GlancesCard> {
           ...(critical ? { critical } : {}),
         },
         [item.name, ...lines].join('\n'),
+        [item.name, ...lines].join('. '),
         this.press(hass, item.popup, undefined),
         html`${icon(item.icon ?? COUNT_ICON)}<span class="state">${found.length}</span>`,
         partOf(item),

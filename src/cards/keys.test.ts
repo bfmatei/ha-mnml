@@ -2,7 +2,19 @@ import assert from 'node:assert/strict';
 
 import { test } from 'vitest';
 
-import { marked, requireKnownKeys, schema, tagged, unknownKeys, variant } from './keys.ts';
+import {
+  entity,
+  entityRule,
+  marked,
+  need,
+  number,
+  parts,
+  plain,
+  tagged,
+  text,
+} from '../contract/structure.ts';
+
+import { cardKeysOf, keysOf, requireKnownKeys, unknownKeys } from './keys.ts';
 
 interface Row {
   entity: string;
@@ -10,14 +22,14 @@ interface Row {
 }
 
 interface Card {
-  type: string;
+  type: 'custom:mnml-list-card';
   title?: string;
   rows: Row[];
 }
 
-const ROW = schema<Row>({ entity: true, low: true });
+const ROW = plain<Row>('row', { entity: need(entity()), low: number() });
 
-const CARD = schema<Card>({ type: true, title: true, rows: true }, { rows: ROW });
+const CARD = cardKeysOf(plain<Card>('card', { title: text(), rows: need(parts(ROW)) }));
 
 test('known keys pass, and so do the layout keys Home Assistant and card-mod add', () => {
   const config = {
@@ -53,12 +65,26 @@ test('layout keys are allowed at the top only', () => {
   ]);
 });
 
+test('a card keeps its type among its keys, and a part keeps only the keys its structure names', () => {
+  assert.ok(CARD.keys.has('type'));
+  assert.deepEqual([...keysOf(ROW).keys], ['entity', 'low']);
+  assert.equal(keysOf(ROW), keysOf(ROW));
+});
+
+test('a rule is checked as the keys of its kind', () => {
+  const shown = keysOf(
+    plain<{ show?: { is?: string[]; entity?: string } }>('shown', { show: entityRule() }),
+  );
+  assert.deepEqual(unknownKeys({ show: { is: ['on'], entity: 'sensor.a', state: 'on' } }, shown), [
+    'show.state',
+  ]);
+});
+
 type Shape = { type: 'a'; x: number; y?: never } | { type: 'b'; x?: never; y: number };
 
-const SHAPE = tagged<Shape>({
-  a: variant<Extract<Shape, { type: 'a' }>>({ type: true, x: true }),
-  b: variant<Extract<Shape, { type: 'b' }>>({ type: true, y: true }),
-});
+const SHAPE = keysOf(
+  tagged<Shape>('shape', { a: { x: need(number()) }, b: { y: need(number()) } }),
+);
 
 test('a tagged union checks a value against the variant its type names', () => {
   assert.deepEqual(unknownKeys({ type: 'a', x: 1, y: 2 }, SHAPE), ['y']);
@@ -72,9 +98,8 @@ test('a tagged union checks a value against the variant its type names', () => {
 
 type Entry = { text: string; entity?: never } | { text?: never; entity: string };
 
-const ENTRY = marked(
-  { text: variant<Extract<Entry, { text: string }>>({ text: true }) },
-  variant<Extract<Entry, { entity: string }>>({ entity: true }),
+const ENTRY = keysOf(
+  marked<Entry>('entry')({ text: { text: need(text()) } }, { entity: need(entity()) }),
 );
 
 test('a marked union checks a value against the variant its marker key picks', () => {

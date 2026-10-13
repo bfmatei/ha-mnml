@@ -114,12 +114,10 @@ heating-popup:
     name: { kind: text, required: true }
     entity: { kind: entity, required: true }
     preset: { kind: flag }
-    thermostats:
-      kind: objects
-      fields:
-        valve: { kind: entity, required: true }
-        battery: { kind: entity }
-    batteries: { kind: entities }
+    thermostats: { shape: thermostat, kind: objects, fields: { valve: { required: true } } }
+    low: { kind: number, default: 20 }
+    critical: { kind: number, default: 5 }
+  retired: [batteries]
   card:
     hash: '#[[key]]-heating'
     cards:
@@ -169,13 +167,12 @@ heating-popup:
             bar: true
       - id: batteries
         template: batteries
-        slots: { batteries: '[[batteries]]' }
+        slots: { batteries: '[[thermostats.*.battery]]', low: '[[low]]', critical: '[[critical]]' }
   example:
     key: bedroom
     name: Bedroom
     entity: climate.bedroom_heating
     thermostats: [{ valve: sensor.radiator_valve, battery: sensor.radiator_battery }]
-    batteries: [sensor.radiator_battery]
 
 ac-popup:
   description: A room's AC pop-up, its target, its fan, swing and other settings, and its energy.
@@ -188,12 +185,7 @@ ac-popup:
     horizontal_swing: { kind: flag }
     power_saving: { kind: entity }
     dehumidifier: { kind: entity }
-    energy:
-      kind: object
-      fields:
-        power: { kind: entity, required: true }
-        today: { kind: entity }
-        total: { kind: entity }
+    energy: { shape: meter, fields: { power: { required: true } } }
   card:
     hash: '#[[key]]-ac'
     cards:

@@ -2,28 +2,51 @@ import assert from 'node:assert/strict';
 
 import { test } from 'vitest';
 
-import type { Value } from '../contract/templates.ts';
-
 import {
-  Unsupported,
-  checkValue,
-  cleanValue,
   corners,
   entity,
   flag,
-  labelOf,
   marked,
   need,
   parts,
-  place,
   plain,
   rule,
-  switchVariant,
   tagged,
   text,
-  textOr,
   texts,
-} from './shape.ts';
+} from '../contract/structure.ts';
+import type { Structure } from '../contract/structure.ts';
+import type { Value } from '../contract/templates.ts';
+
+import { DESCRIPTIONS, describer } from './cards.ts';
+import type { Labels } from './labels.ts';
+import { Unsupported, checkValue, cleanValue, labelOf, place, switchVariant } from './shape.ts';
+import type { ChoiceShape, PlainShape, Shape } from './shape.ts';
+
+const describe = describer({
+  row: { label: 'Row', keys: {} },
+  toy: { label: 'Toy', keys: {} },
+  ball: { label: 'Ball', keys: {}, kinds: { ping: { label: 'Ping' }, pong: { label: 'Pong' } } },
+  line: {
+    label: 'Line',
+    keys: {},
+    kinds: { text: { label: 'Text' }, shown: { label: 'Shown' } },
+    otherwise: { label: 'Value' },
+  },
+  fields: { label: 'Fields', keys: {} },
+} satisfies Readonly<Record<string, Labels>>);
+
+const plainOf = (structure: Structure): PlainShape => {
+  const shape = describe(structure);
+  assert.ok(shape.kind === 'plain');
+  return shape;
+};
+
+const choiceOf = (structure: Structure): ChoiceShape => {
+  const shape = describe(structure);
+  assert.ok(shape.kind !== 'plain');
+  return shape;
+};
 
 interface Toy {
   type: 'custom:toy';
@@ -38,22 +61,26 @@ interface Toy {
   rows?: { entity: string; name?: string }[];
 }
 
-const ROW = plain<{ entity: string; name?: string }>('row', 'Row', {
+const ROW_STRUCTURE = plain<{ entity: string; name?: string }>('row', {
   entity: need(entity()),
   name: text(),
 });
 
-const TOY = plain<Toy>('toy', 'Toy', {
-  entity: need(entity(['light'])),
-  name: text(),
-  label: flag('device'),
-  hidden: flag(),
-  states: texts(['on']),
-  mode: textOr('auto'),
-  when: rule(),
-  wheels: corners(['sensor']),
-  rows: parts(ROW),
-});
+const ROW = plainOf(ROW_STRUCTURE);
+
+const TOY = plainOf(
+  plain<Toy>('toy', {
+    entity: need(entity(['light'])),
+    name: text(),
+    label: flag('device'),
+    hidden: flag(),
+    states: texts(['on']),
+    mode: text('auto'),
+    when: rule(),
+    wheels: corners(['sensor']),
+    rows: parts(ROW_STRUCTURE),
+  }),
+);
 
 test('a configuration the description holds passes, layout keys included', () => {
   checkValue(TOY, {
@@ -130,6 +157,47 @@ test('cleaning drops empty optional values, defaults and flags turned off, and k
   });
 });
 
+test('cleaning keeps an emptied list with a default, which means none, and drops an emptied text, which asks for its default', () => {
+  assert.deepEqual(
+    cleanValue(TOY, { type: 'custom:toy', entity: 'light.desk', states: [], mode: '' }),
+    { type: 'custom:toy', entity: 'light.desk', states: [] },
+  );
+});
+
+test('cleaning against what was there leaves the keys that did not change as they are', () => {
+  const before: Record<string, Value> = {
+    type: 'custom:toy',
+    entity: 'light.desk',
+    name: '',
+    rows: [{ entity: 'sensor.a', name: '' }],
+  };
+  assert.deepEqual(cleanValue(TOY, { ...before, entity: 'light.lamp', hidden: false }, before), {
+    type: 'custom:toy',
+    entity: 'light.lamp',
+    name: '',
+    rows: [{ entity: 'sensor.a', name: '' }],
+  });
+  assert.deepEqual(
+    cleanValue(
+      TOY,
+      {
+        ...before,
+        rows: [
+          { entity: 'sensor.a', name: '' },
+          { entity: 'sensor.b', name: '' },
+        ],
+      },
+      before,
+    ),
+    { ...before, rows: [{ entity: 'sensor.a', name: '' }, { entity: 'sensor.b' }] },
+  );
+  assert.deepEqual(cleanValue(TOY, { ...before, rows: [] }, before), {
+    type: 'custom:toy',
+    entity: 'light.desk',
+    name: '',
+  });
+});
+
 test('a key set again keeps its place, and a new one goes after the keys before it in the description', () => {
   const value: Record<string, Value> = { type: 'custom:toy', rows: [], entity: 'light.a' };
   assert.deepEqual(Object.keys(place(TOY, value, 'entity', 'light.b')), ['type', 'rows', 'entity']);
@@ -146,30 +214,31 @@ test('a key set again keeps its place, and a new one goes after the keys before 
   assert.deepEqual(place(TOY, value, 'rows', undefined), { type: 'custom:toy', entity: 'light.a' });
 });
 
-const PING = plain<{ type: 'ping'; entity: string; name?: string }>('ping', 'Ping', {
-  entity: need(entity()),
-  name: text(),
-});
-const PONG = plain<{ type: 'pong'; entity: string; color?: string }>('pong', 'Pong', {
-  entity: need(entity()),
-  color: text(),
-});
-const BALL = tagged<{ type: 'ping' | 'pong' }>('ball', 'Ball', { ping: PING, pong: PONG });
+type Ball =
+  | { type: 'ping'; entity: string; name?: string }
+  | { type: 'pong'; entity: string; color?: string };
 
-const SAID = plain<{ text: string; when?: { is?: string[] } }>('said', 'Text', {
-  text: need(text()),
-  when: rule(),
-});
-const SHOWN = plain<{ entity?: string; shown: true; when?: { is?: string[] } }>('shown', 'Shown', {
-  entity: entity(),
-  shown: need(flag()),
-  when: rule(),
-});
-const PLAIN = plain<{ entity?: string; when?: { is?: string[] } }>('value', 'Value', {
-  entity: entity(),
-  when: rule(),
-});
-const LINE = marked('line', 'Line', { text: SAID, shown: SHOWN }, PLAIN);
+const BALL = choiceOf(
+  tagged<Ball>('ball', {
+    ping: { entity: need(entity()), name: text() },
+    pong: { entity: need(entity()), color: text() },
+  }),
+);
+
+type Line =
+  | { text: string; entity?: never; shown?: never; when?: { is?: string[] } }
+  | { text?: never; entity?: string; shown: true; when?: { is?: string[] } }
+  | { text?: never; entity?: string; shown?: never; when?: { is?: string[] } };
+
+const LINE = choiceOf(
+  marked<Line>('line')(
+    {
+      text: { text: need(text()), when: rule() },
+      shown: { entity: entity(), shown: need(flag()), when: rule() },
+    },
+    { entity: entity(), when: rule() },
+  ),
+);
 
 test('a part with kinds is checked against the kind it is', () => {
   checkValue(BALL, { type: 'ping', entity: 'light.a', name: 'A' }, 'controls[0]');
@@ -201,10 +270,9 @@ test('switching kinds keeps the keys both kinds have, drops the others, and star
   assert.equal(switchVariant(LINE, same, 'text'), same);
 });
 
-const FIELDS = plain<{ type?: string; name?: string }>('fields', 'Fields', {
-  type: text(),
-  name: text(),
-});
+const FIELDS = plainOf(
+  plain<{ type?: string; name?: string }>('fields', { type: text(), name: text() }),
+);
 
 test('a key named type that is not a tag is a field like any other', () => {
   checkValue(FIELDS, { type: 'kind', name: 'x' }, 'fields');
@@ -223,26 +291,31 @@ test('a part is labelled by its kind and its name, title or entity, or by its pl
   assert.equal(labelOf(ROW, {}, 1), 'Row 2');
 });
 
-test('switching a control to a kind that takes fewer entities drops the entity it cannot take', async () => {
-  const { CONTROL } = await import('./kinds.ts');
+const fieldShape = (type: string, key: string): Shape => {
+  const card = DESCRIPTIONS[type];
+  const of = card?.kind === 'plain' ? card.fields[key]?.of : undefined;
+  assert.ok(of, `${type} ${key}`);
+  return of;
+};
+
+test('switching a control to a kind that takes fewer entities drops the entity it cannot take', () => {
+  const control = fieldShape('custom:mnml-heading-card', 'controls');
+  assert.ok(control.kind !== 'plain');
   assert.deepEqual(
-    switchVariant(CONTROL, { type: 'toggle', entity: 'light.a', color: 'red' }, 'select'),
+    switchVariant(control, { type: 'toggle', entity: 'light.a', color: 'red' }, 'select'),
     {
       type: 'select',
       color: 'red',
     },
   );
-  assert.deepEqual(switchVariant(CONTROL, { type: 'toggle', entity: 'select.mode' }, 'select'), {
+  assert.deepEqual(switchVariant(control, { type: 'toggle', entity: 'select.mode' }, 'select'), {
     type: 'select',
     entity: 'select.mode',
   });
 });
 
-test('a key named type that is a field takes its place in the description like any other', async () => {
-  const { CLIENT_FIELDS } = await import('./kinds.ts');
-  assert.ok(CLIENT_FIELDS.kind === 'plain');
-  assert.deepEqual(Object.keys(place(CLIENT_FIELDS, { type: 'kind' }, 'name', 'host')), [
-    'name',
-    'type',
-  ]);
+test('a key named type that is a field takes its place in the description like any other', () => {
+  const fields = fieldShape('custom:mnml-clients-card', 'fields');
+  assert.ok(fields.kind === 'plain');
+  assert.deepEqual(Object.keys(place(fields, { type: 'kind' }, 'name', 'host')), ['name', 'type']);
 });

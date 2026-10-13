@@ -1,7 +1,8 @@
 import { LitElement, css, html, nothing } from 'lit';
 import type { TemplateResult } from 'lit';
+import { AsyncDirective } from 'lit/async-directive.js';
 import { state } from 'lit/decorators.js';
-import { Directive, PartType, directive } from 'lit/directive.js';
+import { PartType, directive } from 'lit/directive.js';
 import type { ElementPart, PartInfo } from 'lit/directive.js';
 
 const DELAY = 400;
@@ -123,11 +124,15 @@ function show(element: Element): void {
     return;
   }
   if (bubble === undefined || !bubble.isConnected) {
-    bubble = document.createElement('mnml-tooltip') as MnmlTooltip;
+    const made = document.createElement('mnml-tooltip');
+    if (!(made instanceof MnmlTooltip)) {
+      return;
+    }
+    bubble = made;
     document.body.append(bubble);
   }
   current = element;
-  void bubble.open?.(text, element.getBoundingClientRect());
+  void bubble.open(text, element.getBoundingClientRect());
 }
 
 function later(element: Element, delay: number): void {
@@ -181,7 +186,9 @@ function wire(element: Element): void {
   element.addEventListener('focusout', hide);
 }
 
-class Tip extends Directive {
+class Tip extends AsyncDirective {
+  private element: Element | undefined;
+
   constructor(info: PartInfo) {
     super(info);
     if (info.type !== PartType.ELEMENT) {
@@ -195,6 +202,7 @@ class Tip extends Directive {
 
   override update(part: ElementPart, [text]: [string | undefined]): typeof nothing {
     const element = part.element;
+    this.element = element;
     if (text === undefined || text === '') {
       texts.delete(element);
       if (current === element) {
@@ -208,6 +216,12 @@ class Tip extends Directive {
       }
     }
     return nothing;
+  }
+
+  protected override disconnected(): void {
+    if (this.element !== undefined && current === this.element) {
+      hide();
+    }
   }
 }
 

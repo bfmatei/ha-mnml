@@ -354,7 +354,7 @@ test('an emptied state meets the new empty word as a duplicate, and no word is l
   const [first] = words(root);
   assert.ok(first);
   await type(first, '');
-  assert.deepEqual(value()['rows'], [{ entity: 'sensor.a', words: { on: 'An', '': '' } }]);
+  assert.deepEqual(value()['rows'], [{ entity: 'sensor.a', words: { on: 'An' } }]);
   assert.equal(first.getAttribute('aria-invalid'), 'true');
 });
 
@@ -406,4 +406,55 @@ test('a row is named by its entity as Home Assistant names it', async () => {
   context.redraw();
   await click(labelled(root, 'Rows'));
   assert.ok(labelled(root, 'Hall power'));
+});
+
+test("the report card's colours are picked from the list, word by word", async () => {
+  const { root, value } = await harness('custom:mnml-report-card', {
+    type: 'custom:mnml-report-card',
+    entity: 'sensor.report',
+    colors: { warnings: 'orange' },
+  });
+  const picker = labelled(root, 'Colour for warnings');
+  assert.ok(picker instanceof HTMLSelectElement);
+  picker.value = 'blue';
+  picker.dispatchEvent(new Event('change'));
+  await settle();
+  assert.deepEqual(value()['colors'], { warnings: 'blue' });
+});
+
+const schemaNames = (form: HTMLElement | undefined): string[] => {
+  const schema: unknown = Reflect.get(form ?? {}, 'schema');
+  return Array.isArray(schema)
+    ? schema.map((item: unknown) => String(Reflect.get(Object(item), 'name')))
+    : [];
+};
+
+test('a state line of minutes, a relative time, a serial or the name has no switch for its own kind', async () => {
+  const { root, value } = await harness('custom:mnml-heading-card', {
+    type: 'custom:mnml-heading-card',
+    title: 'Hall',
+    icon: 'mdi:door',
+    state: [{ entity: 'sensor.a', minutes: true }],
+  });
+  await click(labelled(root, 'State'));
+  await click(labelled(root, 'Minutes: sensor.a'));
+  assert.deepEqual(schemaNames(forms(root).at(-1)), ['entity', 'icon', '']);
+  await click(labelled(root, 'Relative time'));
+  assert.deepEqual(value()['state'], [{ entity: 'sensor.a', relative: true }]);
+  assert.deepEqual(schemaNames(forms(root).at(-1)), ['entity', 'icon', '']);
+  await click(labelled(root, 'Text'));
+  assert.deepEqual(schemaNames(forms(root).at(-1)), ['text', '']);
+});
+
+test('a part says whether it is open', async () => {
+  const { root } = await harness('custom:mnml-heading-card', {
+    type: 'custom:mnml-heading-card',
+    title: 'Hall',
+    icon: 'mdi:door',
+    controls: [{ type: 'toggle', entity: 'light.a' }],
+  });
+  await click(labelled(root, 'Controls'));
+  assert.equal(labelled(root, 'Toggle: light.a')?.getAttribute('aria-expanded'), 'false');
+  await click(labelled(root, 'Toggle: light.a'));
+  assert.equal(labelled(root, 'Toggle: light.a')?.getAttribute('aria-expanded'), 'true');
 });

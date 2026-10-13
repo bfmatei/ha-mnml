@@ -22,12 +22,12 @@ async def test_removing_mnml_gives_the_default_theme_back(
     hass: HomeAssistant, setup_mnml: SetupMnml, themes: Themes
 ) -> None:
     entry = await setup_mnml(options={"default_theme": True})
-    await hass.services.async_call(
-        "frontend", "set_theme", {"name": "MNML", "mode": "light"}, blocking=True
-    )
+    assert (await themes())["default_theme"] == "MNML"
     await hass.config_entries.async_remove(entry.entry_id)
     await hass.async_block_till_done()
-    assert (await themes())["default_theme"] == "default"
+    result = await themes()
+    assert result["default_theme"] == "default"
+    assert result["default_dark_theme"] is None
 
 
 async def test_removing_mnml_leaves_a_default_chosen_elsewhere_alone(

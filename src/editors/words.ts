@@ -16,7 +16,8 @@ const WORDS_STYLE = css`
     gap: 6px;
     align-items: center;
   }
-  input {
+  input,
+  select {
     font: inherit;
     font-size: 13px;
     color: var(--primary-text-color);
@@ -47,12 +48,13 @@ const same = (a: readonly Pair[], b: readonly Pair[]): boolean =>
 const clashes = (pairs: readonly Pair[], position: number): boolean =>
   pairs.some(([other], at) => at !== position && other === pairs[position]?.[0]);
 
-const named = (state: string): string => (state === '' ? 'a state' : state);
+const stated = (pairs: readonly Pair[]): Pair[] => pairs.filter(([state]) => state !== '');
 
 export class MnmlWords extends LitElement {
   static override styles: CSSResultGroup = [BASE_STYLE, CONTROL_STYLE, WORDS_STYLE];
 
   @property({ attribute: false }) words: Readonly<Record<string, Value>> = {};
+  @property({ attribute: false }) options: readonly string[] | undefined;
   @property({ attribute: false }) changed: (next: Record<string, string>, redraw: boolean) => void =
     () => undefined;
   @state() private shown: readonly Pair[] | undefined;
@@ -61,48 +63,45 @@ export class MnmlWords extends LitElement {
     if (
       changed.has('words') &&
       this.shown !== undefined &&
-      !same(pairsOf(this.words), this.shown)
+      !same(pairsOf(this.words), stated(this.shown))
     ) {
       this.shown = undefined;
     }
   }
 
   protected override render(): TemplateResult {
-    const pairs = this.shown ?? pairsOf(this.words);
-    const add = 'Add a word';
+    const pairs = this.visible();
+    const colours = this.options !== undefined;
+    const named = (state: string): string =>
+      state === '' ? (colours ? 'a word' : 'a state') : state;
+    const add = colours ? 'Add a colour' : 'Add a word';
     return html`<div class="words">
-      ${pairs.map(
-        ([state, word], index) =>
-          html`<input
-              class="word"
-              aria-label="State"
-              aria-invalid=${String(clashes(pairs, index))}
-              .value=${live(state)}
-              @input=${(event: Event) => {
-                this.edited(index, 0, event);
-              }}
-            /><input
-              class="word"
-              aria-label=${`Word for ${named(state)}`}
-              .value=${live(word)}
-              @input=${(event: Event) => {
-                this.edited(index, 1, event);
-              }}
-            /><button
-              type="button"
-              class="control"
-              aria-label=${`Remove the word for ${named(state)}`}
-              title=${`Remove the word for ${named(state)}`}
-              @click=${quietly(() => {
-                this.write(
-                  pairsOf(this.words).filter((_, position) => position !== index),
-                  true,
-                );
-              })}
-            >
-              ${icon('mdi:close')}
-            </button>`,
-      )}
+      ${pairs.map((pair, index) => {
+        const [state] = pair;
+        const remove = `Remove the ${colours ? 'colour' : 'word'} for ${named(state)}`;
+        return html`<input
+            class="word"
+            aria-label=${colours ? 'Word' : 'State'}
+            aria-invalid=${String(clashes(pairs, index))}
+            .value=${live(state)}
+            @input=${(event: Event) => {
+              this.edited(index, 0, event);
+            }}
+          />${this.second(pair, index, named(state))}<button
+            type="button"
+            class="control"
+            aria-label=${remove}
+            title=${remove}
+            @click=${quietly(() => {
+              this.settle(
+                this.visible().filter((_, position) => position !== index),
+                true,
+              );
+            })}
+          >
+            ${icon('mdi:close')}
+          </button>`;
+      })}
       <button
         type="button"
         class="control adder"
@@ -110,7 +109,7 @@ export class MnmlWords extends LitElement {
         title=${add}
         ?disabled=${pairs.some(([state]) => state === '')}
         @click=${quietly(() => {
-          this.write([...pairsOf(this.words), ['', '']], true);
+          this.shown = [...this.visible(), ['', this.options?.[0] ?? '']];
         })}
       >
         ${icon('mdi:plus')}<span>${add}</span>
@@ -118,24 +117,50 @@ export class MnmlWords extends LitElement {
     </div>`;
   }
 
+  private second([, word]: Pair, index: number, state: string): TemplateResult {
+    const changed = (event: Event): void => {
+      this.edited(index, 1, event);
+    };
+    if (this.options === undefined) {
+      return html`<input
+        class="word"
+        aria-label=${`Word for ${state}`}
+        .value=${live(word)}
+        @input=${changed}
+      />`;
+    }
+    return html`<select aria-label=${`Colour for ${state}`} @change=${changed}>
+      ${this.options.map(
+        (option) => html`<option value=${option} ?selected=${option === word}>${option}</option>`,
+      )}
+    </select>`;
+  }
+
+  private visible(): readonly Pair[] {
+    return this.shown ?? pairsOf(this.words);
+  }
+
   private edited(index: number, side: 0 | 1, event: Event): void {
     const box = event.currentTarget;
-    const typed = box instanceof HTMLInputElement ? box.value : '';
-    const visible = (this.shown ?? pairsOf(this.words)).map(([state, word], position): Pair => {
+    const typed =
+      box instanceof HTMLInputElement || box instanceof HTMLSelectElement ? box.value : '';
+    const next = this.visible().map(([state, word], position): Pair => {
       if (position !== index) {
         return [state, word];
       }
       return side === 0 ? [typed, word] : [state, typed];
     });
-    if (visible.some((_, position) => clashes(visible, position))) {
-      this.shown = visible;
-      return;
-    }
-    this.write(visible, false);
+    this.settle(next, false);
   }
 
-  private write(next: readonly Pair[], redraw: boolean): void {
+  private settle(next: readonly Pair[], redraw: boolean): void {
     this.shown = next;
-    this.changed(Object.fromEntries(next), redraw);
+    if (next.some((_, position) => clashes(next, position))) {
+      return;
+    }
+    const written = stated(next);
+    if (!same(written, pairsOf(this.words))) {
+      this.changed(Object.fromEntries(written), redraw);
+    }
   }
 }

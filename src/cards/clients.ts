@@ -13,11 +13,10 @@ import { UNAVAILABLE } from '../ha/rules.ts';
 import { colorStyle } from '../ha/templates.ts';
 
 import { MnmlCard, requireList, requireString } from './base.ts';
-import { schema } from './keys.ts';
 import type { KeySchema } from './keys.ts';
 import { SECTION_STYLE, section } from './parts/section.ts';
 import type { Fold } from './parts/section.ts';
-import { CLIENT_NETWORK } from './schemas.ts';
+import { CLIENTS_CARD } from './schemas.ts';
 import { BASE_STYLE, HEADING_STYLE } from './styles.ts';
 
 const CLIENTS_STYLE = css`
@@ -185,29 +184,13 @@ function group(
   );
 }
 
-const SCHEMA = schema<ClientsCard>(
-  {
-    type: true,
-    entity: true,
-    attribute: true,
-    fields: true,
-    names: true,
-    networks: true,
-    fold: true,
-  },
-  {
-    networks: CLIENT_NETWORK,
-    fields: schema<ClientFields>({ name: true, ip_address: true, type: true }),
-  },
-);
-
 export class MnmlClientsCard extends MnmlCard<ClientsCard> {
   static override styles = [BASE_STYLE, HEADING_STYLE, SECTION_STYLE, CLIENTS_STYLE];
 
   @state() private choices: ReadonlyMap<string, boolean> = new Map();
 
   protected schema(): KeySchema {
-    return SCHEMA;
+    return CLIENTS_CARD;
   }
 
   protected override validate(config: ClientsCard): void {

@@ -2,6 +2,7 @@ import { LitElement, nothing } from 'lit';
 import type { CSSResultGroup, TemplateResult } from 'lit';
 import { property, state } from 'lit/decorators.js';
 
+import { announced, onAnnounce } from '../cards/parts/popup-registry.ts';
 import { BASE_STYLE, CONTROL_STYLE } from '../cards/styles.ts';
 import { isMapping } from '../contract/templates.ts';
 import type { Value } from '../contract/templates.ts';
@@ -48,14 +49,33 @@ export class MnmlCardEditor extends LitElement {
   @state() private config: Record<string, Value> = {};
   @state() private shape: Shape | undefined;
   @state() private hashes: readonly string[] = [];
+  private listed: readonly string[] = [];
+  private stopAnnounced: (() => void) | undefined;
   private readonly open = new Map<string, boolean>();
 
+  override connectedCallback(): void {
+    super.connectedCallback();
+    this.stopAnnounced ??= onAnnounce(this.gather);
+    this.gather();
+  }
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this.stopAnnounced?.();
+    this.stopAnnounced = undefined;
+  }
+
   set lovelace(lovelace: unknown) {
-    const hashes = hashesOf(lovelace);
+    this.listed = hashesOf(lovelace);
+    this.gather();
+  }
+
+  private readonly gather = (): void => {
+    const hashes = [...new Set([...this.listed, ...announced().map((popup) => popup.hash)])];
     if (JSON.stringify(hashes) !== JSON.stringify(this.hashes)) {
       this.hashes = hashes;
     }
-  }
+  };
 
   setConfig(config: unknown): void {
     if (customElements.get('ha-form') === undefined) {
@@ -96,7 +116,7 @@ export class MnmlCardEditor extends LitElement {
     const slot: Slot = {
       get: (): Record<string, Value> => this.config,
       set: (next): void => {
-        this.config = cleanValue(shape, next);
+        this.config = cleanValue(shape, next, this.config);
         this.dispatchEvent(
           new CustomEvent('config-changed', {
             detail: { config: this.config },

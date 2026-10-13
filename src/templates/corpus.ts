@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
+import { isMapping } from '../contract/templates.ts';
 import type { Value } from '../contract/templates.ts';
 
 import { discover } from './discover.ts';
@@ -13,18 +14,28 @@ const EXPECTED = 'expected.json';
 
 type Discoveries = Record<string, Record<string, Record<string, Record<string, Value>>>>;
 
-function sorted(value: unknown): unknown {
+const byKey = ([a]: [string, unknown], [b]: [string, unknown]): number => a.localeCompare(b);
+
+function sorted(value: Record<string, Value>): Record<string, Value> {
+  return Object.fromEntries(
+    Object.entries(value)
+      .toSorted(byKey)
+      .map(([key, inner]) => [key, deep(inner)]),
+  );
+}
+
+function deep(value: Value): Value {
   if (Array.isArray(value)) {
-    return value.map(sorted);
+    return value.map(deep);
   }
-  if (typeof value === 'object' && value !== null) {
-    return Object.fromEntries(
-      Object.entries(value)
-        .toSorted(([a], [b]) => a.localeCompare(b))
-        .map(([key, inner]) => [key, sorted(inner)]),
-    );
-  }
-  return value;
+  return isMapping(value) ? sorted(value) : value;
+}
+
+function isRegistries(value: unknown): value is Registries {
+  return (
+    isMapping(value) &&
+    ['areas', 'devices', 'entities', 'states'].every((key) => isMapping(value[key]))
+  );
 }
 
 export function homes(): Record<string, Registries> {
@@ -34,30 +45,33 @@ export function homes(): Record<string, Registries> {
       .toSorted()
       .map((name) => {
         const parsed: unknown = JSON.parse(readFileSync(join(CORPUS_DIR, name), 'utf8'));
-        return [name.slice(0, -'.json'.length), parsed as Registries];
+        if (!isRegistries(parsed)) {
+          throw new Error(`${name} holds no registries`);
+        }
+        return [name.slice(0, -'.json'.length), parsed];
       }),
   );
 }
 
 export function discoveries(): Discoveries {
   const out: Discoveries = {};
-  for (const [home, registries] of Object.entries(homes())) {
-    const areas = ['', ...Object.keys(registries.areas).toSorted()];
-    for (const [name, template] of Object.entries(SHIPPED)) {
+  for (const [home, registries] of Object.entries(homes()).toSorted(byKey)) {
+    const areas = ['*', ...Object.keys(registries.areas)].toSorted((a, b) => a.localeCompare(b));
+    for (const [name, template] of Object.entries(SHIPPED).toSorted(byKey)) {
       if (!Object.values(template.slots ?? {}).some((slot) => slot.discover !== undefined)) {
         continue;
       }
       for (const area of areas) {
-        const found = discover(template, area === '' ? undefined : area, registries);
+        const found = discover(template, area === '*' ? undefined : area, registries);
         if (Object.keys(found).length > 0) {
           out[home] ??= {};
           out[home][name] ??= {};
-          out[home][name][area === '' ? '*' : area] = found;
+          out[home][name][area] = sorted(found);
         }
       }
     }
   }
-  return sorted(out) as Discoveries;
+  return out;
 }
 
 export function writeExpected(): void {

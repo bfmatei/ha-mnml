@@ -3,35 +3,7 @@ speaker-popup:
   slots:
     key: { kind: text, required: true }
     name: { kind: text, required: true }
-    speaker:
-      kind: object
-      required: true
-      fields:
-        key: { kind: text, required: true }
-        entity: { kind: entity, required: true }
-        bass: { kind: entity, required: true }
-        treble: { kind: entity, required: true }
-        balance: { kind: entity }
-        loudness: { kind: entity, required: true }
-        tv:
-          kind: object
-          fields:
-            input_format: { kind: entity }
-            night_sound: { kind: entity, required: true }
-            speech_enhancement: { kind: entity, required: true }
-            audio_delay: { kind: entity, required: true }
-        subwoofer:
-          kind: object
-          fields:
-            enabled: { kind: entity, required: true }
-            gain: { kind: entity, required: true }
-        surround:
-          kind: object
-          fields:
-            enabled: { kind: entity, required: true }
-            level: { kind: entity, required: true }
-            music_level: { kind: entity, required: true }
-            music_full_volume: { kind: entity, required: true }
+    speaker: { shape: speaker, required: true }
   card:
     hash: '#[[key]]-[[speaker.key]]'
     cards:
@@ -51,9 +23,11 @@ speaker-popup:
         name: Volume
         icon: mdi:volume-high
       - id: number-slider
+        if: speaker.bass
         template: number-slider
         slots: { entity: '[[speaker.bass]]' }
       - id: number-slider-2
+        if: speaker.treble
         template: number-slider
         slots: { entity: '[[speaker.treble]]' }
       - id: speaker-balance
@@ -61,6 +35,7 @@ speaker-popup:
         template: number-slider
         slots: { entity: '[[speaker.balance]]' }
       - id: switch-card
+        if: speaker.loudness
         template: switch-card
         slots: { entity: '[[speaker.loudness]]' }
       - id: speaker-tv

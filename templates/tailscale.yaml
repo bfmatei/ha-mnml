@@ -2,6 +2,7 @@ tailscale:
   description: A tailnet's tile, and its offline, relayed and update chips; it brings the tailnet's pop-up.
   slots:
     devices:
+      shape: tailscale_device
       kind: objects
       required: true
       group: Devices
@@ -18,32 +19,6 @@ tailscale:
           expires: { domain: sensor, platform: tailscale, translation_key: expires }
           update: { domain: binary_sensor, platform: tailscale, translation_key: client }
           udp: { domain: binary_sensor, platform: tailscale, translation_key: client_supports_udp }
-      fields:
-        connected: { kind: entity, required: true, label: Connected to control }
-        essential:
-          {
-            kind: flag,
-            help: 'A device that must stay connected, such as the router and the exit node; the others may come and go.',
-          }
-        ip_address: { kind: entity, label: IP address }
-        last_seen: { kind: entity }
-        expires: { kind: entity, label: Key expires }
-        update: { kind: entity, label: Client update }
-        udp: { kind: entity, label: Supports UDP }
-    essential:
-      {
-        kind: entities,
-        group: Devices,
-        help: "The essential devices' connections, for the Offline chip.",
-      }
-    personal:
-      {
-        kind: entities,
-        group: Devices,
-        help: "The other devices' connections, for the pop-up's Devices heading.",
-      }
-    updates:
-      { kind: entities, group: Devices, help: "The devices' client updates, for the Update chip." }
     soon_days:
       {
         kind: number,
@@ -52,12 +27,7 @@ tailscale:
         group: Devices,
         help: 'A key that expires within this many days is flagged red.',
       }
-    direct:
-      {
-        kind: entities,
-        group: Devices,
-        help: 'The devices that carry traffic and need UDP to connect directly.',
-      }
+  retired: [essential, personal, updates, direct]
   card:
     type: custom:mnml-tile-card
     name: Tailscale
@@ -65,7 +35,7 @@ tailscale:
     popup: '#tailscale'
     chips:
       - id: offline
-        if: essential
+        if: devices.?essential
         type: status
         name: Offline
         icon: mdi:lan-disconnect
@@ -74,15 +44,15 @@ tailscale:
           [
             {
               id: offline,
-              if: essential,
-              entities: ['[[essential]]'],
+              if: devices.?essential,
+              entities: ['[[devices.?essential.connected]]'],
               label: device,
               color: red,
               is: ['off'],
             },
           ]
       - id: relayed
-        if: direct
+        if: devices.*.udp
         type: status
         name: Relayed
         icon: mdi:transit-connection-variant
@@ -91,8 +61,8 @@ tailscale:
           [
             {
               id: relayed,
-              if: direct,
-              entities: ['[[direct]]'],
+              if: devices.*.udp,
+              entities: ['[[devices.*.udp]]'],
               label: device,
               words: { 'off': Relayed },
               color: orange,
@@ -100,7 +70,7 @@ tailscale:
             },
           ]
       - id: update
-        if: updates
+        if: devices.?essential.update
         type: status
         name: Update
         icon: mdi:package-up
@@ -109,8 +79,8 @@ tailscale:
           [
             {
               id: update,
-              if: updates,
-              entities: ['[[updates]]'],
+              if: devices.?essential.update,
+              entities: ['[[devices.?essential.update]]'],
               label: device,
               color: amber,
               is: ['on'],
@@ -120,11 +90,7 @@ tailscale:
   popups:
     - id: tailscale-popup
       template: tailscale-popup
-      slots:
-        devices: '[[devices]]'
-        essential: '[[essential]]'
-        personal: '[[personal]]'
-        soon_days: '[[soon_days]]'
+      slots: { devices: '[[devices]]', soon_days: '[[soon_days]]' }
   example: &tailscale
     devices:
       - connected: binary_sensor.router_connected
@@ -135,27 +101,13 @@ tailscale:
         update: binary_sensor.router_client
         udp: binary_sensor.router_supports_udp
       - connected: binary_sensor.phone_connected
-    essential: [binary_sensor.router_connected]
-    updates: [binary_sensor.router_client]
-    direct: [binary_sensor.router_supports_udp]
 
 tailscale-popup:
   description: The tailnet's pop-up, a card per device, the essential ones under Infrastructure and the others under Devices.
   slots:
-    devices:
-      kind: objects
-      required: true
-      fields:
-        connected: { kind: entity, required: true }
-        essential: { kind: flag }
-        ip_address: { kind: entity }
-        last_seen: { kind: entity }
-        expires: { kind: entity }
-        update: { kind: entity }
-        udp: { kind: entity }
-    essential: { kind: entities }
-    personal: { kind: entities }
+    devices: { shape: tailscale_device, kind: objects, required: true }
     soon_days: { kind: number, default: 14 }
+  retired: [essential, personal]
   card:
     hash: '#tailscale'
     cards:
@@ -164,7 +116,7 @@ tailscale-popup:
         name: Tailscale
         icon: mdi:vpn
       - id: infrastructure
-        if: essential
+        if: devices.?essential
         type: custom:mnml-heading-card
         title: Infrastructure
         icon: mdi:server-network
@@ -175,7 +127,7 @@ tailscale-popup:
         template: tailscale-device
         slots: { device: '[[device]]', alert: red, soon_days: '[[soon_days]]' }
       - id: devices
-        if: personal
+        if: devices.!essential
         type: custom:mnml-heading-card
         title: Devices
         icon: mdi:devices
@@ -196,23 +148,11 @@ tailscale-popup:
         udp: binary_sensor.router_supports_udp
       - connected: binary_sensor.phone_connected
         last_seen: sensor.phone_last_seen
-    essential: [binary_sensor.router_connected]
-    personal: [binary_sensor.phone_connected]
 
 tailscale-device:
   description: A tailnet device's card, its name, Connected or when it was last seen, and icons for a pending update, a key about to expire and how it connects.
   slots:
-    device:
-      kind: object
-      required: true
-      fields:
-        connected: { kind: entity, required: true }
-        essential: { kind: flag }
-        ip_address: { kind: entity }
-        last_seen: { kind: entity }
-        expires: { kind: entity }
-        update: { kind: entity }
-        udp: { kind: entity }
+    device: { shape: tailscale_device, required: true }
     alert:
       {
         kind: text,
@@ -230,7 +170,7 @@ tailscale-device:
     label: device
     strip_word: Tailscale
     color?: '[[alert]]'
-    when?: { is: ['off'] }
+    when?: { if: alert, is: ['off'] }
     state:
       - id: ip
         if: device.ip_address
@@ -262,7 +202,7 @@ tailscale-device:
           [
             {
               id: key,
-              if: device.expires,
+              if: soon_days,
               entities: ['[[device.expires]]'],
               color: red,
               within_days: '[[soon_days]]',

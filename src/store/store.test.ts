@@ -4,6 +4,7 @@ import { test, vi } from 'vitest';
 
 import type { HassConnection } from '../ha/hass.ts';
 import { nodeHash } from '../templates/changes.ts';
+import { expand } from '../templates/expand.ts';
 import { fakeStore } from '../test/fake-hass.ts';
 
 import { knownShared, onShared, resolvedTemplates, sharedTemplates } from './store.ts';
@@ -50,14 +51,24 @@ test('the store is subscribed once per connection, and its templates come with e
   store.keep({});
   stop();
   assert.equal(told, 1);
-  assert.deepEqual(sharedTemplates(on(store)), { status: 'ready', own: {}, changes: {} });
+  assert.deepEqual(sharedTemplates(on(store)), {
+    status: 'ready',
+    own: {},
+    written: {},
+    changes: {},
+  });
 });
 
 test("a home without MNML's store has an empty one, not a failure", async () => {
   const store = fakeStore();
   sharedTemplates(on(store));
   await settle();
-  assert.deepEqual(sharedTemplates(on(store)), { status: 'ready', own: {}, changes: {} });
+  assert.deepEqual(sharedTemplates(on(store)), {
+    status: 'ready',
+    own: {},
+    written: {},
+    changes: {},
+  });
 });
 
 test('a subscription refused for another reason is a failure in words', async () => {
@@ -139,6 +150,77 @@ test('a store entry with one change of the wrong shape is left out whole, and is
   ]);
 });
 
+test("a template of the home's own that names a shipped shape is read with it resolved, and kept as written for the panel; one naming an unknown shape is kept as written, and reported", async () => {
+  const store = fakeStore();
+  const card = { type: 'custom:mnml-heading-card', title: 'Yard', icon: 'mdi:barn' };
+  store.kept = {
+    yard: { kind: 'own', template: { slots: { energy: { shape: 'meter' } }, card } },
+    shed: { kind: 'own', template: { slots: { energy: { shape: 'metre' } }, card } },
+  };
+  const reported: unknown[] = [];
+  const original = console.error;
+  console.error = (...args: unknown[]): void => {
+    reported.push(args[0]);
+  };
+  try {
+    sharedTemplates(on(store));
+    await settle();
+  } finally {
+    console.error = original;
+  }
+  const ready = sharedTemplates(on(store));
+  assert.ok(ready.status === 'ready');
+  const energy = ready.own['yard']?.slots?.['energy'];
+  assert.equal(energy?.kind, 'object');
+  assert.deepEqual(Object.keys(energy?.fields ?? {}), ['power', 'today', 'total']);
+  assert.deepEqual(ready.own['shed']?.slots, { energy: { shape: 'metre' } });
+  assert.deepEqual(ready.written['yard']?.slots, { energy: { shape: 'meter' } });
+  assert.deepEqual(reported, [
+    'mnml: shed: the slot energy uses the shape metre, which is not known',
+  ]);
+});
+
+test("one malformed template of the home's own leaves the others served, and only an expansion of it fails, naming it", async () => {
+  const store = fakeStore();
+  const card = { type: 'custom:mnml-heading-card', title: 'Yard', icon: 'mdi:barn' };
+  let deep: unknown = { shape: 'meter' };
+  for (let level = 0; level < 20_000; level += 1) {
+    deep = { kind: 'object', fields: { inner: deep } };
+  }
+  store.kept = {
+    hall: { kind: 'own', template: GARDEN },
+    typo: { kind: 'own', template: { slots: { title: null }, card } },
+    yard: { kind: 'own', template: { slots: { energy: { shape: 'meter' } }, card } },
+    deep: { kind: 'own', template: { slots: { energy: deep }, card } },
+  };
+  const reported: unknown[] = [];
+  const original = console.error;
+  console.error = (...args: unknown[]): void => {
+    reported.push(args[0]);
+  };
+  try {
+    sharedTemplates(on(store));
+    await settle();
+  } finally {
+    console.error = original;
+  }
+  const ready = sharedTemplates(on(store));
+  assert.ok(ready.status === 'ready');
+  assert.deepEqual(Object.keys(ready.own), ['hall', 'typo', 'yard', 'deep']);
+  assert.deepEqual(Object.keys(ready.written), ['hall', 'typo', 'yard', 'deep']);
+  assert.equal(ready.own['yard']?.slots?.['energy']?.kind, 'object');
+  const all = resolvedTemplates(ready, {});
+  assert.deepEqual(expand(all, { template: 'hall' }).card, GARDEN.card);
+  assert.deepEqual(expand(all, { template: 'yard' }).card, card);
+  assert.throws(
+    () => expand(all, { template: 'typo' }),
+    /^Error: typo: the slot title has the kind none, which is none of /,
+  );
+  assert.throws(() => expand(all, { template: 'deep' }));
+  assert.equal(reported.length, 1);
+  assert.match(String(reported[0]), /^mnml: deep: /);
+});
+
 test('the store is subscribed without the automatic resubscribe, and again after each reconnect', async () => {
   const store = fakeStore();
   store.kept = { hall: { kind: 'own', template: GARDEN } };
@@ -193,7 +275,12 @@ test('a home that never had the store does not try it again after a reconnect', 
 test("a template of the home wins, then a shipped one with the home's changes, then the shipped one", () => {
   const own = { card: { type: 'custom:mnml-heading-card', title: 'Mine', icon: 'mdi:home' } };
   const resolved = resolvedTemplates(
-    { status: 'ready', own: { hall: own }, changes: { room: [removeLock] } },
+    {
+      status: 'ready',
+      own: { hall: own },
+      written: { hall: own },
+      changes: { room: [removeLock] },
+    },
     { room: ROOM, hall: GARDEN, garden: GARDEN },
   );
   assert.equal(resolved['hall'], own);

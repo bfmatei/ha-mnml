@@ -1,376 +1,108 @@
-import type {
-  AgendaCard,
-  ButtonCard,
-  CarPlanCard,
-  ClientsCard,
-  EntityCard,
-  GlancesCard,
-  HeaderCard,
-  HeadingCard,
-  ListCard,
-  MediaCard,
-  MessagesCard,
-  ReportCard,
-  SelectCard,
-  SliderCard,
-  TileCard,
-  WeatherCard,
-} from '../contract/cards.ts';
+import type { CustomCard } from '../contract/cards.ts';
+import { CARD_STRUCTURES, COLORS } from '../contract/structure.ts';
+import type { Key, Structure } from '../contract/structure.ts';
 
-import {
-  AGENDA_SOURCE,
-  CLIENT_FIELDS,
-  CLIENT_NETWORK,
-  CONTROL,
-  GLANCE,
-  ITEM,
-  LIST_ROW,
-  MESSAGE_SOURCE,
-  STATE_ITEM,
-} from './kinds.ts';
-import { MODE_ATTRIBUTES, SLIDER_KINDS } from './lists.ts';
-import {
-  choice,
-  color,
-  corners,
-  entities,
-  entity,
-  flag,
-  icon,
-  marked,
-  need,
-  part,
-  parts,
-  plain,
-  popup,
-  rule,
-  service,
-  share,
-  summary,
-  text,
-  textOr,
-  texts,
-  words,
-} from './shape.ts';
-import type { Shape } from './shape.ts';
+import { LABELS } from './labels.ts';
+import type { KindLabels, Labels } from './labels.ts';
+import { SERVICES } from './lists.ts';
+import type { Field, PlainShape, Shape } from './shape.ts';
 
-const HEADING = plain<HeadingCard>(
-  'heading',
-  'Heading',
-  { title: need(text()), icon: need(icon()), state: parts(STATE_ITEM), controls: parts(CONTROL) },
-  [
-    { title: 'Heading', keys: ['title', 'icon'] },
-    { title: 'State', keys: ['state'] },
-    { title: 'Controls', keys: ['controls'] },
-  ],
-);
-
-const GLANCES = plain<GlancesCard>('glances', 'Glances', { items: need(parts(GLANCE)) }, [
-  { title: 'Items', keys: ['items'] },
+const WITHOUT_FORM: ReadonlySet<string> = new Set<CustomCard['type']>([
+  'custom:mnml-popups-card',
+  'custom:mnml-template-card',
 ]);
 
-const LIST = plain<ListCard>(
-  'list',
-  'List',
-  {
-    lowest_first: flag(),
-    fold: flag(),
-    summary: summary(),
-    title: text(),
-    icon: icon(),
-    headers: texts(),
-    rows: need(parts(LIST_ROW)),
-  },
-  [
-    { title: 'Heading', keys: ['title', 'icon', 'headers'] },
-    { title: 'Rows', keys: ['rows'] },
-    { title: 'Order and summary', keys: ['lowest_first', 'fold', 'summary'] },
-  ],
-);
+const optionsOf = (key: Key): readonly string[] | undefined =>
+  key.kind === 'color' ? COLORS : key.kind === 'service' ? SERVICES : key.options;
 
-const AGENDA = plain<AgendaCard>(
-  'agenda',
-  'Agenda',
-  { title: text(), icon: icon(), sources: need(parts(AGENDA_SOURCE)) },
-  [
-    { title: 'Heading', keys: ['title', 'icon'] },
-    { title: 'Calendars', keys: ['sources'] },
-  ],
-);
+export function describer(
+  table: Readonly<Record<string, Labels>>,
+): (structure: Structure) => Shape {
+  const made = new Map<Structure, Shape>();
 
-const MESSAGES = plain<MessagesCard>(
-  'messages',
-  'Messages',
-  {
-    entity: need(entity(['sensor'])),
-    clear: need(entity(['script'])),
-    sources: parts(MESSAGE_SOURCE),
-  },
-  [
-    { title: 'Messages', keys: ['entity', 'clear'] },
-    { title: 'Sources', keys: ['sources'] },
-  ],
-);
+  const fieldOf = (key: Key, where: string): Field => {
+    const { kind, of } = key;
+    if (kind === 'cards' || kind === 'slots') {
+      throw new Error(`${where}: the editors draw no ${kind}`);
+    }
+    if ((kind === 'part' || kind === 'parts') && of === undefined) {
+      throw new Error(`${where}: the structure gives no part`);
+    }
+    return {
+      kind,
+      required: key.required,
+      default: key.default,
+      options: optionsOf(key),
+      domains: key.domains,
+      writes: key.writes,
+      withEntity:
+        kind === 'rule' && of?.kind === 'plain' && Object.hasOwn(of.keys, 'entity')
+          ? true
+          : undefined,
+      of: (kind === 'part' || kind === 'parts') && of !== undefined ? describe(of) : undefined,
+    };
+  };
 
-const CLIENTS = plain<ClientsCard>(
-  'clients',
-  'Clients',
-  {
-    entity: need(entity(['sensor'])),
-    attribute: textOr('data'),
-    fields: part(CLIENT_FIELDS),
-    names: entity(['sensor']),
-    networks: need(parts(CLIENT_NETWORK)),
-    fold: flag(),
-  },
-  [
-    { title: 'Clients', keys: ['entity', 'attribute', 'fields', 'names'] },
-    { title: 'Networks', keys: ['networks', 'fold'] },
-  ],
-);
+  const plainOf = (
+    id: string,
+    keys: Readonly<Record<string, Key>>,
+    labels: Labels,
+    own: KindLabels,
+  ): PlainShape => {
+    const fields: Record<string, Field> = {};
+    for (const [name, key] of Object.entries(keys)) {
+      fields[name] = fieldOf(key, `${id}.${name}`);
+    }
+    return {
+      kind: 'plain',
+      id,
+      label: own.label,
+      fields,
+      sections: own.sections ?? [{ title: own.label, keys: Object.keys(fields) }],
+      labels: labels.keys,
+      help: labels.help,
+    };
+  };
 
-const REPORT = plain<ReportCard>(
-  'report',
-  'Report',
-  {
-    entity: need(entity(['sensor'])),
-    title: text(),
-    icon: icon(),
-    colors: words(),
-  },
-  [
-    { title: 'Report', keys: ['entity', 'colors'] },
-    { title: 'Heading', keys: ['title', 'icon'] },
-  ],
-);
+  const describe = (structure: Structure): Shape => {
+    const known = made.get(structure);
+    if (known !== undefined) {
+      return known;
+    }
+    const { name } = structure;
+    const labels = table[name];
+    if (labels === undefined) {
+      throw new Error(`${name} has no labels`);
+    }
+    if (structure.kind === 'plain') {
+      const shape = plainOf(name, structure.keys, labels, labels);
+      made.set(structure, shape);
+      return shape;
+    }
+    const shape: Shape = {
+      kind: structure.kind,
+      id: name,
+      label: labels.label,
+      variants: structure.variants.map((variant) => {
+        const own = variant.when === undefined ? labels.otherwise : labels.kinds?.[variant.when];
+        if (own === undefined) {
+          throw new Error(`${name} has no labels for the kind ${String(variant.when)}`);
+        }
+        const id = `${name}-${variant.when ?? 'otherwise'}`;
+        return { when: variant.when, shape: plainOf(id, variant.keys, labels, own) };
+      }),
+    };
+    made.set(structure, shape);
+    return shape;
+  };
 
-const WEATHER = plain<WeatherCard>('weather', 'Weather', {
-  entity: need(entity(['weather'])),
-  title: text(),
-});
+  return describe;
+}
 
-const BUTTON = plain<ButtonCard>('button', 'Button', {
-  entity: need(entity(['button'])),
-  service: need(service()),
-});
+const describe = describer(LABELS);
 
-const SELECT = marked(
-  'select',
-  'Select',
-  {
-    scenes: plain<Extract<SelectCard, { scenes: unknown[] }>>(
-      'select-scenes',
-      'Scenes',
-      {
-        scenes: need(entities(['scene'])),
-        active_scene: entity(['select']),
-        name: need(text()),
-        icon: need(icon()),
-      },
-      [
-        { title: 'Scenes', keys: ['scenes', 'active_scene'] },
-        { title: 'Look', keys: ['name', 'icon'] },
-      ],
-    ),
-  },
-  plain<Extract<SelectCard, { scenes?: never }>>(
-    'select-entity',
-    'An entity',
-    {
-      entity: need(entity(['select', 'climate'])),
-      attribute: choice(MODE_ATTRIBUTES),
-      name: text(),
-      icon: icon(),
-    },
-    [
-      { title: 'Entity', keys: ['entity', 'attribute'] },
-      { title: 'Look', keys: ['name', 'icon'] },
-    ],
+export const DESCRIPTIONS: Readonly<Record<string, Shape>> = Object.fromEntries(
+  Object.entries(CARD_STRUCTURES).flatMap(([type, structure]): [string, Shape][] =>
+    WITHOUT_FORM.has(type) ? [] : [[type, describe(structure)]],
   ),
 );
-
-const SLIDER = plain<SliderCard>(
-  'slider',
-  'Slider',
-  {
-    entity: need(entity()),
-    slider: need(choice(SLIDER_KINDS)),
-    name: text(),
-    icon: icon(),
-    color: color(),
-    turn_on: flag(),
-  },
-  [
-    { title: 'Entity', keys: ['entity', 'slider', 'turn_on'] },
-    { title: 'Look', keys: ['name', 'icon', 'color'] },
-  ],
-);
-
-const ENTITY = plain<EntityCard>(
-  'entity',
-  'Entity',
-  {
-    entity: need(entity()),
-    name: text(),
-    label: flag('device'),
-    strip_word: text(),
-    icon: icon(),
-    popup: popup(),
-    color: color(),
-    when: rule(),
-    state: parts(STATE_ITEM),
-    controls: parts(CONTROL),
-    items: parts(ITEM),
-  },
-  [
-    { title: 'Entity', keys: ['entity', 'name', 'label', 'strip_word', 'icon', 'popup'] },
-    { title: 'Colour', keys: ['color', 'when'] },
-    { title: 'State', keys: ['state'] },
-    { title: 'Controls', keys: ['controls'] },
-    { title: 'More entities', keys: ['items'] },
-  ],
-);
-
-const HEADER = marked(
-  'header',
-  'Header',
-  {
-    name: plain<Extract<HeaderCard, { name: string }>>(
-      'header-named',
-      'A name and icon',
-      {
-        entity: entity(),
-        name: need(text()),
-        icon: need(icon()),
-        back: flag(),
-        color: color(),
-        when: rule(),
-        state: parts(STATE_ITEM),
-        controls: parts(CONTROL),
-      },
-      [
-        { title: 'Subject', keys: ['entity', 'name', 'icon', 'back'] },
-        { title: 'Colour', keys: ['color', 'when'] },
-        { title: 'State', keys: ['state'] },
-        { title: 'Controls', keys: ['controls'] },
-      ],
-    ),
-  },
-  plain<Extract<HeaderCard, { name?: never }>>(
-    'header-entity',
-    'An entity',
-    {
-      entity: need(entity()),
-      label: flag('device'),
-      icon: icon(),
-      back: flag(),
-      color: color(),
-      when: rule(),
-      state: parts(STATE_ITEM),
-      controls: parts(CONTROL),
-    },
-    [
-      { title: 'Subject', keys: ['entity', 'label', 'icon', 'back'] },
-      { title: 'Colour', keys: ['color', 'when'] },
-      { title: 'State', keys: ['state'] },
-      { title: 'Controls', keys: ['controls'] },
-    ],
-  ),
-);
-
-const TILE = marked(
-  'tile',
-  'Tile',
-  {
-    name: plain<Extract<TileCard, { name: string }>>(
-      'tile-named',
-      'A name and icon',
-      {
-        entity: entity(),
-        name: need(text()),
-        icon: need(icon()),
-        popup: need(popup()),
-        state: parts(STATE_ITEM),
-        chips: parts(CONTROL),
-        item: part(ITEM),
-      },
-      [
-        { title: 'Subject', keys: ['entity', 'name', 'icon', 'popup'] },
-        { title: 'State', keys: ['state'] },
-        { title: 'Chips', keys: ['chips'] },
-        { title: 'Item', keys: ['item'] },
-      ],
-    ),
-  },
-  plain<Extract<TileCard, { name?: never }>>(
-    'tile-entity',
-    'An entity',
-    {
-      entity: need(entity()),
-      label: flag('device'),
-      icon: icon(),
-      popup: need(popup()),
-      state: parts(STATE_ITEM),
-      chips: parts(CONTROL),
-      item: part(ITEM),
-    },
-    [
-      { title: 'Subject', keys: ['entity', 'label', 'icon', 'popup'] },
-      { title: 'State', keys: ['state'] },
-      { title: 'Chips', keys: ['chips'] },
-      { title: 'Item', keys: ['item'] },
-    ],
-  ),
-);
-
-const MEDIA = plain<MediaCard>('media', 'Media', {
-  entity: need(entity(['media_player'])),
-  popup: popup(),
-});
-
-const CAR_PLAN = plain<CarPlanCard>(
-  'car-plan',
-  'Car plan',
-  {
-    title: text(),
-    icon: icon(),
-    doors: need(corners(['binary_sensor'])),
-    hood: need(entity(['binary_sensor'])),
-    tailgate: need(entity(['binary_sensor'])),
-    windows: need(corners(['sensor'])),
-    sunroof: entity(['sensor']),
-    open_states: texts(['on', 'open']),
-    half_states: texts(['intermediate']),
-    tyres: need(corners(['sensor'])),
-    tyre_targets: need(corners(['sensor'])),
-    tyre_low_share: need(share()),
-    tyre_warn_share: need(share()),
-  },
-  [
-    { title: 'Heading', keys: ['title', 'icon'] },
-    {
-      title: 'Openings',
-      keys: ['doors', 'hood', 'tailgate', 'windows', 'sunroof', 'open_states', 'half_states'],
-    },
-    { title: 'Tyres', keys: ['tyres', 'tyre_targets', 'tyre_low_share', 'tyre_warn_share'] },
-  ],
-);
-
-export const DESCRIPTIONS: Readonly<Record<string, Shape>> = {
-  'custom:mnml-heading-card': HEADING,
-  'custom:mnml-list-card': LIST,
-  'custom:mnml-agenda-card': AGENDA,
-  'custom:mnml-messages-card': MESSAGES,
-  'custom:mnml-clients-card': CLIENTS,
-  'custom:mnml-report-card': REPORT,
-  'custom:mnml-weather-card': WEATHER,
-  'custom:mnml-glances-card': GLANCES,
-  'custom:mnml-button-card': BUTTON,
-  'custom:mnml-select-card': SELECT,
-  'custom:mnml-slider-card': SLIDER,
-  'custom:mnml-entity-card': ENTITY,
-  'custom:mnml-header-card': HEADER,
-  'custom:mnml-tile-card': TILE,
-  'custom:mnml-media-card': MEDIA,
-  'custom:mnml-car-plan-card': CAR_PLAN,
-};

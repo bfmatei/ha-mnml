@@ -6,39 +6,44 @@ import { ifDefined } from 'lit/directives/if-defined.js';
 import { keyed } from 'lit/directives/keyed.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
-import type { Condition, Popup, PopupOpening, PopupsCard } from '../contract/cards.ts';
+import type {
+  Condition,
+  LovelaceCardConfig,
+  Popup,
+  PopupOpening,
+  PopupsCard,
+} from '../contract/cards.ts';
+import { OPENINGS } from '../contract/structure.ts';
 import type { ChildCard } from '../ha/card-helpers.ts';
 import { visible } from '../ha/conditions.ts';
 import { field } from '../ha/field.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
 import { letGoOfFocus, trackInput } from '../ha/modality.ts';
 import { leave, narrow, reduced } from '../ha/motion.ts';
+import { nameOf } from '../ha/names.ts';
 import { PREBUILD_EVENT, closePopup, originOf, popupDepth, whenOrigin } from '../ha/navigation.ts';
 import { scrollable, scrollableAncestors } from '../ha/scroll.ts';
 
-import { requireKnownKeys, schema } from './keys.ts';
+import { requireOneOf } from './base.ts';
+import { requireKnownKeys } from './keys.ts';
 import { announced, checkPopups, onAnnounce } from './parts/popup-registry.ts';
+import { swipeToClose } from './parts/popup-swipe.ts';
+import {
+  foldTo,
+  folded,
+  following,
+  placed,
+  reveal,
+  settled,
+  unfolded,
+} from './parts/popup-unfold.ts';
+import type { Place } from './parts/popup-unfold.ts';
+import { POPUPS_CARD } from './schemas.ts';
 import { MOTION_STYLE } from './styles.ts';
 
 interface Child {
   card: ChildCard;
   visibility: Condition[] | undefined;
-}
-
-interface Box {
-  left: number;
-  top: number;
-  width: number;
-  height: number;
-}
-
-interface Place {
-  left: number;
-  width: number;
-  edge: number;
-  up: boolean;
-  maxHeight: number;
-  from: Box;
 }
 
 interface View {
@@ -56,86 +61,29 @@ const ROUTE_EVENTS = ['location-changed', 'popstate', 'hashchange'] as const;
 
 export const SHEET = '(max-width: 600px)';
 const TABLET = '(max-width: 1024px)';
-const OPENINGS: readonly PopupOpening[] = ['sheet', 'dialog', 'unfold'];
 const DEFAULT_OPEN = { phone: 'sheet', tablet: 'dialog', desktop: 'dialog' } as const;
-const MARGIN = 8;
 const ORIGIN_WAIT = 600;
-const SETTLE_FRAMES = 6;
-const SETTLE_MAX = 1500;
-const UNFOLD_MIN = 420;
-const UNFOLD_MIN_WIDTH = 320;
 const UNFOLD = 300;
 const SLIDE_OUT = 110;
 const SLIDE_IN = 200;
 const SLIDE_SHIFT = 20;
-const SWIPE_ZONE = 88;
-const SWIPE_START = 10;
-const SWIPE_CLOSE = 80;
-const SWIPE_FLICK = 0.6;
-const SWIPE_OUT = 200;
 const FOLD = 220;
-
-function placed(from: Box): Place {
-  const width = Math.min(Math.max(from.width, UNFOLD_MIN_WIDTH), innerWidth - 2 * MARGIN);
-  const left = Math.min(Math.max(from.left, MARGIN), innerWidth - width - MARGIN);
-  const top = Math.max(from.top, MARGIN);
-  const bottom = Math.min(from.top + from.height, innerHeight - MARGIN);
-  const below = innerHeight - top - MARGIN;
-  const above = bottom - MARGIN;
-  return below < UNFOLD_MIN && above > below
-    ? { left, width, edge: innerHeight - bottom, up: true, maxHeight: above, from }
-    : { left, width, edge: top, up: false, maxHeight: below, from };
-}
-
-function folded(place: Place, radius: string): string {
-  const left = Math.max(0, place.from.left - place.left);
-  const right = Math.max(0, place.width - left - place.from.width);
-  const tall = `calc(100% - ${place.from.height}px)`;
-  return place.up
-    ? `inset(${tall} ${right}px 0px ${left}px round ${radius})`
-    : `inset(0px ${right}px ${tall} ${left}px round ${radius})`;
-}
-
-const atLeast0 = (value: number): number => Math.max(0, value);
-
-function settled(element: Element): Promise<void> {
-  const start = performance.now();
-  return new Promise((resolve) => {
-    let last = '';
-    let still = 0;
-    const tick = (): void => {
-      const box = element.getBoundingClientRect();
-      const now = `${box.left} ${box.top} ${box.width} ${box.height}`;
-      still = now === last ? still + 1 : 0;
-      last = now;
-      if (still >= SETTLE_FRAMES || performance.now() - start > SETTLE_MAX) {
-        resolve();
-      } else {
-        requestAnimationFrame(tick);
-      }
-    };
-    requestAnimationFrame(tick);
-  });
-}
-
 const FADE_LEAVE = 140;
 const SHEET_LEAVE = 200;
 
-async function reveal(from: Element): Promise<void> {
-  const page = scrollableAncestors(from)[0] ?? document.scrollingElement;
-  if (page === null || page === undefined) {
-    return;
+function headerName(
+  header: LovelaceCardConfig | undefined,
+  hass: HomeAssistant | undefined,
+): string | undefined {
+  const name = header?.['name'];
+  if (typeof name === 'string') {
+    return name;
   }
-  const top = from.getBoundingClientRect().top;
-  const short = UNFOLD_MIN - (innerHeight - top - MARGIN);
-  const wanted = top < MARGIN ? top - MARGIN : Math.min(Math.max(short, 0), top - MARGIN);
-  const room = page.scrollHeight - page.clientHeight - page.scrollTop;
-  const delta = wanted < 0 ? Math.max(wanted, -page.scrollTop) : Math.min(wanted, room);
-  if (delta === 0) {
-    return;
+  const entity = header?.['entity'];
+  if (typeof entity !== 'string' || hass === undefined) {
+    return undefined;
   }
-  page.scrollBy({ top: delta, behavior: reduced() ? 'instant' : 'smooth' });
-  await settled(from);
+  return nameOf(hass, entity, header?.['label'] === 'device' ? { label: 'device' } : {});
 }
 
 function feed(child: Child, hass: HomeAssistant): void {
@@ -287,14 +235,6 @@ const POPUPS_STYLE = css`
   }
 `;
 
-const SCHEMA = schema<PopupsCard>(
-  { type: true, width: true, open: true, popups: true },
-  {
-    open: schema<NonNullable<PopupsCard['open']>>({ phone: true, tablet: true, desktop: true }),
-    popups: schema<Popup>({ hash: true, cards: true }),
-  },
-);
-
 export class MnmlPopupsCard extends LitElement {
   static override styles = [MOTION_STYLE, POPUPS_STYLE];
 
@@ -308,13 +248,11 @@ export class MnmlPopupsCard extends LitElement {
   private current: HomeAssistant | undefined;
   private shownHash: string | undefined;
   private landing: string | undefined;
-  private following: number | undefined;
   private fed: Child[] = [];
   private turn = 0;
   private sessions = 0;
   private shownDepth = 0;
   private motion: Animation[] = [];
-  private swipe: { id: number; y0: number; t0: number; dy: number; active: boolean } | undefined;
   private locked: { node: HTMLElement; overflow: string }[] | undefined;
   private ready: { hash: string; cards: Child[] } | undefined;
   private readonly pending = new Map<string, Promise<Child[]>>();
@@ -362,26 +300,23 @@ export class MnmlPopupsCard extends LitElement {
     });
   };
 
-  private readonly follow = (): void => {
-    this.following = undefined;
-    const view = this.view;
-    const from = view?.anchor;
-    if (view?.place === undefined || from?.isConnected !== true || this.leaving) {
-      return;
-    }
-    const next = placed(from.getBoundingClientRect());
-    const was = view.place;
-    if (
-      next.left !== was.left ||
-      next.width !== was.width ||
-      next.edge !== was.edge ||
-      next.up !== was.up ||
-      next.maxHeight !== was.maxHeight
-    ) {
-      this.view = { ...view, place: next };
-    }
-    this.following = requestAnimationFrame(this.follow);
-  };
+  private readonly follower = following(
+    () => (this.leaving ? undefined : this.view),
+    () => this.dialogWidth(),
+    (place) => {
+      if (this.view !== undefined) {
+        this.view = { ...this.view, place };
+      }
+    },
+  );
+
+  private readonly swipe = swipeToClose(
+    () => this.panel,
+    () => this.leaving,
+    (gone) => {
+      this.dismiss(gone);
+    },
+  );
 
   private readonly cancelled = (event: Event): void => {
     event.preventDefault();
@@ -403,110 +338,12 @@ export class MnmlPopupsCard extends LitElement {
     passive: false,
   };
 
-  private readonly swipeStart = (event: PointerEvent): void => {
-    const panel = this.panel;
-    if (
-      panel === null ||
-      panel === undefined ||
-      this.leaving ||
-      event.pointerType === 'mouse' ||
-      !event.isPrimary ||
-      event.clientY - panel.getBoundingClientRect().top > SWIPE_ZONE ||
-      event.composedPath().some((node) => scrollable(node) && node.scrollTop > 0)
-    ) {
-      return;
-    }
-    this.swipe = {
-      id: event.pointerId,
-      y0: event.clientY,
-      t0: event.timeStamp,
-      dy: 0,
-      active: false,
-    };
-  };
-
-  private readonly swipeMove = (event: PointerEvent): void => {
-    const swipe = this.swipe;
-    const panel = this.panel;
-    if (
-      swipe === undefined ||
-      swipe.id !== event.pointerId ||
-      panel === null ||
-      panel === undefined
-    ) {
-      return;
-    }
-    const dy = event.clientY - swipe.y0;
-    if (!swipe.active) {
-      if (dy < -SWIPE_START) {
-        this.swipe = undefined;
-      } else if (dy > SWIPE_START) {
-        swipe.active = true;
-        panel.setPointerCapture(event.pointerId);
-      }
-    }
-    if (swipe.active) {
-      swipe.dy = Math.max(0, dy);
-      panel.style.transform = `translateY(${swipe.dy}px)`;
-    }
-  };
-
-  private readonly swipeEnd = (event: PointerEvent): void => {
-    const swipe = this.swipe;
-    const panel = this.panel;
-    this.swipe = undefined;
-    if (
-      swipe === undefined ||
-      !swipe.active ||
-      swipe.id !== event.pointerId ||
-      panel === null ||
-      panel === undefined
-    ) {
-      return;
-    }
-    const speed = swipe.dy / Math.max(1, event.timeStamp - swipe.t0);
-    if (swipe.dy > SWIPE_CLOSE || (speed > SWIPE_FLICK && swipe.dy > SWIPE_START * 2)) {
-      this.dismiss(swipe.dy);
-      return;
-    }
-    panel.style.removeProperty('transform');
-    if (!reduced()) {
-      panel.animate([{ transform: `translateY(${swipe.dy}px)` }, { transform: 'none' }], {
-        duration: 180,
-        easing: 'cubic-bezier(0.2, 0, 0, 1)',
-      });
-    }
-  };
-
-  private readonly swipeCancel = (event: PointerEvent): void => {
-    const panel = this.panel;
-    if (
-      this.swipe?.id === event.pointerId &&
-      this.swipe.active &&
-      panel !== null &&
-      panel !== undefined
-    ) {
-      panel.style.removeProperty('transform');
-    }
-    this.swipe = undefined;
-  };
-
-  private dismiss(from: number): void {
-    const panel = this.panel;
-    if (panel === null || panel === undefined) {
-      return;
-    }
+  private dismiss(gone: Promise<unknown>): void {
     this.turn += 1;
     const turn = this.turn;
     this.leaving = true;
-    const slide = reduced()
-      ? undefined
-      : panel.animate(
-          [{ transform: `translateY(${from}px)` }, { transform: `translateY(${innerHeight}px)` }],
-          { duration: SWIPE_OUT, easing: 'ease-in', fill: 'forwards' },
-        );
     closePopup();
-    void (slide?.finished ?? Promise.resolve()).then(
+    void gone.then(
       () => {
         if (this.turn === turn) {
           this.close();
@@ -517,7 +354,7 @@ export class MnmlPopupsCard extends LitElement {
   }
 
   setConfig(config: PopupsCard): void {
-    requireKnownKeys(config, SCHEMA);
+    requireKnownKeys(config, POPUPS_CARD);
     if (!/^\d+(?:\.\d+)?px$/.test(config.width)) {
       throw new Error('width must be a size in pixels, such as 560px');
     }
@@ -525,9 +362,7 @@ export class MnmlPopupsCard extends LitElement {
       throw new Error('popups must be a list');
     }
     for (const [device, opening] of Object.entries(config.open ?? {})) {
-      if (!OPENINGS.includes(opening)) {
-        throw new Error(`open.${device} must be one of ${OPENINGS.join(', ')}`);
-      }
+      requireOneOf(`open.${device}`, opening, OPENINGS);
     }
     checkPopups(config.popups ?? []);
     this.shut();
@@ -585,10 +420,7 @@ export class MnmlPopupsCard extends LitElement {
     this.unsubscribe?.();
     this.unsubscribe = undefined;
     this.sizes?.disconnect();
-    if (this.following !== undefined) {
-      cancelAnimationFrame(this.following);
-      this.following = undefined;
-    }
+    this.follower.stop();
     this.ready = undefined;
     this.pending.clear();
     this.shut();
@@ -626,10 +458,10 @@ export class MnmlPopupsCard extends LitElement {
         html`<div
           class=${panel}
           style=${styleMap(panelStyle)}
-          @pointerdown=${this.swipeStart}
-          @pointermove=${this.swipeMove}
-          @pointerup=${this.swipeEnd}
-          @pointercancel=${this.swipeCancel}
+          @pointerdown=${this.swipe.start}
+          @pointermove=${this.swipe.move}
+          @pointerup=${this.swipe.end}
+          @pointercancel=${this.swipe.cancel}
         >
           <div class="head">${first?.card ?? nothing}</div>
           <div class="body" @scroll=${this.measure}>${rest.map((child) => child.card)}</div>
@@ -701,13 +533,11 @@ export class MnmlPopupsCard extends LitElement {
     this.shownHash = entry.hash;
     this.turn += 1;
     const turn = this.turn;
-    const name = entry.cards[0]?.['name'];
-    const label = typeof name === 'string' ? name : undefined;
+    const label = headerName(entry.cards[0], this.current);
     const patient = this.landing === entry.hash;
     this.landing = undefined;
     const before = this.leaving ? undefined : this.view;
-    const kept =
-      before?.place !== undefined && before.anchor?.isConnected === true ? before : undefined;
+    const kept = unfolded(before) ? before : undefined;
     const wanted = kept === undefined ? this.opening() : 'unfold';
     const from =
       kept?.anchor ??
@@ -733,7 +563,8 @@ export class MnmlPopupsCard extends LitElement {
     this.motion = [];
     const opening = wanted === 'unfold' && from === undefined ? 'dialog' : wanted;
     const place =
-      kept?.place ?? (from === undefined ? undefined : placed(from.getBoundingClientRect()));
+      kept?.place ??
+      (from === undefined ? undefined : placed(from.getBoundingClientRect(), this.dialogWidth()));
     const unfolding = kept === undefined && place !== undefined;
     const anchor = from;
     const open = before !== undefined && this.dialog?.open === true && !reduced();
@@ -768,8 +599,8 @@ export class MnmlPopupsCard extends LitElement {
     }
     this.fed = cards;
     this.view = { turn, session, label, cards, opening, place, anchor, unfolding };
-    if (place !== undefined && this.following === undefined) {
-      this.following = requestAnimationFrame(this.follow);
+    if (place !== undefined) {
+      this.follower.start();
     }
     await this.updateComplete;
     const panel = this.panel;
@@ -879,10 +710,13 @@ export class MnmlPopupsCard extends LitElement {
   private shut(): void {
     this.shownHash = undefined;
     this.unlock();
-    if (this.view === undefined || this.leaving) {
+    if (this.leaving) {
       return;
     }
     this.turn += 1;
+    if (this.view === undefined) {
+      return;
+    }
     const turn = this.turn;
     this.fed = [];
     const panel = this.panel;
@@ -897,7 +731,7 @@ export class MnmlPopupsCard extends LitElement {
     const back =
       place === undefined || anchor?.isConnected !== true || place.from.width === 0
         ? undefined
-        : this.foldTo(panel, anchor);
+        : foldTo(panel.getBoundingClientRect(), anchor.getBoundingClientRect(), this.radius());
     const keyframes: Keyframe[] =
       back !== undefined
         ? [{ clipPath: this.openClip() }, { clipPath: back }]
@@ -912,10 +746,8 @@ export class MnmlPopupsCard extends LitElement {
     });
   }
 
-  private foldTo(panel: HTMLElement, anchor: Element): string {
-    const to = anchor.getBoundingClientRect();
-    const box = panel.getBoundingClientRect();
-    return `inset(${atLeast0(to.top - box.top)}px ${atLeast0(box.right - to.right)}px ${atLeast0(box.bottom - to.bottom)}px ${atLeast0(to.left - box.left)}px round ${this.radius()})`;
+  private dialogWidth(): number {
+    return Number.parseFloat(this.config?.width ?? '0');
   }
 
   private radius(): string {
@@ -934,7 +766,7 @@ export class MnmlPopupsCard extends LitElement {
       motion.cancel();
     }
     this.motion = [];
-    this.swipe = undefined;
+    this.swipe.reset();
     this.dialog?.close();
     letGoOfFocus();
     this.view = undefined;

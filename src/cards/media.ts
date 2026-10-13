@@ -11,11 +11,11 @@ import { entityName } from '../ha/names.ts';
 import { stateIcon } from '../ha/templates.ts';
 
 import { MnmlCard, requireString } from './base.ts';
-import { schema } from './keys.ts';
 import type { KeySchema } from './keys.ts';
 import { renderControls } from './parts/controls.ts';
 import type { ControlContext } from './parts/controls.ts';
 import { ITEM_STYLE, linkTo } from './parts/item.ts';
+import { MEDIA_CARD } from './schemas.ts';
 import { BASE_STYLE } from './styles.ts';
 
 const MEDIA_STYLE = css`
@@ -135,13 +135,11 @@ function lanes(entity: MediaPlayerId, stateObj: HassEntity, ctx: ControlContext)
   return html`<div class="lanes">${drawn.map((lane) => lane ?? nothing)}</div>`;
 }
 
-const SCHEMA = schema<MediaCard>({ type: true, entity: true, popup: true });
-
 export class MnmlMediaCard extends MnmlCard<MediaCard> {
   static override styles = [BASE_STYLE, ...ITEM_STYLE, MEDIA_STYLE];
 
   protected schema(): KeySchema {
-    return SCHEMA;
+    return MEDIA_CARD;
   }
 
   protected override validate(config: MediaCard): void {

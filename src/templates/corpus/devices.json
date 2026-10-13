@@ -1,0 +1,1275 @@
+{
+  "areas": {
+    "bedroom": {
+      "area_id": "bedroom",
+      "humidity_entity_id": null,
+      "icon": "mdi:bed",
+      "name": "Bedroom",
+      "temperature_entity_id": null
+    },
+    "hall": {
+      "area_id": "hall",
+      "humidity_entity_id": null,
+      "icon": null,
+      "name": "Hall",
+      "temperature_entity_id": null
+    },
+    "kitchen": {
+      "area_id": "kitchen",
+      "humidity_entity_id": null,
+      "icon": "mdi:fridge",
+      "name": "Kitchen",
+      "temperature_entity_id": null
+    },
+    "laundry": {
+      "area_id": "laundry",
+      "humidity_entity_id": null,
+      "icon": "mdi:washing-machine",
+      "name": "Laundry",
+      "temperature_entity_id": null
+    },
+    "living": {
+      "area_id": "living",
+      "humidity_entity_id": null,
+      "icon": "mdi:sofa",
+      "name": "Living",
+      "temperature_entity_id": null
+    },
+    "office": {
+      "area_id": "office",
+      "humidity_entity_id": null,
+      "icon": "mdi:desk",
+      "name": "Office",
+      "temperature_entity_id": "sensor.desk_sensor_temperature"
+    }
+  },
+  "devices": {
+    "apple_tv": {
+      "area_id": "living",
+      "id": "apple_tv",
+      "manufacturer": "Apple",
+      "model": "Apple TV 4K",
+      "name": "Living room TV"
+    },
+    "better_thermostat": {
+      "area_id": "bedroom",
+      "id": "better_thermostat",
+      "manufacturer": "Better Thermostat",
+      "model": "Eve Thermo",
+      "name": "Bedroom heating",
+      "via_device_id": "eve_thermo"
+    },
+    "daikin_ac": {
+      "area_id": "bedroom",
+      "id": "daikin_ac",
+      "manufacturer": "Daikin",
+      "model": "FTXM25R",
+      "name": "Bedroom AC"
+    },
+    "desk_sensor": {
+      "area_id": "office",
+      "id": "desk_sensor",
+      "manufacturer": "Aqara",
+      "model": "Temperature and Humidity Sensor",
+      "name": "Desk sensor"
+    },
+    "eve_thermo": {
+      "area_id": "bedroom",
+      "id": "eve_thermo",
+      "manufacturer": "Eve Systems",
+      "model": "Eve Thermo",
+      "name": "Radiator valve"
+    },
+    "prusa_mk4": {
+      "area_id": "office",
+      "id": "prusa_mk4",
+      "manufacturer": "Prusa",
+      "model": "MK4",
+      "name": "Prusa MK4"
+    },
+    "roborock_s8": {
+      "area_id": "living",
+      "id": "roborock_s8",
+      "manufacturer": "Roborock",
+      "model": "roborock.vacuum.a51",
+      "name": "Roborock S8"
+    },
+    "roborock_s8_dock": {
+      "area_id": "living",
+      "id": "roborock_s8_dock",
+      "manufacturer": "Roborock",
+      "model": "roborock.vacuum.a51 Dock",
+      "name": "Roborock S8 Dock",
+      "via_device_id": "roborock_s8"
+    },
+    "shelly_plug": {
+      "area_id": "kitchen",
+      "id": "shelly_plug",
+      "manufacturer": "Shelly",
+      "model": "Shelly Plug S",
+      "name": "Kettle plug"
+    },
+    "sonos_arc": {
+      "area_id": "living",
+      "id": "sonos_arc",
+      "manufacturer": "Sonos",
+      "model": "Arc",
+      "name": "Living room"
+    },
+    "tplink_plug": {
+      "area_id": "kitchen",
+      "id": "tplink_plug",
+      "manufacturer": "TP-Link",
+      "model": "HS103",
+      "name": "Radio plug"
+    },
+    "washer": {
+      "area_id": "laundry",
+      "id": "washer",
+      "manufacturer": "Bosch",
+      "model": "WGB24400",
+      "name": "Washer"
+    }
+  },
+  "entities": {
+    "binary_sensor.roborock_s8_dock_clean_water_box": {
+      "device_id": "roborock_s8_dock",
+      "entity_category": "diagnostic",
+      "entity_id": "binary_sensor.roborock_s8_dock_clean_water_box",
+      "platform": "roborock",
+      "translation_key": "clean_water_box"
+    },
+    "binary_sensor.roborock_s8_dock_dirty_water_box": {
+      "device_id": "roborock_s8_dock",
+      "entity_category": "diagnostic",
+      "entity_id": "binary_sensor.roborock_s8_dock_dirty_water_box",
+      "platform": "roborock",
+      "translation_key": "dirty_water_box"
+    },
+    "binary_sensor.roborock_s8_mop_attached": {
+      "device_id": "roborock_s8",
+      "entity_category": "diagnostic",
+      "entity_id": "binary_sensor.roborock_s8_mop_attached",
+      "platform": "roborock",
+      "translation_key": "mop_attached"
+    },
+    "binary_sensor.roborock_s8_water_box_attached": {
+      "device_id": "roborock_s8",
+      "entity_category": "diagnostic",
+      "entity_id": "binary_sensor.roborock_s8_water_box_attached",
+      "platform": "roborock",
+      "translation_key": "water_box_attached"
+    },
+    "binary_sensor.roborock_s8_water_shortage": {
+      "device_id": "roborock_s8",
+      "entity_category": "diagnostic",
+      "entity_id": "binary_sensor.roborock_s8_water_shortage",
+      "platform": "roborock",
+      "translation_key": "water_shortage"
+    },
+    "button.prusa_mk4_cancel_job": {
+      "device_id": "prusa_mk4",
+      "entity_id": "button.prusa_mk4_cancel_job",
+      "platform": "prusalink",
+      "translation_key": "cancel_job"
+    },
+    "button.prusa_mk4_pause_job": {
+      "device_id": "prusa_mk4",
+      "entity_id": "button.prusa_mk4_pause_job",
+      "platform": "prusalink",
+      "translation_key": "pause_job"
+    },
+    "button.prusa_mk4_resume_job": {
+      "device_id": "prusa_mk4",
+      "entity_id": "button.prusa_mk4_resume_job",
+      "platform": "prusalink",
+      "translation_key": "resume_job"
+    },
+    "button.roborock_s8_daily_clean": {
+      "device_id": "roborock_s8",
+      "entity_id": "button.roborock_s8_daily_clean",
+      "platform": "roborock"
+    },
+    "button.roborock_s8_reset_main_brush_consumable": {
+      "device_id": "roborock_s8",
+      "entity_category": "config",
+      "entity_id": "button.roborock_s8_reset_main_brush_consumable",
+      "platform": "roborock",
+      "translation_key": "reset_main_brush_consumable"
+    },
+    "camera.prusa_mk4_preview": {
+      "device_id": "prusa_mk4",
+      "entity_id": "camera.prusa_mk4_preview",
+      "platform": "prusalink",
+      "translation_key": "job_preview"
+    },
+    "climate.bedroom_ac": {
+      "device_id": "daikin_ac",
+      "entity_id": "climate.bedroom_ac",
+      "platform": "daikin"
+    },
+    "climate.bedroom_heating": {
+      "device_id": "better_thermostat",
+      "entity_id": "climate.bedroom_heating",
+      "platform": "better_thermostat"
+    },
+    "climate.hall_heater": {
+      "area_id": "hall",
+      "entity_id": "climate.hall_heater",
+      "platform": "generic_thermostat"
+    },
+    "climate.radiator_valve": {
+      "device_id": "eve_thermo",
+      "entity_id": "climate.radiator_valve",
+      "hidden": true,
+      "platform": "matter"
+    },
+    "image.roborock_s8_downstairs": {
+      "device_id": "roborock_s8",
+      "entity_category": "diagnostic",
+      "entity_id": "image.roborock_s8_downstairs",
+      "platform": "roborock"
+    },
+    "media_player.living_room": {
+      "device_id": "sonos_arc",
+      "entity_id": "media_player.living_room",
+      "platform": "sonos"
+    },
+    "media_player.living_room_tv": {
+      "device_id": "apple_tv",
+      "entity_id": "media_player.living_room_tv",
+      "platform": "apple_tv"
+    },
+    "number.living_room_audio_delay": {
+      "device_id": "sonos_arc",
+      "entity_category": "config",
+      "entity_id": "number.living_room_audio_delay",
+      "platform": "sonos",
+      "translation_key": "audio_delay"
+    },
+    "number.living_room_balance": {
+      "device_id": "sonos_arc",
+      "entity_category": "config",
+      "entity_id": "number.living_room_balance",
+      "platform": "sonos",
+      "translation_key": "balance"
+    },
+    "number.living_room_bass": {
+      "device_id": "sonos_arc",
+      "entity_category": "config",
+      "entity_id": "number.living_room_bass",
+      "platform": "sonos",
+      "translation_key": "bass"
+    },
+    "number.living_room_music_surround_level": {
+      "device_id": "sonos_arc",
+      "entity_category": "config",
+      "entity_id": "number.living_room_music_surround_level",
+      "platform": "sonos",
+      "translation_key": "music_surround_level"
+    },
+    "number.living_room_sub_gain": {
+      "device_id": "sonos_arc",
+      "entity_category": "config",
+      "entity_id": "number.living_room_sub_gain",
+      "platform": "sonos",
+      "translation_key": "sub_gain"
+    },
+    "number.living_room_surround_level": {
+      "device_id": "sonos_arc",
+      "entity_category": "config",
+      "entity_id": "number.living_room_surround_level",
+      "platform": "sonos",
+      "translation_key": "surround_level"
+    },
+    "number.living_room_treble": {
+      "device_id": "sonos_arc",
+      "entity_category": "config",
+      "entity_id": "number.living_room_treble",
+      "platform": "sonos",
+      "translation_key": "treble"
+    },
+    "select.roborock_s8_dock_empty_mode": {
+      "device_id": "roborock_s8_dock",
+      "entity_category": "config",
+      "entity_id": "select.roborock_s8_dock_empty_mode",
+      "platform": "roborock",
+      "translation_key": "dust_collection_mode"
+    },
+    "select.roborock_s8_mop_intensity": {
+      "device_id": "roborock_s8",
+      "entity_category": "config",
+      "entity_id": "select.roborock_s8_mop_intensity",
+      "platform": "roborock",
+      "translation_key": "mop_intensity"
+    },
+    "select.roborock_s8_mop_mode": {
+      "device_id": "roborock_s8",
+      "entity_category": "config",
+      "entity_id": "select.roborock_s8_mop_mode",
+      "platform": "roborock",
+      "translation_key": "mop_mode"
+    },
+    "select.roborock_s8_selected_map": {
+      "device_id": "roborock_s8",
+      "entity_category": "config",
+      "entity_id": "select.roborock_s8_selected_map",
+      "platform": "roborock",
+      "translation_key": "selected_map"
+    },
+    "sensor.bedroom_ac_energy_consumption": {
+      "device_id": "daikin_ac",
+      "entity_id": "sensor.bedroom_ac_energy_consumption",
+      "platform": "daikin",
+      "translation_key": "compressor_energy_consumption"
+    },
+    "sensor.bedroom_ac_energy_today": {
+      "device_id": "daikin_ac",
+      "entity_id": "sensor.bedroom_ac_energy_today",
+      "platform": "utility_meter"
+    },
+    "sensor.bedroom_ac_estimated_power_consumption": {
+      "device_id": "daikin_ac",
+      "entity_id": "sensor.bedroom_ac_estimated_power_consumption",
+      "platform": "daikin",
+      "translation_key": "compressor_estimated_power_consumption"
+    },
+    "sensor.bedroom_ac_inside_temperature": {
+      "device_id": "daikin_ac",
+      "entity_id": "sensor.bedroom_ac_inside_temperature",
+      "platform": "daikin",
+      "translation_key": "inside_temperature"
+    },
+    "sensor.bedroom_ac_outside_temperature": {
+      "device_id": "daikin_ac",
+      "entity_id": "sensor.bedroom_ac_outside_temperature",
+      "platform": "daikin",
+      "translation_key": "outside_temperature"
+    },
+    "sensor.desk_sensor_battery": {
+      "device_id": "desk_sensor",
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.desk_sensor_battery",
+      "platform": "zha"
+    },
+    "sensor.desk_sensor_humidity": {
+      "device_id": "desk_sensor",
+      "entity_id": "sensor.desk_sensor_humidity",
+      "platform": "zha"
+    },
+    "sensor.desk_sensor_temperature": {
+      "device_id": "desk_sensor",
+      "entity_id": "sensor.desk_sensor_temperature",
+      "platform": "zha"
+    },
+    "sensor.kettle_plug_energy": {
+      "device_id": "shelly_plug",
+      "entity_id": "sensor.kettle_plug_energy",
+      "platform": "shelly"
+    },
+    "sensor.kettle_plug_energy_today": {
+      "device_id": "shelly_plug",
+      "entity_id": "sensor.kettle_plug_energy_today",
+      "platform": "utility_meter"
+    },
+    "sensor.kettle_plug_power": {
+      "device_id": "shelly_plug",
+      "entity_id": "sensor.kettle_plug_power",
+      "platform": "shelly"
+    },
+    "sensor.living_room_audio_input_format": {
+      "device_id": "sonos_arc",
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.living_room_audio_input_format",
+      "platform": "sonos",
+      "translation_key": "audio_input_format"
+    },
+    "sensor.prusa_mk4": {
+      "device_id": "prusa_mk4",
+      "entity_id": "sensor.prusa_mk4",
+      "platform": "prusalink",
+      "translation_key": "printer_state"
+    },
+    "sensor.prusa_mk4_filename": {
+      "device_id": "prusa_mk4",
+      "entity_id": "sensor.prusa_mk4_filename",
+      "platform": "prusalink",
+      "translation_key": "filename"
+    },
+    "sensor.prusa_mk4_heatbed_target_temperature": {
+      "device_id": "prusa_mk4",
+      "entity_id": "sensor.prusa_mk4_heatbed_target_temperature",
+      "platform": "prusalink",
+      "translation_key": "heatbed_target_temperature"
+    },
+    "sensor.prusa_mk4_heatbed_temperature": {
+      "device_id": "prusa_mk4",
+      "entity_id": "sensor.prusa_mk4_heatbed_temperature",
+      "platform": "prusalink",
+      "translation_key": "heatbed_temperature"
+    },
+    "sensor.prusa_mk4_material": {
+      "device_id": "prusa_mk4",
+      "entity_id": "sensor.prusa_mk4_material",
+      "platform": "prusalink",
+      "translation_key": "material"
+    },
+    "sensor.prusa_mk4_nozzle_target_temperature": {
+      "device_id": "prusa_mk4",
+      "entity_id": "sensor.prusa_mk4_nozzle_target_temperature",
+      "platform": "prusalink",
+      "translation_key": "nozzle_target_temperature"
+    },
+    "sensor.prusa_mk4_nozzle_temperature": {
+      "device_id": "prusa_mk4",
+      "entity_id": "sensor.prusa_mk4_nozzle_temperature",
+      "platform": "prusalink",
+      "translation_key": "nozzle_temperature"
+    },
+    "sensor.prusa_mk4_print_finish": {
+      "device_id": "prusa_mk4",
+      "entity_id": "sensor.prusa_mk4_print_finish",
+      "platform": "prusalink",
+      "translation_key": "print_finish"
+    },
+    "sensor.prusa_mk4_print_speed": {
+      "device_id": "prusa_mk4",
+      "entity_id": "sensor.prusa_mk4_print_speed",
+      "platform": "prusalink",
+      "translation_key": "print_speed"
+    },
+    "sensor.prusa_mk4_print_start": {
+      "device_id": "prusa_mk4",
+      "entity_id": "sensor.prusa_mk4_print_start",
+      "platform": "prusalink",
+      "translation_key": "print_start"
+    },
+    "sensor.prusa_mk4_progress": {
+      "device_id": "prusa_mk4",
+      "entity_id": "sensor.prusa_mk4_progress",
+      "platform": "prusalink",
+      "translation_key": "progress"
+    },
+    "sensor.radiator_valve_battery": {
+      "device_id": "eve_thermo",
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.radiator_valve_battery",
+      "platform": "matter"
+    },
+    "sensor.radiator_valve_valve_position": {
+      "device_id": "eve_thermo",
+      "entity_id": "sensor.radiator_valve_valve_position",
+      "platform": "matter",
+      "translation_key": "valve_position"
+    },
+    "sensor.roborock_s8_battery": {
+      "device_id": "roborock_s8",
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.roborock_s8_battery",
+      "platform": "roborock"
+    },
+    "sensor.roborock_s8_cleaning_area": {
+      "device_id": "roborock_s8",
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.roborock_s8_cleaning_area",
+      "platform": "roborock",
+      "translation_key": "cleaning_area"
+    },
+    "sensor.roborock_s8_cleaning_progress": {
+      "device_id": "roborock_s8",
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.roborock_s8_cleaning_progress",
+      "platform": "roborock",
+      "translation_key": "clean_percent"
+    },
+    "sensor.roborock_s8_cleaning_time": {
+      "device_id": "roborock_s8",
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.roborock_s8_cleaning_time",
+      "platform": "roborock",
+      "translation_key": "cleaning_time"
+    },
+    "sensor.roborock_s8_current_room": {
+      "device_id": "roborock_s8",
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.roborock_s8_current_room",
+      "platform": "roborock",
+      "translation_key": "current_room"
+    },
+    "sensor.roborock_s8_dock_dock_error": {
+      "device_id": "roborock_s8_dock",
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.roborock_s8_dock_dock_error",
+      "platform": "roborock",
+      "translation_key": "dock_error"
+    },
+    "sensor.roborock_s8_dock_mop_drying_remaining_time": {
+      "device_id": "roborock_s8_dock",
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.roborock_s8_dock_mop_drying_remaining_time",
+      "platform": "roborock",
+      "translation_key": "mop_drying_remaining_time"
+    },
+    "sensor.roborock_s8_last_clean_end": {
+      "device_id": "roborock_s8",
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.roborock_s8_last_clean_end",
+      "platform": "roborock",
+      "translation_key": "last_clean_end"
+    },
+    "sensor.roborock_s8_main_brush_time_left": {
+      "device_id": "roborock_s8",
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.roborock_s8_main_brush_time_left",
+      "platform": "roborock",
+      "translation_key": "main_brush_time_left"
+    },
+    "sensor.roborock_s8_status": {
+      "device_id": "roborock_s8",
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.roborock_s8_status",
+      "platform": "roborock",
+      "translation_key": "status"
+    },
+    "sensor.roborock_s8_total_cleaning_area": {
+      "device_id": "roborock_s8",
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.roborock_s8_total_cleaning_area",
+      "platform": "roborock",
+      "translation_key": "total_cleaning_area"
+    },
+    "sensor.roborock_s8_total_cleaning_count": {
+      "device_id": "roborock_s8",
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.roborock_s8_total_cleaning_count",
+      "platform": "roborock",
+      "translation_key": "total_cleaning_count"
+    },
+    "sensor.roborock_s8_total_cleaning_time": {
+      "device_id": "roborock_s8",
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.roborock_s8_total_cleaning_time",
+      "platform": "roborock",
+      "translation_key": "total_cleaning_time"
+    },
+    "sensor.roborock_s8_vacuum_error": {
+      "device_id": "roborock_s8",
+      "entity_category": "diagnostic",
+      "entity_id": "sensor.roborock_s8_vacuum_error",
+      "platform": "roborock",
+      "translation_key": "vacuum_error"
+    },
+    "sensor.washer_operation_state": {
+      "device_id": "washer",
+      "entity_id": "sensor.washer_operation_state",
+      "platform": "home_connect",
+      "translation_key": "operation_state"
+    },
+    "sensor.washer_program_finish_time": {
+      "device_id": "washer",
+      "entity_id": "sensor.washer_program_finish_time",
+      "platform": "home_connect",
+      "translation_key": "program_finish_time"
+    },
+    "sensor.washer_program_progress": {
+      "device_id": "washer",
+      "entity_id": "sensor.washer_program_progress",
+      "platform": "home_connect",
+      "translation_key": "program_progress"
+    },
+    "switch.kettle_plug": {
+      "device_id": "shelly_plug",
+      "entity_id": "switch.kettle_plug",
+      "platform": "shelly"
+    },
+    "switch.living_room_loudness": {
+      "device_id": "sonos_arc",
+      "entity_category": "config",
+      "entity_id": "switch.living_room_loudness",
+      "platform": "sonos",
+      "translation_key": "loudness"
+    },
+    "switch.living_room_night_sound": {
+      "device_id": "sonos_arc",
+      "entity_category": "config",
+      "entity_id": "switch.living_room_night_sound",
+      "platform": "sonos",
+      "translation_key": "night_mode"
+    },
+    "switch.living_room_speech_enhancement": {
+      "device_id": "sonos_arc",
+      "entity_category": "config",
+      "entity_id": "switch.living_room_speech_enhancement",
+      "platform": "sonos",
+      "translation_key": "dialog_level"
+    },
+    "switch.living_room_subwoofer_enabled": {
+      "device_id": "sonos_arc",
+      "entity_category": "config",
+      "entity_id": "switch.living_room_subwoofer_enabled",
+      "platform": "sonos",
+      "translation_key": "sub_enabled"
+    },
+    "switch.living_room_surround_enabled": {
+      "device_id": "sonos_arc",
+      "entity_category": "config",
+      "entity_id": "switch.living_room_surround_enabled",
+      "platform": "sonos",
+      "translation_key": "surround_enabled"
+    },
+    "switch.living_room_surround_music_full_volume": {
+      "device_id": "sonos_arc",
+      "entity_category": "config",
+      "entity_id": "switch.living_room_surround_music_full_volume",
+      "platform": "sonos",
+      "translation_key": "surround_mode"
+    },
+    "switch.radio_plug": {
+      "device_id": "tplink_plug",
+      "entity_id": "switch.radio_plug",
+      "platform": "tplink"
+    },
+    "switch.roborock_s8_dock_dust_emptying": {
+      "device_id": "roborock_s8_dock",
+      "entity_id": "switch.roborock_s8_dock_dust_emptying",
+      "platform": "roborock",
+      "translation_key": "dust_emptying"
+    },
+    "switch.roborock_s8_dock_mop_drying": {
+      "device_id": "roborock_s8_dock",
+      "entity_id": "switch.roborock_s8_dock_mop_drying",
+      "platform": "roborock",
+      "translation_key": "mop_drying"
+    },
+    "switch.roborock_s8_dock_mop_washing": {
+      "device_id": "roborock_s8_dock",
+      "entity_id": "switch.roborock_s8_dock_mop_washing",
+      "platform": "roborock",
+      "translation_key": "mop_washing"
+    },
+    "update.kettle_plug_firmware": {
+      "device_id": "shelly_plug",
+      "entity_category": "config",
+      "entity_id": "update.kettle_plug_firmware",
+      "platform": "shelly"
+    },
+    "update.radiator_valve_firmware": {
+      "device_id": "eve_thermo",
+      "entity_category": "config",
+      "entity_id": "update.radiator_valve_firmware",
+      "platform": "matter"
+    },
+    "vacuum.roborock_s8": {
+      "device_id": "roborock_s8",
+      "entity_id": "vacuum.roborock_s8",
+      "platform": "roborock",
+      "translation_key": "roborock"
+    }
+  },
+  "states": {
+    "binary_sensor.roborock_s8_dock_clean_water_box": {
+      "attributes": {
+        "device_class": "problem",
+        "friendly_name": "Roborock S8 Dock Clean water box"
+      },
+      "state": "off"
+    },
+    "binary_sensor.roborock_s8_dock_dirty_water_box": {
+      "attributes": {
+        "device_class": "problem",
+        "friendly_name": "Roborock S8 Dock Dirty water box"
+      },
+      "state": "off"
+    },
+    "binary_sensor.roborock_s8_mop_attached": {
+      "attributes": {
+        "device_class": "connectivity",
+        "friendly_name": "Roborock S8 Mop attached"
+      },
+      "state": "on"
+    },
+    "binary_sensor.roborock_s8_water_box_attached": {
+      "attributes": {
+        "device_class": "connectivity",
+        "friendly_name": "Roborock S8 Water box attached"
+      },
+      "state": "on"
+    },
+    "binary_sensor.roborock_s8_water_shortage": {
+      "attributes": {
+        "device_class": "problem",
+        "friendly_name": "Roborock S8 Water shortage"
+      },
+      "state": "off"
+    },
+    "button.prusa_mk4_cancel_job": {
+      "attributes": {
+        "friendly_name": "Prusa MK4 Cancel job"
+      },
+      "state": "unknown"
+    },
+    "button.prusa_mk4_pause_job": {
+      "attributes": {
+        "friendly_name": "Prusa MK4 Pause job"
+      },
+      "state": "unknown"
+    },
+    "button.prusa_mk4_resume_job": {
+      "attributes": {
+        "friendly_name": "Prusa MK4 Resume job"
+      },
+      "state": "unknown"
+    },
+    "button.roborock_s8_daily_clean": {
+      "attributes": {
+        "friendly_name": "Roborock S8 Daily clean"
+      },
+      "state": "unknown"
+    },
+    "button.roborock_s8_reset_main_brush_consumable": {
+      "attributes": {
+        "friendly_name": "Roborock S8 Reset main brush consumable"
+      },
+      "state": "unknown"
+    },
+    "camera.prusa_mk4_preview": {
+      "attributes": {
+        "friendly_name": "Prusa MK4 Preview"
+      },
+      "state": "idle"
+    },
+    "climate.bedroom_ac": {
+      "attributes": {
+        "fan_modes": ["auto", "quiet", "1", "2", "3"],
+        "friendly_name": "Bedroom AC",
+        "hvac_modes": ["off", "heat", "cool", "heat_cool", "dry", "fan_only"]
+      },
+      "state": "cool"
+    },
+    "climate.bedroom_heating": {
+      "attributes": {
+        "friendly_name": "Bedroom heating",
+        "hvac_modes": ["heat", "off"],
+        "preset_modes": ["none", "eco", "comfort"]
+      },
+      "state": "heat"
+    },
+    "climate.hall_heater": {
+      "attributes": {
+        "friendly_name": "Hall heater",
+        "hvac_modes": ["heat", "off"]
+      },
+      "state": "heat"
+    },
+    "climate.radiator_valve": {
+      "attributes": {
+        "friendly_name": "Radiator valve",
+        "hvac_modes": ["off", "heat"]
+      },
+      "state": "heat"
+    },
+    "image.roborock_s8_downstairs": {
+      "attributes": {
+        "friendly_name": "Roborock S8 Downstairs"
+      },
+      "state": "2026-10-12T09:41:00+00:00"
+    },
+    "media_player.living_room": {
+      "attributes": {
+        "device_class": "speaker",
+        "friendly_name": "Living room"
+      },
+      "state": "idle"
+    },
+    "media_player.living_room_tv": {
+      "attributes": {
+        "device_class": "tv",
+        "friendly_name": "Living room TV"
+      },
+      "state": "standby"
+    },
+    "number.living_room_audio_delay": {
+      "attributes": {
+        "friendly_name": "Living room Audio delay"
+      },
+      "state": "0"
+    },
+    "number.living_room_balance": {
+      "attributes": {
+        "friendly_name": "Living room Balance"
+      },
+      "state": "0"
+    },
+    "number.living_room_bass": {
+      "attributes": {
+        "friendly_name": "Living room Bass"
+      },
+      "state": "0"
+    },
+    "number.living_room_music_surround_level": {
+      "attributes": {
+        "friendly_name": "Living room Music surround level"
+      },
+      "state": "0"
+    },
+    "number.living_room_sub_gain": {
+      "attributes": {
+        "friendly_name": "Living room Sub gain"
+      },
+      "state": "0"
+    },
+    "number.living_room_surround_level": {
+      "attributes": {
+        "friendly_name": "Living room Surround level"
+      },
+      "state": "0"
+    },
+    "number.living_room_treble": {
+      "attributes": {
+        "friendly_name": "Living room Treble"
+      },
+      "state": "0"
+    },
+    "select.roborock_s8_dock_empty_mode": {
+      "attributes": {
+        "friendly_name": "Roborock S8 Dock Empty mode"
+      },
+      "state": "smart"
+    },
+    "select.roborock_s8_mop_intensity": {
+      "attributes": {
+        "friendly_name": "Roborock S8 Mop intensity"
+      },
+      "state": "medium"
+    },
+    "select.roborock_s8_mop_mode": {
+      "attributes": {
+        "friendly_name": "Roborock S8 Mop mode"
+      },
+      "state": "standard"
+    },
+    "select.roborock_s8_selected_map": {
+      "attributes": {
+        "friendly_name": "Roborock S8 Selected map"
+      },
+      "state": "Downstairs"
+    },
+    "sensor.bedroom_ac_energy_consumption": {
+      "attributes": {
+        "device_class": "energy",
+        "friendly_name": "Bedroom AC Energy consumption",
+        "state_class": "total_increasing",
+        "unit_of_measurement": "kWh"
+      },
+      "state": "812.4"
+    },
+    "sensor.bedroom_ac_energy_today": {
+      "attributes": {
+        "device_class": "energy",
+        "friendly_name": "Bedroom AC Energy today",
+        "state_class": "total_increasing",
+        "unit_of_measurement": "kWh"
+      },
+      "state": "1.9"
+    },
+    "sensor.bedroom_ac_estimated_power_consumption": {
+      "attributes": {
+        "device_class": "power",
+        "friendly_name": "Bedroom AC Estimated power consumption",
+        "state_class": "measurement",
+        "unit_of_measurement": "W"
+      },
+      "state": "420"
+    },
+    "sensor.bedroom_ac_inside_temperature": {
+      "attributes": {
+        "device_class": "temperature",
+        "friendly_name": "Bedroom AC Inside temperature",
+        "state_class": "measurement",
+        "unit_of_measurement": "°C"
+      },
+      "state": "22.5"
+    },
+    "sensor.bedroom_ac_outside_temperature": {
+      "attributes": {
+        "device_class": "temperature",
+        "friendly_name": "Bedroom AC Outside temperature",
+        "state_class": "measurement",
+        "unit_of_measurement": "°C"
+      },
+      "state": "14.0"
+    },
+    "sensor.desk_sensor_battery": {
+      "attributes": {
+        "device_class": "battery",
+        "friendly_name": "Desk sensor Battery",
+        "state_class": "measurement",
+        "unit_of_measurement": "%"
+      },
+      "state": "92"
+    },
+    "sensor.desk_sensor_humidity": {
+      "attributes": {
+        "device_class": "humidity",
+        "friendly_name": "Desk sensor Humidity",
+        "state_class": "measurement",
+        "unit_of_measurement": "%"
+      },
+      "state": "44"
+    },
+    "sensor.desk_sensor_temperature": {
+      "attributes": {
+        "device_class": "temperature",
+        "friendly_name": "Desk sensor Temperature",
+        "state_class": "measurement",
+        "unit_of_measurement": "°C"
+      },
+      "state": "21.4"
+    },
+    "sensor.kettle_plug_energy": {
+      "attributes": {
+        "device_class": "energy",
+        "friendly_name": "Kettle plug Energy",
+        "state_class": "total_increasing",
+        "unit_of_measurement": "kWh"
+      },
+      "state": "48.2"
+    },
+    "sensor.kettle_plug_energy_today": {
+      "attributes": {
+        "device_class": "energy",
+        "friendly_name": "Kettle plug Energy today",
+        "state_class": "total_increasing",
+        "unit_of_measurement": "kWh"
+      },
+      "state": "0.3"
+    },
+    "sensor.kettle_plug_power": {
+      "attributes": {
+        "device_class": "power",
+        "friendly_name": "Kettle plug Power",
+        "state_class": "measurement",
+        "unit_of_measurement": "W"
+      },
+      "state": "0"
+    },
+    "sensor.living_room_audio_input_format": {
+      "attributes": {
+        "friendly_name": "Living room Audio input format"
+      },
+      "state": "Dolby Atmos"
+    },
+    "sensor.prusa_mk4": {
+      "attributes": {
+        "device_class": "enum",
+        "friendly_name": "Prusa MK4"
+      },
+      "state": "idle"
+    },
+    "sensor.prusa_mk4_filename": {
+      "attributes": {
+        "friendly_name": "Prusa MK4 Filename"
+      },
+      "state": "unknown"
+    },
+    "sensor.prusa_mk4_heatbed_target_temperature": {
+      "attributes": {
+        "device_class": "temperature",
+        "friendly_name": "Prusa MK4 Heatbed target temperature",
+        "state_class": "measurement",
+        "unit_of_measurement": "°C"
+      },
+      "state": "0"
+    },
+    "sensor.prusa_mk4_heatbed_temperature": {
+      "attributes": {
+        "device_class": "temperature",
+        "friendly_name": "Prusa MK4 Heatbed temperature",
+        "state_class": "measurement",
+        "unit_of_measurement": "°C"
+      },
+      "state": "0"
+    },
+    "sensor.prusa_mk4_material": {
+      "attributes": {
+        "friendly_name": "Prusa MK4 Material"
+      },
+      "state": "0"
+    },
+    "sensor.prusa_mk4_nozzle_target_temperature": {
+      "attributes": {
+        "device_class": "temperature",
+        "friendly_name": "Prusa MK4 Nozzle target temperature",
+        "state_class": "measurement",
+        "unit_of_measurement": "°C"
+      },
+      "state": "0"
+    },
+    "sensor.prusa_mk4_nozzle_temperature": {
+      "attributes": {
+        "device_class": "temperature",
+        "friendly_name": "Prusa MK4 Nozzle temperature",
+        "state_class": "measurement",
+        "unit_of_measurement": "°C"
+      },
+      "state": "0"
+    },
+    "sensor.prusa_mk4_print_finish": {
+      "attributes": {
+        "device_class": "timestamp",
+        "friendly_name": "Prusa MK4 Print finish"
+      },
+      "state": "unknown"
+    },
+    "sensor.prusa_mk4_print_speed": {
+      "attributes": {
+        "friendly_name": "Prusa MK4 Print speed",
+        "unit_of_measurement": "%"
+      },
+      "state": "0"
+    },
+    "sensor.prusa_mk4_print_start": {
+      "attributes": {
+        "device_class": "timestamp",
+        "friendly_name": "Prusa MK4 Print start"
+      },
+      "state": "unknown"
+    },
+    "sensor.prusa_mk4_progress": {
+      "attributes": {
+        "friendly_name": "Prusa MK4 Progress",
+        "unit_of_measurement": "%"
+      },
+      "state": "0"
+    },
+    "sensor.radiator_valve_battery": {
+      "attributes": {
+        "device_class": "battery",
+        "friendly_name": "Radiator valve Battery",
+        "state_class": "measurement",
+        "unit_of_measurement": "%"
+      },
+      "state": "80"
+    },
+    "sensor.radiator_valve_valve_position": {
+      "attributes": {
+        "friendly_name": "Radiator valve Valve position",
+        "unit_of_measurement": "%"
+      },
+      "state": "35"
+    },
+    "sensor.roborock_s8_battery": {
+      "attributes": {
+        "device_class": "battery",
+        "friendly_name": "Roborock S8 Battery",
+        "state_class": "measurement",
+        "unit_of_measurement": "%"
+      },
+      "state": "100"
+    },
+    "sensor.roborock_s8_cleaning_area": {
+      "attributes": {
+        "friendly_name": "Roborock S8 Cleaning area",
+        "unit_of_measurement": "m²"
+      },
+      "state": "0"
+    },
+    "sensor.roborock_s8_cleaning_progress": {
+      "attributes": {
+        "friendly_name": "Roborock S8 Cleaning progress",
+        "unit_of_measurement": "%"
+      },
+      "state": "0"
+    },
+    "sensor.roborock_s8_cleaning_time": {
+      "attributes": {
+        "device_class": "duration",
+        "friendly_name": "Roborock S8 Cleaning time",
+        "unit_of_measurement": "min"
+      },
+      "state": "0"
+    },
+    "sensor.roborock_s8_current_room": {
+      "attributes": {
+        "device_class": "enum",
+        "friendly_name": "Roborock S8 Current room"
+      },
+      "state": "Living"
+    },
+    "sensor.roborock_s8_dock_dock_error": {
+      "attributes": {
+        "device_class": "enum",
+        "friendly_name": "Roborock S8 Dock Dock error"
+      },
+      "state": "ok"
+    },
+    "sensor.roborock_s8_dock_mop_drying_remaining_time": {
+      "attributes": {
+        "device_class": "duration",
+        "friendly_name": "Roborock S8 Dock Mop drying remaining time",
+        "unit_of_measurement": "min"
+      },
+      "state": "0"
+    },
+    "sensor.roborock_s8_last_clean_end": {
+      "attributes": {
+        "device_class": "timestamp",
+        "friendly_name": "Roborock S8 Last clean end"
+      },
+      "state": "2026-10-12T09:41:00+00:00"
+    },
+    "sensor.roborock_s8_main_brush_time_left": {
+      "attributes": {
+        "device_class": "duration",
+        "friendly_name": "Roborock S8 Main brush time left",
+        "unit_of_measurement": "h"
+      },
+      "state": "210"
+    },
+    "sensor.roborock_s8_status": {
+      "attributes": {
+        "device_class": "enum",
+        "friendly_name": "Roborock S8 Status"
+      },
+      "state": "charging"
+    },
+    "sensor.roborock_s8_total_cleaning_area": {
+      "attributes": {
+        "friendly_name": "Roborock S8 Total cleaning area",
+        "unit_of_measurement": "m²"
+      },
+      "state": "9120"
+    },
+    "sensor.roborock_s8_total_cleaning_count": {
+      "attributes": {
+        "friendly_name": "Roborock S8 Total cleaning count",
+        "state_class": "total_increasing"
+      },
+      "state": "212"
+    },
+    "sensor.roborock_s8_total_cleaning_time": {
+      "attributes": {
+        "device_class": "duration",
+        "friendly_name": "Roborock S8 Total cleaning time",
+        "unit_of_measurement": "h"
+      },
+      "state": "190"
+    },
+    "sensor.roborock_s8_vacuum_error": {
+      "attributes": {
+        "device_class": "enum",
+        "friendly_name": "Roborock S8 Vacuum error"
+      },
+      "state": "none"
+    },
+    "sensor.washer_operation_state": {
+      "attributes": {
+        "device_class": "enum",
+        "friendly_name": "Washer Operation state"
+      },
+      "state": "ready"
+    },
+    "sensor.washer_program_finish_time": {
+      "attributes": {
+        "device_class": "timestamp",
+        "friendly_name": "Washer Program finish time"
+      },
+      "state": "unknown"
+    },
+    "sensor.washer_program_progress": {
+      "attributes": {
+        "friendly_name": "Washer Program progress",
+        "unit_of_measurement": "%"
+      },
+      "state": "0"
+    },
+    "switch.kettle_plug": {
+      "attributes": {
+        "device_class": "outlet",
+        "friendly_name": "Kettle plug"
+      },
+      "state": "on"
+    },
+    "switch.living_room_loudness": {
+      "attributes": {
+        "friendly_name": "Living room Loudness"
+      },
+      "state": "on"
+    },
+    "switch.living_room_night_sound": {
+      "attributes": {
+        "friendly_name": "Living room Night sound"
+      },
+      "state": "on"
+    },
+    "switch.living_room_speech_enhancement": {
+      "attributes": {
+        "friendly_name": "Living room Speech enhancement"
+      },
+      "state": "on"
+    },
+    "switch.living_room_subwoofer_enabled": {
+      "attributes": {
+        "friendly_name": "Living room Subwoofer enabled"
+      },
+      "state": "on"
+    },
+    "switch.living_room_surround_enabled": {
+      "attributes": {
+        "friendly_name": "Living room Surround enabled"
+      },
+      "state": "on"
+    },
+    "switch.living_room_surround_music_full_volume": {
+      "attributes": {
+        "friendly_name": "Living room Surround music full volume"
+      },
+      "state": "on"
+    },
+    "switch.radio_plug": {
+      "attributes": {
+        "device_class": "outlet",
+        "friendly_name": "Radio plug"
+      },
+      "state": "off"
+    },
+    "switch.roborock_s8_dock_dust_emptying": {
+      "attributes": {
+        "friendly_name": "Roborock S8 Dock Dust emptying"
+      },
+      "state": "on"
+    },
+    "switch.roborock_s8_dock_mop_drying": {
+      "attributes": {
+        "friendly_name": "Roborock S8 Dock Mop drying"
+      },
+      "state": "on"
+    },
+    "switch.roborock_s8_dock_mop_washing": {
+      "attributes": {
+        "friendly_name": "Roborock S8 Dock Mop washing"
+      },
+      "state": "on"
+    },
+    "update.kettle_plug_firmware": {
+      "attributes": {
+        "device_class": "firmware",
+        "friendly_name": "Kettle plug Firmware"
+      },
+      "state": "off"
+    },
+    "update.radiator_valve_firmware": {
+      "attributes": {
+        "device_class": "firmware",
+        "friendly_name": "Radiator valve Firmware"
+      },
+      "state": "off"
+    },
+    "vacuum.roborock_s8": {
+      "attributes": {
+        "friendly_name": "Roborock S8"
+      },
+      "state": "docked"
+    }
+  }
+}

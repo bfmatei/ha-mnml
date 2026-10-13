@@ -1,4 +1,4 @@
-import { html, nothing } from 'lit';
+import { css, html, nothing } from 'lit';
 import type { TemplateResult } from 'lit';
 import { classMap } from 'lit/directives/class-map.js';
 
@@ -480,3 +480,156 @@ export function drawStagePanel(input: StageInput, actions: StageActions): Templa
     }
   </div>`;
 }
+
+export const STAGE_STYLE = css`
+  .stage-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .stage-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .stage-head > div {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+  .stage-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-top: 16px;
+    border-top: 1px solid var(--divider-color);
+  }
+  .stage-section h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .stage-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .stage-field-label {
+    color: var(--secondary-text-color);
+    font-size: 13px;
+  }
+  .stage-modes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .stage-hint {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    color: var(--secondary-text-color);
+  }
+  .stage-crumbs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px;
+    color: var(--secondary-text-color);
+    font-size: 12px;
+  }
+  .stage-crumbs ha-icon {
+    --mdc-icon-size: 14px;
+  }
+  .crumb {
+    all: unset;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 6px;
+  }
+  .crumb:hover {
+    background: var(--secondary-background-color);
+  }
+  .crumb.current {
+    color: var(--primary-text-color);
+    font-weight: 600;
+  }
+  .stage-title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 500;
+  }
+  .stage-panel p {
+    margin: 0;
+  }
+  .stage-looks {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .stage-look {
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+  }
+  .stage-look > span:first-child {
+    color: var(--secondary-text-color);
+  }
+  .stage-switch {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .stage-switch input {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    accent-color: var(--primary-color);
+  }
+  .stage-moves,
+  .stage-add {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+  .stage-adds {
+    gap: 16px;
+  }
+  .stage-add-label {
+    flex-basis: 100%;
+    color: var(--secondary-text-color);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .stage-rest {
+    flex-basis: 100%;
+  }
+  .stage-rest summary {
+    list-style: none;
+  }
+  .stage-rest[open] > summary {
+    margin-bottom: 6px;
+  }
+  .stage-more {
+    padding-top: 16px;
+    border-top: 1px solid var(--divider-color);
+  }
+  .stage-more summary {
+    cursor: pointer;
+    color: var(--secondary-text-color);
+    padding: 4px 0;
+  }
+  .stage-more[open] summary {
+    margin-bottom: 8px;
+  }
+  .simple-look {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+`;

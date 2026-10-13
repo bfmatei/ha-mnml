@@ -5,6 +5,7 @@ import type { Plan, Recipe } from '../contract/builder.ts';
 import type { Templates } from '../contract/templates.ts';
 import type { Registries } from '../templates/discover.ts';
 
+import { readableOf } from './data.ts';
 import { settleImport } from './transfer.ts';
 import type { Choice, Incoming } from './transfer.ts';
 
@@ -33,7 +34,7 @@ export function summary(plan: Plan): string {
 export function previewOf(recipe: Recipe, plan: Plan): string {
   const said = [`Here it makes ${summary(plan)}.`];
   if (recipe.sections.rooms !== undefined && plan.rooms.length === 0) {
-    said.push('Its rooms template draws in no area here, so there is no room.');
+    said.push("Its rooms template draws in none of this home's rooms, so there is no room.");
   }
   const system = recipe.sections.system;
   const listed = system === undefined ? [] : (system.templates ?? SYSTEM_TEMPLATES);
@@ -122,7 +123,9 @@ export function previewPlan(
   const brought = broughtIn(recipe, offered, choices, taken);
   const templates = {
     ...resolved,
-    ...Object.fromEntries(brought.save.map((each) => [each.name, each.template])),
+    ...Object.fromEntries(
+      brought.save.map((each) => [each.name, readableOf(each.name, each.template)]),
+    ),
   };
   return planFrom(brought.recipe, registries, templates);
 }

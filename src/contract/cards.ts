@@ -371,6 +371,7 @@ export interface GlanceOne {
   alert?: StateRule;
   people?: PersonId[];
   is?: never;
+  not?: never;
   below?: never;
   sum?: never;
   critical?: never;
@@ -392,6 +393,7 @@ export interface GlanceCount {
   alert?: never;
   people?: never;
   is?: string[];
+  not?: string[];
   below?: number;
   sum?: true;
   critical?: number;

@@ -5,11 +5,12 @@ from homeassistant.helpers import issue_registry as ir
 
 from custom_components.mnml.const import CONF_GLASS, DOMAIN
 
-from .conftest import FLAT_THEME, THEME, SetupMnml, Themes
+from .conftest import FLAT_THEME, INCLUDE, THEME, SetupMnml, Themes
 
 if TYPE_CHECKING:
     from pathlib import Path
 
+    import pytest
     from homeassistant.core import HomeAssistant
 
 
@@ -105,3 +106,33 @@ async def test_changing_the_design_installs_the_other_theme(
     await hass.config_entries.options.async_configure(flow["flow_id"], {CONF_GLASS: True})
     await hass.async_block_till_done()
     assert target.read_text(encoding="utf-8") == THEME
+
+
+async def test_a_reload_that_fails_keeps_the_new_theme_and_raises_no_repair(
+    hass: HomeAssistant, config_dir: Path, www: Path, setup_mnml: SetupMnml, themes: Themes
+) -> None:
+    entry = await setup_mnml()
+    (config_dir / "configuration.yaml").write_text(INCLUDE + "broken: [\n", encoding="utf-8")
+    (www / "mnml.yaml").write_text(FLAT_THEME, encoding="utf-8")
+    await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    target = config_dir / "themes/mnml-integration/mnml.yaml"
+    assert target.read_text(encoding="utf-8") == FLAT_THEME
+    assert ir.async_get(hass).async_get_issue(DOMAIN, "theme_not_loaded") is None
+    (config_dir / "configuration.yaml").write_text(INCLUDE, encoding="utf-8")
+    await hass.services.async_call("frontend", "reload_themes", blocking=True)
+    assert (await themes())["themes"]["MNML"]["primary-color"] == "#654321"
+
+
+async def test_a_first_install_whose_reload_fails_keeps_the_theme_and_says_why(
+    hass: HomeAssistant,
+    config_dir: Path,
+    setup_mnml: SetupMnml,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    (config_dir / "configuration.yaml").write_text(INCLUDE + "broken: [\n", encoding="utf-8")
+    entry = await setup_mnml()
+    assert entry.state is ConfigEntryState.LOADED
+    assert (config_dir / "themes/mnml-integration/mnml.yaml").read_text(encoding="utf-8") == THEME
+    assert ir.async_get(hass).async_get_issue(DOMAIN, "theme_not_loaded") is None
+    assert "could not reload its themes" in caplog.text

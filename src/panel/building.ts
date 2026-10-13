@@ -154,10 +154,15 @@ export async function rebuildDashboard(
   config: object,
 ): Promise<void> {
   const url_path = built.url_path;
+  const putBack = (): Promise<unknown> =>
+    call({
+      type: 'mnml/dashboards/save',
+      url_path,
+      plan: built.plan,
+      ...(built.previous === undefined ? {} : { previous: built.previous }),
+    });
   if (board === undefined) {
-    await created(call, url_path, plan, config, () =>
-      call({ type: 'mnml/dashboards/save', url_path, plan: built.plan }),
-    );
+    await created(call, url_path, plan, config, putBack);
     return;
   }
   const before = await cardsOf(call, url_path);
@@ -167,7 +172,12 @@ export async function rebuildDashboard(
     plan,
     ...(isMapping(before) ? { previous: { plan: built.plan, config: before } } : {}),
   });
-  await call({ type: 'lovelace/config/save', url_path, config });
+  try {
+    await call({ type: 'lovelace/config/save', url_path, config });
+  } catch (error) {
+    await putBack().catch(() => undefined);
+    throw error;
+  }
   await retitle(call, board, plan);
 }
 

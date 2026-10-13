@@ -1,5 +1,6 @@
 import { css, html, nothing, render } from 'lit';
 import type { TemplateResult } from 'lit';
+import { classMap } from 'lit/directives/class-map.js';
 
 import type { ModeAttribute } from '../../contract/cards.ts';
 import type { EntityId, MdiIcon, SceneId, SelectId } from '../../contract/entities.ts';
@@ -103,8 +104,6 @@ const SINGULAR = {
   swing_horizontal_modes: 'swing_horizontal_mode',
 } as const satisfies Record<ModeAttribute, string>;
 
-export const MODE_ATTRIBUTES = Object.keys(SINGULAR);
-
 interface Option<V extends string> {
   value: V;
   label: string;
@@ -115,7 +114,7 @@ export interface Choice<V extends string = string> {
   options: Option<V>[];
   current: string | undefined;
   currentIcon(): TemplateResult | undefined;
-  select(value: V): Promise<unknown>;
+  select(value: V, now: HomeAssistant | undefined): Promise<unknown>;
 }
 
 export function modeChoice(
@@ -154,7 +153,8 @@ export function modeChoice(
     })),
     current,
     currentIcon: () => (current === undefined ? undefined : modeIcon(current)),
-    select: (value) => callService(hass, entity, `climate.set_${single}`, { [single]: value }),
+    select: (value, now) =>
+      callService(now ?? hass, entity, `climate.set_${single}`, { [single]: value }),
   };
 }
 
@@ -166,7 +166,8 @@ export function optionChoice(hass: HomeAssistant, entity: EntityId, stateObj: Ha
     })),
     current: stateObj.state,
     currentIcon: () => undefined,
-    select: (value) => callService(hass, entity, 'select.select_option', { option: value }),
+    select: (value, now) =>
+      callService(now ?? hass, entity, 'select.select_option', { option: value }),
   };
 }
 
@@ -187,7 +188,7 @@ export function sceneChoice(
       ? options.find((option) => option.label === activeState.state)?.value
       : undefined,
     currentIcon: () => undefined,
-    select: (value) => callService(hass, value, 'scene.turn_on'),
+    select: (value, now) => callService(now ?? hass, value, 'scene.turn_on'),
   };
 }
 
@@ -207,7 +208,19 @@ function step(items: HTMLElement[], from: number, key: string): number | undefin
   }
 }
 
-export function openMenu(anchor: HTMLElement, choice: Choice, host: Host): void {
+const opened = new WeakMap<HTMLElement, (refocus?: boolean) => void>();
+
+export function openMenu(
+  anchor: HTMLElement,
+  choice: Choice,
+  host: Host,
+  trigger: HTMLElement = anchor,
+): void {
+  const open = opened.get(anchor);
+  if (open !== undefined) {
+    open(true);
+    return;
+  }
   const container = anchor.getRootNode();
   if (!(container instanceof ShadowRoot)) {
     return;
@@ -219,6 +232,7 @@ export function openMenu(anchor: HTMLElement, choice: Choice, host: Host): void 
   let items: HTMLElement[] = [];
   const close = dismissable(menu, host, {
     scroll: true,
+    trigger,
     keys: (event) => {
       if (event.key === 'Tab') {
         close(true);
@@ -234,6 +248,7 @@ export function openMenu(anchor: HTMLElement, choice: Choice, host: Host): void 
       }
     },
     closed: (refocus) => {
+      opened.delete(anchor);
       anchor.setAttribute('aria-expanded', 'false');
       if (refocus) {
         anchor.focus({ preventScroll: true });
@@ -241,8 +256,9 @@ export function openMenu(anchor: HTMLElement, choice: Choice, host: Host): void 
     },
   });
   const radio = choice.current !== undefined;
+  opened.set(anchor, close);
   const pick = (value: string): void => {
-    run(host, choice.select(value));
+    run(host, choice.select(value, host.hass));
     close(true);
   };
   render(
@@ -250,7 +266,7 @@ export function openMenu(anchor: HTMLElement, choice: Choice, host: Host): void 
       const selected = option.value === choice.current;
       return html`<button
         type="button"
-        class=${selected ? 'selected' : ''}
+        class=${classMap({ selected })}
         role=${radio ? 'menuitemradio' : 'menuitem'}
         aria-checked=${radio ? String(selected) : nothing}
         @click=${(event: Event) => {

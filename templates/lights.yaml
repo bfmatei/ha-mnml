@@ -116,11 +116,7 @@ lights-popup:
     name: { kind: text, required: true }
     group: { kind: entity, required: true }
     color: { kind: flag }
-    members:
-      kind: objects
-      fields:
-        entity: { kind: entity, required: true }
-        members: { kind: entities }
+    members: { shape: light_member, kind: objects, fields: { entity: { required: true } } }
     scenes: { kind: entities }
     active_scene: { kind: entity }
   card:

@@ -1,5 +1,13 @@
 import { isMapping } from '../contract/templates.ts';
-import type { Rule, SlotSpec, Template, Templates, Value } from '../contract/templates.ts';
+import type {
+  Rule,
+  SlotSpec,
+  Template,
+  Templates,
+  Value,
+  WrittenSlot,
+  WrittenTemplate,
+} from '../contract/templates.ts';
 import { variantOf } from '../editors/shape.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
 
@@ -129,19 +137,27 @@ function nested(
   return { ...into, [head]: nested(isMapping(inner) ? inner : {}, rest, value) };
 }
 
-export function setLiteral(template: Template, field: DataField, entity: string): Template {
+export function setLiteral(
+  template: WrittenTemplate,
+  field: DataField,
+  entity: string,
+): WrittenTemplate {
   return withValue(template, [...field.holder, field.key], entity);
 }
 
-export function setPreview(template: Template, slot: string, entity: string): Template {
+export function setPreview(
+  template: WrittenTemplate,
+  slot: string,
+  entity: string,
+): WrittenTemplate {
   return { ...template, example: nested(template.example ?? {}, slot.split('.'), entity) };
 }
 
 export function fixField(
-  template: Template,
+  template: WrittenTemplate,
   field: DataField,
   entity: string | undefined,
-): Template {
+): WrittenTemplate {
   return withValue(template, [...field.holder, field.key], entity);
 }
 
@@ -154,7 +170,7 @@ function ruleFor(entity: string, hass: HomeAssistant | undefined): Rule {
     : { domain };
 }
 
-function slotNameFor(template: Template, wanted: string): string {
+function slotNameFor(template: WrittenTemplate, wanted: string): string {
   const base =
     wanted
       .replaceAll(/[^a-z0-9_]/gi, '_')
@@ -170,21 +186,21 @@ function slotNameFor(template: Template, wanted: string): string {
 }
 
 export function automateField(
-  template: Template,
+  template: WrittenTemplate,
   field: DataField,
   entity: string,
   hass: HomeAssistant | undefined,
-): Template {
+): WrittenTemplate {
   const holderId = field.holder
     .filter((segment) => segment.startsWith('#'))
     .at(-1)
     ?.slice(1);
   const name = slotNameFor(template, field.key === 'entity' ? (holderId ?? 'entity') : field.key);
-  const slots: Record<string, SlotSpec> = {
+  const slots: Record<string, WrittenSlot> = {
     ...template.slots,
     [name]: { kind: 'entity', label: sentence(name), discover: ruleFor(entity, hass) },
   };
-  const next: Template = {
+  const next: WrittenTemplate = {
     ...template,
     slots,
     example: { ...template.example, [name]: entity },

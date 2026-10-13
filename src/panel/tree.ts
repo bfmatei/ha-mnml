@@ -1,5 +1,5 @@
 import { isMapping, isTemplate } from '../contract/templates.ts';
-import type { Template, Value } from '../contract/templates.ts';
+import type { Value, WrittenTemplate } from '../contract/templates.ts';
 import { toValue } from '../templates/expand.ts';
 
 export type Path = readonly string[];
@@ -17,7 +17,7 @@ function step(node: Value | undefined, segment: string): Value | undefined {
   return isMapping(node) ? node[segment] : undefined;
 }
 
-export function valueAt(template: Template, path: Path): Value | undefined {
+export function valueAt(template: WrittenTemplate, path: Path): Value | undefined {
   let node: Value | undefined = toValue(template);
   for (const segment of path) {
     node = step(node, segment);
@@ -52,7 +52,17 @@ function replaced(node: Value, path: Path, next: Value | undefined): Value {
   return node;
 }
 
-export function withValue(template: Template, path: Path, next: Value | undefined): Template {
+export function listAt(template: WrittenTemplate, path: Path): Value[] {
+  const found =
+    path.length === 1 && path[0] === 'popups' ? (template.popups ?? []) : valueAt(template, path);
+  return Array.isArray(found) ? found : [];
+}
+
+export function withValue(
+  template: WrittenTemplate,
+  path: Path,
+  next: Value | undefined,
+): WrittenTemplate {
   const root = replaced(toValue(template), path, next);
   return isTemplate(root) ? root : template;
 }
@@ -76,7 +86,7 @@ export function inserted(list: readonly Value[], item: Value, after: number): Va
   return [...list.slice(0, after + 1), item, ...list.slice(after + 1)];
 }
 
-export function moved(list: readonly Value[], from: number, to: number): Value[] {
+export function movedTo(list: readonly Value[], from: number, to: number): Value[] {
   const next = [...list];
   const [item] = next.splice(from, 1);
   if (item !== undefined) {
@@ -177,7 +187,10 @@ function adopt(value: Value, base: Value | undefined): Value {
   return value;
 }
 
-export function adoptIds(template: Template, base: Template | undefined): Template {
+export function adoptIds<T extends WrittenTemplate>(
+  template: T,
+  base: WrittenTemplate | undefined,
+): T {
   const popups =
     template.popups === undefined ? undefined : adoptList(template.popups, base?.popups);
   return {

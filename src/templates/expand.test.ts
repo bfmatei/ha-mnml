@@ -322,6 +322,92 @@ test('an empty string inside text is unfilled, a [[...]] that is not a slot path
   assert.deepEqual(expand(t, { template: 'flag', slots: { on: false } }).card, { type: 'x' });
 });
 
+const RETIRED: Templates = {
+  inner: {
+    slots: {
+      key: { kind: 'text', required: true },
+      heating: { kind: 'object', fields: { entity: { kind: 'entity' } } },
+      devices: { kind: 'objects', fields: { connected: { kind: 'entity' } } },
+    },
+    retired: ['meters', 'heating.batteries', 'devices.essential'],
+    card: { type: 'x', key: '[[key]]', heating: '[[heating]]', devices: '[[devices]]' },
+  },
+  outer: {
+    slots: {
+      key: { kind: 'text' },
+      meters: { kind: 'objects' },
+      heating: { kind: 'object' },
+      devices: { kind: 'objects' },
+    },
+    card: {
+      template: 'inner',
+      slots: {
+        key: '[[key]]',
+        meters: '[[meters]]',
+        heating: '[[heating]]',
+        devices: '[[devices]]',
+      },
+    },
+  },
+  reads: {
+    slots: { key: { kind: 'text' } },
+    retired: ['meters'],
+    card: { type: 'x', meters: '[[meters]]' },
+  },
+};
+
+const OLD = {
+  key: 'hall',
+  meters: [{ power: 'sensor.hall_power' }],
+  heating: { entity: 'climate.hall', batteries: ['sensor.valve_battery'] },
+  devices: [{ connected: 'binary_sensor.router', essential: true }],
+};
+
+test('a value given for a retired slot or field is taken and ignored, wherever it comes from', () => {
+  const drawn = {
+    type: 'x',
+    key: 'hall',
+    heating: { entity: 'climate.hall' },
+    devices: [{ connected: 'binary_sensor.router' }],
+  };
+  assert.deepEqual(expand(RETIRED, { template: 'inner', slots: OLD }).card, drawn);
+  assert.deepEqual(expand(RETIRED, { template: 'outer', slots: OLD }).card, drawn);
+  assert.throws(
+    () => expand(RETIRED, { template: 'reads', slots: { meters: [] } }),
+    /^Error: reads at card\.meters: no slot named meters$/,
+  );
+  assert.throws(
+    () =>
+      expand(RETIRED, {
+        template: 'inner',
+        slots: { key: 'hall', heating: { entity: 'climate.hall', valves: [] } },
+      }),
+    /^Error: inner: heating has no field named valves$/,
+  );
+});
+
+test('retired: takes a list of slot paths the template does not declare', () => {
+  const odd = JSON.parse(
+    '{"word": {"retired": "meters", "card": {}}, "caps": {"retired": ["Meters"], "card": {}}, "slot": {"slots": {"key": {"kind": "text"}}, "retired": ["key"], "card": {}}, "field": {"slots": {"heating": {"kind": "object", "fields": {"batteries": {"kind": "entities"}}}}, "retired": ["heating.batteries"], "card": {}}}',
+  ) as Templates;
+  assert.throws(
+    () => expand(odd, { template: 'word' }),
+    /^Error: word: retired: takes a list of slot paths, dotted for a field: heating\.batteries$/,
+  );
+  assert.throws(
+    () => expand(odd, { template: 'caps' }),
+    /^Error: caps: retired: takes a list of slot paths, dotted for a field: heating\.batteries$/,
+  );
+  assert.throws(
+    () => expand(odd, { template: 'slot' }),
+    /^Error: slot: the retired path key names a slot the template declares$/,
+  );
+  assert.throws(
+    () => expand(odd, { template: 'field' }),
+    /^Error: field: the retired path heating\.batteries names a slot the template declares$/,
+  );
+});
+
 const LATER: Templates = {
   power: {
     slots: { entity: { kind: 'entity', required: true } },

@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 
 import { test } from 'vitest';
+import { parse } from 'yaml';
 
-import type { Rule, Template } from '../contract/templates.ts';
+import { isMapping, isTemplate } from '../contract/templates.ts';
+import type { Filter, Rule, SlotSpec, Template } from '../contract/templates.ts';
 
-import { discover } from './discover.ts';
+import { TEXT_FILTERS, describe, discover, filterWords, fromDevice } from './discover.ts';
 import type { Registries } from './discover.ts';
 
 const R: Registries = {
@@ -372,6 +374,52 @@ test('an entity labelled mnml_<slot> is that slot, ahead of any rule, inside the
   );
 });
 
+const LOCKED: Registries = {
+  areas: { hall: { area_id: 'hall', name: 'Hall' } },
+  devices: {
+    nuki: { id: 'nuki', area_id: 'hall', name: 'Front lock', labels: ['mnml_lock'] },
+    multi: { id: 'multi', area_id: 'hall', name: 'Hall sensor', labels: ['mnml_batteries'] },
+  },
+  entities: {
+    'binary_sensor.front_door': { entity_id: 'binary_sensor.front_door', device_id: 'nuki' },
+    'lock.front': { entity_id: 'lock.front', device_id: 'nuki' },
+    'sensor.front_battery': { entity_id: 'sensor.front_battery', device_id: 'nuki' },
+    'sensor.hall_battery': { entity_id: 'sensor.hall_battery', device_id: 'multi' },
+    'sensor.hall_temperature': { entity_id: 'sensor.hall_temperature', device_id: 'multi' },
+    'sensor.hall_odd': {
+      entity_id: 'sensor.hall_odd',
+      device_id: 'multi',
+      labels: ['mnml_batteries'],
+    },
+  },
+  states: {
+    'binary_sensor.front_door': { attributes: { device_class: 'door' } },
+    'sensor.front_battery': { attributes: { device_class: 'battery' } },
+    'sensor.hall_battery': { attributes: { device_class: 'battery' } },
+    'sensor.hall_temperature': { attributes: { device_class: 'temperature' } },
+  },
+};
+
+test("a device labelled mnml_<slot> gives the slot those of its entities that fit the slot's rule", () => {
+  const found = discover(
+    {
+      card: {},
+      slots: {
+        lock: { kind: 'entity', discover: { domain: 'lock' } },
+        batteries: { kind: 'entities', discover: { domain: 'sensor', device_class: 'battery' } },
+      },
+    },
+    'hall',
+    LOCKED,
+  );
+  assert.equal(found['lock'], 'lock.front', 'not the door sensor of the same device');
+  assert.deepEqual(
+    found['batteries'],
+    ['sensor.hall_battery', 'sensor.hall_odd'],
+    "not the temperature beside it, while an entity's own label still counts whatever it is",
+  );
+});
+
 const K: Registries = {
   areas: { den: { area_id: 'den', name: 'Den', icon: null } },
   devices: {},
@@ -432,5 +480,497 @@ test('an entities slot keeps every match, in the order of their ids', () => {
       K,
     )['t'],
     ['sensor.a_gone', 'sensor.b_unknown', 'sensor.c_named', 'sensor.d_main', 'sensor.e_diag'],
+  );
+});
+
+const V: Registries = {
+  areas: {
+    living: { area_id: 'living', name: 'Living' },
+    hall: { area_id: 'hall', name: 'Hall' },
+  },
+  devices: {
+    robo: { id: 'robo', area_id: 'living', name: 'Robo', manufacturer: 'Roborock' },
+    dock: { id: 'dock', area_id: 'hall', name: 'Robo dock', via_device_id: 'robo' },
+    mini: { id: 'mini', area_id: 'living', name: 'Mini' },
+    base: { id: 'base', area_id: 'living', name: 'Mini base', via_device_id: 'mini' },
+    far: { id: 'far', area_id: 'hall', name: 'Far' },
+    hub: { id: 'hub', area_id: 'hall', name: 'Hub' },
+  },
+  entities: {
+    'vacuum.robo': { entity_id: 'vacuum.robo', device_id: 'robo' },
+    'sensor.robo_battery': { entity_id: 'sensor.robo_battery', device_id: 'robo' },
+    'sensor.robo_status': {
+      entity_id: 'sensor.robo_status',
+      device_id: 'robo',
+      translation_key: 'status',
+    },
+    'switch.dock_empty': {
+      entity_id: 'switch.dock_empty',
+      device_id: 'dock',
+      translation_key: 'dust_emptying',
+    },
+    'sensor.dock_status': {
+      entity_id: 'sensor.dock_status',
+      device_id: 'dock',
+      translation_key: 'status',
+    },
+    'vacuum.mini': { entity_id: 'vacuum.mini', device_id: 'mini' },
+    'switch.base_empty': {
+      entity_id: 'switch.base_empty',
+      device_id: 'base',
+      translation_key: 'dust_emptying',
+    },
+    'vacuum.far': { entity_id: 'vacuum.far', device_id: 'far' },
+    'sensor.hub_battery': { entity_id: 'sensor.hub_battery', device_id: 'hub' },
+  },
+  states: {
+    'sensor.robo_battery': { attributes: { device_class: 'battery' } },
+    'sensor.hub_battery': { attributes: { device_class: 'battery' } },
+  },
+};
+
+const VACUUM_RULE: Rule = {
+  device: { domain: 'vacuum' },
+  fields: {
+    entity: { domain: 'vacuum' },
+    status: { translation_key: 'status' },
+    battery: { device_class: 'battery' },
+    dock: { fields: { empty: { translation_key: 'dust_emptying' } } },
+  },
+};
+
+const VACUUM_FIELDS = {
+  entity: { kind: 'entity', required: true },
+  status: { kind: 'entity' },
+  battery: { kind: 'entity' },
+  dock: { kind: 'object', fields: { empty: { kind: 'entity' } } },
+} as const;
+
+function vacuums(
+  kind: 'object' | 'objects',
+  area: string | undefined,
+  registries: Registries = V,
+  rule: Rule = VACUUM_RULE,
+): unknown {
+  return discover(
+    { card: {}, slots: { vacuum: { kind, fields: VACUUM_FIELDS, discover: rule } } },
+    area,
+    registries,
+  )['vacuum'];
+}
+
+test('a device anchor fills the fields among the device and its via_device relatives, either way round', () => {
+  assert.deepEqual(vacuums('objects', 'living'), [
+    { entity: 'vacuum.mini', dock: { empty: 'switch.base_empty' } },
+    {
+      entity: 'vacuum.robo',
+      status: 'sensor.robo_status',
+      battery: 'sensor.robo_battery',
+      dock: { empty: 'switch.dock_empty' },
+    },
+  ]);
+  const flipped: Registries = {
+    ...V,
+    devices: {
+      ...V.devices,
+      dock: { id: 'dock', area_id: 'living', name: 'Robo dock' },
+      robo: { id: 'robo', area_id: 'living', name: 'Robo', via_device_id: 'dock' },
+      mini: { id: 'mini', area_id: 'living', name: 'Mini', via_device_id: 'base' },
+      base: { id: 'base', area_id: 'living', name: 'Mini base' },
+    },
+  };
+  assert.deepEqual(vacuums('objects', 'living', flipped), vacuums('objects', 'living'));
+});
+
+test('an object slot is filled from a device given, its fields found as its anchor finds them', () => {
+  const spec: SlotSpec = { kind: 'object', fields: VACUUM_FIELDS, discover: VACUUM_RULE };
+  assert.deepEqual(fromDevice(spec, 'mini', 'living', V), {
+    entity: 'vacuum.mini',
+    dock: { empty: 'switch.base_empty' },
+  });
+  assert.deepEqual(fromDevice(spec, 'robo', 'living', V), vacuums('object', 'living'));
+  assert.equal(fromDevice(spec, 'hub', 'hall', V), undefined, 'it lacks the required entity');
+  assert.equal(
+    fromDevice({ kind: 'object', fields: VACUUM_FIELDS }, 'robo', 'living', V),
+    undefined,
+    'a slot without field rules is not filled',
+  );
+});
+
+test("a field is taken from the anchor's own device first, and from a relative only when the device has none", () => {
+  const found = vacuums('object', 'living');
+  assert.ok(isMapping(found));
+  assert.equal(found['status'], 'sensor.robo_status', "not the dock's status");
+});
+
+test('two devices of a kind give two objects, or the one that fills most for an object slot, never fields of both', () => {
+  assert.deepEqual(vacuums('object', 'living'), {
+    entity: 'vacuum.robo',
+    status: 'sensor.robo_status',
+    battery: 'sensor.robo_battery',
+    dock: { empty: 'switch.dock_empty' },
+  });
+  const objects = vacuums('objects', 'living');
+  assert.ok(Array.isArray(objects));
+  assert.equal(
+    JSON.stringify(objects[0]).includes('robo'),
+    false,
+    "the mini takes nothing of the robo's",
+  );
+});
+
+test("the anchor device is looked for in the area, or in the whole home with scope: all; a relative's area does not matter", () => {
+  assert.deepEqual(vacuums('objects', 'hall'), [{ entity: 'vacuum.far' }]);
+  assert.equal(vacuums('object', undefined), undefined, 'without an area, nothing');
+  const everywhere = vacuums('objects', undefined, V, { ...VACUUM_RULE, scope: 'all' });
+  assert.ok(Array.isArray(everywhere));
+  assert.deepEqual(
+    everywhere.map((each) => (isMapping(each) ? each['entity'] : undefined)),
+    ['vacuum.far', 'vacuum.mini', 'vacuum.robo'],
+  );
+});
+
+test('an anchor entity with no device makes an object of its own, its fields found on it alone', () => {
+  const registries: Registries = {
+    areas: { hall: { area_id: 'hall', name: 'Hall' } },
+    devices: {},
+    entities: {
+      'climate.helper': { entity_id: 'climate.helper', area_id: 'hall' },
+      'sensor.hall_battery': { entity_id: 'sensor.hall_battery', area_id: 'hall' },
+    },
+    states: { 'sensor.hall_battery': { attributes: { device_class: 'battery' } } },
+  };
+  const found = discover(
+    {
+      card: {},
+      slots: {
+        heating: {
+          kind: 'object',
+          fields: { entity: { kind: 'entity' }, battery: { kind: 'entity' } },
+          discover: {
+            device: { domain: 'climate' },
+            fields: { entity: { domain: 'climate' }, battery: { device_class: 'battery' } },
+          },
+        },
+      },
+    },
+    'hall',
+    registries,
+  );
+  assert.deepEqual(found, { heating: { entity: 'climate.helper' } });
+});
+
+const dock = (scope?: 'area'): Rule => ({
+  device: { domain: 'vacuum' },
+  fields: {
+    entity: { domain: 'vacuum' },
+    dock: {
+      device: { translation_key: 'dock_error' },
+      ...(scope === undefined ? {} : { scope }),
+      fields: { error: { translation_key: 'dock_error' } },
+    },
+  },
+});
+
+test("inside a device, scope: area searches the device's area: a part that is not linked, or a sensor of another device", () => {
+  const registries: Registries = {
+    areas: { living: { area_id: 'living', name: 'Living' } },
+    devices: {
+      robo: { id: 'robo', area_id: 'living', name: 'Robo' },
+      station: { id: 'station', area_id: 'living', name: 'Robo station' },
+    },
+    entities: {
+      'vacuum.robo': { entity_id: 'vacuum.robo', device_id: 'robo' },
+      'sensor.station_error': {
+        entity_id: 'sensor.station_error',
+        device_id: 'station',
+        translation_key: 'dock_error',
+      },
+    },
+    states: {},
+  };
+  assert.deepEqual(vacuums('object', 'living', registries, dock()), { entity: 'vacuum.robo' });
+  assert.deepEqual(vacuums('object', 'living', registries, dock('area')), {
+    entity: 'vacuum.robo',
+    dock: { error: 'sensor.station_error' },
+  });
+});
+
+const STATIONS: Registries = {
+  areas: { living: { area_id: 'living', name: 'Living' } },
+  devices: {
+    alpha: { id: 'alpha', area_id: 'living', name: 'Alpha' },
+    beta: { id: 'beta', area_id: 'living', name: 'Beta' },
+    station: {
+      id: 'station',
+      area_id: 'living',
+      name: 'Beta station',
+      model: 'Dock',
+      via_device_id: 'beta',
+    },
+  },
+  entities: {
+    'vacuum.alpha': { entity_id: 'vacuum.alpha', device_id: 'alpha' },
+    'vacuum.beta': { entity_id: 'vacuum.beta', device_id: 'beta' },
+    'sensor.beta_error': { entity_id: 'sensor.beta_error', device_id: 'beta' },
+    'switch.station_empty': {
+      entity_id: 'switch.station_empty',
+      device_id: 'station',
+      translation_key: 'dust_emptying',
+    },
+    'binary_sensor.station_dirty': {
+      entity_id: 'binary_sensor.station_dirty',
+      device_id: 'station',
+    },
+  },
+  states: { 'binary_sensor.station_dirty': { attributes: { device_class: 'problem' } } },
+};
+
+const STATION_RULE: Rule = {
+  device: { domain: 'vacuum' },
+  fields: {
+    entity: { domain: 'vacuum' },
+    error: { domain: 'sensor', name: 'error' },
+    warnings: { domain: 'binary_sensor', device_class: 'problem' },
+    dock: {
+      device: { model: 'dock' },
+      scope: 'area',
+      fields: {
+        error: { domain: 'sensor', name: 'error' },
+        empty: { translation_key: 'dust_emptying' },
+        warnings: { domain: 'binary_sensor', device_class: 'problem' },
+      },
+    },
+  },
+};
+
+function stations(registries: Registries = STATIONS): unknown {
+  return discover(
+    {
+      card: {},
+      slots: {
+        vacuum: {
+          kind: 'objects',
+          fields: {
+            entity: { kind: 'entity', required: true },
+            error: { kind: 'entity' },
+            warnings: { kind: 'entities' },
+            dock: {
+              kind: 'object',
+              fields: {
+                error: { kind: 'entity' },
+                empty: { kind: 'entity' },
+                warnings: { kind: 'entities' },
+              },
+            },
+          },
+          discover: STATION_RULE,
+        },
+      },
+    },
+    'living',
+    registries,
+  )['vacuum'];
+}
+
+function stationOf(entity: string, registries: Registries = STATIONS): unknown {
+  const found = stations(registries);
+  return Array.isArray(found)
+    ? found.find((each) => isMapping(each) && each['entity'] === entity)
+    : undefined;
+}
+
+test('a nested anchor never takes from the device it is inside: the dock has no error of the vacuum', () => {
+  assert.deepEqual(stationOf('vacuum.beta'), {
+    entity: 'vacuum.beta',
+    error: 'sensor.beta_error',
+    dock: { empty: 'switch.station_empty', warnings: ['binary_sensor.station_dirty'] },
+  });
+});
+
+test("the device a nested anchor takes is the anchor's: the vacuum takes none of its dock's warnings", () => {
+  const found = stationOf('vacuum.beta');
+  assert.ok(isMapping(found));
+  assert.equal(found['warnings'], undefined, 'the warnings are listed once, under the dock');
+});
+
+test("the area's devices that Home Assistant links to another device are not a nested anchor's", () => {
+  assert.deepEqual(stationOf('vacuum.alpha'), { entity: 'vacuum.alpha' }, "not Beta's dock");
+  const unlinked: Registries = {
+    ...STATIONS,
+    devices: {
+      ...STATIONS.devices,
+      station: { id: 'station', area_id: 'living', name: 'Station', model: 'Dock' },
+    },
+  };
+  assert.deepEqual(stationOf('vacuum.alpha', unlinked), {
+    entity: 'vacuum.alpha',
+    dock: { empty: 'switch.station_empty', warnings: ['binary_sensor.station_dirty'] },
+  });
+});
+
+const C: Registries = {
+  areas: { den: { area_id: 'den', name: 'Den' } },
+  devices: {
+    ac: { id: 'ac', area_id: 'den', name: 'AC', manufacturer: 'Daikin', model: 'FTXM25' },
+    trv: { id: 'trv', area_id: 'den', name: 'Valve' },
+    plug: { id: 'plug', area_id: 'den', name: 'Plug' },
+    cloud: { id: 'cloud', area_id: 'den', name: 'Forecast', entry_type: 'service' },
+  },
+  entities: {
+    'climate.ac': { entity_id: 'climate.ac', device_id: 'ac', platform: 'daikin' },
+    'climate.valve': { entity_id: 'climate.valve', device_id: 'trv', platform: 'zha' },
+    'climate.unknown': { entity_id: 'climate.unknown', area_id: 'den', platform: 'template' },
+    'sensor.plug_energy': {
+      entity_id: 'sensor.plug_energy',
+      device_id: 'plug',
+      platform: 'shelly',
+    },
+    'sensor.plug_daily': {
+      entity_id: 'sensor.plug_daily',
+      device_id: 'plug',
+      platform: 'utility_meter',
+    },
+    'sensor.forecast': { entity_id: 'sensor.forecast', device_id: 'cloud', platform: 'met' },
+  },
+  states: {
+    'climate.ac': {
+      attributes: {
+        hvac_modes: ['off', 'heat', 'cool', 'dry'],
+        min_temp: 16,
+        swing: true,
+        fan_speed: '3',
+      },
+    },
+    'climate.valve': { attributes: { hvac_modes: ['off', 'heat'], min_temp: 5 } },
+  },
+};
+
+function among(filter: Filter): unknown {
+  return discover({ card: {}, slots: { x: { kind: 'entities', discover: filter } } }, 'den', C)[
+    'x'
+  ];
+}
+
+test('a filter on an attribute holds for its value, or for a list that contains it, and exclude turns it round', () => {
+  assert.deepEqual(among({ domain: 'climate', attribute: { hvac_modes: 'cool' } }), ['climate.ac']);
+  assert.deepEqual(among({ domain: 'climate', attribute: { min_temp: '5' } }), ['climate.valve']);
+  assert.deepEqual(among({ attribute: { swing: 'true' } }), ['climate.ac']);
+  assert.deepEqual(
+    among({ domain: 'climate', attribute: { hvac_modes: 'heat', min_temp: '16' } }),
+    ['climate.ac'],
+    'every attribute must hold',
+  );
+  assert.deepEqual(
+    among({ domain: 'climate', exclude: { attribute: { hvac_modes: 'cool' } } }),
+    ['climate.unknown', 'climate.valve'],
+    'a climate whose modes are not known lacks cool too',
+  );
+});
+
+function amongWritten(filter: string): unknown {
+  const template: unknown = parse(
+    `card: {}\nslots:\n  x: { kind: entities, discover: ${filter} }\n`,
+  );
+  assert.ok(isTemplate(template));
+  return discover(template, 'den', C)['x'];
+}
+
+test("an attribute's value written in YAML as a number or a flag is compared as the attribute's type", () => {
+  assert.deepEqual(amongWritten('{ domain: climate, attribute: { min_temp: 5 } }'), [
+    'climate.valve',
+  ]);
+  assert.deepEqual(amongWritten('{ attribute: { swing: true } }'), ['climate.ac']);
+  assert.deepEqual(
+    amongWritten('{ attribute: { fan_speed: 3 } }'),
+    ['climate.ac'],
+    'a number written holds for an attribute that is that text',
+  );
+  assert.deepEqual(
+    amongWritten("{ attribute: { min_temp: '5.0' } }"),
+    ['climate.valve'],
+    'a text written holds for an attribute that is that number',
+  );
+  assert.deepEqual(amongWritten("{ attribute: { fan_speed: '3.0' } }"), undefined);
+});
+
+test("a filter on the device: its entry type, maker and model, and the integration of the device's entities", () => {
+  assert.deepEqual(among({ entry_type: 'service' }), ['sensor.forecast']);
+  assert.deepEqual(among({ domain: 'sensor', entry_type: 'none' }), [
+    'sensor.plug_daily',
+    'sensor.plug_energy',
+  ]);
+  assert.deepEqual(among({ manufacturer: 'daikin', model: 'ftxm' }), ['climate.ac']);
+  assert.deepEqual(
+    among({ integration: 'shelly' }),
+    ['sensor.plug_daily', 'sensor.plug_energy'],
+    "the utility meter is on the Shelly's device",
+  );
+  assert.deepEqual(
+    among({ integration: 'template' }),
+    ['climate.unknown'],
+    'a lone entity is its own',
+  );
+});
+
+test('a device labelled mnml_<slot> fills an object slot with that device, its fields found by the rule', () => {
+  const labelled: Registries = {
+    ...V,
+    devices: {
+      ...V.devices,
+      mini: { id: 'mini', area_id: 'living', name: 'Mini', labels: ['mnml_vacuum'] },
+    },
+  };
+  assert.deepEqual(vacuums('object', 'living', labelled), {
+    entity: 'vacuum.mini',
+    dock: { empty: 'switch.base_empty' },
+  });
+  const both: Registries = {
+    ...labelled,
+    entities: {
+      ...labelled.entities,
+      'vacuum.robo': { entity_id: 'vacuum.robo', device_id: 'robo', labels: ['mnml_vacuum'] },
+    },
+  };
+  const objects = vacuums('objects', 'living', both);
+  assert.ok(Array.isArray(objects));
+  assert.equal(objects.length, 2, "an entity's label names its device");
+  assert.deepEqual(
+    vacuums('object', 'hall', labelled),
+    { entity: 'vacuum.far' },
+    'a label in another area does not count',
+  );
+});
+
+test("the rule's sentence and the panel's words come from one vocabulary", () => {
+  assert.equal(
+    describe({ domain: 'binary_sensor', device_class: 'window' }),
+    `binary_sensor ${filterWords('device_class')} window`,
+  );
+  assert.equal(
+    describe({ domain: 'sensor', translation_key: 'status', entity_category: 'none' }),
+    `sensor ${filterWords('translation_key')} status, ${filterWords('entity_category')} primary`,
+  );
+  assert.equal(
+    describe({ domain: 'climate', exclude: { attribute: { hvac_modes: 'cool' } } }),
+    'climate but not with attribute hvac_modes cool',
+  );
+  assert.equal(describe({ label: 'main' }), 'any entity labelled main');
+  assert.deepEqual(
+    TEXT_FILTERS.map((key) => filterWords(key)),
+    [
+      'with device class',
+      'from the integration',
+      'with translation key',
+      'in the category',
+      'with unit',
+      'with state class',
+      'named like',
+      'made by',
+      'of model',
+      'on a device of type',
+      'on a device of the integration',
+      'labelled',
+    ],
   );
 });

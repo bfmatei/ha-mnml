@@ -1,18 +1,45 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 import { parse } from 'yaml';
 
 import { isMapping, isTemplate } from '../contract/templates.ts';
-import type { Template, Templates, Value } from '../contract/templates.ts';
+import type { Shapes, Template, Templates, Value, WrittenSlot } from '../contract/templates.ts';
+
+import { withShapes } from './slot-shapes.ts';
 
 const DIR = resolve(import.meta.dirname, '../../templates');
 
+const SHAPES_FILE = 'shapes.yaml';
+
 export function familyNames(dir: string = DIR): string[] {
   return readdirSync(dir)
-    .filter((name) => name.endsWith('.yaml'))
+    .filter((name) => name.endsWith('.yaml') && name !== SHAPES_FILE)
     .toSorted()
     .map((name) => name.slice(0, -'.yaml'.length));
+}
+
+function isWrittenSlot(value: unknown): value is WrittenSlot {
+  return isMapping(value);
+}
+
+export function readShapes(dir: string = DIR): Shapes {
+  const path = join(dir, SHAPES_FILE);
+  if (!existsSync(path)) {
+    return {};
+  }
+  const parsed: unknown = parse(readFileSync(path, 'utf8'));
+  if (!isMapping(parsed)) {
+    throw new Error(`${SHAPES_FILE} holds no shapes`);
+  }
+  const shapes: Record<string, WrittenSlot> = {};
+  for (const [name, shape] of Object.entries(parsed)) {
+    if (!isWrittenSlot(shape)) {
+      throw new Error(`${name} in ${SHAPES_FILE} is no slot`);
+    }
+    shapes[name] = shape;
+  }
+  return shapes;
 }
 
 export function readFamily(family: string, dir: string = DIR): Templates {
@@ -21,12 +48,13 @@ export function readFamily(family: string, dir: string = DIR): Templates {
   if (typeof parsed !== 'object' || parsed === null) {
     throw new Error(`${file} holds no templates`);
   }
+  const shapes = readShapes(dir);
   const found: Record<string, Template> = {};
   for (const [name, template] of Object.entries(parsed)) {
     if (!isTemplate(template)) {
       throw new Error(`${name} in ${file} has no card`);
     }
-    found[name] = template;
+    found[name] = withShapes(name, template, shapes);
   }
   return found;
 }

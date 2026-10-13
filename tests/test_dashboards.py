@@ -1,3 +1,5 @@
+import json
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.config_entries import ConfigEntryState
@@ -16,15 +18,10 @@ if TYPE_CHECKING:
 
     from .conftest import SetupMnml
 
-PLAN = {
-    "title": "Home",
-    "icon": "mdi:home-variant",
-    "rooms": [{"area": "kitchen"}, {"area": "living", "slots": {"name": "Lounge"}}],
-    "people": [{"entity": "person.jane"}],
-    "cars": [{"key": "sedan", "slots": {"metadata": "sensor.sedan"}}],
-    "system": [{"template": "home-assistant"}],
-    "open": {"tablet": "unfold", "desktop": "unfold"},
-}
+EXAMPLES: dict[str, Any] = json.loads(
+    Path(__file__).with_name("plans.json").read_text(encoding="utf-8")
+)
+PLAN: dict[str, Any] = EXAMPLES["base"]
 CONFIG = {"title": "Home", "views": [{"title": "Home", "path": "home", "sections": []}]}
 
 
@@ -38,6 +35,13 @@ async def listed(client: MockHAClientWebSocket) -> dict[str, Any]:
     reply = await call(client, {"type": "mnml/dashboards/list"})
     dashboards: dict[str, Any] = reply["result"]["dashboards"]
     return dashboards
+
+
+def plan_of(example: dict[str, Any]) -> dict[str, Any]:
+    plan = {**PLAN, **example.get("with", {})}
+    for key in example.get("without", []):
+        del plan[key]
+    return plan
 
 
 async def test_a_built_dashboard_is_kept_with_its_plan_when_and_by_whom(
@@ -128,14 +132,6 @@ async def test_a_dashboard_of_the_wrong_shape_is_refused(
         ("my_home-x", PLAN, {}),
         ("dashboard-" + "x" * 60, PLAN, {}),
         ("dashboard-home", {**PLAN, "title": ""}, {}),
-        ("dashboard-home", {**PLAN, "icon": "home"}, {}),
-        ("dashboard-home", {**PLAN, "rooms": [{"slots": {}}]}, {}),
-        ("dashboard-home", {**PLAN, "people": [{"entity": "sensor.jane"}]}, {}),
-        ("dashboard-home", {**PLAN, "cars": [{"key": "sedan"}]}, {}),
-        ("dashboard-home", {**PLAN, "system": [{"template": "Home Assistant"}]}, {}),
-        ("dashboard-home", {**PLAN, "open": {"watch": "sheet"}}, {}),
-        ("dashboard-home", {**PLAN, "open": {"phone": "drawer"}}, {}),
-        ("dashboard-home", {key: value for key, value in PLAN.items() if key != "open"}, {}),
         ("dashboard-home", PLAN, {"previous": {"plan": PLAN}}),
         ("dashboard-home", PLAN, {"previous": {"config": CONFIG}}),
     ):
@@ -215,67 +211,32 @@ async def test_the_dashboards_survive_a_restart(
     assert (await listed(client))["dashboard-home"]["plan"] == PLAN
 
 
-async def test_a_plan_may_give_its_sections_their_look(
+async def test_a_plan_is_kept_as_the_shared_examples_say(
     hass: HomeAssistant, hass_ws_client: WebSocketGenerator, setup_mnml: SetupMnml
 ) -> None:
     await setup_mnml()
     client = await hass_ws_client(hass)
-    sections = {
-        "rooms": {"title": "Spaces", "icon": "mdi:home-floor-1", "template": "my-room"},
-        "people": {"template": "person"},
-        "garage": {"title": "Cars"},
-        "system": {"title": "Servers", "icon": "mdi:server"},
-    }
-    saved = await call(
-        client,
-        {
-            "type": "mnml/dashboards/save",
-            "url_path": "dashboard-home",
-            "plan": {**PLAN, "sections": sections},
-        },
-    )
-    assert saved["success"]
-    assert (await listed(client))["dashboard-home"]["plan"]["sections"] == sections
-    for wrong in (
-        {"system": {"template": "home-assistant"}},
-        {"attic": {"title": "Attic"}},
-        {"rooms": {"icon": "floor"}},
-        {"rooms": {"template": "My Room"}},
-        {"rooms": {"title": ""}},
-    ):
+    for example in EXAMPLES["valid"]:
+        plan = plan_of(example)
+        saved = await call(
+            client, {"type": "mnml/dashboards/save", "url_path": "dashboard-home", "plan": plan}
+        )
+        assert saved["success"], example["why"]
+        assert (await listed(client))["dashboard-home"]["plan"] == plan, example["why"]
+
+
+async def test_a_plan_is_refused_as_the_shared_examples_say(
+    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, setup_mnml: SetupMnml
+) -> None:
+    await setup_mnml()
+    client = await hass_ws_client(hass)
+    for example in EXAMPLES["invalid"]:
         reply = await call(
             client,
             {
                 "type": "mnml/dashboards/save",
                 "url_path": "dashboard-home",
-                "plan": {**PLAN, "sections": wrong},
+                "plan": plan_of(example),
             },
         )
-        assert reply["error"]["code"] == "invalid_format", wrong
-
-
-async def test_a_plan_may_order_its_sections(
-    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, setup_mnml: SetupMnml
-) -> None:
-    await setup_mnml()
-    client = await hass_ws_client(hass)
-    plan = {**PLAN, "order": ["people", "rooms", "system", "garage"]}
-    saved = await call(
-        client, {"type": "mnml/dashboards/save", "url_path": "dashboard-home", "plan": plan}
-    )
-    assert saved["success"]
-    for wrong in (
-        ["rooms", "rooms"],
-        ["attic"],
-        "rooms",
-        ["rooms", "people", "garage", "system", "rooms"],
-    ):
-        reply = await call(
-            client,
-            {
-                "type": "mnml/dashboards/save",
-                "url_path": "dashboard-home",
-                "plan": {**PLAN, "order": wrong},
-            },
-        )
-        assert reply["error"]["code"] == "invalid_format", wrong
+        assert reply["error"]["code"] == "invalid_format", example["why"]

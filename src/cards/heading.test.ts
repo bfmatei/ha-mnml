@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import { test } from 'vitest';
+import { test, vi } from 'vitest';
 
 import { define, mounted, text } from '../test/render.ts';
 
@@ -122,4 +122,94 @@ test('a status control whose rule lists no entities is an error card that names 
       ],
     } as never);
   }, /controls\[0\]\.rules\[0\]\.entities must be a list/);
+});
+
+test('a slider on a heading opens over the heading, which holds it at the height of its controls', async () => {
+  const { MnmlSlider } = await import('./parts/slider.ts');
+  define('mnml-slider', MnmlSlider);
+  const made = card();
+  made.setConfig({
+    type: 'custom:mnml-heading-card',
+    title: 'Lights',
+    controls: [
+      {
+        type: 'slider',
+        entity: 'light.a',
+        slider: 'brightness',
+        name: 'Brightness',
+        icon: 'mdi:brightness-6',
+      },
+    ],
+  } as never);
+  made.hass = {
+    states: {
+      'light.a': { entity_id: 'light.a', state: 'on', attributes: { brightness: 128 } },
+    },
+    entities: {},
+    devices: {},
+    locale: { language: 'en' },
+    formatEntityState: (stateObj: { state: string }): string => stateObj.state,
+    formatEntityAttributeValue: (_stateObj: unknown, _name: string, value: unknown): string =>
+      String(value),
+  } as never;
+  const root = await mounted(made);
+  const button = root.querySelector('.heading button.control');
+  assert.ok(button instanceof HTMLElement);
+  button.click();
+  const overlay = root.querySelector('.heading > .overlay');
+  assert.ok(overlay instanceof HTMLElement, 'the overlay opens on the heading');
+  const heading = overlay.parentElement;
+  assert.ok(heading);
+  assert.equal(getComputedStyle(heading).position, 'relative', 'which places it');
+  assert.equal(getComputedStyle(overlay).paddingTop, '0px', 'with no inset to clip');
+  assert.equal(
+    getComputedStyle(overlay).getPropertyValue('--m-slider-height').trim(),
+    '36px',
+    'and a slider as tall as the heading',
+  );
+  made.remove();
+});
+
+test('a card taken off the page keeps no wake-up for a key, and takes it again when it returns', async () => {
+  vi.useFakeTimers({ now: Date.parse('2026-10-01T00:00:00Z') });
+  try {
+    const made = card();
+    made.setConfig({
+      type: 'custom:mnml-heading-card',
+      title: 'Keys',
+      controls: [
+        {
+          type: 'status',
+          name: 'Key',
+          icon: 'mdi:key',
+          silent: true,
+          rules: [{ entities: ['sensor.key'], within_days: 14, color: 'red' }],
+        },
+      ],
+    } as never);
+    made.hass = {
+      states: {
+        'sensor.key': { entity_id: 'sensor.key', state: '2026-10-15T03:00:00Z', attributes: {} },
+      },
+      entities: {},
+      devices: {},
+      locale: { language: 'en' },
+      formatEntityState: (stateObj: { state: string }): string => stateObj.state,
+    } as never;
+    const root = await mounted(made);
+    assert.equal(root.querySelector('.control'), null, 'not drawn while the key is further off');
+    const refresh = vi.spyOn(made, 'refresh');
+    made.remove();
+    await vi.advanceTimersByTimeAsync(2 * 3_600_000);
+    assert.equal(refresh.mock.calls.length, 0, 'nothing wakes a card that is off the page');
+    document.body.append(made);
+    await made.updateComplete;
+    assert.equal(root.querySelector('.control'), null, 'back on the page an hour early, not yet');
+    await vi.advanceTimersByTimeAsync(3_600_000);
+    await made.updateComplete;
+    assert.ok(root.querySelector('.control.colored'), 'and red on time, with no new state');
+    made.remove();
+  } finally {
+    vi.useRealTimers();
+  }
 });

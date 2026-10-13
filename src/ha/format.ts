@@ -26,7 +26,7 @@ function capitalise(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-function humanise(value: string): string {
+export function humanise(value: string): string {
   return capitalise(value.replaceAll('_', ' '));
 }
 

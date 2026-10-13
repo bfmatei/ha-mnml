@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'vitest';
 
 import '../cards/register.ts';
+import type { WrittenTemplate } from '../contract/templates.ts';
 import { SHIPPED } from '../templates/shipped.ts';
 
 import { problemOf } from './check.ts';
@@ -66,6 +67,52 @@ test('a draft that reads a slot it does not declare is refused, even where anoth
   );
 });
 
+const tailnet = (read: string): WrittenTemplate => ({
+  slots: {
+    devices: {
+      kind: 'objects',
+      fields: { update: { kind: 'entity' }, essential: { kind: 'flag' } },
+    },
+  },
+  card: {
+    type: 'custom:mnml-tile-card',
+    name: 'Tailnet',
+    icon: 'mdi:vpn',
+    popup: '#tailnet',
+    chips: [
+      {
+        id: 'update',
+        if: 'devices.*.update',
+        type: 'status',
+        name: 'Update',
+        icon: 'mdi:package-up',
+        rules: [{ id: 'update', entities: [read], color: 'amber', is: ['on'] }],
+      },
+    ],
+  },
+  example: { devices: [{ update: 'binary_sensor.router_update', essential: true }] },
+});
+
+test('a draft that reads a slot it does not declare through a projection is refused', () => {
+  for (const read of [
+    '[[devices.*.update]]',
+    '[[devices.?essential.update]]',
+    '[[devices.!essential.update]]',
+  ]) {
+    assert.equal(problemOf(SHIPPED, 'tailnet', tailnet(read)), undefined, read);
+  }
+  for (const read of [
+    '[[devicez.*.update]]',
+    '[[devicez.?essential.update]]',
+    '[[devicez.!essential.update]]',
+  ]) {
+    assert.equal(
+      problemOf(SHIPPED, 'tailnet', tailnet(read)),
+      `card.chips[0].rules[0].entities[0]: ${read} reads a slot the template does not declare`,
+    );
+  }
+});
+
 test('two parts of one list with the same id are refused', () => {
   const problem = problemOf(SHIPPED, 'garden', {
     card: {
@@ -80,4 +127,21 @@ test('two parts of one list with the same id are refused', () => {
     example: {},
   });
   assert.equal(problem, 'card.controls: two parts share the id lock');
+});
+
+test('a draft whose slots name shapes passes the check, and one naming an unknown shape is refused with the reason', () => {
+  const card = { type: 'custom:mnml-heading-card', title: '[[energy.power]]', icon: 'mdi:barn' };
+  const example = { energy: { power: 'sensor.yard_power' } };
+  assert.equal(
+    problemOf(SHIPPED, 'yard', {
+      slots: { energy: { shape: 'meter', fields: { power: { required: true } } } },
+      card,
+      example,
+    }),
+    undefined,
+  );
+  assert.equal(
+    problemOf(SHIPPED, 'yard', { slots: { energy: { shape: 'metre' } }, card, example }),
+    'yard: the slot energy uses the shape metre, which is not known',
+  );
 });

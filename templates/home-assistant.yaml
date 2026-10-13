@@ -36,13 +36,7 @@ home-assistant:
       group: Updates
       discover: { domain: update, platform: hassio, scope: all }
     firmware: { kind: entities, group: Updates }
-    backups:
-      kind: object
-      group: Updates
-      fields:
-        last: { kind: entity, required: true }
-        attempted: { kind: entity }
-        problem: { kind: entity }
+    backups: { shape: system_backups, group: Updates }
     all_firmware:
       {
         label: 'All firmware',
@@ -51,12 +45,10 @@ home-assistant:
         group: Updates,
       }
     room_firmware:
-      label: 'Firmware by room'
+      shape: room_firmware
       kind: objects
+      label: 'Firmware by room'
       group: Updates
-      fields:
-        name: { kind: text, required: true }
-        firmware: { kind: entities }
       discover:
         {
           per: area,
@@ -113,22 +105,34 @@ home-assistant:
             },
           ]
       - id: firmware
-        if: all_firmware
+        if: [all_firmware, firmware, room_firmware]
         type: status
         name: Firmware
         icon: mdi:memory
         silent: true
         rules:
-          [
-            {
-              id: all-firmware,
-              if: all_firmware,
-              entities: ['[[all_firmware]]'],
-              label: device,
-              color: amber,
-              is: ['on'],
-            },
-          ]
+          - id: all-firmware
+            if: all_firmware
+            entities: ['[[all_firmware]]']
+            label: device
+            color: amber
+            is: ['on']
+          - id: firmware
+            if: firmware
+            unless: all_firmware
+            entities: '[[firmware]]'
+            label: device
+            color: amber
+            is: ['on']
+          - id: each-room_firmware
+            each: room_firmware
+            as: room
+            if: room.firmware
+            unless: all_firmware
+            entities: '[[room.firmware]]'
+            label: device
+            color: amber
+            is: ['on']
     grid_options: { columns: 12 }
   popups:
     - id: system-popup
@@ -169,19 +173,12 @@ system-popup:
     services: { kind: entities }
     updates: { kind: entities }
     firmware: { kind: entities }
-    backups:
-      kind: object
-      fields:
-        last: { kind: entity, required: true }
-        attempted: { kind: entity }
-        problem: { kind: entity }
+    backups: { shape: system_backups }
     all_firmware:
       { kind: entities, discover: { domain: update, device_class: firmware, scope: all } }
     room_firmware:
+      shape: room_firmware
       kind: objects
-      fields:
-        name: { kind: text, required: true }
-        firmware: { kind: entities }
       discover:
         {
           per: area,

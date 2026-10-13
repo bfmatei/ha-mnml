@@ -5,7 +5,7 @@ import { styleMap } from 'lit/directives/style-map.js';
 
 import type { Item } from '../../contract/cards.ts';
 import type { PopupHash } from '../../contract/entities.ts';
-import { stateLine } from '../../ha/format.ts';
+import { SEPARATOR, stateLine } from '../../ha/format.ts';
 import { stateOf } from '../../ha/hass.ts';
 import type { HomeAssistant } from '../../ha/hass.ts';
 import { nameOf } from '../../ha/names.ts';
@@ -62,6 +62,39 @@ export function linkTo(popup: PopupHash): Link {
   };
 }
 
+function row(item: Item, link: Link | undefined, content: TemplateResult): TemplateResult {
+  return html`<div
+    class=${classMap({ row: true, link: link !== undefined })}
+    data-part=${partOf(item)}
+    @pointerdown=${link?.pointerdown ?? nothing}
+    @click=${link?.click ?? nothing}
+  >
+    ${content}
+  </div>`;
+}
+
+function pill(
+  hass: HomeAssistant,
+  item: Item,
+  name: string,
+  link: Link | undefined,
+): TemplateResult {
+  const stateObj = stateOf(hass, item.entity);
+  const color = tint(item.color, item.when, stateObj);
+  return html`<div
+    class=${classMap({ pill: true, link: link !== undefined, colored: color !== undefined })}
+    style=${styleMap(colorStyle(color))}
+    role=${link === undefined ? nothing : 'button'}
+    tabindex=${link === undefined ? nothing : 0}
+    aria-label=${link === undefined ? nothing : name}
+    @pointerdown=${link?.pointerdown ?? nothing}
+    @click=${link?.click ?? nothing}
+    @keydown=${link?.keydown ?? nothing}
+  >
+    ${stateIcon(hass, stateObj, item.icon)}
+  </div>`;
+}
+
 export function itemRow(
   hass: HomeAssistant,
   item: Item,
@@ -69,36 +102,38 @@ export function itemRow(
   extra?: TemplateResult,
 ): TemplateResult {
   const name = nameOf(hass, item.entity, item);
-  const stateObj = stateOf(hass, item.entity);
-  const color = tint(item.color, item.when, stateObj);
   const link = item.popup === undefined ? undefined : linkTo(item.popup);
   const lane = controlsOf(item.controls, { hass, host });
-  return html`<div
-    class=${classMap({ row: true, link: link !== undefined })}
-    data-part=${partOf(item)}
-    @pointerdown=${link?.pointerdown ?? nothing}
-    @click=${link?.click ?? nothing}
-  >
-    <div
-      class=${classMap({ pill: true, link: link !== undefined, colored: color !== undefined })}
-      style=${styleMap(colorStyle(color))}
-      role=${link === undefined ? nothing : 'button'}
-      tabindex=${link === undefined ? nothing : 0}
-      aria-label=${link === undefined ? nothing : name}
-      @pointerdown=${link?.pointerdown ?? nothing}
-      @click=${link?.click ?? nothing}
-      @keydown=${link?.keydown ?? nothing}
-    >
-      ${stateIcon(hass, stateObj, item.icon)}
-    </div>
-    <div class="text">
-      <div class="name">${name}</div>
-      <div class="state">${stateLine(hass, item.entity, item.state ?? [{}])}</div>
-    </div>
-    ${
-      extra === undefined && lane.length === 0
-        ? nothing
-        : html`<div class="lane">${extra ?? nothing}${lane}</div>`
-    }
-  </div>`;
+  return row(
+    item,
+    link,
+    html`${pill(hass, item, name, link)}
+      <div class="text">
+        <div class="name">${name}</div>
+        <div class="state">${stateLine(hass, item.entity, item.state ?? [{}])}</div>
+      </div>
+      ${
+        extra === undefined && lane.length === 0
+          ? nothing
+          : html`<div class="lane">${extra ?? nothing}${lane}</div>`
+      }`,
+  );
+}
+
+export function itemLine(hass: HomeAssistant, item: Item, host: Host): TemplateResult {
+  const name = nameOf(hass, item.entity, item);
+  const link = item.popup === undefined ? undefined : linkTo(item.popup);
+  const line = stateLine(hass, item.entity, item.state ?? [{}]);
+  const lane = controlsOf(item.controls, { hass, host });
+  return row(
+    item,
+    link,
+    html`${pill(hass, item, name, link)}
+      <div class="line">
+        <span class="name">${name}</span>${
+          line.length === 0 ? nothing : html`<span class="state">${SEPARATOR}${line}</span>`
+        }
+      </div>
+      ${lane.length === 0 ? nothing : html`<div class="lane">${lane}</div>`}`,
+  );
 }

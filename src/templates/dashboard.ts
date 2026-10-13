@@ -5,9 +5,22 @@ import { expand } from './expand.ts';
 
 type Mapping = Record<string, Value>;
 
+const LAYOUT = new Set(['grid_options', 'visibility', 'view_layout', 'layout_options', 'card_mod']);
+
 function slotsOf(node: Mapping): Mapping {
   const slots = node['slots'];
   return isMapping(slots) ? slots : {};
+}
+
+function laidOut(node: Mapping, card: Value): Value {
+  if (!isMapping(card)) {
+    return card;
+  }
+  const own = Object.fromEntries(Object.entries(node).filter(([key]) => LAYOUT.has(key)));
+  const shown = [card['visibility'], node['visibility']].flatMap((list) =>
+    Array.isArray(list) ? list : [],
+  );
+  return { ...card, ...own, ...(shown.length > 0 ? { visibility: shown } : {}) };
 }
 
 function walk(node: Value, templates: Templates, popups: Value[]): Value {
@@ -20,7 +33,7 @@ function walk(node: Value, templates: Templates, popups: Value[]): Value {
   if (node['type'] === 'custom:mnml-template-card' && typeof node['template'] === 'string') {
     const expanded = expand(templates, { template: node['template'], slots: slotsOf(node) });
     popups.push(...expanded.popups);
-    return expanded.card;
+    return laidOut(node, expanded.card);
   }
   return Object.fromEntries(
     Object.entries(node).map(([key, item]) => [key, walk(item, templates, popups)]),

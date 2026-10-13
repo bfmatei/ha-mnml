@@ -36,17 +36,17 @@ In a card that has an entity of its own (an item, a header, a tile), an entry's 
 
 A list of controls, each with a `type`:
 
-| `type`      | Required                                                                    | Optional                                                     |
-| ----------- | --------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| `toggle`    | `entity`                                                                    | `icon`, `color`, `when`, `primary`                           |
-| `slider`    | `entity`, `slider` (a kind, below), `name`, `icon`                          | `color`                                                      |
-| `select`    | `entity` (a `select` or a `climate`)                                        | `attribute` (a mode list, below), `color`, `when`, `primary` |
-| `service`   | `entity`, `service` (`domain.service`), `name`, `icon`                      | `primary`                                                    |
-| `nav`       | `entity`, `popup`                                                           | `color`, `when`                                              |
-| `indicator` | `entity`, `color`                                                           |                                                              |
-| `status`    | `name`, `icon`, `silent`, `rules`                                           |                                                              |
-| `tyres`     | `tyres`, `targets` (four sensors each), `low_share`, `warn_share`, `silent` |                                                              |
-| `scenes`    | `scenes` (scene entities), `name`, `icon`                                   | `active_scene` (a select whose state names the active scene) |
+| `type`      | Required                                                          | Optional                                                     |
+| ----------- | ----------------------------------------------------------------- | ------------------------------------------------------------ |
+| `toggle`    | `entity`                                                          | `icon`, `color`, `when`, `primary`                           |
+| `slider`    | `entity`, `slider` (a kind, below), `name`, `icon`                | `color`                                                      |
+| `select`    | `entity` (a `select` or a `climate`)                              | `attribute` (a mode list, below), `color`, `when`, `primary` |
+| `service`   | `entity`, `service` (`domain.service`), `name`, `icon`            | `primary`                                                    |
+| `nav`       | `entity`, `popup`                                                 | `color`, `when`                                              |
+| `indicator` | `entity`, `color`                                                 |                                                              |
+| `status`    | `name`, `icon`, `rules`                                           | `silent`                                                     |
+| `tyres`     | `tyres`, `targets` (four sensors each), `low_share`, `warn_share` | `silent`                                                     |
+| `scenes`    | `scenes` (scene entities), `name`, `icon`                         | `active_scene` (a select whose state names the active scene) |
 
 - Every control takes `show`. `primary: true` marks the control as the card's main one: brighter than the others, and filled in a tile chip.
 - A `status` control's `rules` are tried in order, and the first that any of its `entities` matches colours it. Each rule has `entities`, `color` and `is`, `not`, `below` (the entities under a number) or `within_days` (the entities whose state is a timestamp that many days off or less, or already past, which flags a key about to expire), and may add `label: device` and `words` for the tooltip. An unavailable entity is orange, unless a rule's `is` names `unavailable`, which gives it that rule's colour. A `silent` status control is drawn only while a rule holds or an entity is unavailable, and so is a `silent` tyres control, only while a tyre is dropping or low or a sensor is unavailable.
@@ -113,7 +113,7 @@ Upcoming calendar events by week. `sources` (required): each has `entity`, a cal
 `items` (required), each drawn as a well, in one of two shapes:
 
 - **An entity:** `entity` (required), `name` (the tooltip; no text is drawn for it), `icon` (the entity's own by default), `color` and `when` (the icon and the well take the colour while the entity is in the `when` state, `on` by default), `state` (state items; the entity's state by default), `show` (the glance is drawn only while the entity is in that state), `quiet` (while the entity is not in `when`, no value is drawn and the icon is dimmed), `bare` (no value is drawn, the icon alone), `alert` (the glance is red while the entity is in that state), `people` (person entities: the glance is red while it is on with somebody home, or off with everybody away; `when` says what on is), and `popup` or `toggle`: a tap opens the pop-up, or toggles the entity.
-- **A count:** `entities` and `name` (both required; the name is the tooltip), `icon`, `color` (orange by default), `popup` (opened by a tap), and what counts: `is` (the entities in one of these states), `below` (the entities under a number) or `sum` (the total of the entities' numbers, counted while above 0), with `critical`, under which the glance turns red; with `sum`, `critical` is the level at which the first entity turns the glance red, the others leaving it orange. It is drawn only while the count is above 0, and an unavailable entity is not counted.
+- **A count:** `entities` and `name` (both required; the name is the tooltip), `icon`, `color` (orange by default), `popup` (opened by a tap), and what counts: `is` (the entities in one of these states), `not` (the entities in none of these states), `below` (the entities under a number) or `sum` (the total of the entities' numbers, counted while above 0), with `critical`, under which the glance turns red; with `sum`, `critical` is the level at which the first entity turns the glance red, the others leaving it orange. `is` and `not` match the state as a rule's lists do, lower-cased and without hyphens, so `SELECTIVE-LOCKED` is `selectivelocked`. It is drawn only while the count is above 0. An entity that is missing or `unavailable` is never counted; any other state, `unknown` included, is matched as it is, so a `not` count counts an `unknown` entity unless its list names `unknown`, while `below` counts only an entity whose state is a number.
 
 A tooltip names the item, and a count's lists what it counts with each value. The items fall into two groups: the calm statuses on the left, the entity items without `show`; and what needs you on the right, set apart by a hairline, the entity items with `show` and the counts. A critical count fades in once when it is drawn, unless the reader prefers reduced motion. The wells wrap onto a second row rather than scroll. The card is not drawn while none of its items is.
 
@@ -123,7 +123,7 @@ A tooltip names the item, and a count's lists what it counts with each value. Th
 
 ### `mnml-weather-card`
 
-`entity` (required, a `weather` entity) and `title` for the heading. The conditions now come from the entity's attributes, each drawn only when the entity has it, and the forecast from Home Assistant's `weather/subscribe_forecast`: up to seven days when the entity supports a daily forecast, up to eight hours when it only supports an hourly one, and none when it has no forecast.
+`entity` (required, a `weather` entity) and `title` for the heading. The conditions now come from the entity's attributes, each drawn only when the entity has it, and the forecast from Home Assistant's `weather/subscribe_forecast`: the daily forecast when the entity supports one, else the twice-daily one, else the hourly one, and none when it supports no forecast; up to seven days, eight half-days or eight hours, a day or a half-day under its day's name and an hour under its time.
 
 ### `mnml-button-card`
 
@@ -150,7 +150,7 @@ A pop-up's header: a `name` and an `icon`, or an `entity` to take them from (`la
 
 ### `mnml-tile-card`
 
-A tile that opens a pop-up: `popup` (required), and a `name` and an `icon`, or an `entity`, as the header takes them; a `state` line; `chips`, controls; and an `item` row.
+A tile that opens a pop-up: `popup` (required), and a `name` and an `icon`, or an `entity`, as the header takes them; a `state` line; `chips`, controls; and an `item` row, an item (above) drawn minified: its icon, its name and its state line on one line, and every one of its `controls`, smaller. The row opens the item's `popup`, where the same item is drawn full size; a slider button opens its slider over the row.
 
 ### `mnml-media-card`
 
@@ -177,10 +177,10 @@ A template, drawn in place: `template` (required), the template's name; `area`, 
 
 Every pop-up of a dashboard, in one card anywhere on it, edited in YAML:
 
-| Key      | Is                                                                                                                                                                                                                                                                                                                                  |
-| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `width`  | required: the dialog's width on a wide screen, in pixels (`560px`); on a phone it is a bottom sheet                                                                                                                                                                                                                                 |
-| `open`   | how a pop-up opens on each kind of screen: `phone` (600 px wide and less), `tablet` (up to 1024 px) and `desktop`, each `sheet` (a bottom sheet), `dialog` (centred, `width` wide) or `unfold` (out of the tile it was opened from, in that tile's place and as wide as it). Left out, a phone gets `sheet` and the others `dialog` |
-| `popups` | each has a `hash` (`'#kitchen'`), the URL hash that opens it, and its `cards`, any Lovelace cards. Template cards add theirs, so a dashboard of templates leaves it out                                                                                                                                                             |
+| Key      | Is                                                                                                                                                                                                                                                                                                                                                                                                                |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `width`  | required: the dialog's width on a wide screen, in pixels (`560px`); on a phone it is a bottom sheet                                                                                                                                                                                                                                                                                                               |
+| `open`   | how a pop-up opens on each kind of screen: `phone` (600 px wide and less), `tablet` (up to 1024 px) and `desktop`, each `sheet` (a bottom sheet), `dialog` (centred, `width` wide) or `unfold` (out of what it was opened from, a tile, a row, a chip or a glance, `width` wide whatever that element's width, growing from its edge nearer the window's). Left out, a phone gets `sheet` and the others `dialog` |
+| `popups` | each has a `hash` (`'#kitchen'`), the URL hash that opens it, and its `cards`, any Lovelace cards. Template cards add theirs, so a dashboard of templates leaves it out                                                                                                                                                                                                                                           |
 
 A pop-up's first card is its header, which stays in place while the rest scrolls. A card in a pop-up takes `visibility`, and the pop-up judges it: a list of state conditions, each with `condition: state`, `entity`, and either `state` or `state_not`, one state or a list. Any other condition is an error that names where it is.

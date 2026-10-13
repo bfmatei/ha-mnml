@@ -3,13 +3,14 @@ import type { TemplateResult } from 'lit';
 import { property, state } from 'lit/decorators.js';
 import { parseDocument } from 'yaml';
 
-import { isTemplate } from '../contract/templates.ts';
-import type { Template, Value } from '../contract/templates.ts';
+import { isStorable } from '../contract/templates.ts';
+import type { Value, WrittenTemplate } from '../contract/templates.ts';
 import { toYaml } from '../contract/yaml.ts';
 import { field } from '../ha/field.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
 import { toValue } from '../templates/expand.ts';
 
+import { messageOf } from './message.ts';
 import { PANEL_STYLE } from './style.ts';
 
 export function readYaml(text: string): Value {
@@ -27,10 +28,13 @@ export function readYaml(text: string): Value {
   return toValue(document.toJS());
 }
 
-export function readTemplate(text: string): Template {
+export const NOT_A_TEMPLATE =
+  'a template is a mapping with a card; its card is a mapping, or a list for a shipped fragment, and its popups, if any, a list of mappings';
+
+export function readTemplate(text: string, shipped = false): WrittenTemplate {
   const value = readYaml(text);
-  if (!isTemplate(value)) {
-    throw new Error('a template is a mapping with a card');
+  if (!isStorable(value, shipped)) {
+    throw new Error(NOT_A_TEMPLATE);
   }
   return value;
 }
@@ -39,8 +43,8 @@ export class MnmlYaml extends LitElement {
   static override styles = PANEL_STYLE;
 
   @property({ attribute: false }) hass: HomeAssistant | undefined;
-  @property({ attribute: false }) template: Template | undefined;
-  @property({ attribute: false }) apply: ((template: Template) => void) | undefined;
+  @property({ attribute: false }) template: WrittenTemplate | undefined;
+  @property({ attribute: false }) apply: ((template: WrittenTemplate) => void) | undefined;
   @state() private text = '';
   @state() private problem: string | undefined;
 
@@ -91,13 +95,13 @@ export class MnmlYaml extends LitElement {
     this.check(text);
   }
 
-  private check(text: string): Template | undefined {
+  private check(text: string): WrittenTemplate | undefined {
     try {
-      const read = readTemplate(text);
+      const read = readTemplate(text, Array.isArray(this.template?.card));
       this.problem = undefined;
       return read;
     } catch (error) {
-      this.problem = error instanceof Error ? error.message : String(error);
+      this.problem = messageOf(error);
       return undefined;
     }
   }

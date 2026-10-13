@@ -1,8 +1,10 @@
 import { isMapping } from '../contract/templates.ts';
 import type { Value } from '../contract/templates.ts';
+import { humanise } from '../ha/format.ts';
+import { filled } from '../templates/expand.ts';
 
 import { CORNER_NAMES } from './lists.ts';
-import { cleanValue, place, starter } from './shape.ts';
+import { cleanField, place, starter } from './shape.ts';
 import type { Field, PlainShape } from './shape.ts';
 
 export interface FormItem {
@@ -123,15 +125,10 @@ export function schemaOf(
   });
 }
 
-const humanize = (key: string): string => {
-  const words = key.replaceAll('_', ' ');
-  return `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
-};
-
 export function labelFor(shape: PlainShape, name: string): string {
   const [key = name, inner] = name.split('.');
   const field = shape.fields[key];
-  const head = field?.label ?? humanize(key);
+  const head = shape.labels?.[key] ?? field?.label ?? humanise(key);
   if (inner === undefined) {
     return head;
   }
@@ -234,16 +231,35 @@ function fieldFrom(
   }
 }
 
-export function fromForm(
+const entriesOf = (key: string, data: Readonly<Record<string, unknown>>): Map<string, unknown> =>
+  new Map(Object.entries(data).filter(([name]) => name === key || name.startsWith(`${key}.`)));
+
+function changed(
+  shape: PlainShape,
+  key: string,
+  data: Readonly<Record<string, unknown>>,
+  value: Record<string, Value>,
+): boolean {
+  const before = entriesOf(key, formData(shape, [key], value));
+  const after = entriesOf(key, data);
+  return [...new Set([...before.keys(), ...after.keys()])].some(
+    (name) => JSON.stringify(before.get(name)) !== JSON.stringify(after.get(name)),
+  );
+}
+
+type Finish = (field: Field, found: Value | undefined, was: Value | undefined) => Value | undefined;
+
+function readForm(
   shape: PlainShape,
   keys: readonly string[],
   data: Readonly<Record<string, unknown>>,
   value: Record<string, Value>,
+  finish: Finish,
 ): Record<string, Value> {
   let next = value;
   for (const key of keys) {
     const field = shape.fields[key];
-    if (field === undefined || !isSimple(field)) {
+    if (field === undefined || !isSimple(field) || !changed(shape, key, data, value)) {
       continue;
     }
     const found = fieldFrom(key, field, data, next[key]);
@@ -251,7 +267,32 @@ export function fromForm(
       found === undefined && field.required === true && KEPT_EMPTY.has(field.kind)
         ? starter(field)
         : found;
-    next = place(shape, next, key, kept);
+    next = place(shape, next, key, finish(field, kept, value[key]));
   }
-  return cleanValue(shape, next);
+  return next;
+}
+
+export function fromForm(
+  shape: PlainShape,
+  keys: readonly string[],
+  data: Readonly<Record<string, unknown>>,
+  value: Record<string, Value>,
+): Record<string, Value> {
+  return readForm(shape, keys, data, value, (field, found, was) =>
+    found === undefined ? undefined : cleanField(field, found, was),
+  );
+}
+
+export function slotsFromForm(
+  shape: PlainShape,
+  keys: readonly string[],
+  data: Readonly<Record<string, unknown>>,
+  value: Record<string, Value>,
+): Record<string, Value> {
+  return readForm(shape, keys, data, value, (field, found) => {
+    if (field.required === true || filled(found)) {
+      return found;
+    }
+    return field.default === undefined ? undefined : null;
+  });
 }

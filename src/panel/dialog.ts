@@ -3,21 +3,47 @@ import type { TemplateResult } from 'lit';
 
 import { field } from '../ha/field.ts';
 
+import { messageOf } from './message.ts';
+
+let asked = 0;
+
 export interface Choice<T> {
   label: string;
   value: T;
   primary?: true;
 }
 
-export function ask<T>(
+type Body = TemplateResult | ((redraw: () => void) => TemplateResult);
+
+interface YamlWords {
+  file: string;
+  text: string;
+  placeholder: string;
+}
+
+export interface Dialogs {
+  ask: <T>(
+    title: string,
+    body: Body,
+    choices: readonly Choice<T>[],
+    check?: (value: T) => string | undefined,
+  ) => Promise<T | undefined>;
+  confirm: (title: string, text: string, label: string) => Promise<boolean>;
+  name: (title: string, initial: string, taken: ReadonlySet<string>) => Promise<string | undefined>;
+  yaml: <T>(title: string, words: YamlWords, read: (text: string) => T) => Promise<T | undefined>;
+}
+
+function ask<T>(
   root: ParentNode,
   title: string,
-  body: TemplateResult | ((redraw: () => void) => TemplateResult),
+  body: Body,
   choices: readonly Choice<T>[],
   check?: (value: T) => string | undefined,
 ): Promise<T | undefined> {
   const dialog = document.createElement('dialog');
+  const named = `mnml-dialog-${(asked += 1)}`;
   dialog.className = 'dialog';
+  dialog.setAttribute('aria-labelledby', named);
   const { promise, resolve } = Promise.withResolvers<T | undefined>();
   let problem: string | undefined;
   const close = (value: T | undefined): void => {
@@ -27,7 +53,7 @@ export function ask<T>(
   };
   const draw = (): void => {
     render(
-      html`<h2>${title}</h2>
+      html`<h2 id=${named}>${title}</h2>
         ${typeof body === 'function' ? body(draw) : body}
         ${problem === undefined ? nothing : html`<p class="problem-line">${problem}</p>`}
         <div class="dialog-actions">
@@ -71,7 +97,7 @@ export function ask<T>(
   return promise;
 }
 
-export async function askName(
+async function askName(
   root: ParentNode,
   title: string,
   initial: string,
@@ -103,7 +129,7 @@ export async function askName(
   return chosen === true ? name.trim() : undefined;
 }
 
-export async function confirmIt(
+async function confirmIt(
   root: ParentNode,
   title: string,
   text: string,
@@ -112,4 +138,59 @@ export async function confirmIt(
   return (
     (await ask(root, title, html`<p>${text}</p>`, [{ label, value: true, primary: true }])) === true
   );
+}
+
+async function askYaml<T>(
+  root: ParentNode,
+  title: string,
+  words: YamlWords,
+  read: (text: string) => T,
+): Promise<T | undefined> {
+  let text = '';
+  let found: { value: T } | undefined;
+  const next = await ask(
+    root,
+    title,
+    html`<input
+        type="file"
+        accept=".yaml,.yml,text/yaml"
+        aria-label=${words.file}
+        @change=${async (event: Event) => {
+          const files = field(event.target, 'files');
+          const file = files instanceof FileList ? files[0] : undefined;
+          const area = event.target instanceof Element ? event.target.nextElementSibling : null;
+          text = (await file?.text()) ?? text;
+          if (area instanceof HTMLTextAreaElement) {
+            area.value = text;
+          }
+        }}
+      /><textarea
+        class="yaml-text"
+        placeholder=${words.placeholder}
+        aria-label=${words.text}
+        @input=${(event: Event) => {
+          const value = field(event.target, 'value');
+          text = typeof value === 'string' ? value : '';
+        }}
+      ></textarea>`,
+    [{ label: 'Next', value: true, primary: true }],
+    () => {
+      try {
+        found = { value: read(text) };
+        return undefined;
+      } catch (error) {
+        return messageOf(error);
+      }
+    },
+  );
+  return next === true ? found?.value : undefined;
+}
+
+export function dialogsOn(root: ParentNode): Dialogs {
+  return {
+    ask: (title, body, choices, check) => ask(root, title, body, choices, check),
+    confirm: (title, text, label) => confirmIt(root, title, text, label),
+    name: (title, initial, taken) => askName(root, title, initial, taken),
+    yaml: (title, words, read) => askYaml(root, title, words, read),
+  };
 }

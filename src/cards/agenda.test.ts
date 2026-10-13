@@ -8,7 +8,10 @@ import { MnmlAgendaCard } from './agenda.ts';
 
 define('mnml-agenda-card', MnmlAgendaCard);
 
-vi.useFakeTimers({ toFake: ['Date'], now: new Date(2026, 9, 7, 12) });
+vi.useFakeTimers({
+  toFake: ['Date', 'requestAnimationFrame', 'cancelAnimationFrame'],
+  now: new Date(2026, 9, 7, 12),
+});
 
 afterAll(() => {
   vi.useRealTimers();
@@ -230,10 +233,9 @@ test('Next scrolls the buttons under the week it adds into view, so the week is 
   const card = await mount({ calls: [], states: LIVE });
   await press(card, 'Next');
   await settled();
-  await vi.waitFor(() => {
-    assert.equal(shown.filter((node) => node.getRootNode() === card.shadowRoot).length, 1);
-  });
+  await vi.runAllTimersAsync();
   const mine = shown.filter((node) => node.getRootNode() === card.shadowRoot);
+  assert.equal(mine.length, 1);
   assert.ok(mine[0]?.classList.contains('more'));
   spy.mockRestore();
 });
@@ -248,9 +250,8 @@ test('a Next that finds nothing scrolls the buttons into view under the Nothing 
   const card = await mount({ calls: [], states: LIVE }, {});
   await press(card, 'Next');
   await settled();
-  await vi.waitFor(() => {
-    assert.equal(shown.filter((node) => node.getRootNode() === card.shadowRoot).length, 1);
-  });
+  await vi.runAllTimersAsync();
+  assert.equal(shown.filter((node) => node.getRootNode() === card.shadowRoot).length, 1);
   assert.ok(shown.at(-1)?.classList.contains('more'));
   spy.mockRestore();
 });
@@ -312,4 +313,12 @@ test('a change of a calendar state fetches again; another update does not', asyn
   card.hass = hassOf(fake, { [SONARR]: EPISODES, [RADARR]: MOVIES }) as never;
   await settled();
   assert.equal(fake.calls.length, first * 2);
+});
+
+test('a calendar of a kind other than episodes or movies is refused', () => {
+  const made = document.createElement('mnml-agenda-card');
+  assert.ok(made instanceof MnmlAgendaCard);
+  assert.throws(() => {
+    made.setConfig({ ...CONFIG, sources: [{ entity: SONARR, kind: 'books' }] } as never);
+  }, /sources kind must be one of episodes, movies/);
 });

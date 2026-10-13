@@ -1,8 +1,12 @@
+import { css, html } from 'lit';
+import type { TemplateResult } from 'lit';
+
 import type { MdiIcon } from '../contract/entities.ts';
 import type { Template, Value } from '../contract/templates.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
+import { icon } from '../ha/templates.ts';
 
-export interface Starter {
+interface Starter {
   label: string;
   description: string;
   icon: MdiIcon;
@@ -23,7 +27,7 @@ function sample(hass: HomeAssistant | undefined, domain: string, deviceClass?: s
   );
 }
 
-export const STARTERS: readonly Starter[] = [
+const STARTERS: readonly Starter[] = [
   {
     label: 'A tile',
     description:
@@ -118,3 +122,88 @@ export const STARTERS: readonly Starter[] = [
     },
   },
 ];
+
+export function drawStarters(
+  name: string,
+  hass: HomeAssistant | undefined,
+  pick: (template: Template | undefined) => void,
+): TemplateResult {
+  return html`<div class="design-start">
+    <h2>What do you want to make?</h2>
+    <p class="muted">
+      Pick a starting point. You change everything afterwards by clicking what you see.
+    </p>
+    <div class="starts">
+      ${STARTERS.map(
+        (start) =>
+          html`<button
+            type="button"
+            class="start"
+            @click=${() => {
+              pick(start.make(name, hass));
+            }}
+          >
+            ${icon(start.icon)}<strong>${start.label}</strong
+            ><span class="muted">${start.description}</span>
+          </button>`,
+      )}
+    </div>
+    <button
+      type="button"
+      class="chip"
+      @click=${() => {
+        pick(undefined);
+      }}
+    >
+      Start with a heading
+    </button>
+  </div>`;
+}
+
+export const STARTERS_STYLE = css`
+  .design-start {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 24px 16px;
+    max-width: 760px;
+  }
+  .design-start h2 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 500;
+  }
+  .design-start p {
+    margin: 0;
+  }
+  .starts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+    width: 100%;
+  }
+  .start {
+    all: unset;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 16px;
+    border-radius: 16px;
+    border: 1px solid var(--divider-color);
+    background: var(--card-background-color);
+    cursor: pointer;
+  }
+  .start:hover {
+    border-color: var(--primary-color);
+  }
+  .start:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+  }
+  .start ha-icon {
+    --mdc-icon-size: 28px;
+    color: var(--primary-color);
+  }
+`;

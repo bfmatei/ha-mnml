@@ -1,18 +1,13 @@
+import { SECTION_ORDER } from '../contract/builder.ts';
 import { subnetRange } from '../contract/subnet.ts';
 import type { Value } from '../contract/templates.ts';
 import { TemplateError, expand } from '../templates/expand.ts';
 import { SHIPPED } from '../templates/shipped.ts';
 
-import {
-  personSlots,
-  proxmoxSlots,
-  roomSlots,
-  snake,
-  systemSlots,
-  tailscaleSlots,
-} from './slots.ts';
+import { systemChoices } from './plan.ts';
+import { roomSlots, snake } from './slots.ts';
 import type { Home } from './types.ts';
-import { SECTION_NAMES, drawn } from './view.ts';
+import { drawn } from './view.ts';
 
 type Json = Record<string, unknown>;
 
@@ -82,17 +77,11 @@ function producible(home: Home): string[] {
     ...standIn('printer3d'),
     ...standIn('speakers'),
   };
-  const { proxmox, network, tailscale, adguard, media } = home.system;
   const all = [
     ...home.rooms.flatMap((room) => hashes('room', { ...roomSlots(room), ...full })),
-    ...home.people.flatMap((person) => hashes('person', personSlots(person))),
+    ...home.people.flatMap((person) => hashes('person', snake(person))),
     ...home.cars.flatMap((car) => hashes('car', snake(car))),
-    ...(proxmox ? hashes('proxmox-server', proxmoxSlots(proxmox)) : []),
-    ...(network ? hashes('unifi-network', snake(network)) : []),
-    ...(tailscale ? hashes('tailscale', tailscaleSlots(tailscale)) : []),
-    ...(adguard ? hashes('adguard', snake(adguard)) : []),
-    ...hashes('home-assistant', systemSlots(home.system, home.rooms)),
-    ...(media ? hashes('media-server', snake(media)) : []),
+    ...systemChoices(home).flatMap((choice) => hashes(choice.template, choice.slots ?? {})),
   ];
   const twice = all.filter((hash, index) => all.indexOf(hash) !== index);
   return [...new Set(twice)].map((hash) => `${hash} can be produced twice`);
@@ -124,12 +113,12 @@ function orderProblems(home: Home): string[] {
   if (home.order === undefined) {
     return [];
   }
-  const wrong = SECTION_NAMES.filter(
+  const wrong = SECTION_ORDER.filter(
     (name) => home.order?.filter((listed) => listed === name).length !== 1,
   );
-  return wrong.length === 0 && home.order.length === SECTION_NAMES.length
+  return wrong.length === 0 && home.order.length === SECTION_ORDER.length
     ? []
-    : [`order must list each of ${SECTION_NAMES.join(', ')} once`];
+    : [`order must list each of ${SECTION_ORDER.join(', ')} once`];
 }
 
 function drawable(check: () => string[]): string[] {

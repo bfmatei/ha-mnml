@@ -30,9 +30,11 @@ function collectEntityIds(value: unknown, into: Set<string>): void {
 
 export interface Host {
   readonly hass: HomeAssistant | undefined;
+  readonly isConnected: boolean;
   hold(): () => void;
   register(teardown: () => void): () => void;
   notify(message: string): void;
+  refresh(): void;
 }
 
 export abstract class MnmlCard<C extends { type: string }> extends LitElement implements Host {
@@ -64,6 +66,10 @@ export abstract class MnmlCard<C extends { type: string }> extends LitElement im
       previous.entities !== hass.entities ||
       previous.devices !== hass.devices ||
       previous.locale !== hass.locale ||
+      previous.localize !== hass.localize ||
+      previous.formatEntityState !== hass.formatEntityState ||
+      previous.formatEntityAttributeValue !== hass.formatEntityAttributeValue ||
+      previous.config !== hass.config ||
       next.some((stateObj, index) => stateObj !== this.snapshot[index]);
     if (changed) {
       this.snapshot = next;
@@ -123,6 +129,11 @@ export abstract class MnmlCard<C extends { type: string }> extends LitElement im
     );
   }
 
+  override connectedCallback(): void {
+    super.connectedCallback();
+    this.requestUpdate();
+  }
+
   override disconnectedCallback(): void {
     super.disconnectedCallback();
     this.releaseAll();
@@ -142,7 +153,7 @@ export abstract class MnmlCard<C extends { type: string }> extends LitElement im
 
   protected abstract draw(hass: HomeAssistant, config: C): TemplateResult | undefined;
 
-  protected refresh(): void {
+  refresh(): void {
     this.requestUpdate();
   }
 

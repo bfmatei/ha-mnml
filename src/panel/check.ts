@@ -1,11 +1,16 @@
 import { isMapping } from '../contract/templates.ts';
-import type { SlotSpec, Template, Templates, Value } from '../contract/templates.ts';
-import { fitsKind, toValue } from '../templates/expand.ts';
+import type {
+  SlotSpec,
+  Template,
+  Templates,
+  Value,
+  WrittenTemplate,
+} from '../contract/templates.ts';
+import { PATH, fitsKind, toValue } from '../templates/expand.ts';
 
+import { shapedOf } from './data.ts';
+import { messageOf } from './message.ts';
 import { tryDraft } from './preview.ts';
-
-const message = (error: unknown): string =>
-  error instanceof Error ? error.message : String(error);
 
 function mnmlCards(value: Value, found: Record<string, Value>[] = []): Record<string, Value>[] {
   if (Array.isArray(value)) {
@@ -38,7 +43,7 @@ function wrongDefault(slots: Readonly<Record<string, SlotSpec>>, prefix = ''): s
   return undefined;
 }
 
-const READ = /\[\[([a-z_][a-z0-9_]*)(?:\.[a-z0-9_]+)*\]\]/g;
+const READ = new RegExp(`\\[\\[(${PATH})\\]\\]`, 'g');
 
 const names = (rule: Value | undefined): string[] =>
   (Array.isArray(rule) ? rule : rule === undefined ? [] : [rule]).flatMap((each) =>
@@ -48,7 +53,7 @@ const names = (rule: Value | undefined): string[] =>
 function unknownRead(value: Value, where: string, known: ReadonlySet<string>): string | undefined {
   if (typeof value === 'string') {
     for (const match of value.matchAll(READ)) {
-      if (!known.has(match[1] ?? '')) {
+      if (!known.has(match[1]?.split('.')[0] ?? '')) {
         return `${where}: ${match[0]} reads a slot the template does not declare`;
       }
     }
@@ -99,7 +104,17 @@ function unknownRead(value: Value, where: string, known: ReadonlySet<string>): s
   return undefined;
 }
 
-export function problemOf(templates: Templates, name: string, draft: Template): string | undefined {
+export function problemOf(
+  templates: Templates,
+  name: string,
+  written: WrittenTemplate,
+): string | undefined {
+  let draft: Template;
+  try {
+    draft = shapedOf(name, written);
+  } catch (error) {
+    return messageOf(error);
+  }
   const fallback = wrongDefault(draft.slots ?? {});
   if (fallback !== undefined) {
     return fallback;
@@ -114,7 +129,7 @@ export function problemOf(templates: Templates, name: string, draft: Template): 
   try {
     made = tryDraft(templates, name, draft, { slots: draft.example ?? {} }, undefined);
   } catch (error) {
-    return `With the example: ${message(error)}`;
+    return `With the example: ${messageOf(error)}`;
   }
   for (const config of mnmlCards([made.card, toValue(made.popups)])) {
     const type = config['type'];
@@ -131,7 +146,7 @@ export function problemOf(templates: Templates, name: string, draft: Template): 
     try {
       Reflect.apply(setConfig, probe, [config]);
     } catch (error) {
-      return `${tag}: ${message(error)}`;
+      return `${tag}: ${messageOf(error)}`;
     }
   }
   return undefined;

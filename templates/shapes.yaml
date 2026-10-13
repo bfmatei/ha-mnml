@@ -1,0 +1,429 @@
+meter:
+  kind: object
+  fields:
+    power: { kind: entity }
+    today: { kind: entity }
+    total: { kind: entity }
+
+outlet:
+  kind: object
+  fields:
+    entity: { kind: entity, required: true }
+    energy: { shape: meter }
+
+checks_actions:
+  kind: object
+  fields:
+    run: { kind: entity, required: true }
+    stop: { kind: entity, required: true }
+    running: { kind: entity, required: true }
+
+checks:
+  kind: object
+  fields:
+    failed: { kind: entity, required: true, label: Failed checks }
+    warnings: { kind: entity }
+    last_run: { kind: entity, required: true }
+    overdue: { kind: entity, required: true }
+    actions: { shape: checks_actions }
+
+lights:
+  kind: object
+  fields:
+    group: { kind: entity, required: true }
+    color: { kind: flag }
+    members: { shape: light_member, kind: objects }
+    scenes: { kind: entities }
+    active_scene: { kind: entity }
+
+light_member:
+  kind: object
+  fields:
+    entity: { kind: entity }
+    members: { kind: entities }
+
+heating:
+  kind: object
+  fields:
+    entity: { kind: entity, required: true }
+    preset: { kind: flag }
+    thermostats: { shape: thermostat, kind: objects }
+
+thermostat:
+  kind: object
+  fields:
+    valve: { kind: entity }
+    battery: { kind: entity }
+
+ac:
+  kind: object
+  fields:
+    entity: { kind: entity, required: true }
+    fan: { kind: flag }
+    swing: { kind: flag }
+    horizontal_swing: { kind: flag }
+    power_saving: { kind: entity }
+    dehumidifier: { kind: entity }
+    energy: { shape: meter }
+
+vacuum:
+  kind: object
+  fields:
+    entity: { kind: entity, required: true }
+    status: { kind: entity }
+    error: { kind: entity }
+    battery: { kind: entity }
+    current_room: { kind: entity }
+    progress: { kind: entity }
+    area: { kind: entity }
+    time: { kind: entity }
+    last_clean: { kind: entity }
+    mop_attached: { kind: entity }
+    water_box_attached: { kind: entity }
+    totals:
+      kind: object
+      fields:
+        count: { kind: entity }
+        area: { kind: entity }
+        time: { kind: entity }
+    map: { kind: entity }
+    routines: { kind: entities }
+    settings: { kind: entities }
+    consumables: { shape: consumable, kind: objects }
+    warnings: { kind: entities }
+    dock:
+      kind: object
+      fields:
+        error: { kind: entity }
+        dust_emptying: { kind: entity }
+        mop_drying: { kind: entity }
+        mop_drying_time_left: { kind: entity }
+        mop_washing: { kind: entity }
+        consumables: { shape: consumable, kind: objects }
+        warnings: { kind: entities }
+
+vacuum_popup:
+  shape: vacuum
+  fields:
+    consumables: { fields: { entity: { required: true } } }
+    dock: { fields: { consumables: { fields: { entity: { required: true } } } } }
+
+consumable:
+  kind: object
+  fields:
+    entity: { kind: entity }
+    reset: { kind: entity }
+
+printer3d:
+  kind: object
+  fields:
+    entity: { kind: entity, required: true }
+    progress: { kind: entity }
+    filename: { kind: entity }
+    material: { kind: entity }
+    speed: { kind: entity }
+    start: { kind: entity }
+    finish: { kind: entity }
+    nozzle: { shape: printer3d_heater }
+    bed: { shape: printer3d_heater }
+    camera: { kind: entity }
+    actions: { shape: printer3d_actions, required: true }
+    outlet: { shape: outlet }
+
+printer3d_popup:
+  shape: printer3d
+  fields:
+    progress: { required: true }
+    filename: { required: true }
+    material: { required: true }
+    speed: { required: true }
+    start: { required: true }
+    finish: { required: true }
+    nozzle: { required: true, fields: { temperature: { required: true } } }
+    bed: { required: true, fields: { temperature: { required: true } } }
+    outlet: { fields: { energy: { fields: { power: { required: true } } } } }
+
+printer3d_heater:
+  kind: object
+  fields:
+    temperature: { kind: entity }
+    target: { kind: entity }
+
+printer3d_actions:
+  kind: object
+  fields:
+    pause: { kind: entity }
+    resume: { kind: entity }
+    continue: { kind: entity }
+    cancel: { kind: entity }
+
+camera:
+  kind: object
+  fields:
+    entity: { kind: entity, required: true }
+    motion: { kind: entity }
+    person: { kind: entity }
+    doorbell: { kind: entity }
+
+cover:
+  kind: object
+  fields:
+    entity: { kind: entity, required: true }
+    garage: { kind: flag }
+
+fan:
+  kind: object
+  fields:
+    entity: { kind: entity, required: true }
+    quality: { kind: entity }
+
+humidifier:
+  kind: object
+  fields:
+    entity: { kind: entity, required: true }
+
+appliance:
+  kind: object
+  fields:
+    entity: { kind: entity, required: true }
+    remaining: { kind: entity }
+    power: { kind: entity }
+
+pet:
+  kind: object
+  fields:
+    feed: { kind: entity, required: true }
+    fed: { kind: entity, required: true }
+    food: { kind: entity }
+    litter: { kind: entity }
+
+plant:
+  kind: object
+  fields:
+    moisture: { kind: entity, required: true }
+
+player:
+  kind: object
+  fields:
+    entity: { kind: entity, required: true }
+    key: { kind: text }
+
+speaker:
+  kind: object
+  fields:
+    key: { kind: text, required: true }
+    entity: { kind: entity, required: true }
+    bass: { kind: entity }
+    treble: { kind: entity }
+    balance: { kind: entity }
+    loudness: { kind: entity }
+    tv:
+      kind: object
+      label: TV
+      fields:
+        input_format: { kind: entity }
+        night_sound: { kind: entity, required: true }
+        speech_enhancement: { kind: entity, required: true }
+        audio_delay: { kind: entity, required: true }
+    subwoofer:
+      kind: object
+      fields:
+        enabled: { kind: entity, required: true }
+        gain: { kind: entity, required: true }
+    surround:
+      kind: object
+      fields:
+        enabled: { kind: entity, required: true }
+        level: { kind: entity, required: true }
+        music_level: { kind: entity, required: true }
+        music_full_volume: { kind: entity, required: true }
+
+diffuser:
+  kind: object
+  fields:
+    entity: { kind: entity, required: true }
+    amount: { kind: entity, required: true }
+
+person_device:
+  kind: object
+  fields:
+    key: { kind: text, required: true }
+    name: { kind: text }
+    icon: { kind: icon }
+    tracker: { kind: entity }
+    battery: { kind: entity }
+    battery_state: { kind: entity }
+    connection: { kind: entity }
+    network: { kind: entity }
+    storage: { kind: entity }
+    focus: { kind: entity }
+    focus_name: { kind: entity }
+    activity: { kind: entity }
+    permission: { kind: entity }
+
+person_device_popup:
+  shape: person_device
+  fields:
+    battery: { required: true }
+    battery_state: { required: true }
+    connection: { required: true }
+    network: { required: true }
+    storage: { required: true }
+    focus: { required: true }
+    activity: { required: true }
+    permission: { required: true }
+
+health:
+  kind: object
+  fields:
+    steps: { kind: entity, required: true }
+    distance: { kind: entity, required: true }
+    flights_climbed: { kind: entity, required: true }
+    active_energy: { kind: entity, required: true }
+    resting_energy: { kind: entity, required: true }
+
+guest:
+  kind: object
+  fields:
+    host: { kind: text }
+    status: { kind: entity, required: true }
+    cpu: { kind: entity, label: CPU }
+    memory: { kind: entity }
+    disk:
+      kind: object
+      fields:
+        used: { kind: entity }
+        size: { kind: entity }
+
+server_temperatures:
+  kind: object
+  fields:
+    cpu: { kind: entity, required: true, label: CPU }
+    root_disk: { kind: entity, required: true }
+
+server_disks:
+  kind: object
+  fields:
+    pool: { kind: entity, required: true }
+    failing: { kind: entity, required: true }
+    life_left: { kind: entity, required: true }
+
+server_backups:
+  kind: object
+  fields:
+    last: { kind: entity, required: true }
+    problem: { kind: entity, required: true }
+    bucket: { kind: entity }
+
+notifications:
+  kind: object
+  fields:
+    messages: { kind: entity, required: true }
+    clear: { kind: entity }
+    sources:
+      kind: objects
+      fields:
+        source: { kind: text }
+        name: { kind: text }
+
+message_source:
+  kind: object
+  fields:
+    source: { kind: text }
+    name: { kind: text }
+    entity: { kind: entity }
+
+system_backups:
+  kind: object
+  fields:
+    last: { kind: entity, required: true }
+    attempted: { kind: entity }
+    problem: { kind: entity }
+
+room_firmware:
+  kind: object
+  fields:
+    name: { kind: text, required: true }
+    firmware: { kind: entities }
+
+wifi:
+  kind: object
+  fields:
+    key: { kind: text, required: true }
+    enabled: { kind: entity, required: true }
+    qr: { kind: entity, label: QR code }
+    switchable: { kind: flag }
+
+clients:
+  kind: object
+  fields:
+    entity: { kind: entity, required: true }
+    names: { kind: entity }
+    networks:
+      kind: objects
+      required: true
+      fields:
+        name: { kind: text }
+        icon: { kind: icon }
+        subnet: { kind: text, required: true }
+
+router:
+  kind: object
+  fields:
+    cpu: { kind: entity, required: true, label: CPU }
+    temperature: { kind: entity, required: true }
+
+tailscale_device:
+  kind: object
+  fields:
+    connected: { kind: entity, required: true, label: Connected to control }
+    essential:
+      {
+        kind: flag,
+        help: 'A device that must stay connected, such as the router and the exit node; the others may come and go.',
+      }
+    ip_address: { kind: entity, label: IP address }
+    last_seen: { kind: entity }
+    expires: { kind: entity, label: Key expires }
+    update: { kind: entity, label: Client update }
+    udp: { kind: entity, label: Supports UDP }
+
+media_requests:
+  kind: object
+  fields:
+    pending: { kind: entity, required: true }
+    processing: { kind: entity, required: true }
+
+movies:
+  kind: object
+  fields:
+    queue: { kind: entity, required: true }
+    count: { kind: entity, required: true }
+    health: { kind: entity }
+    space: { kind: entity }
+    calendar: { kind: entity }
+
+shows:
+  kind: object
+  fields:
+    queue: { kind: entity, required: true }
+    count: { kind: entity, required: true }
+    wanted: { kind: entity }
+    upcoming: { kind: entity }
+    calendar: { kind: entity }
+
+lock_words:
+  label: Lock words
+  kind: object
+  default: { secured: Locked, selectivelocked: Partly locked }
+  fields:
+    secured: { kind: text }
+    selectivelocked: { kind: text }
+
+alarm_words:
+  label: Alarm words
+  kind: object
+  default: { doorsonly: Doors only, doorstiltcabin: Armed }
+  fields:
+    doorsonly: { kind: text }
+    doorstiltcabin: { kind: text }

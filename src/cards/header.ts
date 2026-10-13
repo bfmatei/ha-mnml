@@ -13,12 +13,11 @@ import { tint } from '../ha/rules.ts';
 import { colorStyle, icon, quietly, stateIcon } from '../ha/templates.ts';
 
 import { MnmlCard, requireString } from './base.ts';
-import { marked, variant } from './keys.ts';
 import type { KeySchema } from './keys.ts';
 import { renderControls, requireControls } from './parts/controls.ts';
 import { ITEM_STYLE } from './parts/item.ts';
 import { tip } from './parts/tooltip.ts';
-import { CONTROLS, STATE_ITEMS, STATE_RULE } from './schemas.ts';
+import { HEADER_CARD } from './schemas.ts';
 import { BASE_STYLE } from './styles.ts';
 
 const HEADER_STYLE = css`
@@ -51,41 +50,6 @@ const HEADER_STYLE = css`
   }
 `;
 
-const NESTED = { when: STATE_RULE, state: STATE_ITEMS, controls: CONTROLS };
-
-const SCHEMA = marked(
-  {
-    name: variant<Extract<HeaderCard, { name: string }>>(
-      {
-        type: true,
-        color: true,
-        when: true,
-        state: true,
-        controls: true,
-        back: true,
-        entity: true,
-        name: true,
-        icon: true,
-      },
-      NESTED,
-    ),
-  },
-  variant<Extract<HeaderCard, { name?: never }>>(
-    {
-      type: true,
-      color: true,
-      when: true,
-      state: true,
-      controls: true,
-      back: true,
-      entity: true,
-      label: true,
-      icon: true,
-    },
-    NESTED,
-  ),
-);
-
 function round(label: string, glyph: TemplateResult, run: () => void): TemplateResult {
   return html`<button
     type="button"
@@ -102,7 +66,7 @@ export class MnmlHeaderCard extends MnmlCard<HeaderCard> {
   static override styles = [BASE_STYLE, ...ITEM_STYLE, HEADER_STYLE];
 
   protected schema(): KeySchema {
-    return SCHEMA;
+    return HEADER_CARD;
   }
 
   protected override validate(config: HeaderCard): void {

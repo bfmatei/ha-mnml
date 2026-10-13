@@ -18,12 +18,24 @@ export class TemplateError extends Error {}
 
 type Mapping = Record<string, Value>;
 
-const PATH = '[a-z_][a-z0-9_]*(?:\\.[a-z0-9_]+)*';
+export const PATH = '[a-z_][a-z0-9_]*(?:\\.(?:[a-z0-9_]+|\\*|[?!][a-z_][a-z0-9_]*))*';
+export const OVER = /^(?:\*|([?!])([a-z_][a-z0-9_]*))$/;
+const LISTS: ReadonlySet<Kind> = new Set(['entities', 'texts', 'objects']);
+const LIST_OF: Readonly<Partial<Record<Kind, Kind>>> = {
+  entity: 'entities',
+  entities: 'entities',
+  text: 'texts',
+  icon: 'texts',
+  texts: 'texts',
+  object: 'objects',
+  objects: 'objects',
+};
 const WHOLE = new RegExp(`^\\[\\[(${PATH})\\]\\]$`);
 const PART = new RegExp(`\\[\\[(${PATH})\\]\\]`, 'g');
 const BRACKETS = /\[\[([^[\]]*)\]\]/g;
 const SLOT_PATH = new RegExp(`^${PATH}$`);
 const SLOT_NAME = /^[a-z_][a-z0-9_]*$/;
+const RETIRED_PATH = /^[a-z_][a-z0-9_]*(?:\.[a-z_][a-z0-9_]*)*$/;
 const CONTROL = new Set(['if', 'unless', 'template', 'slots']);
 const DROP = Symbol('drop');
 
@@ -103,26 +115,104 @@ function step(spec: SlotSpec | undefined, name: string, at: string, scope: Scope
   return spec.fields[name];
 }
 
-function walk(path: string, scope: Scope, where: string) {
+interface Walked {
+  value: Value | undefined;
+  spec: SlotSpec | undefined;
+}
+
+function listed(spec: SlotSpec | undefined): SlotSpec | undefined {
+  const kind = spec === undefined ? undefined : LIST_OF[spec.kind];
+  if (kind === undefined) {
+    return undefined;
+  }
+  return spec?.fields === undefined ? { kind } : { kind, fields: spec.fields };
+}
+
+function child(value: Value | undefined, name: string): Value | undefined {
+  if (Array.isArray(value)) {
+    return value[Number(name)];
+  }
+  return isMapping(value) ? value[name] : undefined;
+}
+
+function follow(
+  value: Value | undefined,
+  spec: SlotSpec | undefined,
+  rest: readonly string[],
+  at: string,
+  scope: Scope,
+  where: string,
+): Walked {
+  const [name, ...more] = rest;
+  if (name === undefined) {
+    return { value, spec };
+  }
+  const over = OVER.exec(name);
+  if (over === null) {
+    return follow(
+      child(value, name),
+      step(spec, name, at, scope, where),
+      more,
+      `${at}.${name}`,
+      scope,
+      where,
+    );
+  }
+  if (spec !== undefined && !LISTS.has(spec.kind)) {
+    fail(scope.template, where, `${at} is not a list`);
+  }
+  const element = member(spec);
+  const [, sign, field] = over;
+  if (field !== undefined && spec !== undefined && spec.kind !== 'objects') {
+    fail(
+      scope.template,
+      where,
+      `${at} is of kind ${spec.kind}, whose elements have no field ${field}`,
+    );
+  }
+  if (
+    field !== undefined &&
+    element?.fields !== undefined &&
+    !Object.hasOwn(element.fields, field)
+  ) {
+    fail(scope.template, where, `${at} has no field named ${field}`);
+  }
+  const into = `${at}.${name}`;
+  const shape = listed(follow(undefined, element, more, into, scope, where).spec);
+  if (value === undefined || value === null) {
+    return { value: undefined, spec: shape };
+  }
+  if (!Array.isArray(value)) {
+    return fail(scope.template, where, `${at} is not a list`);
+  }
+  const found: Value[] = [];
+  for (const item of value) {
+    if (field !== undefined && !isMapping(item)) {
+      fail(
+        scope.template,
+        where,
+        `${at} holds an element that is not an object, so it has no field ${field}`,
+      );
+    }
+    if (field !== undefined && filled(child(item, field)) !== (sign === '?')) {
+      continue;
+    }
+    const reached = follow(item, element, more, into, scope, where).value;
+    if (Array.isArray(reached)) {
+      found.push(...reached);
+    } else if (reached !== undefined && reached !== null) {
+      found.push(reached);
+    }
+  }
+  return { value: found, spec: shape };
+}
+
+function walk(path: string, scope: Scope, where: string): Walked {
   const [head = '', ...rest] = path.split('.');
   if (!scope.values.has(head)) {
     fail(scope.template, where, `no slot named ${head}`);
   }
-  let value = scope.values.get(head);
-  let spec = scope.specs.get(head);
-  let at = head;
-  for (const name of rest) {
-    spec = step(spec, name, at, scope, where);
-    at = `${at}.${name}`;
-    if (Array.isArray(value)) {
-      value = value[Number(name)];
-    } else if (isMapping(value)) {
-      value = value[name];
-    } else {
-      value = undefined;
-    }
-  }
-  return { value, spec };
+  return follow(scope.values.get(head), scope.specs.get(head), rest, head, scope, where);
 }
 
 function lookup(path: string, scope: Scope, where: string): Value | undefined {
@@ -140,7 +230,7 @@ function interpolate(text: string, scope: Scope, where: string): Out {
       fail(
         scope.template,
         where,
-        `${written} is not a slot path: paths are lower case letters, digits, _ and .`,
+        `${written} is not a slot path: paths are lower case letters, digits, _ and ., with * over a list`,
       );
     }
   }
@@ -297,7 +387,7 @@ function renderMapping(
   const slots =
     node['slots'] === undefined
       ? {}
-      : render(node['slots'], scope, { ...context, marking: undefined }, `${where}.slots`);
+      : passed(node['slots'], scope, { ...context, marking: undefined }, `${where}.slots`);
   if (!isMapping(slots)) {
     return fail(scope.template, where, 'slots: must be a mapping');
   }
@@ -325,6 +415,20 @@ function renderMapping(
   return { ...base, ...own, ...mark };
 }
 
+function passed(node: Value, scope: Scope, context: Context, where: string): Out {
+  const rendered = render(node, scope, context, where);
+  if (!isMapping(node) || !isMapping(rendered)) {
+    return rendered;
+  }
+  const none = Object.entries(node).flatMap(([key, value]) => {
+    const path = typeof value === 'string' ? WHOLE.exec(value)?.[1] : undefined;
+    return path !== undefined && !key.endsWith('?') && lookup(path, scope, where) === null
+      ? [key]
+      : [];
+  });
+  return { ...rendered, ...Object.fromEntries(none.map((key) => [key, null])) };
+}
+
 function render(node: Value, scope: Scope, context: Context, where: string): Out {
   if (typeof node === 'string') {
     return interpolate(node, scope, where);
@@ -342,6 +446,8 @@ function settle(
   value: Value | undefined,
   spec: SlotSpec,
   at: string,
+  path: string,
+  retired: ReadonlySet<string>,
   who: string,
 ): Value | undefined {
   if (spec.required && !filled(value)) {
@@ -362,13 +468,20 @@ function settle(
   }
   const shape = (item: Mapping, prefix: string): Mapping => {
     for (const key of Object.keys(item)) {
-      if (!Object.hasOwn(fields, key)) {
+      if (!Object.hasOwn(fields, key) && !retired.has(`${path}.${key}`)) {
         fail(who, '', `${prefix} has no field named ${key}`);
       }
     }
     const out: Mapping = {};
     for (const [key, inner] of Object.entries(fields)) {
-      const settled = settle(item[key] ?? inner.default, inner, `${prefix}.${key}`, who);
+      const settled = settle(
+        item[key] ?? inner.default,
+        inner,
+        `${prefix}.${key}`,
+        `${path}.${key}`,
+        retired,
+        who,
+      );
       if (settled !== undefined) {
         out[key] = settled;
       }
@@ -396,6 +509,14 @@ function checkSlots(who: string, slots: unknown, prefix: string): void {
     if (!SLOT_NAME.test(name)) {
       fail(who, '', `the slot name ${at} is not lower case letters, digits and _`);
     }
+    const shape = isMapping(spec) ? spec['shape'] : undefined;
+    if (shape !== undefined) {
+      fail(
+        who,
+        '',
+        `the slot ${at} uses the shape ${typeof shape === 'string' ? shape : JSON.stringify(shape)}, which could not be resolved`,
+      );
+    }
     const kind = isMapping(spec) ? spec['kind'] : undefined;
     if (typeof kind !== 'string' || !Object.hasOwn(KINDS, kind)) {
       fail(
@@ -411,6 +532,30 @@ function checkSlots(who: string, slots: unknown, prefix: string): void {
   }
 }
 
+function declares(slots: Record<string, SlotSpec> | undefined, path: readonly string[]): boolean {
+  const [name = '', ...rest] = path;
+  const spec = slots !== undefined && Object.hasOwn(slots, name) ? slots[name] : undefined;
+  return spec !== undefined && (rest.length === 0 || declares(spec.fields, rest));
+}
+
+function checkRetired(who: string, template: Template): void {
+  const retired: unknown = template.retired;
+  if (retired === undefined) {
+    return;
+  }
+  if (
+    !Array.isArray(retired) ||
+    !retired.every((path) => typeof path === 'string' && RETIRED_PATH.test(path))
+  ) {
+    fail(who, '', 'retired: takes a list of slot paths, dotted for a field: heating.batteries');
+  }
+  for (const path of template.retired ?? []) {
+    if (declares(template.slots, path.split('.'))) {
+      fail(who, '', `the retired path ${path} names a slot the template declares`);
+    }
+  }
+}
+
 function resolve(
   name: string,
   who: string,
@@ -420,18 +565,25 @@ function resolve(
 ): Scope {
   if (!CHECKED.has(template)) {
     checkSlots(who, template.slots, '');
+    checkRetired(who, template);
     CHECKED.add(template);
   }
   const specs: Record<string, SlotSpec> = template.slots ?? {};
+  const retired = new Set(template.retired);
   for (const key of Object.keys(given)) {
-    if (!Object.hasOwn(specs, key)) {
+    if (!Object.hasOwn(specs, key) && !retired.has(key)) {
       fail(who, '', `no slot named ${key}`);
     }
   }
   const values = new Map<string, Value | undefined>();
   for (const [slot, spec] of Object.entries(specs)) {
     const value = Object.hasOwn(given, slot) ? given[slot] : (discovered[slot] ?? spec.default);
-    values.set(slot, settle(value, spec, slot, who));
+    values.set(
+      slot,
+      value === null && spec.required !== true
+        ? null
+        : settle(value, spec, slot, slot, retired, who),
+    );
   }
   return { template: name, values, specs: new Map(Object.entries(specs)) };
 }

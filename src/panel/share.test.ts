@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 import { test } from 'vitest';
 
-import { HOME } from '../builder/fixture.ts';
+import { HOME, HOUSE } from '../builder/fixture.ts';
 import { planFrom } from '../builder/plan.ts';
 import type { Recipe } from '../contract/builder.ts';
 import type { Template } from '../contract/templates.ts';
@@ -40,6 +40,18 @@ test('the preview of a dashboard template says what it makes here, and what it c
   assert.match(
     previewOf({ ...RECIPE, sections: { rooms: { template: 'person' } } }, empty),
     /no room/,
+  );
+});
+
+test('a rooms template that draws only in areas that are not rooms is said to draw in none of the rooms', () => {
+  const entities = Object.fromEntries(
+    Object.entries(HOUSE.entities).filter(([id]) => id !== 'light.living_lamp'),
+  );
+  const plan = planFrom(RECIPE, { ...HOUSE, entities }, SHIPPED);
+  assert.deepEqual(plan.rooms, []);
+  assert.match(
+    previewOf(RECIPE, plan),
+    /Its rooms template draws in none of this home's rooms, so there is no room\./,
   );
 });
 

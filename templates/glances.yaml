@@ -1,5 +1,5 @@
 glances:
-  description: "The strip of the home's overall statuses, one line across the section: the weather, the alarm, the vacation toggle, and whatever needs you: failed checks, low batteries, a leak, smoke. What does not need you is not drawn."
+  description: "The strip of the home's overall statuses, one line across the section: the weather, the alarm, the vacation toggle, and whatever needs you: failed checks, stopped guests, devices down or offline, low batteries, a lock or a car left open, a leak, smoke. What does not need you is not drawn."
   slots:
     weather:
       {
@@ -37,20 +37,9 @@ glances:
         solar_today: { kind: entity, label: Solar today }
         export_today: { kind: entity, label: Export today }
     checks:
-      kind: object
+      shape: checks
       group: Problems
       help: The daily checks; the item counts the failed ones and the warnings together while there are any, and opens the checks pop-up.
-      fields:
-        failed: { kind: entity, required: true, label: Failed checks }
-        warnings: { kind: entity }
-        last_run: { kind: entity, required: true }
-        overdue: { kind: entity, required: true }
-        actions:
-          kind: object
-          fields:
-            run: { kind: entity, required: true }
-            stop: { kind: entity, required: true }
-            running: { kind: entity, required: true }
     batteries:
       {
         kind: entities,
@@ -107,6 +96,65 @@ glances:
         help: A binary sensor that is on while the backups have a problem.,
         group: Problems,
       }
+    guests:
+      {
+        kind: entities,
+        discover:
+          { domain: binary_sensor, platform: proxmoxve, translation_key: status, scope: all },
+        help: "The Proxmox guests' running states; counted while off.",
+        group: Problems,
+      }
+    network_devices:
+      {
+        kind: entities,
+        discover: { domain: sensor, platform: unifi, translation_key: device_state, scope: all },
+        label: Network devices,
+        help: "The network devices' states; counted while not up.",
+        group: Problems,
+      }
+    device_up:
+      {
+        kind: texts,
+        default: [connected, upgrading, provisioning],
+        label: Up states,
+        group: Problems,
+      }
+    tailscale:
+      {
+        kind: entities,
+        label: Essential Tailscale devices,
+        help: 'The connection sensors of the Tailscale devices that must stay connected; counted while off.',
+        group: Problems,
+      }
+    media_health:
+      {
+        kind: entity,
+        discover: { domain: binary_sensor, platform: radarr, translation_key: health, scope: all },
+        label: Media health,
+        help: 'A binary sensor that is on while the media server reports a problem.',
+        group: Problems,
+      }
+    locks:
+      kind: objects
+      group: Problems
+      help: 'Each lock, and the key of the room whose pop-up deals with it; counted while unlocked, open or jammed.'
+      fields:
+        entity: { kind: entity, required: true }
+        room: { kind: text, label: Room key }
+      discover:
+        device: { domain: lock }
+        scope: all
+        fields: { entity: { domain: lock }, room: area.id }
+    cars:
+      kind: objects
+      group: Problems
+      help: "Each car's key, lock state and arming state; counted while unlocked or unarmed, in the car template's words."
+      fields:
+        key: { kind: text, required: true }
+        lock: { kind: entity }
+        alarm: { kind: entity }
+        unlocked: { kind: texts, default: [unlocked, selectivelocked] }
+        disarmed: { kind: texts, default: [unarmed] }
     low: { kind: number, default: 20 }
     critical: { kind: number, default: 5 }
   card:
@@ -146,7 +194,6 @@ glances:
         entities: ['[[checks.failed]]', '[[checks.warnings]]']
         name: Checks
         icon: mdi:clipboard-alert-outline
-        color: orange
         sum: true
         critical: 1
         popup: '#checks'
@@ -176,6 +223,38 @@ glances:
         color: orange
         show: { is: ['on'] }
         popup: '#proxmox'
+      - id: guests
+        if: guests
+        entities: '[[guests]]'
+        name: Stopped guests
+        icon: mdi:server-network-off
+        color: red
+        is: ['off']
+        popup: '#proxmox'
+      - id: network-devices
+        if: network_devices
+        entities: '[[network_devices]]'
+        name: Network devices down
+        icon: mdi:access-point-network-off
+        color: red
+        not: '[[device_up]]'
+        popup: '#network'
+      - id: tailscale
+        if: tailscale
+        entities: '[[tailscale]]'
+        name: Tailscale offline
+        icon: mdi:lan-disconnect
+        color: red
+        is: ['off']
+        popup: '#tailscale'
+      - id: media-health
+        if: media_health
+        entities: ['[[media_health]]']
+        name: Media health
+        icon: mdi:heart-pulse
+        color: red
+        is: ['on']
+        popup: '#media'
       - id: batteries
         if: batteries
         entities: '[[batteries]]'
@@ -200,6 +279,35 @@ glances:
         color: amber
         is: ['on']
         popup: '#system'
+      - id: each-locks
+        each: locks
+        as: lock
+        if: lock.room
+        entities: ['[[lock.entity]]']
+        name: Unlocked
+        icon: mdi:lock-open-variant-outline
+        color: red
+        is: [unlocked, open, jammed]
+        popup: '#[[lock.room]]'
+      - id: each-locks-2
+        each: locks
+        as: lock
+        unless: lock.room
+        entities: ['[[lock.entity]]']
+        name: Unlocked
+        icon: mdi:lock-open-variant-outline
+        color: red
+        is: [unlocked, open, jammed]
+      - id: each-cars
+        each: cars
+        as: car
+        if: [car.lock, car.alarm]
+        entities: ['[[car.lock]]', '[[car.alarm]]']
+        name: Car security
+        icon: mdi:car-key
+        color: red
+        is: ['[[car.unlocked]]', '[[car.disarmed]]']
+        popup: '#car-[[car.key]]'
       - id: leaks
         if: leaks
         entities: '[[leaks]]'
@@ -266,20 +374,7 @@ weather-popup:
 checks-popup:
   description: 'The daily checks: what failed, the warnings, when they last ran, and the details.'
   slots:
-    checks:
-      kind: object
-      required: true
-      fields:
-        failed: { kind: entity, required: true, label: Failed checks }
-        warnings: { kind: entity }
-        last_run: { kind: entity, required: true }
-        overdue: { kind: entity, required: true }
-        actions:
-          kind: object
-          fields:
-            run: { kind: entity, required: true }
-            stop: { kind: entity, required: true }
-            running: { kind: entity, required: true }
+    checks: { shape: checks, required: true }
   card:
     hash: '#checks'
     cards:

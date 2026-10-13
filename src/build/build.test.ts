@@ -3,15 +3,15 @@ import { createHash } from 'node:crypto';
 import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { SourceMap } from 'node:module';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { test } from 'vitest';
 
 import { COMMON_FAMILY } from '../templates/families.ts';
-import { familyNames, readFamily } from '../templates/shipped.ts';
+import { familyNames, readFamily, readShapes } from '../templates/shipped.ts';
 
-import { buildBundle, familiesModule } from './bundle.ts';
+import { buildBundle, familiesModule, sourceOf } from './bundle.ts';
 import { BUNDLE } from './names.ts';
 
 function loaded(dir: string, entry: string, seen = new Set<string>()): string {
@@ -94,6 +94,35 @@ test('the source map leads a place in the bundle back to its source, which it ca
   }
 });
 
+test('the source maps name a dependency from its package, never by where the checkout keeps it', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'mnml-'));
+  try {
+    await buildBundle(join(dir, 'cards.js'));
+    const sources = readdirSync(dir)
+      .filter((name) => name.endsWith('.map'))
+      .flatMap((name) => {
+        const map: { sources: string[] } = JSON.parse(readFileSync(join(dir, name), 'utf8'));
+        return map.sources;
+      });
+    assert.ok(sources.some((source) => source.startsWith('node_modules/lit-html/')));
+    assert.deepEqual(
+      sources.filter(
+        (source) => !/^(?:src|node_modules)\//.test(source) || /\.\.|\.pnpm/.test(source),
+      ),
+      [],
+    );
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test('a build inside a parent workspace names its sources as a checkout of its own does', () => {
+  const file = 'node_modules/.pnpm/lit-html@3.3.3/node_modules/lit-html/directives/keyed.js';
+  assert.equal(sourceOf(resolve(file)), 'node_modules/lit-html/directives/keyed.js');
+  assert.equal(sourceOf(resolve('../..', file)), 'node_modules/lit-html/directives/keyed.js');
+  assert.equal(sourceOf(resolve('src/cards/register.ts')), 'src/cards/register.ts');
+});
+
 test('the bundle carries the common templates and an index, and no YAML parser', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'mnml-'));
   try {
@@ -155,6 +184,24 @@ test('HACS installs the zip the release attaches, and the integration serves the
   );
 });
 
+test('the integration serves the bundle, the loader and the panel by the names the build gives them', async () => {
+  const constants = readFileSync('custom_components/mnml/const.py', 'utf8');
+  const dir = mkdtempSync(join(tmpdir(), 'mnml-'));
+  try {
+    await buildBundle(join(dir, BUNDLE));
+    const written = readdirSync(dir);
+    for (const key of ['BUNDLE', 'LOADER', 'PANEL']) {
+      const name = new RegExp(`^${key}: Final = "([^"]+)"$`, 'm').exec(constants)?.[1];
+      assert.ok(
+        name !== undefined && written.includes(name),
+        `${key} names a file the build writes`,
+      );
+    }
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+});
+
 test('a family that cannot be fetched or read names its file, whatever went wrong', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'mnml-'));
   const original = globalThis.fetch;
@@ -183,6 +230,19 @@ test('a family that cannot be fetched or read names its file, whatever went wron
     );
   } finally {
     globalThis.fetch = original;
+    rmSync(dir, { recursive: true });
+  }
+});
+
+test("the index carries the shipped shapes, for the home's own templates that name one", async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'mnml-'));
+  try {
+    const file = join(dir, 'families.mjs');
+    writeFileSync(file, familiesModule({}, {}, {}));
+    const { SLOT_SHAPES } = (await import(pathToFileURL(file).href)) as { SLOT_SHAPES: unknown };
+    assert.deepEqual(SLOT_SHAPES, readShapes());
+    assert.ok(Object.keys(readShapes()).length > 0);
+  } finally {
     rmSync(dir, { recursive: true });
   }
 });

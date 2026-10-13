@@ -99,3 +99,28 @@ test('a car plan without a number for each tyre share is an error card', () => {
     made.setConfig({ ...CONFIG, tyre_warn_share: '0.95' } as never);
   }, /tyre_warn_share must be a number/);
 });
+
+test('the drawing is an image named by what it shows, part by part', async () => {
+  const made = card();
+  made.setConfig(CONFIG as never);
+  made.hass = hassOf({ 'binary_sensor.door_front_left': 'on' }) as never;
+  const root = await mounted(made);
+  const drawing = root.querySelector('svg');
+  assert.equal(drawing?.getAttribute('role'), 'img');
+  assert.equal(
+    drawing.getAttribute('aria-label'),
+    [
+      'Hood: off',
+      'Tailgate: off',
+      'Front left door: on',
+      'Front right door: off',
+      'Rear left door: off',
+      'Rear right door: off',
+      'Front left window: closed',
+      'Front right window: closed',
+      'Rear left window: closed',
+      'Rear right window: closed',
+    ].join('. '),
+  );
+  assert.ok(root.querySelector('.caption.alert'), 'and the caption says what is open');
+});

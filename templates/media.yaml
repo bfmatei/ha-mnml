@@ -12,7 +12,7 @@ media-server:
       help: 'The number of streams playing on other media servers, such as Jellyfin beside Plex.'
     update: { kind: entity }
     requests:
-      kind: object
+      shape: media_requests
       discover:
         fields:
           pending:
@@ -24,25 +24,16 @@ media-server:
               translation_key: processing_requests,
               scope: all,
             }
-      fields:
-        pending: { kind: entity, required: true }
-        processing: { kind: entity, required: true }
     movies:
-      kind: object
+      shape: movies
       discover:
         fields:
           queue: { domain: sensor, platform: radarr, translation_key: queue, scope: all }
           count: { domain: sensor, platform: radarr, translation_key: movies, scope: all }
           health: { domain: binary_sensor, platform: radarr, translation_key: health, scope: all }
           calendar: { domain: calendar, platform: radarr, scope: all }
-      fields:
-        queue: { kind: entity, required: true }
-        count: { kind: entity, required: true }
-        health: { kind: entity }
-        space: { kind: entity }
-        calendar: { kind: entity }
     shows:
-      kind: object
+      shape: shows
       discover:
         fields:
           queue: { domain: sensor, platform: sonarr, translation_key: queue, scope: all }
@@ -50,12 +41,6 @@ media-server:
           wanted: { domain: sensor, platform: sonarr, translation_key: wanted, scope: all }
           upcoming: { domain: sensor, platform: sonarr, translation_key: upcoming, scope: all }
           calendar: { domain: calendar, platform: sonarr, scope: all }
-      fields:
-        queue: { kind: entity, required: true }
-        count: { kind: entity, required: true }
-        wanted: { kind: entity }
-        upcoming: { kind: entity }
-        calendar: { kind: entity }
     none: { kind: texts, default: ['0', unknown, unavailable] }
   card:
     type: custom:mnml-tile-card
@@ -76,6 +61,7 @@ media-server:
           [
             {
               id: requests-pending,
+              if: none,
               entities: ['[[requests.pending]]'],
               color: amber,
               not: '[[none]]',
@@ -91,6 +77,7 @@ media-server:
           [
             {
               id: movies-queue,
+              if: none,
               entities: ['[[movies.queue]]', '[[shows.queue]]'],
               label: device,
               color: amber,
@@ -141,6 +128,7 @@ media-server:
         requests: '[[requests]]'
         movies: '[[movies]]'
         shows: '[[shows]]'
+        none: '[[none]]'
   example: &media
     streams: sensor.plex_watching
     movies: { queue: sensor.radarr_queue, count: sensor.radarr_movies }
@@ -151,27 +139,10 @@ media-popup:
     streams: { kind: entity, required: true }
     more_streams: { kind: entities }
     update: { kind: entity }
-    requests:
-      kind: object
-      fields:
-        pending: { kind: entity, required: true }
-        processing: { kind: entity, required: true }
-    movies:
-      kind: object
-      fields:
-        queue: { kind: entity, required: true }
-        count: { kind: entity, required: true }
-        health: { kind: entity }
-        space: { kind: entity }
-        calendar: { kind: entity }
-    shows:
-      kind: object
-      fields:
-        queue: { kind: entity, required: true }
-        count: { kind: entity, required: true }
-        wanted: { kind: entity }
-        upcoming: { kind: entity }
-        calendar: { kind: entity }
+    requests: { shape: media_requests }
+    movies: { shape: movies }
+    shows: { shape: shows }
+    none: { kind: texts, default: ['0', unknown, unavailable] }
   card:
     hash: '#media'
     cards:
@@ -208,9 +179,13 @@ media-popup:
         icon: mdi:account-clock-outline
         rows:
           - id: requests-pending
+            if: none
             entity: '[[requests.pending]]'
             color: amber
-            when: { not: ['0'] }
+            when: { not: '[[none]]' }
+          - id: requests-pending-2
+            unless: none
+            entity: '[[requests.pending]]'
           - id: requests-processing
             entity: '[[requests.processing]]'
       - id: movies-shows
@@ -224,13 +199,13 @@ media-popup:
             entity: '[[movies.queue]]'
             label: device
             color: amber
-            when: { not: ['0'] }
+            when: { not: '[[none]]' }
           - id: shows
             if: shows
             entity: '[[shows.queue]]'
             label: device
             color: amber
-            when: { not: ['0'] }
+            when: { not: '[[none]]' }
           - id: shows-wanted
             if: shows.wanted
             entity: '[[shows.wanted]]'
