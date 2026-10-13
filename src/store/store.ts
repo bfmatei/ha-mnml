@@ -83,8 +83,16 @@ function storeOf(message: unknown): SharedState {
   return { status: 'ready', own, written, changes };
 }
 
+function same(next: SharedState, state: SharedState): boolean {
+  try {
+    return JSON.stringify(next) === JSON.stringify(state);
+  } catch {
+    return false;
+  }
+}
+
 function settle(entry: Entry, next: SharedState): void {
-  if (JSON.stringify(next) === JSON.stringify(entry.state)) {
+  if (same(next, entry.state)) {
     return;
   }
   entry.state = next;
