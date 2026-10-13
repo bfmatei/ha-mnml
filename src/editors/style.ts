@@ -147,47 +147,6 @@ export const EDITOR_STYLE = css`
   .needs {
     color: var(--error-color);
   }
-  .fold {
-    justify-content: flex-start;
-    margin: 12px 0 0;
-    color: var(--primary-color);
-    font-size: 14px;
-    font-weight: 500;
-  }
-  .gallery {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-  .tiles {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-    gap: 8px;
-  }
-  .tile {
-    height: auto;
-    flex-direction: column;
-    align-items: stretch;
-    justify-content: flex-start;
-    text-align: left;
-    padding: 8px;
-    border-radius: 12px;
-    box-shadow: inset 0 0 0 1px var(--divider-color);
-    white-space: normal;
-  }
-  .tile-name {
-    font-weight: 500;
-    color: var(--primary-text-color);
-  }
-  .tile-description {
-    font-size: 12px;
-  }
-  .tile-preview {
-    height: 120px;
-    overflow: hidden;
-    pointer-events: none;
-    border-radius: 8px;
-  }
   .template-head {
     display: flex;
     flex-direction: column;

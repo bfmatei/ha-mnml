@@ -178,3 +178,58 @@ test('a required text or entity cleared in the form stays, empty, so the part ke
   assert.deepEqual(back, { type: 'custom:mnml-header-card', name: '', icon: 'mdi:door' });
   assert.equal(variantOf(header, back), named);
 });
+
+const PLANNED: Record<string, Value> = {
+  type: 'custom:mnml-car-plan-card',
+  title: 'Car',
+  doors: ['binary_sensor.a', 'binary_sensor.b', 'binary_sensor.c', 'binary_sensor.d'],
+  hood: 'binary_sensor.hood',
+  tailgate: 'binary_sensor.tailgate',
+  windows: ['sensor.a', 'sensor.b', 'sensor.c', 'sensor.d'],
+  open_states: ['open'],
+  half_states: [],
+  tyres: ['sensor.a', 'sensor.b', 'sensor.c', 'sensor.d'],
+  tyre_targets: ['sensor.a', 'sensor.b', 'sensor.c', 'sensor.d'],
+  tyre_low_share: 0.9,
+  tyre_warn_share: 0.95,
+};
+
+test('a form writes only the fields changed in it, and an empty value over a default stays', () => {
+  assert.ok(CAR?.kind === 'plain');
+  const titled = fromForm(
+    CAR,
+    ['title', 'icon'],
+    { ...formData(CAR, ['title', 'icon'], PLANNED), title: 'My car' },
+    PLANNED,
+  );
+  assert.deepEqual(titled, { ...PLANNED, title: 'My car' });
+  const openings = [
+    'doors',
+    'hood',
+    'tailgate',
+    'windows',
+    'sunroof',
+    'open_states',
+    'half_states',
+  ];
+  const opened = fromForm(
+    CAR,
+    openings,
+    { ...formData(CAR, openings, PLANNED), open_states: [] },
+    PLANNED,
+  );
+  assert.deepEqual(opened, { ...PLANNED, open_states: [] });
+});
+
+test('a text with a default that is emptied in a form is left out, so the card takes its default', () => {
+  const clients = DESCRIPTIONS['custom:mnml-clients-card'];
+  assert.ok(clients?.kind === 'plain');
+  const value = {
+    type: 'custom:mnml-clients-card',
+    entity: 'sensor.clients',
+    attribute: 'clients',
+    networks: [],
+  };
+  const { attribute: _attribute, ...rest } = value;
+  assert.deepEqual(fromForm(clients, ['attribute'], { attribute: '' }, value), rest);
+});

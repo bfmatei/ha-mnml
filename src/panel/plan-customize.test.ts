@@ -120,6 +120,9 @@ test("Customize opens the template card's editor on the row's card, and keeps wh
     template: 'room',
     area: 'kitchen',
   });
+  const title = dialog.getAttribute('aria-labelledby');
+  assert.ok(title);
+  assert.equal(text(dialog.querySelector(`h2[id="${title}"]`)), 'Customize Kitchen');
   assert.equal(dialog.isConnected, false);
   const plan = await saved(element, root, plans);
   assert.deepEqual(plan.rooms[0], { area: 'kitchen', slots: { name: 'Cook' } });

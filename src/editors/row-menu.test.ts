@@ -118,3 +118,52 @@ test('a row menu stays open while the page scrolls under it, following its butto
   await menu.updateComplete;
   assert.ok(labelled(menu, 'Delete'));
 });
+
+test('the button says it opens a menu, and whether it is open', async () => {
+  const menu = await menuOf('Living Sonos', [
+    { label: 'Delete', icon: 'mdi:delete-outline', run: () => undefined },
+  ]);
+  const button = labelled(menu, 'More for Living Sonos');
+  assert.equal(button?.getAttribute('aria-haspopup'), 'menu');
+  assert.equal(button?.getAttribute('aria-expanded'), 'false');
+  button?.click();
+  await menu.updateComplete;
+  assert.equal(button?.getAttribute('aria-expanded'), 'true');
+});
+
+function drawnLikeAnOpenPopover(menu: MnmlRowMenu): void {
+  const list = menu.shadowRoot?.querySelector('.row-menu-list');
+  assert.ok(list instanceof HTMLElement);
+  list.style.display = 'flex';
+}
+
+test('an open menu takes the focus, the arrow keys walk its items, and Escape gives it back', async () => {
+  const menu = await menuOf('Living Sonos', [
+    { label: 'Move up', icon: 'mdi:arrow-up', disabled: true, run: () => undefined },
+    { label: 'Copy', icon: 'mdi:content-copy', run: () => undefined },
+    { label: 'Delete', icon: 'mdi:delete-outline', run: () => undefined },
+  ]);
+  drawnLikeAnOpenPopover(menu);
+  const button = labelled(menu, 'More for Living Sonos');
+  button?.click();
+  await menu.updateComplete;
+  await menu.updateComplete;
+  const focused = (): string | null | undefined =>
+    menu.shadowRoot?.activeElement?.getAttribute('aria-label');
+  assert.equal(focused(), 'Copy', 'the first item that can be used');
+  const press = (key: string): void => {
+    menu.shadowRoot?.activeElement?.dispatchEvent(
+      new KeyboardEvent('keydown', { key, bubbles: true, composed: true }),
+    );
+  };
+  press('ArrowDown');
+  assert.equal(focused(), 'Delete');
+  press('ArrowDown');
+  assert.equal(focused(), 'Copy');
+  press('ArrowUp');
+  assert.equal(focused(), 'Delete');
+  press('Escape');
+  await menu.updateComplete;
+  assert.equal(labelled(menu, 'Delete'), undefined);
+  assert.equal(focused(), 'More for Living Sonos');
+});

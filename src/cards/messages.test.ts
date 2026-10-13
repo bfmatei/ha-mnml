@@ -230,3 +230,39 @@ test('a message cleared takes its own card away, so the focus stays with the mes
   await made.updateComplete;
   assert.equal(messages(root)[0], kept);
 });
+
+test('a clear goes through the hass of the moment, not the one the message was drawn with', async () => {
+  const drawn: Call[] = [];
+  const now: Call[] = [];
+  const shared = {
+    states: {
+      'sensor.notifications': {
+        entity_id: 'sensor.notifications',
+        state: '2',
+        attributes: { messages: MESSAGES },
+      },
+    },
+    entities: {},
+    devices: {},
+    locale: { language: 'en' },
+  };
+  const hass = (calls: Call[]): unknown => ({
+    ...shared,
+    formatEntityState: (stateObj: { state: string }): string => stateObj.state,
+    callService: (domain: string, service: string, data: unknown, target: unknown) => {
+      calls.push({ domain, service, data, target });
+      return Promise.resolve();
+    },
+  });
+  const made = card();
+  made.setConfig(CONFIG as never);
+  made.hass = hass(drawn) as never;
+  const root = await mounted(made);
+  made.hass = hass(now) as never;
+  messages(root)[1]?.querySelector<HTMLElement>('.control')?.click();
+  assert.deepEqual(drawn, []);
+  assert.deepEqual(
+    now.map((call) => call.data),
+    [{ variables: { id: 'a' } }],
+  );
+});

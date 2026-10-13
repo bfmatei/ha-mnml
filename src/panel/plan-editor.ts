@@ -1,4 +1,4 @@
-import { html, LitElement, nothing } from 'lit';
+import { css, html, LitElement, nothing } from 'lit';
 import type { PropertyValues, TemplateResult } from 'lit';
 import { property, state } from 'lit/decorators.js';
 import { live } from 'lit/directives/live.js';
@@ -6,23 +6,30 @@ import { live } from 'lit/directives/live.js';
 import { carFrom, personFrom, roomFrom, systemFrom } from '../builder/customized.ts';
 import { carCard, personCard, roomCard, systemCard } from '../builder/dashboard.ts';
 import { personOf } from '../builder/person.ts';
-import { peopleIn, roomShows, systemFills } from '../builder/plan.ts';
+import { areaKinds, peopleIn, roomShows, systemFills, unplaced } from '../builder/plan.ts';
+import type { AreaKind } from '../builder/plan.ts';
 import {
   SECTION_LOOKS,
-  SECTION_ORDER,
   SYSTEM_NAMES,
   SYSTEM_TEMPLATES,
   isPlan,
   lookOf,
   orderOf,
 } from '../contract/builder.ts';
-import type { Plan, SectionKey, SectionLook, SystemChoice } from '../contract/builder.ts';
+import type {
+  Plan,
+  RoomChoice,
+  SectionKey,
+  SectionLook,
+  SystemChoice,
+} from '../contract/builder.ts';
 import type { PopupOpen, PopupOpening, TemplateCard } from '../contract/cards.ts';
 import type { MdiIcon, PersonId } from '../contract/entities.ts';
 import { isMapping } from '../contract/templates.ts';
 import type { Templates, Value } from '../contract/templates.ts';
 import { field } from '../ha/field.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
+import { registriesOf } from '../ha/registries.ts';
 import { icon } from '../ha/templates.ts';
 import { discover } from '../templates/discover.ts';
 import type { Registries } from '../templates/discover.ts';
@@ -31,6 +38,18 @@ import { rolesOf } from '../templates/roles.ts';
 import type { Role } from '../templates/roles.ts';
 
 import { customize } from './customize.ts';
+import { messageOf } from './message.ts';
+import {
+  isIcon,
+  movedBy,
+  templatesOf,
+  trimmed,
+  withDeclared,
+  withGlances,
+  withLook,
+  withOrder,
+  withSystem,
+} from './plan-edits.ts';
 import { PANEL_STYLE } from './style.ts';
 
 export interface PlanHost {
@@ -40,35 +59,30 @@ export interface PlanHost {
 
 type Device = keyof PopupOpen;
 
+interface Survey {
+  kinds: Readonly<Record<string, AreaKind>>;
+  unplaced: number;
+}
+
 const ADDRESS = /^[a-z0-9]+(?:-[a-z0-9]+)+$/;
 const LONGEST = 64;
-const ICON = /^mdi:[a-z0-9-]+$/;
 const DEVICES: readonly { device: Device; label: string; otherwise: string }[] = [
   { device: 'phone', label: 'On a phone', otherwise: 'a sheet' },
   { device: 'tablet', label: 'On a tablet', otherwise: 'a dialog' },
   { device: 'desktop', label: 'On a computer', otherwise: 'a dialog' },
 ];
+const WHY: Readonly<Record<AreaKind, string | undefined>> = {
+  room: undefined,
+  phones: 'Only phones and trackers.',
+  system: 'Only system devices.',
+  empty: 'Nothing in this area: its devices are in no area or elsewhere.',
+};
+const DEVICES_PAGE = '/config/devices/dashboard';
 const OPENINGS: readonly { opening: PopupOpening; label: string }[] = [
   { opening: 'sheet', label: 'A sheet from the bottom' },
   { opening: 'dialog', label: 'A dialog in the middle' },
   { opening: 'unfold', label: 'Unfolded from its tile' },
 ];
-
-function registriesOf(hass: HomeAssistant | undefined): Registries {
-  return {
-    areas: hass?.areas ?? {},
-    devices: hass?.devices ?? {},
-    entities: hass?.entities ?? {},
-    states: hass?.states ?? {},
-  };
-}
-
-const isIcon = (value: string): value is MdiIcon => ICON.test(value);
-
-const message = (error: unknown): string => {
-  const said = field(error, 'message');
-  return typeof said === 'string' ? said : String(error);
-};
 
 function asConfig(card: TemplateCard): Record<string, Value> {
   const value = toValue(card);
@@ -108,126 +122,124 @@ function withOpening(
   return next;
 }
 
+function roomName(room: RoomChoice, registries: Registries): string {
+  if (room.spelled === true) {
+    const name = room.slots['name'];
+    return typeof name === 'string' ? name : 'A room';
+  }
+  return registries.areas[room.area]?.name ?? room.area;
+}
+
+function placing(count: number): TemplateResult | typeof nothing {
+  if (count === 0) {
+    return nothing;
+  }
+  const [have, them] = count === 1 ? ['1 device has', 'it'] : [`${count} devices have`, 'them'];
+  return html`<p class="muted">
+    ${have} no area, so no room shows ${them}.
+    <a href=${DEVICES_PAGE}>Give ${them} an area in Home Assistant</a>
+  </p>`;
+}
+
 function text(event: Event): string {
   const value = field(event.target, 'value');
   return typeof value === 'string' ? value : '';
 }
 
-function moved<T>(list: readonly T[], from: number, by: number): T[] {
-  const to = from + by;
-  if (to < 0 || to >= list.length) {
-    return [...list];
+const PLAN_STYLE = css`
+  .plan-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
-  const next = [...list];
-  const [item] = next.splice(from, 1);
-  if (item !== undefined) {
-    next.splice(to, 0, item);
+  .plan-title h1 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 400;
   }
-  return next;
-}
-
-function templatesOf(plan: Plan): { rooms: string; people: string; cars: string } {
-  return {
-    rooms: lookOf(plan, 'rooms').template ?? 'room',
-    people: lookOf(plan, 'people').template ?? 'person',
-    cars: lookOf(plan, 'garage').template ?? 'car',
-  };
-}
-
-function withLook(
-  plan: Plan,
-  key: SectionKey,
-  change: Partial<Record<keyof SectionLook, string>>,
-): Plan['sections'] {
-  const fallback = SECTION_LOOKS[key];
-  const merged: Partial<Record<keyof SectionLook, string>> = { ...plan.sections?.[key], ...change };
-  const title = merged.title;
-  const icon = merged.icon === fallback.icon ? undefined : merged.icon;
-  const template = merged.template === fallback.template ? undefined : merged.template;
-  const look: SectionLook = {
-    ...(title === undefined || title === '' ? {} : { title }),
-    ...(icon === undefined || !isIcon(icon) ? {} : { icon }),
-    ...(template === undefined || template === '' ? {} : { template }),
-  };
-  const others = Object.fromEntries(
-    Object.entries(plan.sections ?? {}).filter(([section]) => section !== key),
-  );
-  const sections = Object.keys(look).length === 0 ? others : { ...others, [key]: look };
-  return Object.keys(sections).length === 0 ? undefined : sections;
-}
-
-function kept(
-  slots: Record<string, Value> | undefined,
-  declared: ReadonlySet<string>,
-): Record<string, Value> | undefined {
-  if (slots === undefined) {
-    return undefined;
+  .plan-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 16px;
+    border: 1px solid var(--divider-color);
+    border-radius: 12px;
+    background: var(--card-background-color);
   }
-  const left = Object.fromEntries(Object.entries(slots).filter(([slot]) => declared.has(slot)));
-  return Object.keys(left).length === 0 ? undefined : left;
-}
-
-function withDeclared(plan: Plan, key: SectionKey, declared: ReadonlySet<string>): Plan {
-  if (key === 'rooms') {
-    return {
-      ...plan,
-      rooms: plan.rooms.map((room) => {
-        const slots = kept(room.slots, declared);
-        return slots === undefined ? { area: room.area } : { area: room.area, slots };
-      }),
-    };
+  .plan-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
   }
-  if (key === 'people') {
-    return {
-      ...plan,
-      people: plan.people.map((person) => {
-        const slots = kept(person.slots, declared);
-        return slots === undefined ? { entity: person.entity } : { entity: person.entity, slots };
-      }),
-    };
+  .plan-section h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 500;
   }
-  if (key === 'garage') {
-    return {
-      ...plan,
-      cars: plan.cars.map((car) => ({ key: car.key, slots: kept(car.slots, declared) ?? {} })),
-    };
+  .plan-section p {
+    margin: 0;
   }
-  return plan;
-}
-
-function trimmed(sections: Plan['sections']): Plan['sections'] {
-  if (sections === undefined) {
-    return undefined;
+  .plan-section a {
+    color: var(--primary-color);
   }
-  const looks = Object.fromEntries(
-    Object.entries(sections).flatMap(([key, look]) => {
-      const title = look.title?.trim();
-      const { title: _title, ...rest } = look;
-      const next: SectionLook = {
-        ...rest,
-        ...(title === undefined || title === '' ? {} : { title }),
-      };
-      return Object.keys(next).length === 0 ? [] : [[key, next]];
-    }),
-  );
-  return Object.keys(looks).length === 0 ? undefined : looks;
-}
-
-function withSystem(chosen: readonly SystemChoice[], choice: SystemChoice): SystemChoice[] {
-  return chosen.some((each) => each.template === choice.template)
-    ? chosen.map((each) => (each.template === choice.template ? choice : each))
-    : [...chosen, choice];
-}
-
-function withOrder(plan: Plan, order: readonly SectionKey[]): Plan {
-  const { order: _order, ...rest } = plan;
-  return order.every((key, index) => SECTION_ORDER[index] === key)
-    ? rest
-    : { ...rest, order: [...order] };
-}
+  .plan-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 40px;
+  }
+  .plan-row input[type='checkbox'] {
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    flex: none;
+    accent-color: var(--primary-color);
+  }
+  .plan-tile {
+    flex: 1;
+    min-width: 0;
+    max-width: 420px;
+  }
+  .plan-words {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+  }
+  .plan-row.off .plan-words > span:first-child {
+    color: var(--secondary-text-color);
+  }
+  .plan-look {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .plan-look .fact-input {
+    flex: 1;
+    min-width: 140px;
+  }
+  .plan-field {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .plan-field > span:first-child {
+    width: 120px;
+    color: var(--secondary-text-color);
+  }
+  .plan-icon {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 200px;
+  }
+`;
 
 export class MnmlPlanEditor extends LitElement {
-  static override styles = PANEL_STYLE;
+  static override styles = [PANEL_STYLE, PLAN_STYLE];
 
   @property({ attribute: false }) hass: HomeAssistant | undefined;
   @property({ attribute: false }) templates: Templates = {};
@@ -239,25 +251,30 @@ export class MnmlPlanEditor extends LitElement {
   @state() private draft: Plan | undefined;
   @state() private where = '';
   @state() private iconText = '';
+  @state() private lookIcons: Partial<Record<SectionKey, string>> = {};
   @state() private problem: string | undefined;
   @state() private saving = false;
   private readonly found = new Map<string, boolean>();
+  private survey: Survey | undefined;
   private known: { templates: Templates | undefined; roles: Readonly<Record<string, Role>> } = {
     templates: undefined,
     roles: {},
   };
   private seen: readonly unknown[] = [];
+  private drafted = '';
 
   protected override willUpdate(changed: PropertyValues<this>): void {
     const now = [this.templates, this.hass?.areas, this.hass?.devices, this.hass?.entities];
     if (now.some((each, index) => each !== this.seen[index])) {
       this.seen = now;
       this.found.clear();
+      this.survey = undefined;
     }
-    if (changed.has('plan') && this.plan !== undefined) {
+    if (this.plan !== undefined && (this.draft === undefined || this.address !== this.drafted)) {
+      this.drafted = this.address;
       this.draft = structuredClone(this.plan);
       this.iconText = this.plan.icon;
-      this.problem = undefined;
+      this.lookIcons = {};
     }
     if (changed.has('address')) {
       this.where = this.address;
@@ -279,6 +296,11 @@ export class MnmlPlanEditor extends LitElement {
     const value = find();
     this.found.set(key, value);
     return value;
+  }
+
+  private surveyOf(registries: Registries): Survey {
+    this.survey ??= { kinds: areaKinds(registries), unplaced: unplaced(registries) };
+    return this.survey;
   }
 
   private change(next: Partial<Plan>): void {
@@ -326,7 +348,7 @@ export class MnmlPlanEditor extends LitElement {
         ? undefined
         : `It waits for ${expanded.missing.join(', ')}.`;
     } catch (error) {
-      return message(error);
+      return messageOf(error);
     }
   }
 
@@ -350,7 +372,7 @@ export class MnmlPlanEditor extends LitElement {
         }
       })
       .catch((error: unknown) => {
-        this.problem = message(error);
+        this.problem = messageOf(error);
       });
   }
 
@@ -375,7 +397,7 @@ export class MnmlPlanEditor extends LitElement {
     try {
       await host.save(tidy, this.where);
     } catch (error) {
-      this.problem = message(error);
+      this.problem = messageOf(error);
     } finally {
       this.saving = false;
     }
@@ -496,9 +518,11 @@ export class MnmlPlanEditor extends LitElement {
         class="fact-input"
         aria-label=${`${name} icon`}
         placeholder=${fallback.icon}
-        .value=${live(given?.icon ?? '')}
-        @change=${(event: Event) => {
-          change({ icon: text(event).trim() });
+        .value=${live(this.lookIcons[key] ?? given?.icon ?? '')}
+        @input=${(event: Event) => {
+          const typed = text(event);
+          this.lookIcons = { ...this.lookIcons, [key]: typed };
+          change({ icon: typed.trim() });
         }}
       />
       ${
@@ -525,61 +549,56 @@ export class MnmlPlanEditor extends LitElement {
 
   private drawRooms(plan: Plan, registries: Registries): TemplateResult {
     const look = templatesOf(plan);
-    const chosen = plan.rooms.filter((room) => Object.hasOwn(registries.areas, room.area));
+    const chosen = plan.rooms.filter(
+      (room) => room.spelled === true || Object.hasOwn(registries.areas, room.area),
+    );
     const others = Object.values(registries.areas).filter(
       (area) => !chosen.some((room) => room.area === area.area_id),
     );
+    const survey = this.surveyOf(registries);
     return html`<section class="plan-section">
       ${this.drawHeading(plan, 'rooms')} ${this.drawLook(plan, 'rooms')}
       <p class="muted">
-        Each area with something for its tile gets a room. Tick the ones to show, in order.
+        Each area that holds something a room shows gets a room. Tick the ones to show, in order.
       </p>
-      ${chosen.map(
-        (room, index) =>
-          html`<div class="plan-row">
-            <input
-              type="checkbox"
-              .checked=${live(true)}
-              aria-label=${`Show ${registries.areas[room.area]?.name ?? room.area}`}
-              @change=${() => {
-                this.change({ rooms: plan.rooms.filter((each) => each !== room) });
-              }}
-            />
-            ${this.drawTile(roomCard(room, look.rooms))}
-            <span class="row-actions">
-              ${iconButton(
-                'mdi:tune-variant',
-                `Customize ${registries.areas[room.area]?.name ?? room.area}`,
-                () => {
-                  this.edit(
-                    `Customize ${registries.areas[room.area]?.name ?? room.area}`,
-                    look.rooms,
-                    roomCard(room, look.rooms),
-                    (config) => {
-                      this.change({
-                        rooms: chosen.map((each) =>
-                          each === room ? roomFrom(room, config) : each,
-                        ),
-                      });
-                    },
-                  );
+      ${chosen.map((room, index) => {
+        const name = roomName(room, registries);
+        return html`<div class="plan-row">
+          <input
+            type="checkbox"
+            .checked=${live(true)}
+            aria-label=${`Show ${name}`}
+            @change=${() => {
+              this.change({ rooms: plan.rooms.filter((each) => each !== room) });
+            }}
+          />
+          ${this.drawTile(roomCard(room, look.rooms, this.templates))}
+          <span class="row-actions">
+            ${iconButton('mdi:tune-variant', `Customize ${name}`, () => {
+              this.edit(
+                `Customize ${name}`,
+                look.rooms,
+                roomCard(room, look.rooms, this.templates),
+                (config) => {
+                  this.change({
+                    rooms: chosen.map((each) => (each === room ? roomFrom(room, config) : each)),
+                  });
                 },
-              )}
-              ${this.moves(
-                registries.areas[room.area]?.name ?? room.area,
-                index,
-                chosen.length,
-                (by) => {
-                  this.change({ rooms: moved(chosen, index, by) });
-                },
-              )}
-            </span>
-          </div>`,
-      )}
+              );
+            })}
+            ${this.moves(name, index, chosen.length, (by) => {
+              this.change({ rooms: movedBy(chosen, index, by) });
+            })}
+          </span>
+        </div>`;
+      })}
       ${others.map((area) => {
         const shows = this.remembered(`room:${look.rooms}:${area.area_id}`, () =>
           roomShows(registries, this.templates, area.area_id, look.rooms),
         );
+        const why =
+          WHY[survey.kinds[area.area_id] ?? 'empty'] ??
+          (shows ? undefined : 'Its template finds nothing to show here.');
         return html`<div class="plan-row off">
           <input
             type="checkbox"
@@ -592,10 +611,11 @@ export class MnmlPlanEditor extends LitElement {
           />
           <span class="plan-words">
             <span>${area.name}</span>
-            ${shows ? nothing : html`<span class="muted">Its template finds nothing to show here.</span>`}
+            ${why === undefined ? nothing : html`<span class="muted">${why}</span>`}
           </span>
         </div>`;
       })}
+      ${placing(survey.unplaced)}
     </section>`;
   }
 
@@ -626,13 +646,13 @@ export class MnmlPlanEditor extends LitElement {
                 this.change({ people: chosen.filter((person) => person !== choice) });
               }}
             />
-            ${this.drawTile(personCard(choice, registries, look.people))}
+            ${this.drawTile(personCard(choice, registries, look.people, this.templates))}
             <span class="row-actions">
               ${iconButton('mdi:tune-variant', `Customize ${nameOf(choice.entity)}`, () => {
                 this.edit(
                   `Customize ${nameOf(choice.entity)}`,
                   look.people,
-                  personCard(choice, registries, look.people),
+                  personCard(choice, registries, look.people, this.templates),
                   (config) => {
                     this.change({
                       people: chosen.map((each) =>
@@ -643,7 +663,7 @@ export class MnmlPlanEditor extends LitElement {
                 );
               })}
               ${this.moves(nameOf(choice.entity), index, chosen.length, (by) => {
-                this.change({ people: moved(chosen, index, by) });
+                this.change({ people: movedBy(chosen, index, by) });
               })}
             </span>
           </div>`,
@@ -692,16 +712,16 @@ export class MnmlPlanEditor extends LitElement {
       ${plan.cars.map(
         (car, index) =>
           html`<div class="plan-row">
-            ${this.drawTile(carCard(car, look.cars))}
+            ${this.drawTile(carCard(car, look.cars, this.templates))}
             <span class="row-actions">
               ${this.moves(car.key, index, plan.cars.length, (by) => {
-                this.change({ cars: moved(plan.cars, index, by) });
+                this.change({ cars: movedBy(plan.cars, index, by) });
               })}
               ${iconButton('mdi:tune-variant', `Customize ${car.key}`, () => {
                 this.edit(
                   `Customize ${car.key}`,
                   look.cars,
-                  carCard(car, look.cars),
+                  carCard(car, look.cars, this.templates),
                   (config) => {
                     const next = carFrom(config);
                     if (next !== undefined) {
@@ -777,7 +797,7 @@ export class MnmlPlanEditor extends LitElement {
           );
         })}
         ${this.moves(label, index, plan.system.length, (by) => {
-          this.change({ system: moved(plan.system, index, by) });
+          this.change({ system: movedBy(plan.system, index, by) });
         })}
       </span>
     </div>`;
@@ -886,7 +906,7 @@ export class MnmlPlanEditor extends LitElement {
         ${this.moves(`the ${name} section`, index, order.length, (by) => {
           const draft = this.draft;
           if (draft !== undefined) {
-            this.draft = withOrder(draft, moved(order, index, by));
+            this.draft = withOrder(draft, movedBy(order, index, by));
             this.problem = undefined;
           }
         })}
@@ -902,6 +922,35 @@ export class MnmlPlanEditor extends LitElement {
       return this.drawPeople(plan, registries);
     }
     return key === 'garage' ? this.drawGarage(plan) : this.drawSystem(plan, registries);
+  }
+
+  private reshaped(edit: (draft: Plan) => Plan): void {
+    if (this.draft !== undefined) {
+      this.draft = edit(this.draft);
+      this.problem = undefined;
+    }
+  }
+
+  private drawGlances(plan: Plan): TemplateResult {
+    return html`<section class="plan-section">
+      <h2>Glances</h2>
+      <div class="plan-row">
+        <input
+          type="checkbox"
+          aria-label="Show the Glances strip"
+          .checked=${live(plan.glances !== undefined)}
+          @change=${() => {
+            this.reshaped((draft) => withGlances(draft, draft.glances === undefined));
+          }}
+        />
+        <span class="plan-words">
+          <span>The Glances strip</span>
+          <span class="muted"
+            >One line across the top: the weather, the alarm, and whatever needs you.</span
+          >
+        </span>
+      </div>
+    </section>`;
   }
 
   private drawPopups(plan: Plan): TemplateResult {
@@ -972,7 +1021,8 @@ export class MnmlPlanEditor extends LitElement {
       </div>
       ${this.problem === undefined ? nothing : html`<p class="problem-line">${this.problem}</p>`}
       ${this.drawDashboard(plan)}
-      ${orderOf(plan).map((key) => this.drawPart(plan, key, registries))} ${this.drawPopups(plan)}
+      ${orderOf(plan).map((key) => this.drawPart(plan, key, registries))} ${this.drawGlances(plan)}
+      ${this.drawPopups(plan)}
     </div>`;
   }
 }

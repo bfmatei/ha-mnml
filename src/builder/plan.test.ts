@@ -4,17 +4,210 @@ import { test } from 'vitest';
 
 import { isPlan } from '../contract/builder.ts';
 import type { Template } from '../contract/templates.ts';
+import { homes } from '../templates/corpus.ts';
 import { discover } from '../templates/discover.ts';
 import type { Registries } from '../templates/discover.ts';
 import { readTemplates } from '../templates/shipped.ts';
 
-import { HOME } from './fixture.ts';
-import { defaultPlan } from './plan.ts';
+import { HOME, HOUSE } from './fixture.ts';
+import { areaKinds, defaultPlan, unplaced } from './plan.ts';
 
 const TEMPLATES = readTemplates();
 
 test('the default plan has the rooms with something to show, in the order Home Assistant lists them', () => {
   assert.deepEqual(defaultPlan(HOME, TEMPLATES).rooms, [{ area: 'kitchen' }, { area: 'living' }]);
+});
+
+test('the default plan ticks only the areas that are rooms, not those of phones or of system devices', () => {
+  const room = TEMPLATES['room'];
+  assert.ok(room);
+  assert.ok(Object.keys(discover(room, 'jane', HOUSE)).includes('batteries'));
+  assert.ok(Object.keys(discover(room, 'infrastructure', HOUSE)).includes('temperature'));
+  assert.deepEqual(defaultPlan(HOUSE, TEMPLATES).rooms, [{ area: 'living' }]);
+});
+
+test('an area is a room by what it holds, and says why it is not', () => {
+  assert.deepEqual(areaKinds(HOUSE), {
+    jane: 'phones',
+    infrastructure: 'system',
+    living: 'room',
+    attic: 'empty',
+  });
+  assert.deepEqual(areaKinds(HOME), { kitchen: 'room', hallway: 'empty', living: 'room' });
+});
+
+test("a reading on no device makes a room only when it is the area's own", () => {
+  const reading: Registries = {
+    areas: { porch: { area_id: 'porch', name: 'Porch' } },
+    devices: {},
+    entities: {
+      'sensor.porch_temperature': {
+        entity_id: 'sensor.porch_temperature',
+        area_id: 'porch',
+        platform: 'template',
+      },
+    },
+    states: { 'sensor.porch_temperature': { attributes: { device_class: 'temperature' } } },
+  };
+  assert.deepEqual(areaKinds(reading), { porch: 'empty' });
+  const named: Registries = {
+    ...reading,
+    areas: {
+      porch: { area_id: 'porch', name: 'Porch', temperature_entity_id: 'sensor.porch_temperature' },
+    },
+  };
+  assert.deepEqual(areaKinds(named), { porch: 'room' });
+});
+
+test("a reading on a service device, a server's or an integration's own, does not make a room", () => {
+  const service: Registries = {
+    areas: { closet: { area_id: 'closet', name: 'Closet' } },
+    devices: {
+      monitor: { id: 'monitor', area_id: 'closet', name: 'System Monitor', entry_type: 'service' },
+    },
+    entities: {
+      'sensor.cpu_temperature': {
+        entity_id: 'sensor.cpu_temperature',
+        device_id: 'monitor',
+        platform: 'systemmonitor',
+      },
+    },
+    states: { 'sensor.cpu_temperature': { attributes: { device_class: 'temperature' } } },
+  };
+  assert.deepEqual(areaKinds(service), { closet: 'system' });
+  const measured: Registries = {
+    ...service,
+    devices: { monitor: { id: 'monitor', area_id: 'closet', name: 'Thermometer' } },
+  };
+  assert.deepEqual(areaKinds(measured), { closet: 'room' });
+});
+
+test('the devices in no area are counted when they hold something a room shows', () => {
+  assert.equal(
+    unplaced(HOUSE),
+    2,
+    'the bulb and the thermometer; not the car, which moves, nor the plug, whose switch is no outlet',
+  );
+  const outlet: Registries = {
+    ...HOUSE,
+    states: { ...HOUSE.states, 'switch.plug': { attributes: { device_class: 'outlet' } } },
+  };
+  assert.equal(unplaced(outlet), 3, 'an outlet is something a room shows');
+  assert.equal(unplaced(HOME), 0);
+});
+
+function single(
+  device: string,
+  entities: readonly (readonly [string, Record<string, unknown>, string?, string?])[],
+): Registries {
+  return {
+    areas: { here: { area_id: 'here', name: 'Here' } },
+    devices: { [device]: { id: device, area_id: 'here', name: device } },
+    entities: Object.fromEntries(
+      entities.map(([entity_id, , platform, translation_key]) => [
+        entity_id,
+        { entity_id, device_id: device, platform, translation_key },
+      ]),
+    ),
+    states: Object.fromEntries(
+      entities.map(([entity_id, attributes]) => [entity_id, { attributes }]),
+    ),
+  };
+}
+
+const kinds = (registries: Registries): string | undefined => areaKinds(registries)['here'];
+
+test("an area is a room when it holds an outlet, a plug's power, a camera, a humidifier, or a device the room template finds", () => {
+  assert.equal(kinds(single('plug', [['switch.plug', { device_class: 'outlet' }]])), 'room');
+  assert.equal(
+    kinds(
+      single('plug', [
+        ['switch.plug', {}],
+        ['sensor.plug_power', { device_class: 'power' }],
+      ]),
+    ),
+    'room',
+  );
+  assert.equal(
+    kinds(single('meter', [['sensor.meter_power', { device_class: 'power' }]])),
+    'system',
+    'a meter with no switch is no plug',
+  );
+  assert.equal(kinds(single('cam', [['camera.cam', {}]])), 'room');
+  assert.equal(kinds(single('air', [['humidifier.air', {}]])), 'room');
+  assert.equal(kinds(single('robot', [['vacuum.robot', {}]])), 'room');
+  assert.equal(kinds(single('nest', [['media_player.nest', { device_class: 'speaker' }]])), 'room');
+  assert.equal(
+    kinds(single('prusa', [['sensor.prusa', { device_class: 'enum' }, 'prusalink']])),
+    'room',
+  );
+  for (const [platform, key] of [
+    ['smartthings', 'washer_machine_state'],
+    ['smartthings', 'dryer_machine_state'],
+    ['smartthings', 'dishwasher_machine_state'],
+    ['home_connect', 'operation_state'],
+  ] as const) {
+    assert.equal(
+      kinds(single('appliance', [['sensor.appliance_state', {}, platform, key]])),
+      'room',
+      key,
+    );
+  }
+});
+
+test('on the corpus home of devices, the kitchen of plugs and the laundry of a washer are rooms, and the quick start offers them', () => {
+  const devices = homes()['devices'];
+  assert.ok(devices);
+  assert.deepEqual(areaKinds(devices), {
+    bedroom: 'room',
+    hall: 'room',
+    kitchen: 'room',
+    laundry: 'room',
+    living: 'room',
+    office: 'room',
+  });
+  assert.deepEqual(
+    defaultPlan(devices, TEMPLATES).rooms.map((each) => each.area),
+    ['bedroom', 'hall', 'kitchen', 'laundry', 'living', 'office'],
+  );
+});
+
+test("a router's tracker on a speaker or a bulb does not make it move with someone; a GPS tracker does", () => {
+  const living: Registries = {
+    areas: { living: { area_id: 'living', name: 'Living' } },
+    devices: {
+      sonos: { id: 'sonos', area_id: 'living', name: 'Sonos' },
+      bulb: { id: 'bulb', area_id: 'living', name: 'Bulb' },
+    },
+    entities: {
+      'media_player.sonos': { entity_id: 'media_player.sonos', device_id: 'sonos' },
+      'device_tracker.sonos': {
+        entity_id: 'device_tracker.sonos',
+        device_id: 'sonos',
+        platform: 'unifi',
+      },
+      'light.bulb': { entity_id: 'light.bulb', device_id: 'bulb' },
+      'device_tracker.bulb': {
+        entity_id: 'device_tracker.bulb',
+        device_id: 'bulb',
+        platform: 'unifi',
+      },
+    },
+    states: {
+      'device_tracker.sonos': { state: 'home', attributes: { source_type: 'router' } },
+      'device_tracker.bulb': { state: 'home', attributes: {} },
+    },
+  };
+  assert.deepEqual(areaKinds(living), { living: 'room' });
+  const tracked: Registries = {
+    ...living,
+    states: {
+      ...living.states,
+      'device_tracker.sonos': { state: 'home', attributes: { source_type: 'gps' } },
+      'device_tracker.bulb': { state: 'home', attributes: { source_type: 'gps' } },
+    },
+  };
+  assert.deepEqual(areaKinds(tracked), { living: 'phones' });
 });
 
 test('the default plan has every person, and pop-ups that unfold on tablet and desktop', () => {

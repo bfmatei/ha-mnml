@@ -1,4 +1,4 @@
-import { html, LitElement, nothing } from 'lit';
+import { css, html, LitElement, nothing } from 'lit';
 import type { TemplateResult } from 'lit';
 import { property } from 'lit/decorators.js';
 
@@ -40,8 +40,50 @@ function button(name: MdiIcon, label: string, run: () => void): TemplateResult {
   </button>`;
 }
 
+const DASHBOARDS_STYLE = css`
+  .start {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 16px;
+    border-radius: 16px;
+    border: 1px solid var(--divider-color);
+    background: var(--card-background-color);
+    cursor: pointer;
+  }
+  .start:hover {
+    border-color: var(--primary-color);
+  }
+  .start ha-icon {
+    --mdc-icon-size: 28px;
+    color: var(--primary-color);
+  }
+  .start-words {
+    flex: 1;
+    min-width: 220px;
+  }
+  .start-words h2 {
+    margin: 0 0 4px;
+    font-size: 18px;
+    font-weight: 500;
+  }
+  .start-words p {
+    margin: 0;
+    color: var(--secondary-text-color);
+  }
+  .start-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .board-name {
+    font-weight: 500;
+  }
+`;
+
 export class MnmlDashboards extends LitElement {
-  static override styles = PANEL_STYLE;
+  static override styles = [PANEL_STYLE, DASHBOARDS_STYLE];
 
   @property({ attribute: false }) rows: readonly DashboardRow[] = [];
   @property({ attribute: false }) actions: DashboardActions | undefined;

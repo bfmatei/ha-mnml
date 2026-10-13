@@ -13,7 +13,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.util.file import write_utf8_file
 from homeassistant.util.yaml import load_yaml
 
-from .const import THEME_FILE, THEME_FLAT_FILE, THEME_FOLDER, THEME_NAME
+from .const import LOGGER, THEME_FILE, THEME_FLAT_FILE, THEME_FOLDER, THEME_NAME
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -32,23 +32,35 @@ def write_theme(source: Path, target: Path) -> bool:
     return True
 
 
-async def async_reload_themes(hass: HomeAssistant) -> bool:
+def theme_loaded(hass: HomeAssistant) -> bool:
+    return THEME_NAME in hass.data.get(DATA_THEMES, {})
+
+
+async def async_reload_themes(hass: HomeAssistant) -> str | None:
     try:
         await hass.services.async_call("frontend", "reload_themes", blocking=True)
-    except HomeAssistantError, vol.Invalid:
-        return False
-    return True
+    except (HomeAssistantError, vol.Invalid) as err:
+        return str(err)
+    return None
 
 
 async def async_install_theme(hass: HomeAssistant, www: Path, *, glass: bool) -> bool:
     target = theme_target(hass)
     source = www / (THEME_FILE if glass else THEME_FLAT_FILE)
     written = await hass.async_add_executor_job(write_theme, source, target)
-    reloaded = await async_reload_themes(hass) if written else True
-    loaded = reloaded and THEME_NAME in hass.data.get(DATA_THEMES, {})
-    if not loaded:
-        await hass.async_add_executor_job(partial(shutil.rmtree, target.parent, ignore_errors=True))
-    return loaded
+    failure = await async_reload_themes(hass) if written else None
+    if failure is None and theme_loaded(hass):
+        return True
+    await hass.async_add_executor_job(partial(shutil.rmtree, target.parent, ignore_errors=True))
+    if failure is None or await async_reload_themes(hass) is None:
+        return False
+    await hass.async_add_executor_job(write_theme, source, target)
+    LOGGER.warning(
+        "Home Assistant could not reload its themes, so MNML's theme changes only at the next "
+        "reload or restart: %s",
+        failure,
+    )
+    return True
 
 
 def other_theme_files(themes: Path) -> list[Path]:
@@ -73,7 +85,7 @@ async def async_remove_theme(hass: HomeAssistant) -> None:
     await async_reload_themes(hass)
 
 
-async def async_apply_default(hass: HomeAssistant, *, on: bool) -> None:
+async def async_apply_default(hass: HomeAssistant, *, on: bool) -> bool:
     for mode, key in (("light", DATA_DEFAULT_THEME), ("dark", DATA_DEFAULT_DARK_THEME)):
         if on:
             name = THEME_NAME
@@ -81,6 +93,11 @@ async def async_apply_default(hass: HomeAssistant, *, on: bool) -> None:
             name = "none"
         else:
             continue
-        await hass.services.async_call(
-            "frontend", "set_theme", {"name": name, "mode": mode}, blocking=True
-        )
+        try:
+            await hass.services.async_call(
+                "frontend", "set_theme", {"name": name, "mode": mode}, blocking=True
+            )
+        except (HomeAssistantError, vol.Invalid) as err:
+            LOGGER.warning("Home Assistant could not set its default theme to %s: %s", name, err)
+            return False
+    return True

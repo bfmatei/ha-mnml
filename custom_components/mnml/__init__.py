@@ -20,6 +20,7 @@ from .theme import (
     async_install_theme,
     async_remove_theme,
     other_theme_files,
+    theme_loaded,
     theme_target,
 )
 from .websocket import async_register
@@ -31,8 +32,6 @@ if TYPE_CHECKING:
 
 @dataclass
 class MnmlData:
-    url: str
-    default_theme: bool
     glass: bool
 
 
@@ -70,11 +69,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: MnmlConfigEntry) -> bool
         raise
     entry.async_on_unload(partial(remove_extra_js_url, hass, url))
     entry.async_on_unload(partial(async_remove_panel, hass))
-    entry.runtime_data = MnmlData(
-        url=url,
-        default_theme=bool(entry.options.get(const.CONF_DEFAULT_THEME, False)),
-        glass=glass,
-    )
+    entry.runtime_data = MnmlData(glass=glass)
+    await async_sync_default(hass, entry)
     entry.async_on_unload(entry.add_update_listener(async_options_updated))
     return True
 
@@ -95,13 +91,13 @@ async def async_load_into[S: Loadable](
 
 
 async def async_check_home(hass: HomeAssistant, *, glass: bool) -> None:
-    loaded = await async_install_theme(hass, const.WWW, glass=glass)
+    kept = await async_install_theme(hass, const.WWW, glass=glass)
     others = await hass.async_add_executor_job(other_theme_files, Path(hass.config.path("themes")))
     hand = await async_hand_loaded(hass)
     async_set_issue(
         hass,
         const.ISSUE_THEME_NOT_LOADED,
-        raised=not loaded,
+        raised=not kept,
         placeholders={"path": str(theme_target(hass))},
     )
     async_set_issue(
@@ -120,10 +116,19 @@ async def async_options_updated(hass: HomeAssistant, entry: MnmlConfigEntry) -> 
     if glass != entry.runtime_data.glass:
         await async_check_home(hass, glass=glass)
         entry.runtime_data.glass = glass
+    await async_sync_default(hass, entry)
+
+
+async def async_sync_default(hass: HomeAssistant, entry: MnmlConfigEntry) -> None:
     on = bool(entry.options.get(const.CONF_DEFAULT_THEME, False))
-    if on != entry.runtime_data.default_theme:
-        await async_apply_default(hass, on=on)
-        entry.runtime_data.default_theme = on
+    if on == bool(entry.data.get(const.APPLIED_DEFAULT_THEME, False)):
+        return
+    if on and not theme_loaded(hass):
+        return
+    if await async_apply_default(hass, on=on):
+        hass.config_entries.async_update_entry(
+            entry, data={**entry.data, const.APPLIED_DEFAULT_THEME: on}
+        )
 
 
 async def async_unload_entry(hass: HomeAssistant, _entry: MnmlConfigEntry) -> bool:

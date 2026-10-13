@@ -2,23 +2,16 @@ import assert from 'node:assert/strict';
 
 import { test } from 'vitest';
 
-import type { Template, Value } from '../contract/templates.ts';
+import { isMapping } from '../contract/templates.ts';
+import type { Value, WrittenTemplate } from '../contract/templates.ts';
 import { field } from '../ha/field.ts';
-import { define, drawn, mounted } from '../test/render.ts';
+import { drawn } from '../test/render.ts';
 
-import {
-  conditionOf,
-  drawInspector,
-  fittingSlots,
-  MnmlBinder,
-  slotPaths,
-  withCondition,
-} from './inspector.ts';
+import { readableOf } from './data.ts';
+import { conditionOf, drawInspector, slotPaths, withCondition } from './inspector.ts';
 import type { InspectorActions } from './inspector.ts';
 import { partOf } from './outline.ts';
 import { valueAt, withValue } from './tree.ts';
-
-define('mnml-binder', MnmlBinder);
 
 test("a template's slots are offered with the fields of its object slots", () => {
   assert.deepEqual(
@@ -57,11 +50,14 @@ test('a part is shown always, if slots are set, or unless they are; the conditio
   });
 });
 
-function actionsFor(get: () => Template, set: (next: Template) => void): InspectorActions {
+function actionsFor(
+  get: () => WrittenTemplate,
+  set: (next: WrittenTemplate) => void,
+): InspectorActions {
   return {
     hass: undefined,
     open: new Map(),
-    template: get(),
+    template: readableOf('test', get()),
     templates: {},
     value: (path) => {
       const found = valueAt(get(), path);
@@ -74,14 +70,14 @@ function actionsFor(get: () => Template, set: (next: Template) => void): Inspect
   };
 }
 
-function cardOf(template: Template): Record<string, Value> {
+function cardOf(template: WrittenTemplate): Record<string, Value> {
   const card = valueAt(template, ['card']);
   assert.ok(typeof card === 'object' && card !== null && !Array.isArray(card));
   return card;
 }
 
 test('two bound fields of a part changed one after the other both stay, without a redraw between them', () => {
-  let template: Template = {
+  let template: WrittenTemplate = {
     slots: { title: { kind: 'text' }, icon: { kind: 'icon' } },
     card: { type: 'custom:mnml-heading-card', title: '[[title]]', icon: '[[icon]]' },
   };
@@ -117,59 +113,47 @@ test('two bound fields of a part changed one after the other both stay, without 
   });
 });
 
-test('a field is offered only the slots of a kind that fits it', () => {
-  const slots = {
-    name: { kind: 'text' },
-    count: { kind: 'number' },
-    lamp: { kind: 'entity' },
-    lamps: { kind: 'entities' },
-    shown: { kind: 'flag' },
-    look: { kind: 'icon' },
-  } as const;
-  assert.deepEqual(fittingSlots(slots, 'entity'), ['lamp']);
-  assert.deepEqual(fittingSlots(slots, 'entities'), ['lamp', 'lamps']);
-  assert.deepEqual(fittingSlots(slots, 'flag'), ['shown']);
-  assert.deepEqual(fittingSlots(slots, 'icon'), ['name', 'look']);
-  assert.deepEqual(fittingSlots(slots, 'text'), ['name', 'count', 'lamp', 'look']);
-  assert.deepEqual(fittingSlots(slots, 'rule'), [
-    'name',
-    'count',
-    'lamp',
-    'lamps',
-    'shown',
-    'look',
-  ]);
-});
+function dataOf(node: Element): Record<string, Value> {
+  const data = field(node, 'data');
+  return isMapping(data) ? data : {};
+}
 
-test('the binder offers the slots that fit the field chosen, and binds the one chosen', async () => {
-  const bound: string[] = [];
-  const binder = document.createElement('mnml-binder');
-  assert.ok(binder instanceof MnmlBinder);
-  binder.fields = [
-    { value: 'entity', label: 'Entity', kind: 'entity' },
-    { value: 'name', label: 'Name', kind: 'text' },
-  ];
-  binder.slots = { title: { kind: 'text' }, lamp: { kind: 'entity' } };
-  binder.bind = (key, slot) => {
-    bound.push(`${key}=${slot}`);
+test('a shared piece shows a slot it is not given as empty, and an edit writes that slot alone, leaving the others as they were', () => {
+  let template: WrittenTemplate = { card: { template: 'banner', slots: { title: 'Hi', size: 3 } } };
+  const actions: InspectorActions = {
+    ...actionsFor(
+      () => template,
+      (next) => {
+        template = next;
+      },
+    ),
+    templates: {
+      banner: {
+        slots: { title: { kind: 'text' }, subtitle: { kind: 'text' }, size: { kind: 'number' } },
+        card: { type: 'custom:mnml-heading-card', title: '[[title]]' },
+      },
+    },
   };
-  const root = await mounted(binder);
-  const picks = (): HTMLSelectElement[] => [...root.querySelectorAll('select')];
-  const slots = (): string[] => [...(picks()[1]?.options ?? [])].map((option) => option.value);
-  assert.deepEqual(slots(), ['lamp']);
-  const chosen = picks()[0];
-  assert.ok(chosen);
-  chosen.value = 'name';
-  chosen.dispatchEvent(new Event('change'));
-  await binder.updateComplete;
-  assert.deepEqual(slots(), ['title', 'lamp']);
-  const slot = picks()[1];
-  assert.ok(slot);
-  slot.value = 'lamp';
-  slot.dispatchEvent(new Event('change'));
-  await binder.updateComplete;
-  const bind = root.querySelector('button[aria-label="Link the setting to the slot"]');
-  assert.ok(bind instanceof HTMLButtonElement);
-  bind.click();
-  assert.deepEqual(bound, ['name=lamp']);
+  const box = drawn(drawInspector(partOf(cardOf(template), ['card'], undefined, 0), actions));
+  const form = (key: string): Element => {
+    const found = [...box.querySelectorAll('ha-form')].find((node) =>
+      Object.hasOwn(dataOf(node), key),
+    );
+    assert.ok(found, key);
+    return found;
+  };
+  const edit = (key: string, value: string): void => {
+    form(key).dispatchEvent(
+      new CustomEvent('value-changed', {
+        detail: { value: { ...dataOf(form(key)), [key]: value } },
+      }),
+    );
+  };
+  assert.equal(dataOf(form('subtitle'))['subtitle'], '');
+  assert.equal(dataOf(form('size'))['size'], '3');
+  edit('title', 'Hello');
+  assert.deepEqual(template.card, { template: 'banner', slots: { title: 'Hello', size: 3 } });
+  edit('subtitle', 'Hall');
+  edit('title', '');
+  assert.deepEqual(template.card, { template: 'banner', slots: { size: 3, subtitle: 'Hall' } });
 });

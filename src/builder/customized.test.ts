@@ -41,10 +41,10 @@ test('a person keeps only what differs from what MNML finds of them, so their de
   assert.deepEqual(
     personFrom(
       { entity: 'person.jane' },
-      { type: CARD, template: 'person', slots: { ...found, batteries: [] } },
+      { type: CARD, template: 'person', slots: { ...found, low: 30 } },
       HOME,
     ),
-    { entity: 'person.jane', slots: { batteries: [] } },
+    { entity: 'person.jane', slots: { low: 30 } },
   );
 });
 
@@ -82,4 +82,37 @@ test('a car is its key and the rest of its slots, and one without a key that nam
     undefined,
   );
   assert.equal(carFrom({ type: CARD, template: 'car', slots: { key: 'My car' } }), undefined);
+});
+
+test('a spelled room, person or system card keeps every slot its editor gives, and stays spelled', () => {
+  const slots = { key: 'office', name: 'Office' };
+  assert.deepEqual(
+    roomFrom({ slots: { key: 'office' }, spelled: true }, { type: CARD, template: 'room', slots }),
+    { slots, spelled: true },
+  );
+  assert.deepEqual(
+    roomFrom(
+      { slots: { key: 'office' }, spelled: true },
+      { type: CARD, template: 'room', area: 'kitchen', slots: { name: 'Cook' } },
+    ),
+    { area: 'kitchen', slots: { name: 'Cook' } },
+  );
+  const person = { key: 'jane', entity: 'person.jane', low: 30 };
+  assert.deepEqual(
+    personFrom(
+      { entity: 'person.jane', slots: { key: 'jane' }, spelled: true },
+      { type: CARD, template: 'person', slots: person },
+      HOME,
+    ),
+    { entity: 'person.jane', slots: person, spelled: true },
+  );
+  assert.deepEqual(
+    systemFrom(
+      { template: 'home-assistant', slots: {}, spelled: true },
+      { type: CARD, template: 'home-assistant', slots: { cpu: 'sensor.cpu' } },
+      HOME,
+      TEMPLATES,
+    ),
+    { template: 'home-assistant', slots: { cpu: 'sensor.cpu' }, spelled: true },
+  );
 });

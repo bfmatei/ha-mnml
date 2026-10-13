@@ -4,7 +4,7 @@ import { SECTION_LOOKS, isOrder, lookOf } from '../contract/builder.ts';
 import type { Plan, Recipe, RecipeSection, SectionKey } from '../contract/builder.ts';
 import type { PopupOpen, PopupOpening } from '../contract/cards.ts';
 import type { MdiIcon } from '../contract/entities.ts';
-import { isMapping, isTemplate } from '../contract/templates.ts';
+import { isMapping, isStorable, isTemplate } from '../contract/templates.ts';
 import type { Template, Templates, Value } from '../contract/templates.ts';
 import { toYaml } from '../contract/yaml.ts';
 
@@ -92,6 +92,7 @@ export function recipeOf(plan: Plan, templates: Templates, shipped: Templates): 
   return {
     title: plan.title,
     icon: plan.icon,
+    ...(plan.glances === undefined ? {} : { glances: true }),
     open: plan.open,
     sections,
     ...(plan.order === undefined ? {} : { order: [...plan.order] }),
@@ -193,11 +194,7 @@ export function readRecipe(text: string, shipped: Templates): Recipe {
       return refuse("The dashboard template's templates are not a mapping of names.");
     }
     for (const [name, template] of Object.entries(templates)) {
-      if (
-        !isName(name) ||
-        !isTemplate(template) ||
-        (!isMapping(template.card) && !Array.isArray(template.card))
-      ) {
+      if (!isName(name) || !isStorable(template, shipped[name] !== undefined)) {
         return refuse(`${name} in the dashboard template is not a template.`);
       }
       bundled[name] = template;
@@ -230,9 +227,14 @@ export function readRecipe(text: string, shipped: Templates): Recipe {
   if (order !== undefined && !isOrder(order)) {
     return refuse("The dashboard template's order is not the sections, each once.");
   }
+  const glances = inner['glances'];
+  if (glances !== undefined && glances !== true) {
+    return refuse("The dashboard template's glances is true, for the Glances strip, or left out.");
+  }
   return {
     title,
     icon,
+    ...(glances === undefined ? {} : { glances }),
     open: openOf(inner['open']),
     sections: read,
     ...(order === undefined ? {} : { order }),

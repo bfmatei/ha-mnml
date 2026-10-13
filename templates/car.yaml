@@ -47,22 +47,8 @@ car:
         help: "Each tyre's target pressure, in the order of the tyres.",
       }
     location: { kind: entity, group: Basics, help: "The car's device tracker." }
-    lock_words:
-      label: 'Lock words'
-      kind: object
-      default: { secured: Locked, selectivelocked: Partly locked }
-      group: Locks
-      fields:
-        secured: { kind: text }
-        selectivelocked: { kind: text }
-    alarm_words:
-      label: 'Alarm words'
-      kind: object
-      default: { doorsonly: Doors only, doorstiltcabin: Armed }
-      group: Locks
-      fields:
-        doorsonly: { kind: text }
-        doorstiltcabin: { kind: text }
+    lock_words: { shape: lock_words, group: Locks }
+    alarm_words: { shape: alarm_words, group: Locks }
     unlocked: { kind: texts, default: [unlocked, selectivelocked], group: Locks }
     disarmed: { kind: texts, default: [unarmed], group: Locks }
     open_states:
@@ -102,7 +88,7 @@ car:
             entities: ['[[lock]]']
             words: '[[lock_words]]'
             color: red
-            is: '[[unlocked]]'
+            is: ['[[unlocked]]']
           - id: doors
             entities: ['[[doors]]', '[[hood]]', '[[tailgate]]']
             color: orange
@@ -116,7 +102,7 @@ car:
           - id: windows
             entities: ['[[windows]]', '[[sunroof]]']
             color: orange
-            is: '[[open_states]]'
+            is: ['[[open_states]]']
       - id: alarm
         if: [alarm_active, alarm]
         type: status
@@ -128,13 +114,13 @@ car:
             if: alarm_active
             entities: ['[[alarm_active]]']
             color: red
-            is: [on, unavailable]
+            is: ['on', unavailable]
           - id: alarm
             if: alarm
             entities: ['[[alarm]]']
             words: '[[alarm_words]]'
             color: red
-            is: '[[disarmed]]'
+            is: ['[[disarmed]]']
           - id: alarm-unavailable
             if: alarm
             entities: ['[[alarm]]']
@@ -177,6 +163,7 @@ car:
         alarm_words: '[[alarm_words]]'
         unlocked: '[[unlocked]]'
         disarmed: '[[disarmed]]'
+        open_states: '[[open_states]]'
         tyre_low_share: '[[tyre_low_share]]'
         tyre_warn_share: '[[tyre_warn_share]]'
   example: &car
@@ -211,6 +198,8 @@ car-plan:
     tailgate: { kind: entity, required: true, group: Openings }
     windows: { kind: entities, required: true, group: Openings }
     sunroof: { kind: entity, group: Openings }
+    open_states: { kind: texts, group: Openings, label: 'Open states' }
+    half_states: { kind: texts, group: Openings, label: 'Half open states' }
     tyres: { kind: entities, required: true, group: Tyres }
     tyre_targets: { kind: entities, required: true, group: Tyres }
     tyre_low_share: { kind: number, default: 0.9, group: Tyres }
@@ -224,6 +213,8 @@ car-plan:
     tailgate: '[[tailgate]]'
     windows: '[[windows]]'
     sunroof: '[[sunroof]]'
+    open_states: '[[open_states]]'
+    half_states: '[[half_states]]'
     tyres: '[[tyres]]'
     tyre_targets: '[[tyre_targets]]'
     tyre_low_share: '[[tyre_low_share]]'
@@ -268,20 +259,11 @@ car-popup:
     tyres: { kind: entities, required: true }
     tyre_targets: { kind: entities, required: true }
     location: { kind: entity }
-    lock_words:
-      kind: object
-      default: { secured: Locked, selectivelocked: Partly locked }
-      fields:
-        secured: { kind: text }
-        selectivelocked: { kind: text }
-    alarm_words:
-      kind: object
-      default: { doorsonly: Doors only, doorstiltcabin: Armed }
-      fields:
-        doorsonly: { kind: text }
-        doorstiltcabin: { kind: text }
+    lock_words: { shape: lock_words }
+    alarm_words: { shape: alarm_words }
     unlocked: { kind: texts, default: [unlocked, selectivelocked] }
     disarmed: { kind: texts, default: [unarmed] }
+    open_states: { kind: texts, default: [open, intermediate] }
     tyre_low_share: { kind: number, default: 0.9 }
     tyre_warn_share: { kind: number, default: 0.95 }
   card:
@@ -303,7 +285,7 @@ car-popup:
             entity: '[[lock]]'
             words: '[[lock_words]]'
             color: red
-            when: { is: '[[unlocked]]' }
+            when: { is: ['[[unlocked]]'] }
           - id: alarm
             if: alarm
             entity: '[[alarm]]'
@@ -325,6 +307,7 @@ car-popup:
           tailgate: '[[tailgate]]'
           windows: '[[windows]]'
           sunroof: '[[sunroof]]'
+          half_states: '[[open_states]]'
           tyres: '[[tyres]]'
           tyre_targets: '[[tyre_targets]]'
           tyre_low_share: '[[tyre_low_share]]'

@@ -1,8 +1,10 @@
 import type { MdiIcon } from '../contract/entities.ts';
 import { isMapping } from '../contract/templates.ts';
 import type { Rule, SlotSpec, Value } from '../contract/templates.ts';
-import type { AreaEntry } from '../templates/discover.ts';
+import { humanise } from '../ha/format.ts';
+import type { AreaEntry, EntityEntry } from '../templates/discover.ts';
 import { filled } from '../templates/expand.ts';
+import type { DeviceFit } from '../templates/explain.ts';
 
 import { iconFor } from './icons.ts';
 
@@ -17,11 +19,7 @@ interface Group {
 const SIMPLE = new Set(['text', 'texts', 'number', 'icon', 'flag', 'entity', 'entities']);
 
 export function slotLabel(name: string, spec: SlotSpec): string {
-  if (spec.label !== undefined) {
-    return spec.label;
-  }
-  const words = name.replaceAll('_', ' ');
-  return `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
+  return spec.label ?? humanise(name);
 }
 
 export function singular(label: string): string {
@@ -71,27 +69,6 @@ export function defaultArea(
   )?.area_id;
 }
 
-const same = (a: Value | undefined, b: Value | undefined): boolean =>
-  JSON.stringify(a) === JSON.stringify(b);
-
-export function overridesOf(
-  found: Readonly<Record<string, Value>>,
-  values: Readonly<Record<string, Value>>,
-): Record<string, Value> {
-  const out: Record<string, Value> = {};
-  for (const [name, value] of Object.entries(values)) {
-    if (!same(found[name], value)) {
-      out[name] = value;
-    }
-  }
-  for (const name of Object.keys(found)) {
-    if (!Object.hasOwn(values, name)) {
-      out[name] = null;
-    }
-  }
-  return out;
-}
-
 export function valuesOf(
   source: Source,
   found: Readonly<Record<string, Value>>,
@@ -104,9 +81,14 @@ export function valuesOf(
     return { ...found };
   }
   return Object.fromEntries(
-    Object.entries({ ...found, ...slots }).filter(([, value]) => value !== null),
+    Object.entries({ ...found, ...slots }).filter(
+      ([name, value]) => value !== null || !Object.hasOwn(found, name),
+    ),
   );
 }
+
+export const deviceWords = (device: DeviceFit): string =>
+  device.area === undefined ? device.name : `${device.name} in ${device.area}`;
 
 export function noteOf(
   source: Source,
@@ -114,9 +96,14 @@ export function noteOf(
   found: Readonly<Record<string, Value>>,
   slots: Readonly<Record<string, Value>>,
   place: string,
+  device?: DeviceFit,
 ): string | undefined {
   if (source === 'yourself') {
     return undefined;
+  }
+  const own = source === 'area' && Object.hasOwn(slots, name);
+  if (device !== undefined && (own ? filled(slots[name]) : Object.hasOwn(found, name))) {
+    return `${own ? 'Set by you' : 'Found'}: ${deviceWords(device)}`;
   }
   if (source === 'home') {
     return Object.hasOwn(found, name) ? 'Found in the home' : 'Nothing found in the home';
@@ -124,8 +111,34 @@ export function noteOf(
   if (place === '') {
     return undefined;
   }
-  if (Object.hasOwn(slots, name)) {
+  if (own) {
     return filled(slots[name]) ? 'Set by you' : 'Not set';
   }
   return Object.hasOwn(found, name) ? `Found in ${place}` : `Nothing found in ${place}`;
+}
+
+function idsIn(value: Value | undefined): string[] {
+  if (typeof value === 'string') {
+    return [value];
+  }
+  if (Array.isArray(value)) {
+    return value.flatMap(idsIn);
+  }
+  return isMapping(value) ? Object.values(value).flatMap(idsIn) : [];
+}
+
+export function deviceIn(
+  value: Value | undefined,
+  fits: readonly DeviceFit[],
+  entities: Readonly<Record<string, EntityEntry>>,
+): DeviceFit | undefined {
+  const held = idsIn(value).map((id) => entities[id]?.device_id);
+  let best: { fit: DeviceFit; count: number } | undefined;
+  for (const fit of fits) {
+    const count = held.filter((device) => device === fit.id).length;
+    if (count > 0 && (best === undefined || count > best.count)) {
+      best = { fit, count };
+    }
+  }
+  return best?.fit;
 }

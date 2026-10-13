@@ -6,7 +6,7 @@ import { test } from 'vitest';
 
 import type { SlotSpec } from '../contract/templates.ts';
 
-import { SHIPPED } from './shipped.ts';
+import { SHIPPED, readShapes } from './shipped.ts';
 
 function named(spec: SlotSpec, path: string): string[] {
   return [
@@ -55,4 +55,17 @@ test('docs/templates.md marks a slot required exactly when its template requires
     }
   }
   assert.deepEqual(wrong, []);
+});
+
+test('docs/templates.md names every shipped shape under Shapes', () => {
+  const doc = readFileSync(resolve(import.meta.dirname, '../../docs/templates.md'), 'utf8');
+  const start = doc.indexOf('\n## Shapes\n');
+  const named = new Set(
+    [...doc.slice(start, doc.indexOf('\n## ', start + 1)).matchAll(/^\| `([a-z0-9_]+)` /gm)].map(
+      (match) => match[1],
+    ),
+  );
+  const missing = Object.keys(readShapes()).filter((name) => !named.has(name));
+  assert.ok(start !== -1);
+  assert.deepEqual(missing, []);
 });

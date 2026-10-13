@@ -1,6 +1,7 @@
 import { html } from 'lit';
 import type { TemplateResult } from 'lit';
 import { state } from 'lit/decorators.js';
+import { classMap } from 'lit/directives/class-map.js';
 
 import type { EntityCard } from '../contract/cards.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
@@ -8,31 +9,12 @@ import { nameOf } from '../ha/names.ts';
 import { icon, quietly } from '../ha/templates.ts';
 
 import { MnmlCard, requireString } from './base.ts';
-import { schema } from './keys.ts';
 import type { KeySchema } from './keys.ts';
 import { requireControls } from './parts/controls.ts';
 import { ITEM_STYLE, itemRow } from './parts/item.ts';
 import { tip } from './parts/tooltip.ts';
-import { CONTROLS, ITEM, STATE_ITEMS, STATE_RULE } from './schemas.ts';
+import { ENTITY_CARD } from './schemas.ts';
 import { BASE_STYLE } from './styles.ts';
-
-const SCHEMA = schema<EntityCard>(
-  {
-    type: true,
-    items: true,
-    entity: true,
-    name: true,
-    label: true,
-    strip_word: true,
-    icon: true,
-    color: true,
-    when: true,
-    state: true,
-    popup: true,
-    controls: true,
-  },
-  { items: ITEM, when: STATE_RULE, state: STATE_ITEMS, controls: CONTROLS },
-);
 
 export class MnmlEntityCard extends MnmlCard<EntityCard> {
   static override styles = [BASE_STYLE, ...ITEM_STYLE];
@@ -40,7 +22,7 @@ export class MnmlEntityCard extends MnmlCard<EntityCard> {
   @state() private expanded = false;
 
   protected schema(): KeySchema {
-    return SCHEMA;
+    return ENTITY_CARD;
   }
 
   protected override validate(config: EntityCard): void {
@@ -72,7 +54,7 @@ export class MnmlEntityCard extends MnmlCard<EntityCard> {
     </button>`;
     return html`<div class="card">
       ${itemRow(hass, config, this, toggle)}
-      <div class="children ${this.expanded ? '' : 'hidden'}">
+      <div class=${classMap({ children: true, hidden: !this.expanded })}>
         ${items.map((item) => itemRow(hass, item, this))}
       </div>
     </div>`;

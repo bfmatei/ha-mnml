@@ -1,3 +1,4 @@
+import type { SectionKey } from '../contract/builder.ts';
 import type { ClientNetwork, CustomCard, PopupOpen } from '../contract/cards.ts';
 import type {
   AlarmPanelId,
@@ -210,10 +211,10 @@ export interface Surround {
 export interface Speaker {
   key: string;
   entity: MediaPlayerId;
-  bass: NumberId;
-  treble: NumberId;
+  bass?: NumberId;
+  treble?: NumberId;
   balance?: NumberId;
-  loudness: SwitchId;
+  loudness?: SwitchId;
   tv?: SpeakerTv;
   subwoofer?: Subwoofer;
   surround?: Surround;
@@ -519,19 +520,12 @@ export interface Dashboard {
   views: View[];
 }
 
-export interface SectionTitles {
-  rooms: string;
-  people: string;
-  garage: string;
-  infrastructure: string;
-}
-
-export type SectionName = keyof SectionTitles;
+export type SectionTitles = Readonly<Record<SectionKey, string>>;
 
 export interface Home {
   title: string;
   sections: SectionTitles;
-  order?: readonly SectionName[];
+  order?: readonly SectionKey[];
   popupOpen?: PopupOpen;
   outside?: WeatherId;
   vacation?: InputBooleanId;
@@ -542,3 +536,101 @@ export interface Home {
   cars: readonly Car[];
   system: System;
 }
+
+export const HOME_KEYS: Record<keyof Home, true> = {
+  title: true,
+  sections: true,
+  order: true,
+  popupOpen: true,
+  outside: true,
+  vacation: true,
+  security: true,
+  energy: true,
+  rooms: true,
+  people: true,
+  cars: true,
+  system: true,
+};
+
+export const SECTION_TITLES_KEYS: Record<keyof SectionTitles, true> = {
+  rooms: true,
+  people: true,
+  garage: true,
+  system: true,
+};
+
+export const ROOM_KEYS: Record<keyof Room, true> = {
+  key: true,
+  name: true,
+  icon: true,
+  temperature: true,
+  humidity: true,
+  window: true,
+  door: true,
+  lock: true,
+  lights: true,
+  heating: true,
+  ac: true,
+  vacuum: true,
+  printer3d: true,
+  cameras: true,
+  covers: true,
+  fans: true,
+  humidifiers: true,
+  appliances: true,
+  pets: true,
+  plants: true,
+  media: true,
+  outlets: true,
+  diffuser: true,
+  batteries: true,
+  leaks: true,
+  firmware: true,
+};
+
+export const PERSON_KEYS: Record<keyof Person, true> = {
+  key: true,
+  entity: true,
+  health: true,
+  devices: true,
+};
+
+export const CAR_KEYS: Record<keyof Car, true> = {
+  key: true,
+  icon: true,
+  metadata: true,
+  fuel: true,
+  remainingFuel: true,
+  range: true,
+  mileage: true,
+  service: true,
+  batteryVoltage: true,
+  coolantTemperature: true,
+  lock: true,
+  alarm: true,
+  alarmActive: true,
+  doors: true,
+  hood: true,
+  tailgate: true,
+  windows: true,
+  sunroof: true,
+  tyres: true,
+  tyreTargets: true,
+  location: true,
+};
+
+export const SYSTEM_KEYS: Record<keyof System, true> = {
+  cpu: true,
+  memory: true,
+  diskFree: true,
+  diskUsed: true,
+  services: true,
+  updates: true,
+  firmware: true,
+  backups: true,
+  proxmox: true,
+  adguard: true,
+  network: true,
+  tailscale: true,
+  media: true,
+};

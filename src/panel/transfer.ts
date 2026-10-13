@@ -1,20 +1,25 @@
-import { isMapping, isTemplate } from '../contract/templates.ts';
-import type { Template, Templates } from '../contract/templates.ts';
+import { SECTION_ORDER } from '../contract/builder.ts';
+import type { Plan, SectionKey, SectionLook } from '../contract/builder.ts';
+import { isMapping, isStorable, isTemplate } from '../contract/templates.ts';
+import type { Templates, WrittenTemplate } from '../contract/templates.ts';
 import { toYaml } from '../contract/yaml.ts';
 import { field } from '../ha/field.ts';
 import { changesOf, nodeHash } from '../templates/changes.ts';
+import type { Change } from '../templates/changes.ts';
 import { toValue } from '../templates/expand.ts';
 
-import type { Entry } from './builder.ts';
-import type { Dashboard, Kept } from './data.ts';
+import type { Built, Call } from './building.ts';
+import { shapedOf } from './data.ts';
+import type { Dashboard, Entry, Kept } from './data.ts';
+import { messageOf } from './message.ts';
 import { adoptIds } from './tree.ts';
-import { readYaml } from './yaml.ts';
+import { NOT_A_TEMPLATE, readYaml } from './yaml.ts';
 
 type Fate = 'changes' | 'own' | 'replaces' | 'same';
 
 export interface Incoming {
   name: string;
-  template: Template;
+  template: WrittenTemplate;
   fate: Fate;
   clash: boolean;
   from: readonly string[];
@@ -22,34 +27,50 @@ export interface Incoming {
 
 export type Choice = 'replace' | 'both' | 'skip';
 
-export function templatesIn(text: string): Record<string, Template> {
+export function templatesIn(
+  text: string,
+  shipped: ReadonlySet<string> = new Set(),
+): Record<string, WrittenTemplate> {
   const read = readYaml(text);
   const inner =
     isMapping(read) && isMapping(read['mnml_templates']) ? read['mnml_templates'] : read;
   if (!isMapping(inner)) {
     throw new Error('the file holds no mapping of names to templates');
   }
-  const found: Record<string, Template> = {};
+  const found: Record<string, WrittenTemplate> = {};
   for (const [name, template] of Object.entries(inner)) {
     if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(name)) {
       throw new Error(`${name}: a template's name is lower case letters, digits, - and _`);
     }
-    if (!isTemplate(template)) {
-      throw new Error(`${name}: a template is a mapping with a card`);
+    if (!isStorable(template, shipped.has(name))) {
+      throw new Error(`${name}: ${NOT_A_TEMPLATE}`);
     }
     found[name] = template;
   }
+  resolvable(found);
   return found;
 }
 
-const same = (a: Template, b: Template): boolean => nodeHash(toValue(a)) === nodeHash(toValue(b));
+export function resolvable(templates: Readonly<Record<string, WrittenTemplate>>): void {
+  for (const [name, template] of Object.entries(templates)) {
+    shapedOf(name, template);
+  }
+}
 
-function adopted(name: string, template: Template, shipped: Templates, kept: Kept): Template {
+const same = (a: WrittenTemplate, b: WrittenTemplate): boolean =>
+  nodeHash(toValue(a)) === nodeHash(toValue(b));
+
+function adopted(
+  name: string,
+  template: WrittenTemplate,
+  shipped: Templates,
+  kept: Kept,
+): WrittenTemplate {
   return adoptIds(template, kept.own[name] ?? shipped[name]);
 }
 
 export function planImport(
-  incoming: Readonly<Record<string, Template>>,
+  incoming: Readonly<Record<string, WrittenTemplate>>,
   shipped: Templates,
   kept: Kept,
   resolved: Templates,
@@ -57,15 +78,15 @@ export function planImport(
 ): Incoming[] {
   return Object.entries(incoming).map(([name, given]) => {
     const template = adopted(name, given, shipped, kept);
-    const now = resolved[name];
-    const fate: Fate =
-      now !== undefined && same(now, template)
-        ? 'same'
-        : kept.own[name] !== undefined
-          ? 'replaces'
-          : shipped[name] !== undefined
-            ? 'changes'
-            : 'own';
+    const fate: Fate = [kept.own[name], resolved[name]].some(
+      (now) => now !== undefined && same(now, template),
+    )
+      ? 'same'
+      : kept.own[name] !== undefined
+        ? 'replaces'
+        : shipped[name] !== undefined
+          ? 'changes'
+          : 'own';
     const clash =
       fate !== 'same' && (kept.own[name] !== undefined || kept.changes[name] !== undefined);
     return { name, template, fate, clash, from: from[name] ?? [] };
@@ -104,37 +125,43 @@ export function settleImport(
 export function entryFor(incoming: Incoming, shipped: Templates): Entry | undefined {
   const base = shipped[incoming.name];
   if (incoming.fate === 'changes' && base !== undefined) {
-    const changes = changesOf(base, incoming.template);
+    const changes = changesOf(base, shapedOf(incoming.name, incoming.template));
     return changes.length === 0 ? undefined : { kind: 'changes', changes };
   }
   return { kind: 'own', template: incoming.template };
 }
 
-export function exportText(names: readonly string[], resolved: Templates): string {
+export function exportText(
+  names: readonly string[],
+  templates: Readonly<Record<string, WrittenTemplate>>,
+): string {
   return toYaml(
     Object.fromEntries(
-      names.flatMap((name) => (resolved[name] === undefined ? [] : [[name, resolved[name]]])),
+      names.flatMap((name) => (templates[name] === undefined ? [] : [[name, templates[name]]])),
     ),
   );
 }
 
 const SHARED = 'mnml-templates';
 
-export function dashboardTemplates(dashboards: readonly Dashboard[]): {
-  templates: Record<string, Template>;
+export function dashboardTemplates(
+  dashboards: readonly Dashboard[],
+  shipped: ReadonlySet<string> = new Set(),
+): {
+  templates: Record<string, WrittenTemplate>;
   from: Record<string, string[]>;
   differ: string[];
 } {
   const ordered = [...dashboards].toSorted(
     (a, b) => Number(b.path === SHARED) - Number(a.path === SHARED),
   );
-  const templates: Record<string, Template> = {};
+  const templates: Record<string, WrittenTemplate> = {};
   const from: Record<string, string[]> = {};
   const differ = new Set<string>();
   for (const dashboard of ordered) {
     const own = field(dashboard.config, 'mnml_templates');
     for (const [name, template] of Object.entries(isMapping(own) ? own : {})) {
-      if (!isTemplate(template)) {
+      if (!isStorable(template, shipped.has(name))) {
         continue;
       }
       const first = templates[name];
@@ -150,11 +177,11 @@ export function dashboardTemplates(dashboards: readonly Dashboard[]): {
 }
 
 export function notKept(
-  found: Readonly<Record<string, Template>>,
+  found: Readonly<Record<string, WrittenTemplate>>,
   kept: Kept,
   resolved: Templates,
   shipped: Templates,
-): Record<string, Template> {
+): Record<string, WrittenTemplate> {
   return Object.fromEntries(
     Object.entries(found).filter(([name, template]) => {
       const now = resolved[name];
@@ -213,12 +240,52 @@ export function renamedConfig(
 }
 
 export function renamedTemplate(
-  template: Template,
+  template: WrittenTemplate,
   from: string,
   to: string,
-): Template | undefined {
+): WrittenTemplate | undefined {
   const { value, count } = renamed(template, from, to, false);
   return count > 0 && isTemplate(value) ? value : undefined;
+}
+
+export function renamedChanges(
+  changes: readonly Change[],
+  from: string,
+  to: string,
+): Change[] | undefined {
+  let count = 0;
+  const next = changes.map((change): Change => {
+    if (change.op === 'set' && change.key === 'template' && change.value === from) {
+      count += 1;
+      return { ...change, value: to };
+    }
+    if (change.op !== 'set' && change.op !== 'insert') {
+      return change;
+    }
+    const inner = renamed(change.value, from, to, false);
+    count += inner.count;
+    return { ...change, value: toValue(inner.value) };
+  });
+  return count > 0 ? next : undefined;
+}
+
+function renamedPlan(plan: Plan, from: string, to: string): Plan | undefined {
+  const sections: Partial<Record<SectionKey, SectionLook>> = {};
+  let count = 0;
+  for (const key of SECTION_ORDER) {
+    const look = plan.sections?.[key];
+    if (look !== undefined) {
+      count += look.template === from ? 1 : 0;
+      sections[key] = look.template === from ? { ...look, template: to } : look;
+    }
+  }
+  const system = plan.system.map((choice) => {
+    count += choice.template === from ? 1 : 0;
+    return choice.template === from ? { ...choice, template: to } : choice;
+  });
+  return count === 0
+    ? undefined
+    : { ...plan, system, ...(plan.sections === undefined ? {} : { sections }) };
 }
 
 export interface Renamed {
@@ -226,13 +293,6 @@ export interface Renamed {
   byHand: string[];
   failed: string[];
 }
-
-type Call = (message: { type: string } & Record<string, unknown>) => Promise<unknown>;
-
-const said = (error: unknown): string => {
-  const text = field(error, 'message');
-  return typeof text === 'string' ? text : String(error);
-};
 
 export async function renameEverywhere(
   call: Call,
@@ -257,7 +317,7 @@ export async function renameEverywhere(
         await call({ type: 'lovelace/config/save', url_path: dashboard.path, config });
         return ['written', `${dashboard.title} (${count})`];
       } catch (error) {
-        return ['failed', `${dashboard.title}: ${said(error)}`];
+        return ['failed', `${dashboard.title}: ${messageOf(error)}`];
       }
     }),
   );
@@ -268,4 +328,38 @@ export async function renameEverywhere(
     }
   }
   return renamed;
+}
+
+export async function renamePlans(
+  call: Call,
+  built: readonly Built[],
+  from: string,
+  to: string,
+): Promise<string[]> {
+  const failed = await Promise.all(
+    built.map(async (each): Promise<string[]> => {
+      const before = each.previous;
+      const plan = renamedPlan(each.plan, from, to);
+      const earlier = before === undefined ? undefined : renamedPlan(before.plan, from, to);
+      const cards = renamedConfig(before?.config, from, to);
+      if (plan === undefined && earlier === undefined && cards.count === 0) {
+        return [];
+      }
+      const config = isMapping(cards.config) ? cards.config : undefined;
+      try {
+        await call({
+          type: 'mnml/dashboards/save',
+          url_path: each.url_path,
+          plan: plan ?? each.plan,
+          ...(before === undefined || config === undefined
+            ? {}
+            : { previous: { plan: earlier ?? before.plan, config } }),
+        });
+        return [];
+      } catch (error) {
+        return [`the plan of ${each.plan.title}: ${messageOf(error)}`];
+      }
+    }),
+  );
+  return failed.flat();
 }

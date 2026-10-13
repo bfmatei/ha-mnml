@@ -44,7 +44,6 @@ export const BASE_STYLE = css`
     );
     --m-edge-strong: color-mix(in srgb, var(--primary-text-color) 50%, transparent);
     --m-card: var(--mnml-card-background-color, var(--card-background-color));
-    --m-raised: var(--mnml-pill-raised-color, var(--card-background-color));
     --m-shadow: var(--mnml-card-shadow, none);
     --m-well: var(--mnml-button-shadow, 0 0 0 transparent);
   }

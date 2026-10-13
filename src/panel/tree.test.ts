@@ -5,7 +5,7 @@ import { test } from 'vitest';
 import type { Template } from '../contract/templates.ts';
 import { changesOf } from '../templates/changes.ts';
 
-import { adoptIds, moved, uniqueId, valueAt, withValue } from './tree.ts';
+import { adoptIds, movedTo, uniqueId, valueAt, withValue } from './tree.ts';
 
 const ROOM: Template = {
   card: {
@@ -37,7 +37,7 @@ test('a new id is unique in its list, and a move keeps every part', () => {
   assert.ok(Array.isArray(list));
   assert.equal(uniqueId(list, 'lock'), 'my-lock');
   assert.equal(uniqueId(list, 'door'), 'my-door');
-  assert.deepEqual(moved(['a', 'b', 'c'], 0, 2), ['b', 'c', 'a']);
+  assert.deepEqual(movedTo(['a', 'b', 'c'], 0, 2), ['b', 'c', 'a']);
 });
 
 const stripped = (value: unknown): unknown =>

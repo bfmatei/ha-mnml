@@ -3,6 +3,7 @@ import type { TemplateResult } from 'lit';
 import { styleMap } from 'lit/directives/style-map.js';
 
 import type { SelectCard } from '../contract/cards.ts';
+import { MODE_ATTRIBUTES } from '../contract/structure.ts';
 import { formatState, unavailableValue } from '../ha/format.ts';
 import { hasValue, isUnavailable, stateOf } from '../ha/hass.ts';
 import type { HassEntity, HomeAssistant } from '../ha/hass.ts';
@@ -11,18 +12,11 @@ import { UNAVAILABLE } from '../ha/rules.ts';
 import { colorStyle, icon, quietly, stateIcon } from '../ha/templates.ts';
 
 import { MnmlCard, requireList, requireOneOf, requireString } from './base.ts';
-import { marked, variant } from './keys.ts';
 import type { KeySchema } from './keys.ts';
-import {
-  MENU_STYLE,
-  MODE_ATTRIBUTES,
-  modeChoice,
-  openMenu,
-  optionChoice,
-  sceneChoice,
-} from './parts/menu.ts';
+import { MENU_STYLE, modeChoice, openMenu, optionChoice, sceneChoice } from './parts/menu.ts';
 import type { Choice } from './parts/menu.ts';
 import { tip } from './parts/tooltip.ts';
+import { SELECT_CARD } from './schemas.ts';
 import { BASE_STYLE, CONTROL_STYLE, ROW_STYLE } from './styles.ts';
 
 const SELECT_STYLE = css`
@@ -50,32 +44,13 @@ function unavailableRow(
   </div>`;
 }
 
-const SCHEMA = marked(
-  {
-    scenes: variant<Extract<SelectCard, { scenes: unknown[] }>>({
-      type: true,
-      scenes: true,
-      active_scene: true,
-      name: true,
-      icon: true,
-    }),
-  },
-  variant<Extract<SelectCard, { scenes?: never }>>({
-    type: true,
-    entity: true,
-    attribute: true,
-    name: true,
-    icon: true,
-  }),
-);
-
 export class MnmlSelectCard extends MnmlCard<SelectCard> {
   static override styles = [BASE_STYLE, ROW_STYLE, CONTROL_STYLE, MENU_STYLE, SELECT_STYLE];
 
   protected override readonly columns = 6;
 
   protected schema(): KeySchema {
-    return SCHEMA;
+    return SELECT_CARD;
   }
 
   protected override validate(config: SelectCard): void {
@@ -100,14 +75,15 @@ export class MnmlSelectCard extends MnmlCard<SelectCard> {
     const fromCard = (event: Event): void => {
       const card = event.currentTarget;
       const arrow = card instanceof HTMLElement ? card.querySelector('button.control') : null;
-      if (arrow instanceof HTMLElement) {
-        openMenu(arrow, choice, this);
+      if (card instanceof HTMLElement && arrow instanceof HTMLElement) {
+        openMenu(arrow, choice, this, card);
       }
     };
     const fromArrow = (event: Event): void => {
       const arrow = event.currentTarget;
-      if (arrow instanceof HTMLElement) {
-        openMenu(arrow, choice, this);
+      const card = arrow instanceof HTMLElement ? arrow.closest('.card') : null;
+      if (arrow instanceof HTMLElement && card instanceof HTMLElement) {
+        openMenu(arrow, choice, this, card);
       }
     };
     return html`<div class="card row select" @click=${fromCard}>

@@ -36,259 +36,334 @@ room:
     door: { kind: entity, discover: { domain: binary_sensor, device_class: door }, group: Sensors }
     lock: { kind: entity, discover: { domain: lock }, group: Sensors }
     lights:
+      shape: lights
       help: "The room's lights: their group, and the members it controls."
-      kind: object
       group: Lights
-      fields:
-        group: { kind: entity, required: true }
-        color: { kind: flag }
-        members:
-          kind: objects
-          fields:
-            entity: { kind: entity, required: true }
-            members: { kind: entities }
-        scenes: { kind: entities }
-        active_scene: { kind: entity }
+      fields: { members: { fields: { entity: { required: true } } } }
       discover:
         fields:
           group: [{ domain: light, platform: group }, { domain: light }]
           members: { per: device, where: { domain: light }, fields: { entity: { domain: light } } }
           scenes: { domain: scene }
     heating:
-      kind: object
+      shape: heating
       group: Climate
-      fields:
-        entity: { kind: entity, required: true }
-        preset: { kind: flag }
-        thermostats:
-          kind: objects
-          fields:
-            valve: { kind: entity, required: true }
-            battery: { kind: entity }
-        batteries: { kind: entities }
+      fields: { thermostats: { fields: { valve: { required: true } } } }
       discover:
+        device: { domain: climate, exclude: { attribute: { hvac_modes: cool } } }
         fields:
-          entity: { domain: climate }
+          entity: { domain: climate, exclude: { attribute: { hvac_modes: cool } } }
+          thermostats:
+            - per: device
+              scope: area
+              where: { domain: sensor, translation_key: valve_position }
+              fields:
+                valve: { domain: sensor, translation_key: valve_position }
+                battery: { domain: sensor, device_class: battery }
+            - per: device
+              scope: area
+              where: { domain: sensor, name: valve position }
+              fields:
+                valve: { domain: sensor, name: valve position }
+                battery: { domain: sensor, device_class: battery }
     ac:
-      kind: object
+      shape: ac
       label: Air conditioning
       group: Climate
-      fields:
-        entity: { kind: entity, required: true }
-        fan: { kind: flag }
-        swing: { kind: flag }
-        horizontal_swing: { kind: flag }
-        power_saving: { kind: entity }
-        dehumidifier: { kind: entity }
-        energy:
-          kind: object
-          fields:
-            power: { kind: entity, required: true }
-            today: { kind: entity }
-            total: { kind: entity }
+      fields: { energy: { fields: { power: { required: true } } } }
+      discover:
+        device: { domain: climate, attribute: { hvac_modes: cool } }
+        fields:
+          entity: { domain: climate, attribute: { hvac_modes: cool } }
+          power_saving:
+            - { domain: select, translation_key: power_saving_mode }
+            - { domain: select, name: power saving }
+          dehumidifier:
+            - { domain: number, translation_key: dehumidifier_level }
+            - { domain: number, name: dehumidifier }
+          energy:
+            fields:
+              power: { domain: sensor, device_class: power }
+              today: { domain: sensor, device_class: energy, platform: utility_meter }
+              total: { domain: sensor, device_class: energy, exclude: { platform: utility_meter } }
     vacuum:
-      kind: object
+      shape: vacuum_popup
       group: Devices
-      fields:
-        entity: { kind: entity, required: true }
-        status: { kind: entity }
-        error: { kind: entity }
-        battery: { kind: entity }
-        current_room: { kind: entity }
-        progress: { kind: entity, required: true }
-        area: { kind: entity, required: true }
-        time: { kind: entity, required: true }
-        last_clean: { kind: entity, required: true }
-        mop_attached: { kind: entity, required: true }
-        water_box_attached: { kind: entity }
-        totals:
-          kind: object
-          fields:
-            count: { kind: entity, required: true }
-            area: { kind: entity, required: true }
-            time: { kind: entity, required: true }
-        map: { kind: entity }
-        routines: { kind: entities }
-        settings: { kind: entities }
-        consumables:
-          kind: objects
-          fields:
-            entity: { kind: entity, required: true }
-            reset: { kind: entity }
-        warnings: { kind: entities }
-        dock:
-          kind: object
-          fields:
-            error: { kind: entity }
-            dust_emptying: { kind: entity, required: true }
-            mop_drying: { kind: entity, required: true }
-            mop_drying_time_left: { kind: entity }
-            mop_washing: { kind: entity, required: true }
-            consumables:
-              kind: objects
-              fields:
-                entity: { kind: entity, required: true }
-                reset: { kind: entity }
-            warnings: { kind: entities }
+      discover:
+        device: { domain: vacuum }
+        fields:
+          entity: { domain: vacuum }
+          status:
+            - { domain: sensor, translation_key: status }
+            - { domain: sensor, name: status }
+          error:
+            - { domain: sensor, translation_key: vacuum_error }
+            - { domain: sensor, name: error, exclude: { name: dock } }
+          battery: { domain: sensor, device_class: battery }
+          current_room:
+            - { domain: sensor, translation_key: current_room }
+            - { domain: sensor, name: current room }
+          progress:
+            - { domain: sensor, translation_key: clean_percent }
+            - { domain: sensor, name: cleaning progress }
+          area:
+            - { domain: sensor, translation_key: cleaning_area }
+            - { domain: sensor, name: cleaning area, exclude: { name: total } }
+          time:
+            - { domain: sensor, translation_key: cleaning_time }
+            - { domain: sensor, name: cleaning time, exclude: { name: total } }
+          last_clean:
+            - { domain: sensor, translation_key: last_clean_end }
+            - { domain: sensor, name: last clean end }
+          mop_attached:
+            - { domain: binary_sensor, translation_key: mop_attached }
+            - { domain: binary_sensor, name: mop attached }
+          water_box_attached:
+            - { domain: binary_sensor, translation_key: water_box_attached }
+            - { domain: binary_sensor, name: water box attached }
+          totals:
+            fields:
+              count:
+                - { domain: sensor, translation_key: total_cleaning_count }
+                - { domain: sensor, name: total cleaning count }
+              area:
+                - { domain: sensor, translation_key: total_cleaning_area }
+                - { domain: sensor, name: total cleaning area }
+              time:
+                - { domain: sensor, translation_key: total_cleaning_time }
+                - { domain: sensor, name: total cleaning time }
+          map: { domain: image }
+          routines: { domain: button, entity_category: none }
+          settings:
+            { domain: select, entity_category: config, exclude: { translation_key: selected_map } }
+          warnings: { domain: binary_sensor, device_class: problem }
+          dock:
+            device:
+              - { domain: sensor, translation_key: dock_error }
+              - { model: dock }
+              - { domain: sensor, name: dock error }
+            scope: area
+            fields:
+              error:
+                - { domain: sensor, translation_key: dock_error }
+                - { domain: sensor, name: error }
+              dust_emptying:
+                - { domain: switch, translation_key: dust_emptying }
+                - { domain: switch, name: dust emptying }
+              mop_drying:
+                - { domain: switch, translation_key: mop_drying }
+                - { domain: switch, name: mop drying }
+              mop_drying_time_left:
+                - { domain: sensor, translation_key: mop_drying_remaining_time }
+                - { domain: sensor, name: mop drying }
+              mop_washing:
+                - { domain: switch, translation_key: mop_washing }
+                - { domain: switch, name: mop washing }
+              warnings: { domain: binary_sensor, device_class: problem }
     printer3d:
-      kind: object
+      shape: printer3d_popup
       label: 3D printer
       group: Devices
-      fields:
-        entity: { kind: entity, required: true }
-        progress: { kind: entity, required: true }
-        filename: { kind: entity, required: true }
-        material: { kind: entity, required: true }
-        speed: { kind: entity, required: true }
-        start: { kind: entity, required: true }
-        finish: { kind: entity, required: true }
-        nozzle:
-          kind: object
-          required: true
-          fields:
-            temperature: { kind: entity, required: true }
-            target: { kind: entity }
-        bed:
-          kind: object
-          required: true
-          fields:
-            temperature: { kind: entity, required: true }
-            target: { kind: entity }
-        camera: { kind: entity }
-        actions:
-          kind: object
-          required: true
-          fields:
-            pause: { kind: entity }
-            resume: { kind: entity }
-            continue: { kind: entity }
-            cancel: { kind: entity }
-        outlet:
-          kind: object
-          fields:
-            entity: { kind: entity, required: true }
-            energy:
-              kind: object
-              fields:
-                power: { kind: entity, required: true }
-                today: { kind: entity }
-                total: { kind: entity }
+      discover:
+        device: { platform: prusalink }
+        fields:
+          entity:
+            - { domain: sensor, translation_key: printer_state }
+            - { domain: sensor, device_class: enum }
+          progress:
+            - { domain: sensor, translation_key: progress }
+            - { domain: sensor, name: progress }
+          filename:
+            - { domain: sensor, translation_key: filename }
+            - { domain: sensor, name: filename }
+          material:
+            - { domain: sensor, translation_key: material }
+            - { domain: sensor, name: material }
+          speed:
+            - { domain: sensor, translation_key: print_speed }
+            - { domain: sensor, name: print speed }
+          start:
+            - { domain: sensor, translation_key: print_start }
+            - { domain: sensor, name: print start }
+          finish:
+            - { domain: sensor, translation_key: print_finish }
+            - { domain: sensor, name: print finish }
+          nozzle:
+            fields:
+              temperature:
+                - { domain: sensor, translation_key: nozzle_temperature }
+                - { domain: sensor, name: nozzle temperature, exclude: { name: target } }
+              target:
+                - { domain: sensor, translation_key: nozzle_target_temperature }
+                - { domain: sensor, name: nozzle target temperature }
+          bed:
+            fields:
+              temperature:
+                - { domain: sensor, translation_key: heatbed_temperature }
+                - { domain: sensor, name: heatbed temperature, exclude: { name: target } }
+              target:
+                - { domain: sensor, translation_key: heatbed_target_temperature }
+                - { domain: sensor, name: heatbed target temperature }
+          camera: { domain: camera }
+          actions:
+            fields:
+              pause:
+                - { domain: button, translation_key: pause_job }
+                - { domain: button, name: pause }
+              resume:
+                - { domain: button, translation_key: resume_job }
+                - { domain: button, name: resume }
+              continue:
+                - { domain: button, translation_key: continue_job }
+                - { domain: button, name: continue }
+              cancel:
+                - { domain: button, translation_key: cancel_job }
+                - { domain: button, name: cancel }
     cameras:
+      shape: camera
       kind: objects
       group: Security
-      fields:
-        entity: { kind: entity, required: true }
-        motion: { kind: entity }
-        person: { kind: entity }
-        doorbell: { kind: entity }
       discover: { per: device, where: { domain: camera }, fields: { entity: { domain: camera } } }
     covers:
+      shape: cover
       kind: objects
       group: Covers
-      fields:
-        entity: { kind: entity, required: true }
-        garage: { kind: flag }
       discover: { per: device, where: { domain: cover }, fields: { entity: { domain: cover } } }
     fans:
+      shape: fan
       kind: objects
       group: Air
-      fields:
-        entity: { kind: entity, required: true }
-        quality: { kind: entity }
       discover: { per: device, where: { domain: fan }, fields: { entity: { domain: fan } } }
     humidifiers:
+      shape: humidifier
       kind: objects
       group: Air
-      fields:
-        entity: { kind: entity, required: true }
       discover:
         { per: device, where: { domain: humidifier }, fields: { entity: { domain: humidifier } } }
     appliances:
+      shape: appliance
       kind: objects
       group: Devices
-      fields:
-        entity: { kind: entity, required: true }
-        remaining: { kind: entity }
-        power: { kind: entity }
-    pets:
-      kind: objects
-      group: Devices
-      fields:
-        feed: { kind: entity, required: true }
-        fed: { kind: entity, required: true }
-        food: { kind: entity }
-        litter: { kind: entity }
-    plants:
-      kind: objects
-      group: Devices
-      fields:
-        moisture: { kind: entity, required: true }
+      discover:
+        device:
+          - { domain: sensor, platform: smartthings, translation_key: washer_machine_state }
+          - { domain: sensor, platform: smartthings, translation_key: dryer_machine_state }
+          - { domain: sensor, platform: smartthings, translation_key: dishwasher_machine_state }
+          - {
+              domain: sensor,
+              platform: home_connect,
+              translation_key: operation_state,
+              name: washer,
+            }
+          - {
+              domain: sensor,
+              platform: home_connect,
+              translation_key: operation_state,
+              name: dryer,
+            }
+        fields:
+          entity:
+            - { domain: sensor, translation_key: washer_machine_state }
+            - { domain: sensor, translation_key: dryer_machine_state }
+            - { domain: sensor, translation_key: dishwasher_machine_state }
+            - { domain: sensor, translation_key: operation_state }
+          remaining:
+            - { domain: sensor, translation_key: completion_time }
+            - { domain: sensor, translation_key: program_finish_time }
+          power: { domain: sensor, device_class: power }
+    pets: { shape: pet, kind: objects, group: Devices }
+    plants: { shape: plant, kind: objects, group: Devices }
     media:
+      shape: player
       kind: objects
       label: Players
       group: Media
-      fields:
-        entity: { kind: entity, required: true }
-        key: { kind: text }
       discover:
-        {
-          per: device,
-          where: { domain: media_player },
-          fields: { entity: { domain: media_player } },
-        }
+        per: device
+        where: { domain: media_player }
+        fields:
+          entity: { domain: media_player }
+          key:
+            - { domain: media_player, device_class: speaker }
+            - { domain: media_player, platform: sonos }
     speakers:
+      shape: speaker
       kind: objects
       group: Media
-      fields:
-        key: { kind: text, required: true }
-        entity: { kind: entity, required: true }
-        bass: { kind: entity, required: true }
-        treble: { kind: entity, required: true }
-        balance: { kind: entity }
-        loudness: { kind: entity, required: true }
-        tv:
-          kind: object
-          label: TV
-          fields:
-            input_format: { kind: entity }
-            night_sound: { kind: entity, required: true }
-            speech_enhancement: { kind: entity, required: true }
-            audio_delay: { kind: entity, required: true }
-        subwoofer:
-          kind: object
-          fields:
-            enabled: { kind: entity, required: true }
-            gain: { kind: entity, required: true }
-        surround:
-          kind: object
-          fields:
-            enabled: { kind: entity, required: true }
-            level: { kind: entity, required: true }
-            music_level: { kind: entity, required: true }
-            music_full_volume: { kind: entity, required: true }
+      discover:
+        device:
+          - { domain: media_player, device_class: speaker }
+          - { domain: media_player, platform: sonos }
+        fields:
+          key:
+            - { domain: media_player, device_class: speaker }
+            - { domain: media_player, platform: sonos }
+          entity:
+            - { domain: media_player, device_class: speaker }
+            - { domain: media_player, platform: sonos }
+          bass:
+            - { domain: number, translation_key: bass }
+            - { domain: number, name: bass }
+          treble:
+            - { domain: number, translation_key: treble }
+            - { domain: number, name: treble }
+          balance:
+            - { domain: number, translation_key: balance }
+            - { domain: number, name: balance }
+          loudness:
+            - { domain: switch, translation_key: loudness }
+            - { domain: switch, name: loudness }
+          tv:
+            fields:
+              input_format:
+                - { domain: sensor, translation_key: audio_input_format }
+                - { domain: sensor, name: audio input format }
+              night_sound:
+                - { domain: switch, translation_key: night_mode }
+                - { domain: switch, name: night sound }
+              speech_enhancement:
+                - { domain: switch, translation_key: dialog_level }
+                - { domain: switch, name: speech enhancement }
+              audio_delay:
+                - { domain: number, translation_key: audio_delay }
+                - { domain: number, name: audio delay }
+          subwoofer:
+            fields:
+              enabled:
+                - { domain: switch, translation_key: sub_enabled }
+                - { domain: switch, name: subwoofer enabled }
+              gain:
+                - { domain: number, translation_key: sub_gain }
+                - { domain: number, name: sub gain }
+          surround:
+            fields:
+              enabled:
+                - { domain: switch, translation_key: surround_enabled }
+                - { domain: switch, name: surround enabled }
+              level:
+                - { domain: number, translation_key: surround_level }
+                - { domain: number, name: surround level, exclude: { name: music } }
+              music_level:
+                - { domain: number, translation_key: music_surround_level }
+                - { domain: number, name: music surround level }
+              music_full_volume:
+                - { domain: switch, translation_key: surround_mode }
+                - { domain: switch, name: surround music full volume }
     outlets:
+      shape: outlet
       kind: objects
       group: Devices
-      fields:
-        entity: { kind: entity, required: true }
-        energy:
-          kind: object
-          fields:
-            power: { kind: entity }
-            today: { kind: entity }
-            total: { kind: entity }
       discover:
-        {
-          per: device,
-          where: { domain: switch, device_class: outlet },
-          fields: { entity: { domain: switch, device_class: outlet } },
-        }
-    diffuser:
-      kind: object
-      group: Devices
-      fields:
-        entity: { kind: entity, required: true }
-        amount: { kind: entity, required: true }
+        per: device
+        where: { domain: switch, device_class: outlet }
+        fields:
+          entity: { domain: switch, device_class: outlet }
+          energy:
+            fields:
+              power: { domain: sensor, device_class: power }
+              today: { domain: sensor, device_class: energy, platform: utility_meter }
+              total: { domain: sensor, device_class: energy, exclude: { platform: utility_meter } }
+    diffuser: { shape: diffuser, group: Devices }
     batteries:
       {
         kind: entities,
@@ -305,13 +380,7 @@ room:
       }
     low: { kind: number, default: 20, label: Low battery, group: Problems }
     critical: { kind: number, default: 5, label: Critical battery, group: Problems }
-    meters:
-      kind: objects
-      group: Energy
-      fields:
-        power: { kind: entity, required: true }
-        today: { kind: entity }
-        total: { kind: entity }
+  retired: [meters, heating.batteries]
   card:
     type: custom:mnml-tile-card
     name: '[[name]]'
@@ -402,12 +471,20 @@ room:
         rules:
           - {
               id: critical,
+              if: critical,
               entities: '[[batteries]]',
               below: '[[critical]]',
               color: red,
               label: device,
             }
-          - { id: low, entities: '[[batteries]]', below: '[[low]]', color: orange, label: device }
+          - {
+              id: low,
+              if: low,
+              entities: '[[batteries]]',
+              below: '[[low]]',
+              color: orange,
+              label: device,
+            }
     item:
       if: lights.group
       template: light-item
@@ -446,7 +523,8 @@ room:
         outlets: '[[outlets]]'
         diffuser: '[[diffuser]]'
         batteries: '[[batteries]]'
-        meters: '[[meters]]'
+        low: '[[low]]'
+        critical: '[[critical]]'
     - id: lights-popup
       if: lights.group
       template: lights-popup
@@ -467,7 +545,8 @@ room:
         entity: '[[heating.entity]]'
         preset: '[[heating.preset]]'
         thermostats: '[[heating.thermostats]]'
-        batteries: '[[heating.batteries]]'
+        low: '[[low]]'
+        critical: '[[critical]]'
     - id: ac
       if: ac
       template: ac-popup
@@ -506,12 +585,7 @@ room-media-card:
   description: A room's media player, opening its speaker pop-up when it is a speaker.
   slots:
     key: { kind: text, required: true }
-    member:
-      kind: object
-      required: true
-      fields:
-        entity: { kind: entity, required: true }
-        key: { kind: text }
+    member: { shape: player, required: true }
   card:
     - id: member-key
       if: member.key
@@ -536,191 +610,25 @@ room-popup:
     window: { kind: entity }
     door: { kind: entity }
     lock: { kind: entity }
-    lights:
-      kind: object
-      fields:
-        group: { kind: entity, required: true }
-        members:
-          kind: objects
-          fields:
-            entity: { kind: entity }
-            members: { kind: entities }
-        scenes: { kind: entities }
-        active_scene: { kind: entity }
-        color: { kind: flag }
-    heating:
-      kind: object
-      fields:
-        entity: { kind: entity, required: true }
-        preset: { kind: flag }
-        thermostats:
-          kind: objects
-          fields:
-            valve: { kind: entity }
-            battery: { kind: entity }
-        batteries: { kind: entities }
-    ac:
-      kind: object
-      fields:
-        entity: { kind: entity, required: true }
-        fan: { kind: flag }
-        swing: { kind: flag }
-        horizontal_swing: { kind: flag }
-        power_saving: { kind: entity }
-        dehumidifier: { kind: entity }
-        energy:
-          kind: object
-          fields:
-            power: { kind: entity }
-            today: { kind: entity }
-            total: { kind: entity }
-    vacuum:
-      kind: object
-      fields:
-        entity: { kind: entity, required: true }
-        status: { kind: entity }
-        error: { kind: entity }
-        battery: { kind: entity }
-        current_room: { kind: entity }
-        progress: { kind: entity }
-        area: { kind: entity }
-        time: { kind: entity }
-        last_clean: { kind: entity }
-        mop_attached: { kind: entity }
-        water_box_attached: { kind: entity }
-        totals:
-          kind: object
-          fields:
-            count: { kind: entity }
-            area: { kind: entity }
-            time: { kind: entity }
-        map: { kind: entity }
-        routines: { kind: entities }
-        settings: { kind: entities }
-        consumables:
-          kind: objects
-          fields:
-            entity: { kind: entity }
-            reset: { kind: entity }
-        warnings: { kind: entities }
-        dock:
-          kind: object
-          fields:
-            error: { kind: entity }
-            dust_emptying: { kind: entity }
-            mop_drying: { kind: entity }
-            mop_drying_time_left: { kind: entity }
-            mop_washing: { kind: entity }
-            consumables:
-              kind: objects
-              fields:
-                entity: { kind: entity }
-                reset: { kind: entity }
-            warnings: { kind: entities }
-    printer3d:
-      kind: object
-      fields:
-        entity: { kind: entity, required: true }
-        progress: { kind: entity }
-        filename: { kind: entity }
-        material: { kind: entity }
-        speed: { kind: entity }
-        start: { kind: entity }
-        finish: { kind: entity }
-        nozzle:
-          kind: object
-          fields:
-            temperature: { kind: entity }
-            target: { kind: entity }
-        bed:
-          kind: object
-          fields:
-            temperature: { kind: entity }
-            target: { kind: entity }
-        camera: { kind: entity }
-        actions:
-          kind: object
-          required: true
-          fields:
-            pause: { kind: entity }
-            resume: { kind: entity }
-            continue: { kind: entity }
-            cancel: { kind: entity }
-        outlet:
-          kind: object
-          fields:
-            entity: { kind: entity, required: true }
-            energy:
-              kind: object
-              fields:
-                power: { kind: entity }
-                today: { kind: entity }
-                total: { kind: entity }
-    cameras:
-      kind: objects
-      fields:
-        entity: { kind: entity, required: true }
-        motion: { kind: entity }
-        person: { kind: entity }
-        doorbell: { kind: entity }
-    covers:
-      kind: objects
-      fields:
-        entity: { kind: entity, required: true }
-        garage: { kind: flag }
-    fans:
-      kind: objects
-      fields:
-        entity: { kind: entity, required: true }
-        quality: { kind: entity }
-    humidifiers:
-      kind: objects
-      fields:
-        entity: { kind: entity, required: true }
-    appliances:
-      kind: objects
-      fields:
-        entity: { kind: entity, required: true }
-        remaining: { kind: entity }
-        power: { kind: entity }
-    pets:
-      kind: objects
-      fields:
-        feed: { kind: entity, required: true }
-        fed: { kind: entity, required: true }
-        food: { kind: entity }
-        litter: { kind: entity }
-    plants:
-      kind: objects
-      fields:
-        moisture: { kind: entity, required: true }
-    media:
-      kind: objects
-      fields:
-        entity: { kind: entity, required: true }
-        key: { kind: text }
-    outlets:
-      kind: objects
-      fields:
-        entity: { kind: entity, required: true }
-        energy:
-          kind: object
-          fields:
-            power: { kind: entity }
-            today: { kind: entity }
-            total: { kind: entity }
-    diffuser:
-      kind: object
-      fields:
-        entity: { kind: entity, required: true }
-        amount: { kind: entity, required: true }
+    lights: { shape: lights }
+    heating: { shape: heating }
+    ac: { shape: ac }
+    vacuum: { shape: vacuum }
+    printer3d: { shape: printer3d }
+    cameras: { shape: camera, kind: objects }
+    covers: { shape: cover, kind: objects }
+    fans: { shape: fan, kind: objects }
+    humidifiers: { shape: humidifier, kind: objects }
+    appliances: { shape: appliance, kind: objects }
+    pets: { shape: pet, kind: objects }
+    plants: { shape: plant, kind: objects }
+    media: { shape: player, kind: objects }
+    outlets: { shape: outlet, kind: objects }
+    diffuser: { shape: diffuser }
     batteries: { kind: entities }
-    meters:
-      kind: objects
-      fields:
-        power: { kind: entity, required: true }
-        today: { kind: entity }
-        total: { kind: entity }
+    low: { kind: number, default: 20 }
+    critical: { kind: number, default: 5 }
+  retired: [meters, heating.batteries]
   card:
     hash: '#[[key]]'
     cards:
@@ -885,11 +793,11 @@ room-popup:
         slots: { entity: '[[diffuser.entity]]', amount: '[[diffuser.amount]]' }
       - id: batteries
         template: batteries
-        slots: { batteries: '[[batteries]]' }
+        slots: { batteries: '[[batteries]]', low: '[[low]]', critical: '[[critical]]' }
       - id: meters
-        if: meters
+        if: [outlets.*.energy, ac.energy]
         template: energy-table
-        slots: { meters: '[[meters]]' }
+        slots: { meters: ['[[outlets.*.energy]]', '[[ac.energy]]'] }
   example:
     key: kitchen
     name: Kitchen

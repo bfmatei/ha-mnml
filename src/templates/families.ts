@@ -1,6 +1,6 @@
-import type { Templates, Value } from '../contract/templates.ts';
+import type { Shapes, Templates, Value } from '../contract/templates.ts';
 
-import { familyNames, readFamily, shapeOf } from './shipped.ts';
+import { familyNames, readFamily, readShapes, shapeOf } from './shipped.ts';
 
 export const COMMON_FAMILY = 'common';
 
@@ -22,6 +22,8 @@ export const SHAPES: Readonly<Record<string, Value>> = Object.fromEntries(
       }),
     ),
 );
+
+export const SLOT_SHAPES: Shapes = readShapes();
 
 export function loadFamily(family: string): Promise<Templates> {
   return Promise.resolve(readFamily(family));

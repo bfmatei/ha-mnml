@@ -4,10 +4,10 @@ import { property, state } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
-import type { Color, SliderKind } from '../../contract/cards.ts';
-import type { EntityId, MdiIcon } from '../../contract/entities.ts';
-import { formatAttribute, unavailableValue } from '../../ha/format.ts';
-import { callService, numberAttribute, numericState, settled } from '../../ha/hass.ts';
+import type { Color } from '../../contract/cards.ts';
+import type { MdiIcon } from '../../contract/entities.ts';
+import { unavailableValue } from '../../ha/format.ts';
+import { run, settled } from '../../ha/hass.ts';
 import type { HassEntity, HomeAssistant } from '../../ha/hass.ts';
 import { UNAVAILABLE } from '../../ha/rules.ts';
 import { colorStyle, colorVar, icon } from '../../ha/templates.ts';
@@ -15,18 +15,8 @@ import type { Host } from '../base.ts';
 import { BASE_STYLE } from '../styles.ts';
 
 import { dismissable } from './overlay.ts';
+import type { SliderSpec } from './slider-spec.ts';
 import { tip } from './tooltip.ts';
-
-export interface SliderSpec {
-  min: number;
-  max: number;
-  step: number;
-  value: number;
-  gradient?: string;
-  dimmed?: true;
-  format(value: number): string;
-  commit(value: number): Promise<unknown>;
-}
 
 export interface SliderLabel {
   icon: MdiIcon;
@@ -159,10 +149,6 @@ const SLIDER_STYLE = css`
   }
 `;
 
-const WHITE_GRADIENT = 'linear-gradient(90deg, #ffb057 0%, #fff1dc 55%, #cfe1ff 100%)';
-const HUE_GRADIENT =
-  'linear-gradient(90deg, hsl(0 100% 50%), hsl(60 100% 50%), hsl(120 100% 50%), hsl(180 100% 50%), hsl(240 100% 50%), hsl(300 100% 50%), hsl(360 100% 50%))';
-
 const COMMIT_GRACE = 600;
 const COMMIT_CEILING = 5000;
 const KEY_DEBOUNCE = 500;
@@ -172,137 +158,6 @@ function decimals(step: number): number {
   const text = String(step);
   const dot = text.indexOf('.');
   return dot === -1 ? 0 : text.length - dot - 1;
-}
-
-interface SpecOptions {
-  turn_on?: true;
-}
-
-export function sliderSpec(
-  hass: HomeAssistant,
-  id: EntityId,
-  stateObj: HassEntity,
-  kind: SliderKind,
-  options: SpecOptions = {},
-): SliderSpec | undefined {
-  switch (kind) {
-    case 'brightness': {
-      const brightness = numberAttribute(stateObj, 'brightness') ?? 0;
-      return {
-        min: 0,
-        max: 100,
-        step: 1,
-        value: stateObj.state === 'on' ? Math.round((brightness / 255) * 100) : 0,
-        format: (value) => formatAttribute(hass, stateObj, 'brightness', (value / 100) * 255),
-        commit: (value) =>
-          value === 0
-            ? callService(hass, id, 'light.turn_off')
-            : callService(hass, id, 'light.turn_on', { brightness_pct: value }),
-      };
-    }
-    case 'color_temp': {
-      const min = numberAttribute(stateObj, 'min_color_temp_kelvin') ?? 2000;
-      const kelvin = numberAttribute(stateObj, 'color_temp_kelvin');
-      return {
-        min,
-        max: numberAttribute(stateObj, 'max_color_temp_kelvin') ?? 6500,
-        step: 50,
-        value: kelvin ?? min,
-        gradient: WHITE_GRADIENT,
-        dimmed: stateObj.state === 'on' && kelvin !== undefined ? undefined : true,
-        format: (value) => formatAttribute(hass, stateObj, 'color_temp_kelvin', value),
-        commit: (value) => callService(hass, id, 'light.turn_on', { color_temp_kelvin: value }),
-      };
-    }
-    case 'hue': {
-      const hs = stateObj.attributes['hs_color'];
-      const hue = Array.isArray(hs) && typeof hs[0] === 'number' ? hs[0] : undefined;
-      return {
-        min: 0,
-        max: 360,
-        step: 1,
-        value: Math.round(hue ?? 0),
-        gradient: HUE_GRADIENT,
-        dimmed: stateObj.state === 'on' && hue !== undefined ? undefined : true,
-        format: (value) => `${value}°`,
-        commit: (value) => callService(hass, id, 'light.turn_on', { hs_color: [value, 100] }),
-      };
-    }
-    case 'temperature': {
-      const min = numberAttribute(stateObj, 'min_temp') ?? 7;
-      return {
-        min,
-        max: numberAttribute(stateObj, 'max_temp') ?? 35,
-        step: numberAttribute(stateObj, 'target_temp_step') ?? 0.5,
-        value: numberAttribute(stateObj, 'temperature') ?? min,
-        format: (value) => formatAttribute(hass, stateObj, 'temperature', value),
-        commit: async (value) => {
-          if (options.turn_on && stateObj.state === 'off') {
-            await callService(hass, id, 'climate.turn_on');
-          }
-          return callService(hass, id, 'climate.set_temperature', { temperature: value });
-        },
-      };
-    }
-    case 'value': {
-      const min = numberAttribute(stateObj, 'min') ?? 0;
-      return {
-        min,
-        max: numberAttribute(stateObj, 'max') ?? 100,
-        step: numberAttribute(stateObj, 'step') ?? 1,
-        value: numericState(stateObj) ?? min,
-        format: (value) => hass.formatEntityState(stateObj, String(value)),
-        commit: (value) => callService(hass, id, 'number.set_value', { value }),
-      };
-    }
-    case 'volume': {
-      const level = numberAttribute(stateObj, 'volume_level') ?? 0;
-      return {
-        min: 0,
-        max: 100,
-        step: 1,
-        value: Math.round(level * 100),
-        format: (value) => `${value} %`,
-        commit: (value) =>
-          callService(hass, id, 'media_player.volume_set', { volume_level: value / 100 }),
-      };
-    }
-    case 'position': {
-      const position = numberAttribute(stateObj, 'current_position');
-      return {
-        min: 0,
-        max: 100,
-        step: 1,
-        value: position ?? (stateObj.state === 'open' ? 100 : 0),
-        format: (value) => `${value} %`,
-        commit: (value) => callService(hass, id, 'cover.set_cover_position', { position: value }),
-      };
-    }
-    case 'percentage': {
-      const percentage = numberAttribute(stateObj, 'percentage') ?? 0;
-      return {
-        min: 0,
-        max: 100,
-        step: numberAttribute(stateObj, 'percentage_step') ?? 1,
-        value: stateObj.state === 'on' ? percentage : 0,
-        format: (value) => `${value} %`,
-        commit: (value) => callService(hass, id, 'fan.set_percentage', { percentage: value }),
-      };
-    }
-    case 'humidity': {
-      const min = numberAttribute(stateObj, 'min_humidity') ?? 0;
-      return {
-        min,
-        max: numberAttribute(stateObj, 'max_humidity') ?? 100,
-        step: 1,
-        value: numberAttribute(stateObj, 'humidity') ?? min,
-        format: (value) => `${value} %`,
-        commit: (value) => callService(hass, id, 'humidifier.set_humidity', { humidity: value }),
-      };
-    }
-    default:
-      return undefined;
-  }
 }
 
 export const OVERLAY_STYLE = css`
@@ -322,6 +177,17 @@ export const OVERLAY_STYLE = css`
   }
   .overlay mnml-slider {
     flex: 1;
+  }
+  .heading {
+    position: relative;
+  }
+  .heading > .overlay {
+    padding: 0;
+    border-radius: 12px;
+    --m-slider-height: 36px;
+    color: var(--primary-text-color);
+    letter-spacing: normal;
+    text-transform: none;
   }
 `;
 
@@ -349,7 +215,9 @@ export class MnmlSlider extends LitElement {
   @state() private value: number | undefined;
   private dragging = false;
   private release: (() => void) | undefined;
-  private timer: ReturnType<typeof setTimeout> | undefined;
+  private pause: ReturnType<typeof setTimeout> | undefined;
+  private letGo: ReturnType<typeof setTimeout> | undefined;
+  private commits = 0;
   private keyed = false;
 
   protected override willUpdate(changed: PropertyValues<this>): void {
@@ -360,9 +228,15 @@ export class MnmlSlider extends LitElement {
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
-    clearTimeout(this.timer);
-    if (this.keyed && this.spec !== undefined && this.value !== undefined) {
-      void this.spec.commit(this.value);
+    clearTimeout(this.pause);
+    clearTimeout(this.letGo);
+    if (
+      this.keyed &&
+      this.spec !== undefined &&
+      this.owner !== undefined &&
+      this.value !== undefined
+    ) {
+      run(this.owner, this.spec.commit(this.value));
     }
     this.keyed = false;
     this.release?.();
@@ -462,27 +336,27 @@ export class MnmlSlider extends LitElement {
     return this.quantise(spec.min + ratio * (spec.max - spec.min));
   }
 
-  private releaseSoon(): void {
-    clearTimeout(this.timer);
-    this.timer = setTimeout(() => {
-      this.release?.();
-      this.release = undefined;
-    }, COMMIT_GRACE);
-  }
-
   private commit(): void {
     const spec = this.spec;
     const owner = this.owner;
     if (spec === undefined || owner === undefined) {
       return;
     }
-    clearTimeout(this.timer);
-    this.timer = setTimeout(() => {
-      this.releaseSoon();
-    }, COMMIT_CEILING);
-    void settled(owner, spec.commit(this.value ?? spec.value)).then(() => {
-      this.releaseSoon();
-    });
+    this.commits += 1;
+    const sent = this.commits;
+    const landed = (): void => {
+      if (sent !== this.commits || this.keyed || this.dragging) {
+        return;
+      }
+      clearTimeout(this.letGo);
+      this.letGo = setTimeout(() => {
+        this.release?.();
+        this.release = undefined;
+      }, COMMIT_GRACE);
+    };
+    clearTimeout(this.letGo);
+    this.letGo = setTimeout(landed, COMMIT_CEILING);
+    void settled(owner, spec.commit(this.value ?? spec.value)).then(landed);
   }
 
   private readonly down = (event: PointerEvent): void => {
@@ -494,7 +368,8 @@ export class MnmlSlider extends LitElement {
     event.preventDefault();
     this.dragging = true;
     this.keyed = false;
-    clearTimeout(this.timer);
+    clearTimeout(this.pause);
+    clearTimeout(this.letGo);
     this.release ??= this.owner?.hold();
     track.setPointerCapture(event.pointerId);
     this.value = this.fromPointer(track, event.clientX);
@@ -543,9 +418,10 @@ export class MnmlSlider extends LitElement {
     this.release ??= this.owner?.hold();
     this.value = next;
     this.interacted?.();
-    clearTimeout(this.timer);
+    clearTimeout(this.pause);
+    clearTimeout(this.letGo);
     this.keyed = true;
-    this.timer = setTimeout(() => {
+    this.pause = setTimeout(() => {
       this.keyed = false;
       this.commit();
     }, KEY_DEBOUNCE);
@@ -558,6 +434,7 @@ export function openSliderOverlay(
   label: SliderLabel,
   color: Color | undefined,
   host: Host,
+  keyboard: boolean,
 ): void {
   const root = surface.getRootNode();
   const focusedIn = (): Element | null => (root instanceof ShadowRoot ? root.activeElement : null);
@@ -611,8 +488,12 @@ export function openSliderOverlay(
   overlay.addEventListener('focusout', () => setTimeout(schedule, 0));
   surface.append(overlay);
   const slider = overlay.querySelector('mnml-slider');
-  if (slider instanceof HTMLElement) {
-    slider.focus();
+  if (keyboard && slider instanceof MnmlSlider) {
+    void slider.updateComplete.then(() => {
+      if (slider.isConnected) {
+        slider.focus();
+      }
+    });
   }
   schedule();
 }

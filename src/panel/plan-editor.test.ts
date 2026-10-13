@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 import { test } from 'vitest';
 
-import { HOME } from '../builder/fixture.ts';
+import { HOME, HOUSE } from '../builder/fixture.ts';
 import { defaultPlan } from '../builder/plan.ts';
 import type { Plan } from '../contract/builder.ts';
 import type { Template } from '../contract/templates.ts';
@@ -20,11 +20,11 @@ const TEMPLATES = readTemplates();
 const HASS = { ...HOME, locale: { language: 'en' } } as never as HomeAssistant;
 
 async function editor(
-  options: { fresh?: boolean; taken?: string[]; plan?: Plan } = {},
+  options: { fresh?: boolean; taken?: string[]; plan?: Plan; hass?: HomeAssistant } = {},
 ): Promise<{ element: MnmlPlanEditor; root: ShadowRoot; saved: [Plan, string][] }> {
   const saved: [Plan, string][] = [];
   const element = new MnmlPlanEditor();
-  element.hass = HASS;
+  element.hass = options.hass ?? HASS;
   element.templates = TEMPLATES;
   element.plan = options.plan ?? defaultPlan(HOME, TEMPLATES);
   element.address = 'dashboard-home';
@@ -61,16 +61,68 @@ async function save(element: MnmlPlanEditor, root: ShadowRoot): Promise<void> {
   await element.updateComplete;
 }
 
+test("a row's preview holds only the slots its template declares, a retired one left out", async () => {
+  const plan = defaultPlan(HOME, TEMPLATES);
+  const [first] = plan.people;
+  assert.ok(first);
+  const people = [
+    { ...first, slots: { activities: ['sensor.phone_activity'] } },
+    ...plan.people.slice(1),
+  ];
+  const { root } = await editor({ plan: { ...plan, people } });
+  const tiles = [
+    ...root.querySelectorAll<HTMLElement & { config?: Record<string, unknown> }>('mnml-live-card'),
+  ];
+  const configs = tiles.map((tile) => JSON.stringify(tile.config ?? {}));
+  assert.ok(configs.some((config) => config.includes('"template":"person"')));
+  assert.ok(configs.every((config) => !config.includes('activities')));
+});
+
 test('an area with no light offers no room, and one ticked comes last', async () => {
   const plan: Plan = { ...defaultPlan(HOME, TEMPLATES), rooms: [{ area: 'living' }] };
   const { element, root, saved } = await editor({ plan });
   const hallway = labelled(root, 'Show Hallway');
   assert.ok(hallway instanceof HTMLInputElement);
   assert.equal(hallway.disabled, true);
-  assert.match(text(root), /Its template finds nothing to show here/);
+  assert.match(
+    text(hallway.closest('.plan-row')),
+    /Nothing in this area: its devices are in no area or elsewhere\./,
+  );
+  assert.doesNotMatch(text(root), /no area, so/);
   labelled(root, 'Show Kitchen').dispatchEvent(new Event('change'));
   await save(element, root);
   assert.deepEqual(saved[0]?.[0].rooms, [{ area: 'living' }, { area: 'kitchen' }]);
+  element.remove();
+});
+
+test('an area of phones or of system devices is unticked, says why, and can still be ticked', async () => {
+  const hass = { ...HOUSE, locale: { language: 'en' } } as never as HomeAssistant;
+  const { element, root, saved } = await editor({ plan: defaultPlan(HOUSE, TEMPLATES), hass });
+  const row = (name: string): { box: HTMLInputElement; words: string } => {
+    const box = labelled(root, `Show ${name}`);
+    assert.ok(box instanceof HTMLInputElement);
+    return { box, words: text(box.closest('.plan-row')) };
+  };
+  assert.equal(row('Living').box.checked, true);
+  assert.equal(row('Jane').box.checked, false);
+  assert.equal(row('Jane').box.disabled, false);
+  assert.match(row('Jane').words, /Only phones and trackers\./);
+  assert.equal(row('Infrastructure').box.checked, false);
+  assert.equal(row('Infrastructure').box.disabled, false);
+  assert.match(row('Infrastructure').words, /Only system devices\./);
+  assert.equal(row('Attic').box.disabled, true);
+  assert.match(
+    row('Attic').words,
+    /Nothing in this area: its devices are in no area or elsewhere\./,
+  );
+  const placing = control<HTMLAnchorElement>(root, 'a[href="/config/devices/dashboard"]');
+  assert.match(
+    text(placing.closest('p')),
+    /^2 devices have no area, so no room shows them\. Give them an area in Home Assistant$/,
+  );
+  row('Jane').box.dispatchEvent(new Event('change'));
+  await save(element, root);
+  assert.deepEqual(saved[0]?.[0].rooms, [{ area: 'living' }, { area: 'jane' }]);
   element.remove();
 });
 
@@ -233,6 +285,23 @@ test("a section's title keeps what is typed, and is trimmed when saved", async (
   element.remove();
 });
 
+test("a section's icon keeps what is typed when Home Assistant's states change, and is saved once it is an icon", async () => {
+  const { element, root, saved } = await editor();
+  const input = root.querySelector<HTMLInputElement>('input[aria-label="Rooms icon"]');
+  assert.ok(input);
+  input.value = 'mdi:sof';
+  input.dispatchEvent(new Event('input'));
+  element.hass = { ...HASS };
+  await element.updateComplete;
+  assert.equal(input.value, 'mdi:sof');
+  input.value = 'mdi:sofa';
+  input.dispatchEvent(new Event('input'));
+  input.dispatchEvent(new Event('change'));
+  await save(element, root);
+  assert.deepEqual(saved[0]?.[0].sections, { rooms: { icon: 'mdi:sofa' } });
+  element.remove();
+});
+
 test("a section offers the templates that take its rows' slots, and a new one drops the slots it lacks", async () => {
   const room = TEMPLATES['room'];
   assert.ok(room);
@@ -280,7 +349,15 @@ test('the sections move up and down, and the page and the plan follow', async ()
   press(root, 'Move the People section up');
   await element.updateComplete;
   const headings = [...root.querySelectorAll('.plan-section h2')].map((heading) => text(heading));
-  assert.deepEqual(headings, ['Dashboard', 'People', 'Rooms', 'Garage', 'System', 'Pop-ups']);
+  assert.deepEqual(headings, [
+    'Dashboard',
+    'People',
+    'Rooms',
+    'Garage',
+    'System',
+    'Glances',
+    'Pop-ups',
+  ]);
   await save(element, root);
   assert.deepEqual(saved[0]?.[0].order, ['people', 'rooms', 'garage', 'system']);
   press(root, 'Move the People section down');
@@ -343,6 +420,27 @@ test('a system card outside the five is listed, and kept when another changes', 
   element.remove();
 });
 
+test('the plan read again for the same dashboard keeps the edits, and another dashboard opens on its own plan', async () => {
+  const { element, root } = await editor({ fresh: false });
+  const title = (): HTMLInputElement => {
+    const found = root.querySelector<HTMLInputElement>('input.fact-input');
+    assert.ok(found);
+    return found;
+  };
+  title().value = 'Our flat';
+  title().dispatchEvent(new Event('input'));
+  await element.updateComplete;
+  assert.ok(element.plan);
+  element.plan = structuredClone(element.plan);
+  await element.updateComplete;
+  assert.equal(title().value, 'Our flat');
+  element.plan = { ...element.plan, title: 'Cabin' };
+  element.address = 'dashboard-cabin';
+  await element.updateComplete;
+  assert.equal(title().value, 'Cabin');
+  element.remove();
+});
+
 test("a save Home Assistant refuses says Home Assistant's reason", async () => {
   const { element, root } = await editor();
   element.host = {
@@ -351,5 +449,35 @@ test("a save Home Assistant refuses says Home Assistant's reason", async () => {
   };
   await save(element, root);
   assert.equal(text(control(root, '.problem-line')), 'expected a dictionary');
+  element.remove();
+});
+
+test('the Glances strip is shown or not, and the plan follows', async () => {
+  const { element, root, saved } = await editor();
+  const strip = labelled(root, 'Show the Glances strip');
+  assert.ok(strip instanceof HTMLInputElement);
+  assert.equal(strip.checked, false);
+  strip.dispatchEvent(new Event('change'));
+  await element.updateComplete;
+  await save(element, root);
+  assert.deepEqual(saved[0]?.[0].glances, {});
+  labelled(root, 'Show the Glances strip').dispatchEvent(new Event('change'));
+  await element.updateComplete;
+  await save(element, root);
+  assert.equal('glances' in (saved[1]?.[0] ?? {}), false);
+  element.remove();
+});
+
+test('a spelled room is listed by its name and kept, and unticked it goes', async () => {
+  const office = { slots: { key: 'office', name: 'Office' }, spelled: true } as const;
+  const plan: Plan = { ...defaultPlan(HOME, TEMPLATES), rooms: [office, { area: 'living' }] };
+  const { element, root, saved } = await editor({ plan });
+  assert.ok(labelled(root, 'Show Office'));
+  await save(element, root);
+  assert.deepEqual(saved[0]?.[0].rooms, [office, { area: 'living' }]);
+  labelled(root, 'Show Office').dispatchEvent(new Event('change'));
+  await element.updateComplete;
+  await save(element, root);
+  assert.deepEqual(saved[1]?.[0].rooms, [{ area: 'living' }]);
   element.remove();
 });

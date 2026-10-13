@@ -57,15 +57,5 @@ export function personOf(registries: Registries, entity: PersonId): Record<strin
   const devices = trackersOf(registries, entity)
     .map((tracker) => deviceOf(registries, key, tracker))
     .filter((device): device is Record<string, string> => device !== undefined);
-  if (devices.length === 0) {
-    return { key, entity };
-  }
-  return {
-    key,
-    entity,
-    devices,
-    activities: devices.flatMap((device) => device['activity'] ?? []),
-    focuses: devices.flatMap((device) => device['focus'] ?? []),
-    batteries: devices.flatMap((device) => device['battery'] ?? []),
-  };
+  return devices.length === 0 ? { key, entity } : { key, entity, devices };
 }

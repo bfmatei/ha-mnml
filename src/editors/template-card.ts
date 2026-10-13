@@ -1,46 +1,50 @@
 import { LitElement, html, nothing } from 'lit';
 import type { CSSResultGroup, TemplateResult } from 'lit';
 import { property, state } from 'lit/decorators.js';
-import { live } from 'lit/directives/live.js';
+import { cache } from 'lit/directives/cache.js';
 import { repeat } from 'lit/directives/repeat.js';
 
 import { LAYOUT } from '../cards/keys.ts';
 import { BASE_STYLE, CONTROL_STYLE } from '../cards/styles.ts';
 import { isMapping } from '../contract/templates.ts';
 import type { SlotSpec, Template, Templates, Value } from '../contract/templates.ts';
-import type { ChildCard } from '../ha/card-helpers.ts';
+import { field } from '../ha/field.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
+import { registriesOf } from '../ha/registries.ts';
 import { icon, quietly } from '../ha/templates.ts';
 import { SHIPPED_TEMPLATES } from '../store/shipped.ts';
 import { onShared, resolvedTemplates, sharedTemplates } from '../store/store.ts';
 import type { SharedState } from '../store/store.ts';
+import { fromDevice, relativesOf } from '../templates/discover.ts';
 import { filled, toValue } from '../templates/expand.ts';
 import { explain } from '../templates/explain.ts';
-import type { Trace } from '../templates/explain.ts';
+import type { DeviceFit, Trace } from '../templates/explain.ts';
 import { OWNER } from '../templates/families.ts';
-import { rolesOf } from '../templates/roles.ts';
+import { overridesOf } from '../templates/overrides.ts';
 
-import { adder, keysForm } from './draw.ts';
+import { adder, formOf, keysForm } from './draw.ts';
 import type { Context, Slot } from './draw.ts';
 import {
   defaultArea,
+  deviceIn,
+  deviceWords,
   groupsOf,
   homeWide,
   noteOf,
-  overridesOf,
   slotLabel,
   sourceOf,
   valuesOf,
 } from './fill.ts';
 import type { Source } from './fill.ts';
-import { formData, fromForm, isSimple, labelFor, schemaOf } from './form.ts';
+import { isSimple, slotsFromForm } from './form.ts';
 import type { FormItem } from './form.ts';
 import { haForm } from './ha-form.ts';
 import { openPanel } from './leave.ts';
 import { sectionPanel } from './panel.ts';
-import { Unsupported, place, text } from './shape.ts';
+import type { Related } from './related.ts';
+import { Unsupported, place } from './shape.ts';
 import type { PlainShape } from './shape.ts';
-import { drawsCard, kept, previewConfig, slotsShape } from './slots.ts';
+import { kept, previewConfig, slotsShape } from './slots.ts';
 import { EDITOR_STYLE } from './style.ts';
 import { summarize } from './summary.ts';
 
@@ -51,10 +55,18 @@ const KEY_ORDER: PlainShape = {
   kind: 'plain',
   id: 'template-card',
   label: 'Template',
-  fields: { template: text(), area: text(), slots: text() },
+  fields: { template: { kind: 'text' }, area: { kind: 'text' }, slots: { kind: 'text' } },
   sections: [],
 };
 const AREA_SCHEMA: readonly FormItem[] = [{ name: 'area', required: true, selector: { area: {} } }];
+const NO_TEMPLATES: Templates = {};
+
+interface Explained {
+  readonly template: Template;
+  readonly area: string | undefined;
+  readonly registries: readonly object[];
+  readonly traces: Record<string, Trace>;
+}
 
 interface Origin {
   readonly source: Source;
@@ -74,6 +86,20 @@ const HOME: [Source, string, string] = [
   'The template finds what it needs anywhere in your home.',
 ];
 
+interface Devices {
+  readonly using: DeviceFit | undefined;
+  readonly others: readonly DeviceFit[];
+}
+
+const NO_DEVICES: Devices = { using: undefined, others: [] };
+
+const foundIn = (traces: Readonly<Record<string, Trace>>): Record<string, Value> =>
+  Object.fromEntries(
+    Object.entries(traces).flatMap(([name, trace]) =>
+      trace.value === undefined ? [] : [[name, trace.value]],
+    ),
+  );
+
 function lacks(spec: SlotSpec, value: Value | undefined): boolean {
   if (!filled(value)) {
     return spec.required === true;
@@ -81,7 +107,7 @@ function lacks(spec: SlotSpec, value: Value | undefined): boolean {
   return (
     spec.kind === 'object' &&
     isMapping(value) &&
-    Object.entries(spec.fields ?? {}).some(([field, inner]) => lacks(inner, value[field]))
+    Object.entries(spec.fields ?? {}).some(([key, inner]) => lacks(inner, value[key]))
   );
 }
 
@@ -91,23 +117,19 @@ export class MnmlTemplateCardEditor extends LitElement {
   @property({ attribute: false }) hass: HomeAssistant | undefined;
   @state() private config: Record<string, Value> = { type: TYPE, template: '' };
   @state() private problem: string | undefined;
-  @state() private filter = '';
   @state() private browsing = false;
   @state() private loaded = false;
   @state() private values: Record<string, Value> | undefined;
   @state() private pendingArea = false;
-  @state() private everything = false;
   private loading = false;
+  private explained: Explained | undefined;
   private stopShared: (() => void) | undefined;
-  private observer: IntersectionObserver | undefined;
   private readonly open = new Map<string, boolean>();
-  private readonly previews = new Map<string, ChildCard>();
 
   override connectedCallback(): void {
     super.connectedCallback();
     if (this.stopShared === undefined) {
       this.stopShared = onShared(() => {
-        this.previews.clear();
         this.requestUpdate();
       });
       this.requestUpdate();
@@ -118,8 +140,6 @@ export class MnmlTemplateCardEditor extends LitElement {
     super.disconnectedCallback();
     this.stopShared?.();
     this.stopShared = undefined;
-    this.observer?.disconnect();
-    this.observer = undefined;
   }
 
   setConfig(config: unknown): void {
@@ -172,12 +192,8 @@ export class MnmlTemplateCardEditor extends LitElement {
         : undefined;
     const waiting = !this.loaded || shared === undefined || shared.status === 'waiting';
     const named = typeof name === 'string' && name !== '';
-    const body =
-      !this.browsing && named && template === undefined && waiting
-        ? html`<div class="template-description">Loading the templates...</div>`
-        : this.browsing || template === undefined || !named
-          ? this.gallery(templates)
-          : this.chosen(name, template);
+    const ready = !this.browsing && named && template !== undefined;
+    const loading = !this.browsing && named && template === undefined && waiting;
     return html`<div class="object">
       ${problems.map((problem) =>
         problem === undefined ? nothing : html`<div class="problem">${problem}</div>`,
@@ -189,35 +205,25 @@ export class MnmlTemplateCardEditor extends LitElement {
               ${unknown} is not a template this dashboard knows: pick one
             </div>`
       }
-      ${body}
+      ${cache(
+        ready || loading
+          ? nothing
+          : html`<mnml-template-gallery
+              .hass=${this.hass}
+              .templates=${templates}
+              .own=${shared?.status === 'ready' ? shared.own : NO_TEMPLATES}
+              @template-picked=${this.picked}
+            ></mnml-template-gallery>`,
+      )}
+      ${loading ? html`<div class="template-description">Loading the templates...</div>` : nothing}
+      ${ready ? this.chosen(name, template) : nothing}
     </div>`;
   }
 
-  protected override updated(): void {
-    if (typeof IntersectionObserver !== 'function') {
-      return;
-    }
-    const waiting = [...this.renderRoot.querySelectorAll<HTMLElement>('.tile-preview')].filter(
-      (target) => {
-        const name = target.dataset['template'];
-        return name !== undefined && !this.previews.has(name);
-      },
-    );
-    if (waiting.length === 0) {
-      return;
-    }
-    this.observer ??= new IntersectionObserver(this.shown);
-    for (const target of waiting) {
-      this.observer.observe(target);
-    }
-  }
-
-  private readonly shown = (entries: readonly IntersectionObserverEntry[]): void => {
-    for (const entry of entries) {
-      if (entry.isIntersecting) {
-        this.observer?.unobserve(entry.target);
-        void this.preview(entry.target);
-      }
+  private readonly picked = (event: Event): void => {
+    const name = field(field(event, 'detail'), 'template');
+    if (typeof name === 'string') {
+      this.pick(name);
     }
   };
 
@@ -234,11 +240,6 @@ export class MnmlTemplateCardEditor extends LitElement {
 
   private get templates(): Templates {
     return resolvedTemplates(this.shared ?? { status: 'waiting' }, SHIPPED_TEMPLATES.templates());
-  }
-
-  private get ownNames(): string[] {
-    const shared = this.shared;
-    return shared?.status === 'ready' ? Object.keys(shared.own) : [];
   }
 
   private write(next: Record<string, Value>): void {
@@ -261,123 +262,6 @@ export class MnmlTemplateCardEditor extends LitElement {
         this.requestUpdate();
       },
     };
-  }
-
-  private gallery(templates: Templates): TemplateResult {
-    const filtered = (event: Event): void => {
-      const box = event.currentTarget;
-      this.filter = box instanceof HTMLInputElement ? box.value : '';
-    };
-    return html`<div class="gallery">
-      <input
-        class="filter"
-        placeholder="Filter"
-        aria-label="Filter the templates"
-        .value=${live(this.filter)}
-        @input=${filtered}
-      />
-      <div class="gallery">${this.tiles(templates)}</div>
-    </div>`;
-  }
-
-  private tiles(templates: Templates): TemplateResult {
-    const own = new Set(this.ownNames);
-    const roles = rolesOf(templates);
-    const words = this.filter.trim().toLowerCase();
-    const names = Object.keys(templates)
-      .toSorted()
-      .filter((name) => {
-        const text = `${name} ${templates[name]?.description ?? ''}`.toLowerCase();
-        return words === '' || text.includes(words);
-      });
-    const tiles = names.filter((name) => roles[name] === 'tile');
-    const rest = names.filter((name) => roles[name] !== 'tile');
-    const grouped = (from: readonly string[]): TemplateResult => {
-      const groups = new Map<string, string[]>();
-      for (const name of from) {
-        const group = own.has(name) ? 'Yours' : `Shipped: ${OWNER[name] ?? 'common'}`;
-        groups.set(group, [...(groups.get(group) ?? []), name]);
-      }
-      const order = [...groups.keys()].toSorted((a, b) =>
-        a === 'Yours' ? -1 : b === 'Yours' ? 1 : a.localeCompare(b),
-      );
-      return html`${repeat(
-        order,
-        (group) => group,
-        (group) =>
-          html`<div class="heading">${group}</div>
-            <div class="tiles">
-              ${repeat(
-                groups.get(group) ?? [],
-                (name) => name,
-                (name) => this.tile(templates, name),
-              )}
-            </div>`,
-      )}`;
-    };
-    const open = this.everything || words !== '';
-    return html`${grouped(tiles)}
-    ${
-      rest.length === 0
-        ? nothing
-        : html`<button
-              type="button"
-              class="control fold"
-              aria-expanded=${open}
-              @click=${quietly(() => {
-                this.everything = !this.everything;
-              })}
-            >
-              Pop-ups and parts (${rest.length})
-            </button>
-            ${open ? grouped(rest) : nothing}`
-    }`;
-  }
-
-  private tile(templates: Templates, name: string): TemplateResult | typeof nothing {
-    const template = templates[name];
-    if (template === undefined) {
-      return nothing;
-    }
-    const use = `Use ${name}`;
-    return html`<button
-      type="button"
-      class="control tile"
-      aria-label=${use}
-      title=${use}
-      @click=${quietly(() => {
-        this.pick(name);
-      })}
-    >
-      <div class="tile-name">${name}</div>
-      <div class="tile-description">${template.description ?? ''}</div>
-      ${
-        drawsCard(template)
-          ? html`<div class="tile-preview" data-template=${name}>
-              ${this.previews.get(name) ?? nothing}
-            </div>`
-          : nothing
-      }
-    </button>`;
-  }
-
-  private async preview(target: Element): Promise<void> {
-    const name = target instanceof HTMLElement ? target.dataset['template'] : undefined;
-    const template = name === undefined ? undefined : this.templates[name];
-    if (name === undefined || template === undefined) {
-      return;
-    }
-    const helpers = await window.loadCardHelpers?.();
-    if (helpers === undefined) {
-      return;
-    }
-    const card = helpers.createCardElement(previewConfig(name, template, this.hass));
-    card.preview = true;
-    if (this.hass !== undefined) {
-      card.hass = this.hass;
-    }
-    this.previews.set(name, card);
-    this.requestUpdate();
   }
 
   private pick(name: string): void {
@@ -426,22 +310,23 @@ export class MnmlTemplateCardEditor extends LitElement {
 
   private tracesFor(template: Template, area: string | undefined): Record<string, Trace> {
     const hass = this.hass;
-    return hass === undefined
-      ? {}
-      : explain(template, area === '' ? undefined : area, {
-          areas: hass.areas,
-          devices: hass.devices,
-          entities: hass.entities,
-          states: hass.states,
-        });
-  }
-
-  private foundFor(template: Template, area: string | undefined): Record<string, Value> {
-    return Object.fromEntries(
-      Object.entries(this.tracesFor(template, area)).flatMap(([name, trace]) =>
-        trace.value === undefined ? [] : [[name, trace.value]],
-      ),
-    );
+    if (hass === undefined) {
+      return {};
+    }
+    const where = area === '' ? undefined : area;
+    const registries = [hass.areas, hass.devices, hass.entities];
+    const known = this.explained;
+    if (
+      known !== undefined &&
+      known.template === template &&
+      known.area === where &&
+      known.registries.every((registry, index) => registry === registries[index])
+    ) {
+      return known.traces;
+    }
+    const traces = explain(template, where, registriesOf(hass));
+    this.explained = { template, area: where, registries, traces };
+    return traces;
   }
 
   private origin(template: Template): Origin {
@@ -452,14 +337,9 @@ export class MnmlTemplateCardEditor extends LitElement {
       source === 'yourself' || placeless
         ? {}
         : this.tracesFor(template, source === 'home' ? undefined : area);
-    const found = Object.fromEntries(
-      Object.entries(traces).flatMap(([name, trace]) =>
-        trace.value === undefined ? [] : [[name, trace.value]],
-      ),
-    );
     const own = isMapping(this.config['slots']) ? this.config['slots'] : {};
     const where = area === undefined || area === '' ? '' : (this.hass?.areas[area]?.name ?? area);
-    return { source, found, traces, own, where };
+    return { source, found: foundIn(traces), traces, own, where };
   }
 
   private chosen(name: string, template: Template): TemplateResult {
@@ -615,11 +495,18 @@ export class MnmlTemplateCardEditor extends LitElement {
     const specs = template.slots ?? {};
     const drawn: TemplateResult[] = [];
     const simple = names.filter((name) => {
-      const field = shape.fields[name];
-      return field !== undefined && isSimple(field);
+      const shaped = shape.fields[name];
+      return shaped !== undefined && isSimple(shaped);
     });
     if (simple.length > 0) {
-      drawn.push(this.slotsForm(shape, simple, specs, slot, origin));
+      const helper = (name: string): string | undefined => {
+        const note = noteOf(origin.source, name, origin.found, origin.own, origin.where);
+        const words = [specs[name]?.help, note].filter(
+          (part): part is string => part !== undefined,
+        );
+        return words.length === 0 ? undefined : words.join(' ');
+      };
+      drawn.push(formOf(shape, simple, slot, context, { helper, read: slotsFromForm }));
     }
     for (const name of names.filter((each) => !simple.includes(each))) {
       const spec = specs[name];
@@ -628,7 +515,8 @@ export class MnmlTemplateCardEditor extends LitElement {
       }
       const label = slotLabel(name, spec);
       const optional = spec.kind === 'object' && spec.required !== true;
-      if (optional && slot.get()[name] === undefined) {
+      const current = slot.get()[name];
+      if (optional && (current === undefined || current === null)) {
         drawn.push(
           adder(`Add ${label}`, 'mdi:plus', () => {
             slot.set({ ...slot.get(), [name]: {} }, true);
@@ -638,10 +526,23 @@ export class MnmlTemplateCardEditor extends LitElement {
       }
       const alone = names.length === 1 && label === title;
       const fields = keysForm(shape, [name], slot, context, 'slots', !alone);
-      const words = noteOf(origin.source, name, origin.found, origin.own, origin.where) ?? '';
+      const devices = spec.kind === 'object' ? this.devicesOf(name, origin) : NO_DEVICES;
+      const words =
+        noteOf(origin.source, name, origin.found, origin.own, origin.where, devices.using) ?? '';
       const note = html`<div class="slot-note" ?hidden=${words === ''}>${words}</div>`;
+      const body =
+        spec.kind === 'object'
+          ? [
+              html`<mnml-related .related=${this.relatedTo(devices.using)}
+                >${alone ? fields : fields.slice(1)}</mnml-related
+              >`,
+            ]
+          : fields.slice(alone ? 0 : 1);
       drawn.push(
-        ...(alone ? [note, ...fields] : [...fields.slice(0, 1), note, ...fields.slice(1)]),
+        ...(alone ? [] : fields.slice(0, 1)),
+        note,
+        ...this.another(name, spec, devices, slot),
+        ...body,
       );
       if (optional) {
         drawn.push(
@@ -696,7 +597,9 @@ export class MnmlTemplateCardEditor extends LitElement {
     origin: Origin,
   ): TemplateResult[] {
     return names.flatMap((name) => {
-      const tied = origin.traces[name]?.steps.find((step) => step.tied !== undefined)?.tied;
+      const tied = origin.traces[name]?.steps.find(
+        (step) => step.field === '' && step.tied !== undefined,
+      )?.tied;
       if (tied === undefined) {
         return [];
       }
@@ -726,36 +629,66 @@ export class MnmlTemplateCardEditor extends LitElement {
     });
   }
 
-  private slotsForm(
-    shape: PlainShape,
-    keys: readonly string[],
-    specs: Readonly<Record<string, SlotSpec>>,
-    slot: Slot,
-    origin: Origin,
-  ): TemplateResult {
-    return haForm({
-      hass: this.hass,
-      data: formData(shape, keys, slot.get()),
-      schema: schemaOf(shape, keys, []),
-      computeLabel: (item) => labelFor(shape, item.name),
-      computeHelper: (item) => {
-        const note = noteOf(origin.source, item.name, origin.found, origin.own, origin.where);
-        const words = [specs[item.name]?.help, note].filter(
-          (part): part is string => part !== undefined,
-        );
-        return words.length === 0 ? undefined : words.join(' ');
-      },
-      changed: (data) => {
-        slot.set(fromForm(shape, keys, data, slot.get()), false);
-      },
-    });
+  private devicesOf(name: string, origin: Origin): Devices {
+    const trace = origin.traces[name];
+    const fits = trace?.devices ?? [];
+    const using = Object.hasOwn(origin.own, name)
+      ? deviceIn(origin.own[name], fits, this.hass?.entities ?? {})
+      : fits.find((fit) => fit.id === trace?.device);
+    return { using, others: fits.filter((fit) => fit.id !== using?.id) };
+  }
+
+  private relatedTo(device: DeviceFit | undefined): Related | undefined {
+    const hass = this.hass;
+    if (device === undefined || hass === undefined) {
+      return undefined;
+    }
+    const registries = registriesOf(hass);
+    const area = registries.devices[device.id]?.area_id;
+    return {
+      entities: new Set(
+        Object.values(registries.entities)
+          .filter((entry) => entry.device_id === device.id)
+          .map((entry) => entry.entity_id),
+      ),
+      devices: new Set(relativesOf(device.id, registries)),
+      areas: new Set(area === undefined || area === null ? [] : [area]),
+    };
+  }
+
+  private another(name: string, spec: SlotSpec, devices: Devices, slot: Slot): TemplateResult[] {
+    if (devices.others.length === 0) {
+      return [];
+    }
+    const area = typeof this.config['area'] === 'string' ? this.config['area'] : undefined;
+    return [
+      html`<div class="alternatives" role="group" aria-label=${`${name} devices`}>
+        <span class="alt-note">Use another:</span>
+        ${devices.others.map(
+          (fit) =>
+            html`<button
+              type="button"
+              class="alt"
+              aria-label=${`Use ${deviceWords(fit)}`}
+              @click=${quietly(() => {
+                const value = fromDevice(spec, fit.id, area, registriesOf(this.hass));
+                if (value !== undefined) {
+                  slot.set({ ...slot.get(), [name]: value }, true);
+                }
+              })}
+            >
+              ${deviceWords(fit)}
+            </button>`,
+        )}
+      </div>`,
+    ];
   }
 
   private edit(template: Template, next: Record<string, Value>): void {
     this.values = next;
     if (sourceOf(this.config) === 'area') {
       const area = typeof this.config['area'] === 'string' ? this.config['area'] : undefined;
-      const overrides = overridesOf(this.foundFor(template, area), next);
+      const overrides = overridesOf(foundIn(this.tracesFor(template, area)), next);
       const overridden = Object.keys(overrides).length === 0 ? undefined : overrides;
       this.write(place(KEY_ORDER, this.config, 'slots', overridden));
       return;
@@ -768,8 +701,11 @@ export class MnmlTemplateCardEditor extends LitElement {
     if (origin.source === to) {
       return;
     }
-    const values = this.values ?? valuesOf(origin.source, origin.found, origin.own);
-    this.values = values;
+    const values =
+      origin.source === 'home'
+        ? valuesOf('home', origin.found, origin.own)
+        : (this.values ?? valuesOf(origin.source, origin.found, origin.own));
+    this.values = to === 'home' ? undefined : values;
     this.pendingArea = false;
     const rest = this.placeless();
     if (to === 'home') {
@@ -799,7 +735,7 @@ export class MnmlTemplateCardEditor extends LitElement {
   }
 
   private toArea(template: Template, area: string, values: Record<string, Value>): void {
-    const overrides = overridesOf(this.foundFor(template, area), values);
+    const overrides = overridesOf(foundIn(this.tracesFor(template, area)), values);
     const withArea = place(KEY_ORDER, this.placeless(), 'area', area);
     this.write(
       Object.keys(overrides).length === 0

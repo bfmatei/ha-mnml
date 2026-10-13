@@ -2,9 +2,14 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { html } from 'lit';
 import { test } from 'vitest';
 
-import { BASE_STYLE } from './styles.ts';
+import { stateLine } from '../ha/format.ts';
+import { styled } from '../test/render.ts';
+
+import { MENU_STYLE } from './parts/menu.ts';
+import { BASE_STYLE, ROW_STYLE, SELECT_STYLE } from './styles.ts';
 
 function sources(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -33,21 +38,26 @@ test('no card still reads a --minimal- variable', () => {
 });
 
 test('what is pressed cannot be selected, so quick clicks select no text; values stay selectable', () => {
-  const rule = [...BASE_STYLE.cssText.matchAll(/([^{}]+)\{([^}]*)\}/g)].find(([, , body]) =>
-    /(?:^|;|\s)user-select:\s*none/.test(body ?? ''),
+  const root = styled(
+    [BASE_STYLE],
+    html`<div class="card">
+      <button>Press</button>
+      <span role="button">Press</span>
+      <span class="link">Open</span>
+      <div class="heading fold">Fold</div>
+      <span class="value">21</span>
+    </div>`,
   );
-  assert.ok(rule, 'a rule turns selection off');
-  const selectors = new Set((rule[1] ?? '').split(',').map((selector) => selector.trim()));
+  const selection = (selector: string): string => {
+    const node = root.querySelector(selector);
+    assert.ok(node, selector);
+    return getComputedStyle(node).userSelect;
+  };
   for (const pressed of ['button', "[role='button']", '.link', '.heading.fold']) {
-    assert.ok(selectors.has(pressed), pressed);
+    assert.equal(selection(pressed), 'none', pressed);
   }
-  assert.ok(!selectors.has('.card') && !selectors.has('*'), 'not the whole card');
-});
-
-test('a linking row keeps its hover wash while one of its controls is hovered, so sweeping across it does not blink', () => {
-  const css = BASE_STYLE.cssText;
-  assert.ok(css.includes('.row.link:hover::before'), 'the row washes while hovered');
-  assert.doesNotMatch(css, /\.row\.link:hover:not\(/, 'whatever is under the pointer in it');
+  assert.notEqual(selection('.card'), 'none', 'not the whole card');
+  assert.notEqual(selection('.value'), 'none', 'a value');
 });
 
 const WASHED = [
@@ -72,35 +82,72 @@ test('every hover wash is one overlay that fades, never a gradient or an inset s
   assert.deepEqual(left, []);
 });
 
-test('the same overlay washes all eight surfaces: under the content, clear at rest, fading in 120 ms', () => {
-  const css = BASE_STYLE.cssText;
-  for (const surface of WASHED) {
-    assert.ok(css.includes(`${surface}::before`), `${surface} has the overlay`);
-    assert.ok(
-      css.includes(`${surface},`) || css.includes(`${surface} {`),
-      `${surface} is isolated`,
-    );
-  }
-  const rule = [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)].find(
-    ([, selector, body]) =>
-      (selector ?? '').includes('.tile::before') && /content:\s*''/.test(body ?? ''),
+test('each of the eight washed surfaces holds its overlay under its own content, and an inert control has none', () => {
+  const root = styled(
+    [BASE_STYLE],
+    html`<div class="tile"></div>
+      <div class="card button"></div>
+      <div class="glance link"></div>
+      <div class="row link"></div>
+      <div class="control"></div>
+      <button class="reset"></button>
+      <div class="heading fold"><span class="chevron"></span></div>
+      <div class="header"><span class="round"></span></div>
+      <div class="control inert"></div>`,
   );
-  assert.ok(rule, 'a rule draws the overlay');
-  const body = rule[2] ?? '';
-  assert.match(body, /z-index:\s*-1/);
-  assert.match(body, /opacity:\s*0/);
-  assert.match(body, /pointer-events:\s*none/);
-  assert.match(body, /transition:\s*opacity 120ms ease-out/);
-  assert.match(body, /background:\s*var\(--m-hover\)/);
-  assert.match(css, /isolation:\s*isolate/);
+  for (const surface of WASHED) {
+    const node = root.querySelector(surface);
+    assert.ok(node, surface);
+    const style = getComputedStyle(node);
+    assert.equal(style.isolation, 'isolate', surface);
+    assert.equal(style.position, 'relative', surface);
+  }
+  const inert = root.querySelector('.control.inert');
+  assert.ok(inert);
+  assert.notEqual(getComputedStyle(inert).isolation, 'isolate');
 });
 
-const read = (name: string): string => readFileSync(join(import.meta.dirname, name), 'utf8');
-
 test('a menu item and a select ease into their hover too', () => {
-  assert.match(
-    read('parts/menu.ts'),
-    /\.menu button \{[^}]*transition:\s*background-color 120ms ease-out/,
+  const root = styled(
+    [MENU_STYLE, SELECT_STYLE],
+    html`<div class="menu"><button>Cool</button></div>
+      <select></select>`,
   );
-  assert.match(read('styles.ts'), /select,[^{]*\{[^}]*transition:\s*border-color 120ms ease-out/);
+  const item = root.querySelector('.menu button');
+  const select = root.querySelector('select');
+  assert.ok(item && select);
+  assert.equal(getComputedStyle(item).transition, 'background-color 120ms ease-out');
+  assert.equal(getComputedStyle(select).transition, 'border-color 120ms ease-out');
+});
+
+const ROOM = {
+  states: {
+    'sensor.temperature': {
+      entity_id: 'sensor.temperature',
+      state: '21',
+      attributes: { friendly_name: 'Temperature' },
+    },
+  },
+  entities: {},
+  devices: {},
+  locale: { language: 'en' },
+  formatEntityState: (stateObj: { state: string }): string => `${stateObj.state} °C`,
+};
+
+test("each part of a row's state line is the box that centres its icon on its value and cuts the value with an ellipsis", () => {
+  const line = stateLine(ROOM as never, 'sensor.temperature', [{ icon: true }, { text: 'Warm' }]);
+  const root = styled([BASE_STYLE, ROW_STYLE], html`<div class="state">${line}</div>`);
+  const parts = [...root.querySelectorAll('.state > span')];
+  assert.equal(parts.length, 2);
+  for (const part of parts) {
+    const value = part.querySelector('.value');
+    assert.ok(value);
+    const box = getComputedStyle(part);
+    const cut = getComputedStyle(value);
+    assert.deepEqual(
+      [box.display, box.alignItems, box.gap, box.maxWidth],
+      ['inline-flex', 'center', '3px', '100%'],
+    );
+    assert.deepEqual([cut.minWidth, cut.overflow, cut.textOverflow], ['0px', 'hidden', 'ellipsis']);
+  }
 });

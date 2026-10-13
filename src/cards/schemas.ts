@@ -1,212 +1,30 @@
-import type {
-  AgendaSource,
-  ClientNetwork,
-  Control,
-  EntityRule,
-  GlanceCount,
-  GlanceOne,
-  Item,
-  ListRow,
-  MessageSource,
-  StateItem,
-  StateRule,
-} from '../contract/cards.ts';
+import type { CustomCard } from '../contract/cards.ts';
+import { CARD_STRUCTURES, CONTROL, LIST_ROW as ROW, STATE_ITEM } from '../contract/structure.ts';
 
-import { marked, schema, tagged, variant } from './keys.ts';
+import { cardKeysOf, keysOf } from './keys.ts';
+import type { KeySchema } from './keys.ts';
 
-export const STATE_RULE = schema<StateRule>({ is: true, not: true });
+const cardKeys = (type: CustomCard['type']): KeySchema => cardKeysOf(CARD_STRUCTURES[type]);
 
-const ENTITY_RULE = schema<EntityRule>({ is: true, not: true, entity: true });
+export const STATE_ITEMS = keysOf(STATE_ITEM);
+export const CONTROLS = keysOf(CONTROL);
+export const LIST_ROW = keysOf(ROW);
 
-export const STATE_ITEMS = marked(
-  {
-    text: variant<Extract<StateItem, { text: string }>>(
-      { when: true, text: true },
-      { when: ENTITY_RULE },
-    ),
-    attribute: variant<Extract<StateItem, { attribute: string }>>(
-      { when: true, entity: true, attribute: true, icon: true },
-      { when: ENTITY_RULE },
-    ),
-    minutes: variant<Extract<StateItem, { minutes: true }>>(
-      { when: true, entity: true, minutes: true, icon: true },
-      { when: ENTITY_RULE },
-    ),
-    relative: variant<Extract<StateItem, { relative: true }>>(
-      { when: true, entity: true, relative: true, icon: true },
-      { when: ENTITY_RULE },
-    ),
-    serial: variant<Extract<StateItem, { serial: true }>>(
-      { when: true, entity: true, serial: true },
-      { when: ENTITY_RULE },
-    ),
-    name: variant<Extract<StateItem, { name: true }>>(
-      { when: true, entity: true, name: true },
-      { when: ENTITY_RULE },
-    ),
-  },
-  variant<
-    Extract<
-      StateItem,
-      {
-        text?: never;
-        attribute?: never;
-        minutes?: never;
-        relative?: never;
-        serial?: never;
-        name?: never;
-      }
-    >
-  >({ when: true, entity: true, icon: true }, { when: ENTITY_RULE }),
-);
-
-const STATUS_RULE = schema<Extract<Control, { type: 'status' }>['rules'][number]>({
-  is: true,
-  not: true,
-  below: true,
-  within_days: true,
-  entities: true,
-  label: true,
-  words: true,
-  color: true,
-});
-
-export const CONTROLS = tagged<Control>({
-  toggle: variant<Extract<Control, { type: 'toggle' }>>(
-    { type: true, show: true, entity: true, icon: true, color: true, when: true, primary: true },
-    { show: ENTITY_RULE, when: STATE_RULE },
-  ),
-  slider: variant<Extract<Control, { type: 'slider' }>>(
-    { type: true, show: true, entity: true, slider: true, name: true, icon: true, color: true },
-    { show: ENTITY_RULE },
-  ),
-  select: variant<Extract<Control, { type: 'select' }>>(
-    {
-      type: true,
-      show: true,
-      entity: true,
-      attribute: true,
-      color: true,
-      when: true,
-      primary: true,
-    },
-    { show: ENTITY_RULE, when: STATE_RULE },
-  ),
-  service: variant<Extract<Control, { type: 'service' }>>(
-    { type: true, show: true, entity: true, service: true, name: true, icon: true, primary: true },
-    { show: ENTITY_RULE },
-  ),
-  nav: variant<Extract<Control, { type: 'nav' }>>(
-    { type: true, show: true, entity: true, popup: true, color: true, when: true },
-    { show: ENTITY_RULE, when: STATE_RULE },
-  ),
-  indicator: variant<Extract<Control, { type: 'indicator' }>>(
-    { type: true, show: true, entity: true, color: true },
-    { show: ENTITY_RULE },
-  ),
-  status: variant<Extract<Control, { type: 'status' }>>(
-    { type: true, show: true, name: true, icon: true, silent: true, rules: true },
-    { show: ENTITY_RULE, rules: STATUS_RULE },
-  ),
-  tyres: variant<Extract<Control, { type: 'tyres' }>>(
-    {
-      type: true,
-      show: true,
-      tyres: true,
-      targets: true,
-      low_share: true,
-      warn_share: true,
-      silent: true,
-    },
-    { show: ENTITY_RULE },
-  ),
-  scenes: variant<Extract<Control, { type: 'scenes' }>>(
-    { type: true, show: true, scenes: true, active_scene: true, name: true, icon: true },
-    { show: ENTITY_RULE },
-  ),
-});
-
-export const ITEM = schema<Item>(
-  {
-    entity: true,
-    name: true,
-    label: true,
-    strip_word: true,
-    icon: true,
-    color: true,
-    when: true,
-    state: true,
-    popup: true,
-    controls: true,
-  },
-  { when: STATE_RULE, state: STATE_ITEMS, controls: CONTROLS },
-);
-
-export const GLANCE = marked(
-  {
-    entities: variant<GlanceCount>({
-      entities: true,
-      name: true,
-      icon: true,
-      color: true,
-      popup: true,
-      is: true,
-      below: true,
-      sum: true,
-      critical: true,
-    }),
-  },
-  variant<GlanceOne>(
-    {
-      entity: true,
-      name: true,
-      icon: true,
-      color: true,
-      when: true,
-      show: true,
-      state: true,
-      popup: true,
-      toggle: true,
-      quiet: true,
-      bare: true,
-      alert: true,
-      people: true,
-    },
-    { when: STATE_RULE, show: STATE_RULE, alert: STATE_RULE, state: STATE_ITEMS },
-  ),
-);
-
-export const LIST_ROW = schema<ListRow>(
-  {
-    entity: true,
-    name: true,
-    label: true,
-    strip: true,
-    words: true,
-    relative: true,
-    zero_when_empty: true,
-    flag: true,
-    bar: true,
-    of: true,
-    low: true,
-    low_only: true,
-    critical: true,
-    high: true,
-    critical_high: true,
-    reset: true,
-    color: true,
-    when: true,
-    show: true,
-    values: true,
-  },
-  { when: STATE_RULE, show: ENTITY_RULE },
-);
-
-export const AGENDA_SOURCE = schema<AgendaSource>({ entity: true, kind: true });
-
-export const MESSAGE_SOURCE = marked(
-  { entity: variant<Extract<MessageSource, { entity: string }>>({ source: true, entity: true }) },
-  variant<Extract<MessageSource, { name: string }>>({ source: true, name: true }),
-);
-
-export const CLIENT_NETWORK = schema<ClientNetwork>({ name: true, icon: true, subnet: true });
+export const HEADING_CARD = cardKeys('custom:mnml-heading-card');
+export const LIST_CARD = cardKeys('custom:mnml-list-card');
+export const AGENDA_CARD = cardKeys('custom:mnml-agenda-card');
+export const MESSAGES_CARD = cardKeys('custom:mnml-messages-card');
+export const CLIENTS_CARD = cardKeys('custom:mnml-clients-card');
+export const REPORT_CARD = cardKeys('custom:mnml-report-card');
+export const WEATHER_CARD = cardKeys('custom:mnml-weather-card');
+export const GLANCES_CARD = cardKeys('custom:mnml-glances-card');
+export const BUTTON_CARD = cardKeys('custom:mnml-button-card');
+export const SELECT_CARD = cardKeys('custom:mnml-select-card');
+export const SLIDER_CARD = cardKeys('custom:mnml-slider-card');
+export const ENTITY_CARD = cardKeys('custom:mnml-entity-card');
+export const HEADER_CARD = cardKeys('custom:mnml-header-card');
+export const TILE_CARD = cardKeys('custom:mnml-tile-card');
+export const MEDIA_CARD = cardKeys('custom:mnml-media-card');
+export const CAR_PLAN_CARD = cardKeys('custom:mnml-car-plan-card');
+export const POPUPS_CARD = cardKeys('custom:mnml-popups-card');
+export const TEMPLATE_CARD = cardKeys('custom:mnml-template-card');

@@ -4,7 +4,7 @@ import { html, render } from 'lit';
 import type { CSSResultGroup } from 'lit';
 import { test } from 'vitest';
 
-import { text } from '../test/render.ts';
+import { styled, text } from '../test/render.ts';
 
 import { sectionPanel } from './panel.ts';
 import { MnmlRowMenu } from './row-menu.ts';
@@ -71,5 +71,15 @@ test('every control the editors unstyle keeps a focus ring', () => {
 });
 
 test('an element the editors hide stays hidden, whatever display its class gives it', () => {
-  assert.match(EDITOR_STYLE.cssText, /^\s*\[hidden\]\s*\{\s*display: none !important;\s*\}/m);
+  const root = styled([EDITOR_STYLE], html``);
+  const rules: CSSRule[] = [];
+  for (const style of root.querySelectorAll('style')) {
+    rules.push(...(style.sheet?.cssRules ?? []));
+  }
+  const hidden = rules.find(
+    (rule) => rule instanceof CSSStyleRule && rule.selectorText === '[hidden]',
+  );
+  assert.ok(hidden instanceof CSSStyleRule, 'a rule of their own for [hidden]');
+  assert.equal(hidden.style.getPropertyValue('display'), 'none');
+  assert.equal(hidden.style.getPropertyPriority('display'), 'important', 'that outweighs a class');
 });

@@ -1,4 +1,4 @@
-import { html, nothing } from 'lit';
+import { css, html, nothing } from 'lit';
 import type { TemplateResult } from 'lit';
 import { live } from 'lit/directives/live.js';
 
@@ -12,25 +12,32 @@ import type {
   SlotSpec,
   Template,
   Value,
+  WrittenSlot,
+  WrittenTemplate,
 } from '../contract/templates.ts';
 import { toYaml } from '../contract/yaml.ts';
 import { field } from '../ha/field.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
+import { registriesOf } from '../ha/registries.ts';
 import { icon } from '../ha/templates.ts';
 import { nodeHash } from '../templates/changes.ts';
+import { TEXT_FILTERS, filterWords } from '../templates/discover.ts';
 import type { Step } from '../templates/discover.ts';
 import { toValue } from '../templates/expand.ts';
 import { explain } from '../templates/explain.ts';
 import type { Trace } from '../templates/explain.ts';
 
+import { slotOf } from './data.ts';
+import { messageOf } from './message.ts';
 import { readYaml } from './yaml.ts';
 
 export interface SlotsActions {
+  name: string;
   hass: HomeAssistant | undefined;
   open: Map<string, boolean>;
   areas: readonly { value: string; label: string }[];
   shipped: Template | undefined;
-  update: (next: Template, redraw: boolean) => void;
+  update: (next: WrittenTemplate, redraw: boolean) => void;
   redraw: () => void;
 }
 
@@ -52,39 +59,34 @@ const AREA_VALUES: readonly { value: AreaValue; label: string }[] = [
   { value: 'area.temperature', label: 'temperature sensor' },
   { value: 'area.humidity', label: 'humidity sensor' },
 ];
-const FILTERS = [
-  { key: 'device_class', words: 'with device class' },
-  { key: 'platform', words: 'from the integration' },
-  { key: 'translation_key', words: 'with translation key' },
-  { key: 'entity_category', words: 'in the category' },
-  { key: 'unit', words: 'with unit' },
-  { key: 'state_class', words: 'with state class' },
-  { key: 'name', words: 'named like' },
-  { key: 'manufacturer', words: 'made by' },
-  { key: 'model', words: 'of model' },
-  { key: 'label', words: 'labelled' },
-] as const;
+const FILTERS = TEXT_FILTERS.map((key) => ({ key, words: filterWords(key) }));
 const CATEGORIES = ['none', 'diagnostic', 'config'];
+const LISTS: readonly Kind[] = ['object', 'objects'];
 const SLOT_NAME = /^[a-z_][a-z0-9_]*$/;
 
 type Mode = 'area' | 'find' | 'per' | 'fields';
 
 const isAreaValue = (rule: Rule): rule is AreaValue => typeof rule === 'string';
 
-const FILTER_KEYS = new Set([
-  'domain',
-  'device_class',
-  'platform',
-  'translation_key',
-  'entity_category',
-  'unit',
-  'state_class',
-  'name',
-  'manufacturer',
-  'model',
-  'label',
-  'scope',
-]);
+const FILTER_KEYS = new Set<string>(['domain', ...TEXT_FILTERS, 'scope']);
+
+function isFilter(value: Readonly<Record<string, Value>>): boolean {
+  return Object.entries(value).every(([key, inner]) => {
+    if (key === 'exclude') {
+      return isMapping(inner) && isFilter(inner);
+    }
+    if (key === 'attribute') {
+      return isMapping(inner) && Object.values(inner).every((each) => typeof each === 'string');
+    }
+    return FILTER_KEYS.has(key) && typeof inner === 'string';
+  });
+}
+
+const isAnchor = (value: Value | undefined): boolean =>
+  value === undefined ||
+  (Array.isArray(value)
+    ? value.every((each) => isMapping(each) && isFilter(each))
+    : isMapping(value) && isFilter(value));
 
 function isRule(value: unknown): value is Rule {
   if (typeof value === 'string') {
@@ -98,11 +100,9 @@ function isRule(value: unknown): value is Rule {
   }
   const fields = value['fields'];
   if (fields !== undefined) {
-    return isMapping(fields) && Object.values(fields).every(isRule);
+    return isMapping(fields) && Object.values(fields).every(isRule) && isAnchor(value['device']);
   }
-  return Object.entries(value).every(([key, inner]) =>
-    key === 'exclude' ? isMapping(inner) : FILTER_KEYS.has(key) && typeof inner === 'string',
-  );
+  return isFilter(value);
 }
 const isPer = (rule: Rule): rule is ObjectsRule => isMapping(rule) && 'per' in rule;
 const isFind = (rule: Rule): rule is FilterRule =>
@@ -118,7 +118,7 @@ function modeOf(rule: Rule): Mode {
   return isMapping(rule) && 'fields' in rule ? 'fields' : 'find';
 }
 
-function alternatives(spec: SlotSpec): Rule[] {
+function alternatives(spec: WrittenSlot): Rule[] {
   const rule = spec.discover;
   if (rule === undefined) {
     return [];
@@ -126,7 +126,7 @@ function alternatives(spec: SlotSpec): Rule[] {
   return Array.isArray(rule) ? rule : [rule];
 }
 
-function withRules(spec: SlotSpec, rules: readonly Rule[]): SlotSpec {
+function withRules(spec: WrittenSlot, rules: readonly Rule[]): WrittenSlot {
   const { discover: _old, ...rest } = spec;
   if (rules.length === 0) {
     return rest;
@@ -162,10 +162,12 @@ function choose(
   value: string,
   label: string,
   changed: (value: string) => void,
+  fixed = false,
 ): TemplateResult {
   return html`<select
     class="word"
     aria-label=${label}
+    ?disabled=${fixed}
     .value=${live(value)}
     @change=${(event: Event) => {
       changed(valueOf(event));
@@ -321,7 +323,7 @@ function drawYamlRule(rule: Rule, set: (rule: Rule) => void, redraw: () => void)
           }
           problem = 'not a rule: see the rules in the templates guide';
         } catch (error) {
-          problem = error instanceof Error ? error.message : String(error);
+          problem = messageOf(error);
         }
         const target = event.target;
         if (target instanceof HTMLElement) {
@@ -376,7 +378,9 @@ function drawRule(
       : isMapping(rule) && 'fields' in rule
         ? [drawYamlRule(rule, set, actions.redraw)]
         : isFind(rule)
-          ? drawFind(rule, kind, actions.hass, set)
+          ? rule.attribute === undefined
+            ? drawFind(rule, kind, actions.hass, set)
+            : [drawYamlRule(rule, set, actions.redraw)]
           : [];
   return html`<div class="sentence">
     ${choose(modes, mode, 'how', (next) => {
@@ -461,12 +465,7 @@ function drawTrial(
     [...actions.open.keys()].find((each) => each.startsWith(`${key}=`))?.slice(key.length + 1) ??
     actions.areas[0]?.value ??
     '';
-  const trace = explain({ card: {}, slots: { [name]: spec } }, chosen, {
-    areas: hass.areas,
-    devices: hass.devices,
-    entities: hass.entities,
-    states: hass.states,
-  })[name];
+  const trace = explain({ card: {}, slots: { [name]: spec } }, chosen, registriesOf(hass))[name];
   return html`<div class="trial">
     <span class="muted">In</span>
     ${choose(actions.areas, chosen, 'Try it in', (where) => {
@@ -488,98 +487,170 @@ function parseDefault(kind: Kind, text: string): Value | undefined {
   return kind === 'text' || kind === 'icon' || kind === 'entity' ? text : readYaml(text);
 }
 
+function oneLine(value: Value | undefined): string {
+  return value === undefined ? '' : typeof value === 'string' ? value : JSON.stringify(value);
+}
+
 type SlotKey = 'label' | 'help' | 'group' | 'required' | 'default' | 'fields';
 
-function drawSlot(
-  name: string,
-  now: () => SlotSpec,
-  shipped: SlotSpec | undefined,
-  actions: SlotsActions,
-  set: (spec: SlotSpec | undefined, redraw: boolean) => void,
-  depth: number,
-): TemplateResult {
-  const spec = now();
-  const changed =
-    actions.shipped !== undefined &&
-    (shipped === undefined || nodeHash(toValue(shipped)) !== nodeHash(toValue(spec)));
-  const without = (key: SlotKey): SlotSpec => {
-    const next: SlotSpec = { ...now() };
+type Edit = (slot: WrittenSlot) => WrittenSlot;
+
+const without =
+  (key: SlotKey): Edit =>
+  (slot) => {
+    const next = { ...slot };
     Reflect.deleteProperty(next, key);
     return next;
   };
-  const text = (
-    value: string | undefined,
-    label: string,
-    apply: (next: string) => SlotSpec,
-  ): TemplateResult =>
-    html`<label class="fact"
+
+const hashOf = (value: unknown): string =>
+  nodeHash(value === undefined ? undefined : toValue(value));
+
+function overrideOf(base: SlotSpec, wanted: WrittenSlot): WrittenSlot {
+  const { kind, required, default: value, discover, label, help, group } = wanted;
+  const fields = Object.fromEntries(
+    Object.entries(base.fields ?? {}).flatMap(([field, inner]): [string, WrittenSlot][] => {
+      const asked = wanted.fields?.[field];
+      const change = asked === undefined ? {} : overrideOf(inner, asked);
+      return Object.keys(change).length === 0 ? [] : [[field, change]];
+    }),
+  );
+  return {
+    ...(kind === undefined || kind === base.kind ? {} : { kind }),
+    ...(required === true && base.required !== true ? { required } : {}),
+    ...(value === undefined || hashOf(value) === hashOf(base.default) ? {} : { default: value }),
+    ...(discover === undefined || hashOf(discover) === hashOf(base.discover) ? {} : { discover }),
+    ...(label === undefined || label === base.label ? {} : { label }),
+    ...(help === undefined || help === base.help ? {} : { help }),
+    ...(group === undefined || group === base.group ? {} : { group }),
+    ...(Object.keys(fields).length === 0 ? {} : { fields }),
+  };
+}
+
+function shapeWords(shape: string, kind: Kind): string {
+  const one = `${/^[aeiou]/.test(shape) ? 'an' : 'a'} ${shape}`;
+  return kind === 'objects' ? `each ${one}` : one;
+}
+
+function drawDelete(name: string, remove: () => void): TemplateResult {
+  return html`<button
+    type="button"
+    class="icon-button"
+    aria-label=${`Delete the slot ${name}`}
+    title=${`Delete the slot ${name}`}
+    @click=${remove}
+  >
+    ${icon('mdi:delete-outline')}
+  </button>`;
+}
+
+function drawSlot(
+  name: string,
+  now: () => WrittenSlot,
+  shipped: SlotSpec | undefined,
+  actions: SlotsActions,
+  set: (spec: WrittenSlot | undefined, redraw: boolean) => void,
+  depth: number,
+  within: SlotSpec | undefined,
+): TemplateResult {
+  const remove = (): void => {
+    set(undefined, true);
+  };
+  let spec: SlotSpec;
+  try {
+    spec = slotOf(actions.name, name, now());
+  } catch (error) {
+    return html`<section class="slot">
+      <div class="slot-head"><code class="slot-name">${name}</code>${drawDelete(name, remove)}</div>
+      <p class="problem-line">${messageOf(error)}</p>
+    </section>`;
+  }
+  const shape = now().shape;
+  const base = shape === undefined ? undefined : slotOf(actions.name, name, { shape });
+  const floor = within ?? base;
+  const current = (): SlotSpec => {
+    try {
+      return slotOf(actions.name, name, now());
+    } catch {
+      return spec;
+    }
+  };
+  const apply = (edit: Edit, redraw: boolean): void => {
+    set(
+      shape === undefined || base === undefined
+        ? edit(now())
+        : { shape, ...overrideOf(base, edit(current())) },
+      redraw,
+    );
+  };
+  const kinds =
+    within !== undefined
+      ? [spec.kind]
+      : base === undefined
+        ? KINDS
+        : LISTS.includes(base.kind)
+          ? LISTS
+          : [base.kind];
+  const changed =
+    actions.shipped !== undefined && (shipped === undefined || hashOf(shipped) !== hashOf(spec));
+  const text = (key: 'label' | 'help' | 'group', label: string): TemplateResult => {
+    const shaped = floor?.[key];
+    return html`<label class="fact"
       ><span class="fact-label">${label}</span
       ><input
         class="fact-input"
         aria-label=${label}
-        .value=${value ?? ''}
+        .value=${spec[key] === shaped ? '' : (spec[key] ?? '')}
+        .placeholder=${shaped ?? ''}
         @change=${(event: Event) => {
-          set(apply(valueOf(event).trim()), false);
+          const next = valueOf(event).trim();
+          apply(next === '' ? without(key) : (slot) => ({ ...slot, [key]: next }), false);
+          if (next === shaped && event.target instanceof HTMLInputElement) {
+            event.target.value = '';
+          }
         }}
     /></label>`;
-  const fallback =
-    spec.default === undefined
-      ? ''
-      : typeof spec.default === 'string'
-        ? spec.default
-        : toYaml(spec.default).trim();
+  };
+  const shapedDefault = floor?.default;
+  const fallback = hashOf(spec.default) === hashOf(shapedDefault) ? '' : oneLine(spec.default);
   const rules = alternatives(spec);
   return html`<section class="slot">
     <div class="slot-head">
       <code class="slot-name">${name}</code>
       <span class="muted">${spec.kind}</span>
+      ${shape === undefined ? nothing : html`<span class="muted">${shapeWords(shape, spec.kind)}</span>`}
       ${spec.required === true ? html`<span class="badge">required</span>` : nothing}
       ${changed ? html`<span class="badge changed">changed</span>` : nothing}
-      <button
-        type="button"
-        class="icon-button"
-        aria-label=${`Delete the slot ${name}`}
-        title=${`Delete the slot ${name}`}
-        @click=${() => {
-          set(undefined, true);
-        }}
-      >
-        ${icon('mdi:delete-outline')}
-      </button>
+      ${within === undefined ? drawDelete(name, remove) : nothing}
     </div>
     <div class="slot-facts">
       <label class="fact"
         ><span class="fact-label">Kind</span>${choose(
-          KINDS.map((kind) => ({ value: kind, label: kind })),
+          kinds.map((kind) => ({ value: kind, label: kind })),
           spec.kind,
           'Kind',
           (kind) => {
-            const found = KINDS.find((each) => each === kind);
+            const found = kinds.find((each) => each === kind);
             if (found !== undefined) {
-              set({ ...now(), kind: found }, true);
+              apply((slot) => ({ ...slot, kind: found }), true);
             }
           },
+          kinds.length < 2,
         )}</label
       >
-      ${text(spec.label, 'Label', (label) => (label === '' ? without('label') : { ...now(), label }))}
-      ${text(spec.help, 'Help', (help) => (help === '' ? without('help') : { ...now(), help }))}
-      ${
-        depth === 0
-          ? text(spec.group, 'Group', (group) =>
-              group === '' ? without('group') : { ...now(), group },
-            )
-          : nothing
-      }
+      ${text('label', 'Label')} ${text('help', 'Help')}
+      ${depth === 0 ? text('group', 'Group') : nothing}
       <label class="fact"
         ><span class="fact-label">Required</span
         ><input
           type="checkbox"
           aria-label="Required"
+          ?disabled=${floor?.required === true}
           .checked=${spec.required === true}
           @change=${(event: Event) => {
-            set(
+            apply(
               field(event.target, 'checked') === true
-                ? { ...now(), required: true }
+                ? (slot) => ({ ...slot, required: true })
                 : without('required'),
               true,
             );
@@ -591,17 +662,24 @@ function drawSlot(
           class="fact-input"
           aria-label="Default"
           .value=${fallback}
+          .placeholder=${oneLine(shapedDefault)}
           @change=${(event: Event) => {
             const target = event.target;
             try {
-              const value = parseDefault(now().kind, valueOf(event));
-              set(value === undefined ? without('default') : { ...now(), default: value }, false);
+              const value = parseDefault(current().kind, valueOf(event));
+              apply(
+                value === undefined ? without('default') : (slot) => ({ ...slot, default: value }),
+                false,
+              );
               if (target instanceof HTMLInputElement) {
                 target.setCustomValidity('');
+                if (value !== undefined && hashOf(value) === hashOf(shapedDefault)) {
+                  target.value = '';
+                }
               }
             } catch (error) {
               if (target instanceof HTMLInputElement) {
-                target.setCustomValidity(error instanceof Error ? error.message : String(error));
+                target.setCustomValidity(messageOf(error));
                 target.reportValidity();
               }
             }
@@ -617,20 +695,22 @@ function drawSlot(
             spec.kind,
             actions,
             (next) => {
-              set(
-                withRules(
-                  now(),
-                  alternatives(now()).map((each, at) => (at === index ? next : each)),
-                ),
+              apply(
+                (slot) =>
+                  withRules(
+                    slot,
+                    alternatives(slot).map((each, at) => (at === index ? next : each)),
+                  ),
                 true,
               );
             },
             () => {
-              set(
-                withRules(
-                  now(),
-                  alternatives(now()).filter((_each, at) => at !== index),
-                ),
+              apply(
+                (slot) =>
+                  withRules(
+                    slot,
+                    alternatives(slot).filter((_each, at) => at !== index),
+                  ),
                 true,
               );
             },
@@ -642,11 +722,12 @@ function drawSlot(
         aria-label=${rules.length === 0 ? 'Find it' : 'Or else'}
         title=${rules.length === 0 ? 'Find it' : 'Or else'}
         @click=${() => {
-          set(
-            withRules(now(), [
-              ...alternatives(now()),
-              starterRule(spec.kind, spec.kind === 'objects' ? 'per' : 'find'),
-            ]),
+          apply(
+            (slot) =>
+              withRules(slot, [
+                ...alternatives(slot),
+                starterRule(spec.kind, spec.kind === 'objects' ? 'per' : 'find'),
+              ]),
             true,
           );
         }}
@@ -656,20 +737,23 @@ function drawSlot(
       ${drawTrial(name, spec, actions)}
     </div>
     ${
-      spec.kind === 'object' || spec.kind === 'objects'
+      LISTS.includes(spec.kind)
         ? html`<div class="fields">
             <h4>Fields</h4>
             ${drawSlotList(
-              () => now().fields ?? {},
+              () => (floor === undefined ? now().fields : current().fields) ?? {},
               shipped?.fields,
               actions,
               (next, redraw) => {
-                set(
-                  Object.keys(next).length === 0 ? without('fields') : { ...now(), fields: next },
+                apply(
+                  Object.keys(next).length === 0
+                    ? without('fields')
+                    : (slot) => ({ ...slot, fields: next }),
                   redraw,
                 );
               },
               depth + 1,
+              floor === undefined ? undefined : (floor.fields ?? {}),
             )}
           </div>`
         : nothing
@@ -723,17 +807,26 @@ function drawAdd(
   </div>`;
 }
 
+function groupOf(name: string, slot: string, spec: WrittenSlot): string | undefined {
+  try {
+    return slotOf(name, slot, spec).group;
+  } catch {
+    return spec.group;
+  }
+}
+
 function drawSlotList(
-  now: () => Readonly<Record<string, SlotSpec>>,
+  now: () => Readonly<Record<string, WrittenSlot>>,
   shipped: Readonly<Record<string, SlotSpec>> | undefined,
   actions: SlotsActions,
-  set: (next: Record<string, SlotSpec>, redraw: boolean) => void,
+  set: (next: Record<string, WrittenSlot>, redraw: boolean) => void,
   depth: number,
+  within: Readonly<Record<string, SlotSpec>> | undefined,
 ): TemplateResult {
   const slots = now();
-  const groups = new Map<string, [string, SlotSpec][]>();
+  const groups = new Map<string, [string, WrittenSlot][]>();
   for (const entry of Object.entries(slots)) {
-    const group = depth === 0 ? (entry[1].group ?? 'Basics') : '';
+    const group = depth === 0 ? (groupOf(actions.name, ...entry) ?? 'Basics') : '';
     groups.set(group, [...(groups.get(group) ?? []), entry]);
   }
   return html`<div class="slot-list">
@@ -757,19 +850,26 @@ function drawSlotList(
                 );
               },
               depth,
+              within?.[name],
             ),
         )}`,
     )}
-    ${drawAdd(Object.keys(slots), (name, kind) => {
-      set({ ...now(), [name]: { kind } }, true);
-    })}
+    ${
+      within === undefined
+        ? drawAdd(Object.keys(slots), (name, kind) => {
+            set({ ...now(), [name]: { kind } }, true);
+          })
+        : nothing
+    }
   </div>`;
 }
 
-export function drawSlots(now: () => Template, actions: SlotsActions): TemplateResult {
+export function drawSlots(now: () => WrittenTemplate, actions: SlotsActions): TemplateResult {
   return html`<div class="slots-tab">
     <p class="muted">
-      A slot is what a card of this template is given, or finds on its own in its area.
+      A slot is what a card of this template is given, or finds on its own in its area. A slot that
+      names a shape takes the shape's fields, and an edit to it writes only what differs from the
+      shape.
     </p>
     ${drawSlotList(
       () => now().slots ?? {},
@@ -780,6 +880,129 @@ export function drawSlots(now: () => Template, actions: SlotsActions): TemplateR
         actions.update(Object.keys(next).length === 0 ? rest : { ...rest, slots: next }, redraw);
       },
       0,
+      undefined,
     )}
   </div>`;
 }
+
+export const SLOTS_STYLE = css`
+  .slot-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .slot-group {
+    margin: 12px 0 0;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .slot {
+    border: 1px solid var(--divider-color);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    background: var(--card-background-color);
+  }
+  .slot-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .slot-head .icon-button {
+    margin-left: auto;
+  }
+  .slot-name {
+    font-family: var(--ha-font-family-code, monospace);
+    font-size: 14px;
+  }
+  .slot-facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px 16px;
+    align-items: start;
+  }
+  .fact {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--secondary-text-color);
+  }
+  .fact input[type='checkbox'] {
+    width: 20px;
+    height: 20px;
+    margin: 6px 0;
+    accent-color: var(--primary-color);
+  }
+  .finding {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding-top: 12px;
+    border-top: 1px solid var(--divider-color);
+  }
+  .finding > .sentence,
+  .finding > .trial {
+    align-self: stretch;
+  }
+  .finding h4,
+  .fields h4 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .sentence {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+  .word-box input {
+    width: 140px;
+  }
+  .or {
+    color: var(--secondary-text-color);
+    font-size: 12px;
+  }
+  .trial {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+  }
+  .found {
+    color: var(--primary-text-color);
+  }
+  .trace {
+    flex-basis: 100%;
+    margin: 0;
+    padding-left: 18px;
+    color: var(--secondary-text-color);
+    font-size: 12px;
+  }
+  .trace .near {
+    margin: 2px 0 4px;
+    padding-left: 16px;
+  }
+  .trace .reason {
+    color: var(--primary-text-color);
+  }
+  .fields {
+    padding-left: 12px;
+    border-left: 2px solid var(--divider-color);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .add-slot {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+`;

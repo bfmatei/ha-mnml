@@ -1,13 +1,26 @@
 import { isMapping } from '../contract/templates.ts';
-import type { Template, Templates, Value } from '../contract/templates.ts';
-import { applyChanges } from '../templates/changes.ts';
+import type {
+  SlotSpec,
+  Template,
+  Templates,
+  Value,
+  WrittenSlot,
+  WrittenTemplate,
+} from '../contract/templates.ts';
+import { applyChanges, changesOf, nodeHash } from '../templates/changes.ts';
 import type { Change, Conflict } from '../templates/changes.ts';
+import type { Registries } from '../templates/discover.ts';
+import { TemplateError, toValue } from '../templates/expand.ts';
+import { SLOT_SHAPES } from '../templates/families.ts';
 import type { Role } from '../templates/roles.ts';
+import { withShapes } from '../templates/slot-shapes.ts';
+
+import type { Board, Built } from './building.ts';
 
 export type Status = 'shipped' | 'customised' | 'own' | 'conflict';
 
 export interface Kept {
-  own: Templates;
+  own: Readonly<Record<string, WrittenTemplate>>;
   changes: Readonly<Record<string, readonly Change[]>>;
 }
 
@@ -33,7 +46,7 @@ export interface Clash {
 
 export interface Draft {
   name: string;
-  template: Template;
+  template: WrittenTemplate;
   shipped: Template | undefined;
   conflicts: readonly Clash[];
   fresh?: true;
@@ -47,7 +60,58 @@ export interface Dashboard {
   config: unknown;
 }
 
+export type Entry =
+  | { kind: 'own'; template: WrittenTemplate; changes?: never }
+  | { kind: 'changes'; template?: never; changes: Change[] };
+
+export interface PanelState {
+  kept: Kept;
+  shipped: Templates;
+  shippedFailure: string | undefined;
+  resolved: Templates;
+  taken: ReadonlySet<string>;
+  registries: Registries;
+  dashboards: readonly Dashboard[];
+  built: readonly Built[] | undefined;
+  boards: readonly Board[];
+  boardsFailure: string | undefined;
+  addresses: ReadonlySet<string>;
+}
+
 const NONE: Use = { cards: 0, dashboards: [] };
+
+export function shapedOf(name: string, template: WrittenTemplate): Template {
+  return withShapes(name, template, SLOT_SHAPES);
+}
+
+export function slotOf(name: string, slot: string, spec: WrittenSlot): SlotSpec {
+  const resolved = shapedOf(name, { card: {}, slots: { [slot]: spec } }).slots?.[slot];
+  if (resolved === undefined) {
+    throw new TemplateError(`${name}: the slot ${slot} could not be resolved`);
+  }
+  return resolved;
+}
+
+export function readableOf(name: string, template: WrittenTemplate): Template {
+  const { slots: written, ...rest } = template;
+  if (written === undefined) {
+    return rest;
+  }
+  const slots = Object.fromEntries(
+    Object.entries(written).flatMap(([slot, spec]): [string, SlotSpec][] => {
+      try {
+        return [[slot, slotOf(name, slot, spec)]];
+      } catch (error) {
+        if (error instanceof TemplateError) {
+          return [];
+        }
+        throw error;
+      }
+    }),
+  );
+  return { ...rest, slots };
+}
+
 const TEMPLATE_CARD = 'custom:mnml-template-card';
 
 function walk(value: unknown, visit: (node: Record<string, Value>) => void): void {
@@ -153,4 +217,40 @@ export function describe(row: Row): string {
     );
   }
   return parts.join(' • ');
+}
+
+export function roundTrips(
+  name: string,
+  entry: Entry | undefined,
+  draft: WrittenTemplate,
+  shipped: Template | undefined,
+): boolean {
+  if (shipped === undefined || entry?.kind === 'own') {
+    return true;
+  }
+  const kept = entry === undefined ? shipped : applyChanges(shipped, entry.changes).template;
+  return nodeHash(toValue(kept)) === nodeHash(toValue(shapedOf(name, draft)));
+}
+
+export function storedAs(entry: Entry | undefined, kept: Kept, name: string): boolean {
+  const own = kept.own[name];
+  const changes = kept.changes[name];
+  if (entry === undefined) {
+    return own === undefined && changes === undefined;
+  }
+  return entry.kind === 'own'
+    ? own !== undefined && nodeHash(toValue(own)) === nodeHash(toValue(entry.template))
+    : changes !== undefined && nodeHash(toValue(changes)) === nodeHash(toValue(entry.changes));
+}
+
+export function entryOf(
+  name: string,
+  draft: WrittenTemplate,
+  shipped: Template | undefined,
+): Entry | undefined {
+  if (shipped === undefined) {
+    return { kind: 'own', template: draft };
+  }
+  const changes = changesOf(shipped, shapedOf(name, draft));
+  return changes.length === 0 ? undefined : { kind: 'changes', changes };
 }

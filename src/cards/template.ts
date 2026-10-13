@@ -7,6 +7,7 @@ import type { Templates, Value } from '../contract/templates.ts';
 import type { ChildCard } from '../ha/card-helpers.ts';
 import { isCondition, visible } from '../ha/conditions.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
+import { registriesOf } from '../ha/registries.ts';
 import { SHIPPED_TEMPLATES } from '../store/shipped.ts';
 import { knownShared, onShared, resolvedTemplates, sharedTemplates } from '../store/store.ts';
 import type { SharedState } from '../store/store.ts';
@@ -16,10 +17,9 @@ import type { Expanded } from '../templates/expand.ts';
 import { SHAPES } from '../templates/families.ts';
 
 import { requireString } from './base.ts';
-import { requireKnownKeys, schema } from './keys.ts';
+import { requireKnownKeys } from './keys.ts';
 import { announce, checkPopups, withdraw } from './parts/popup-registry.ts';
-
-const SCHEMA = schema<TemplateCard>({ type: true, template: true, area: true, slots: true });
+import { TEMPLATE_CARD } from './schemas.ts';
 
 function checked(template: string, popups: readonly Value[]): Popup[] {
   try {
@@ -102,7 +102,7 @@ export class MnmlTemplateCard extends LitElement {
   };
 
   setConfig(config: TemplateCard): void {
-    requireKnownKeys(config, SCHEMA);
+    requireKnownKeys(config, TEMPLATE_CARD);
     requireString('template', config.template);
     this.config = config;
     this.seen = [];
@@ -250,15 +250,7 @@ export class MnmlTemplateCard extends LitElement {
       if (area !== undefined && !Object.hasOwn(hass.areas, area)) {
         throw new Error(`${config.template}: no area named ${area}`);
       }
-      const found =
-        template === undefined
-          ? {}
-          : discover(template, area, {
-              areas: hass.areas,
-              devices: hass.devices,
-              entities: hass.entities,
-              states: hass.states,
-            });
+      const found = template === undefined ? {} : discover(template, area, registriesOf(hass));
       return this.complete(config, expand(all, { template: config.template, slots }, found, later));
     } catch (error) {
       return {

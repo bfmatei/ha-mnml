@@ -1,9 +1,9 @@
 import type { CarChoice, PersonChoice, RoomChoice, SystemChoice } from '../contract/builder.ts';
 import { isMapping } from '../contract/templates.ts';
 import type { Templates, Value } from '../contract/templates.ts';
-import { overridesOf } from '../editors/fill.ts';
 import { discover } from '../templates/discover.ts';
 import type { Registries } from '../templates/discover.ts';
+import { overridesOf } from '../templates/overrides.ts';
 
 import { personOf } from './person.ts';
 
@@ -23,10 +23,12 @@ function kept<T extends object>(
 
 export function roomFrom(room: RoomChoice, config: Record<string, Value>): RoomChoice {
   const area = config['area'];
-  return kept(
-    { area: typeof area === 'string' && area !== '' ? area : room.area },
-    slotsIn(config),
-  );
+  if (typeof area === 'string' && area !== '') {
+    return kept({ area }, slotsIn(config));
+  }
+  return room.spelled === true
+    ? { slots: slotsIn(config) ?? {}, spelled: true }
+    : kept({ area: room.area }, slotsIn(config));
 }
 
 export function personFrom(
@@ -34,6 +36,9 @@ export function personFrom(
   config: Record<string, Value>,
   registries: Registries,
 ): PersonChoice {
+  if (person.spelled === true) {
+    return { entity: person.entity, slots: slotsIn(config) ?? {}, spelled: true };
+  }
   return kept(
     { entity: person.entity },
     overridesOf(personOf(registries, person.entity), slotsIn(config) ?? {}),
@@ -47,6 +52,9 @@ export function systemFrom(
   templates: Templates,
 ): SystemChoice {
   const slots = slotsIn(config);
+  if (choice.spelled === true) {
+    return { template: choice.template, slots: slots ?? {}, spelled: true };
+  }
   const template = templates[choice.template];
   if (slots === undefined || template === undefined) {
     return { template: choice.template };

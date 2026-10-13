@@ -19,9 +19,12 @@ export interface Filter {
   entity_category?: 'none' | 'diagnostic' | 'config';
   unit?: string;
   state_class?: string;
+  attribute?: Record<string, string>;
   name?: string;
   manufacturer?: string;
   model?: string;
+  entry_type?: 'none' | 'service';
+  integration?: string;
   label?: string;
   exclude?: Filter;
 }
@@ -45,6 +48,8 @@ export interface ObjectsRule {
 }
 
 export interface ObjectRule {
+  device?: Filter | Filter[];
+  scope?: 'area' | 'all';
   fields: Record<string, Rule>;
 }
 
@@ -64,12 +69,36 @@ export interface SlotSpec {
 export interface Template {
   description?: string;
   slots?: Record<string, SlotSpec>;
+  retired?: string[];
   card: Value;
   popups?: Value[];
   example?: Record<string, Value>;
 }
 
 export type Templates = Readonly<Record<string, Template>>;
+
+export interface WrittenSlot {
+  shape?: string;
+  kind?: Kind;
+  required?: true;
+  default?: Value;
+  discover?: Rule;
+  label?: string;
+  help?: string;
+  group?: string;
+  fields?: Record<string, WrittenSlot>;
+}
+
+export interface WrittenTemplate {
+  description?: string;
+  slots?: Record<string, WrittenSlot>;
+  retired?: string[];
+  card: Value;
+  popups?: Value[];
+  example?: Record<string, Value>;
+}
+
+export type Shapes = Readonly<Record<string, WrittenSlot>>;
 
 export interface Instance {
   template: string;
@@ -82,6 +111,18 @@ export function isTemplate(value: unknown): value is Template {
 
 export function isMapping(value: unknown): value is Record<string, Value> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+export function isStorable(value: unknown, shipped = false): value is Template {
+  if (!isMapping(value)) {
+    return false;
+  }
+  const card = value['card'];
+  if (!isMapping(card) && !(shipped && Array.isArray(card))) {
+    return false;
+  }
+  const popups = value['popups'];
+  return popups === undefined || (Array.isArray(popups) && popups.every(isMapping));
 }
 
 export const PART_KEY = '_part';

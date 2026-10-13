@@ -123,25 +123,27 @@ test('a folding list is folded while no row needs you, its heading kept', async 
 
 test('unfolding a list scrolls it into view, and folding it does not', async () => {
   const shown = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => undefined);
-  const out = await paint(BATTERIES, HEALTHY);
-  const chevron = heading(out)?.querySelector<HTMLElement>('.chevron');
-  chevron?.click();
-  await vi.waitFor(() => {
+  vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame'] });
+  try {
+    const out = await paint(BATTERIES, HEALTHY);
+    const chevron = heading(out)?.querySelector<HTMLElement>('.chevron');
+    chevron?.click();
+    await vi.runAllTimersAsync();
     assert.equal(shown.mock.calls.length, 1);
-  });
-  assert.equal(shown.mock.contexts[0] instanceof HTMLElement, true);
-  assert.equal(
-    shown.mock.contexts[0] instanceof HTMLElement &&
-      shown.mock.contexts[0].classList.contains('section'),
-    true,
-  );
-  assert.deepEqual(shown.mock.calls[0]?.[0], { block: 'nearest', behavior: 'instant' });
-  heading(out)?.querySelector<HTMLElement>('.chevron')?.click();
-  await new Promise((resolve) => {
-    setTimeout(resolve, 100);
-  });
-  assert.equal(shown.mock.calls.length, 1);
-  shown.mockRestore();
+    assert.equal(shown.mock.contexts[0] instanceof HTMLElement, true);
+    assert.equal(
+      shown.mock.contexts[0] instanceof HTMLElement &&
+        shown.mock.contexts[0].classList.contains('section'),
+      true,
+    );
+    assert.deepEqual(shown.mock.calls[0]?.[0], { block: 'nearest', behavior: 'instant' });
+    heading(out)?.querySelector<HTMLElement>('.chevron')?.click();
+    await vi.runAllTimersAsync();
+    assert.equal(shown.mock.calls.length, 1);
+  } finally {
+    vi.useRealTimers();
+    shown.mockRestore();
+  }
 });
 
 test('it unfolds by itself while a row is orange or red', async () => {
@@ -342,4 +344,32 @@ test('a summary the list does not know is an error card', () => {
   assert.throws(() => {
     made.setConfig({ ...BATTERIES, summary: { column: 0 } } as never);
   }, /summary must be lowest, highest or/);
+});
+
+test("a row's reset presses its button, through the hass of the moment", async () => {
+  const drawn: { domain: string; service: string; target: unknown }[] = [];
+  const now: { domain: string; service: string; target: unknown }[] = [];
+  const base = hassOf({ 'sensor.filter_days': ['12', 'd'] });
+  const hass = (calls: typeof now): unknown => ({
+    ...(base as Record<string, unknown>),
+    callService: (domain: string, service: string, _data: unknown, target: unknown) => {
+      calls.push({ domain, service, target });
+      return Promise.resolve();
+    },
+  });
+  const made = card();
+  made.setConfig({
+    type: 'custom:mnml-list-card',
+    rows: [{ entity: 'sensor.filter_days', reset: 'button.filter_reset' }],
+  } as never);
+  made.hass = hass(drawn) as never;
+  const root = await mounted(made);
+  made.hass = hass(now) as never;
+  const reset = root.querySelector<HTMLElement>('button.reset');
+  assert.equal(reset?.getAttribute('aria-label'), 'Reset sensor.filter_days');
+  reset?.click();
+  assert.deepEqual(drawn, []);
+  assert.deepEqual(now, [
+    { domain: 'button', service: 'press', target: { entity_id: 'button.filter_reset' } },
+  ]);
 });

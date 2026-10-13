@@ -5,7 +5,7 @@ import type { TemplateResult } from 'lit';
 import { test } from 'vitest';
 
 import { isMapping } from '../contract/templates.ts';
-import type { Template } from '../contract/templates.ts';
+import type { Template, WrittenTemplate } from '../contract/templates.ts';
 import { readTemplates } from '../templates/shipped.ts';
 import { drawn } from '../test/render.ts';
 
@@ -36,7 +36,7 @@ const TILE: Template = {
   },
 };
 
-const rowOf = (template: Template, shipped: Template | undefined, id: string) =>
+const rowOf = (template: WrittenTemplate, shipped: Template | undefined, id: string) =>
   simpleOf(template, shipped).find((row) => row.path.at(-1) === `#${id}`);
 
 test("a template's parts are rows to switch, with their conditions and their literal looks", () => {

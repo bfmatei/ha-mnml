@@ -10,11 +10,10 @@ import { navigate, offerOrigin, prebuild } from '../ha/navigation.ts';
 import { onPress, stateIcon } from '../ha/templates.ts';
 
 import { MnmlCard, requireString } from './base.ts';
-import { marked, variant } from './keys.ts';
 import type { KeySchema } from './keys.ts';
 import { renderControls, requireControls } from './parts/controls.ts';
-import { ITEM_STYLE, itemRow } from './parts/item.ts';
-import { CONTROLS, ITEM, STATE_ITEMS } from './schemas.ts';
+import { ITEM_STYLE, itemLine } from './parts/item.ts';
+import { TILE_CARD } from './schemas.ts';
 import { BASE_STYLE } from './styles.ts';
 
 const TILE_STYLE = css`
@@ -48,52 +47,54 @@ const TILE_STYLE = css`
   .tile > .row {
     position: relative;
     grid-column: 1 / -1;
-    justify-content: space-between;
+    gap: 8px;
+    min-height: 36px;
+    padding: 4px;
     background: var(--m-pill);
     box-shadow: var(--m-well);
     border-radius: 14px;
   }
   .tile > .row > .pill {
-    background: var(--m-raised);
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: none;
     box-shadow: none;
+  }
+  .tile > .row > .pill ha-icon,
+  .tile > .row > .pill ha-state-icon,
+  .tile > .row > .pill ha-attribute-icon {
+    --mdc-icon-size: 18px;
+  }
+  .tile > .row > .line {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .tile > .row > .line > .name {
+    font-size: 14px;
+  }
+  .tile > .row .control {
+    min-width: 28px;
+    height: 28px;
+    border-radius: 50%;
+  }
+  .tile > .row .control ha-icon,
+  .tile > .row .control ha-state-icon,
+  .tile > .row .control ha-attribute-icon {
+    --mdc-icon-size: 16px;
+  }
+  .tile > .row > .overlay {
+    padding: 0;
+    border-radius: inherit;
+    --m-slider-height: 36px;
   }
   .tile:active:not(:has(.control:active, .pill.link:active, .row.link:active))::before {
     opacity: 1;
   }
 `;
-
-const NESTED = { state: STATE_ITEMS, chips: CONTROLS, item: ITEM };
-
-const SCHEMA = marked(
-  {
-    name: variant<Extract<TileCard, { name: string }>>(
-      {
-        type: true,
-        popup: true,
-        state: true,
-        chips: true,
-        item: true,
-        entity: true,
-        name: true,
-        icon: true,
-      },
-      NESTED,
-    ),
-  },
-  variant<Extract<TileCard, { name?: never }>>(
-    {
-      type: true,
-      popup: true,
-      state: true,
-      chips: true,
-      item: true,
-      entity: true,
-      label: true,
-      icon: true,
-    },
-    NESTED,
-  ),
-);
 
 export class MnmlTileCard extends MnmlCard<TileCard> {
   static override styles = [BASE_STYLE, ...ITEM_STYLE, TILE_STYLE];
@@ -109,7 +110,7 @@ export class MnmlTileCard extends MnmlCard<TileCard> {
   }
 
   protected schema(): KeySchema {
-    return SCHEMA;
+    return TILE_CARD;
   }
 
   protected override validate(config: TileCard): void {
@@ -142,7 +143,7 @@ export class MnmlTileCard extends MnmlCard<TileCard> {
         <div class="state">${stateLine(hass, config.entity, config.state)}</div>
       </div>
       ${renderControls(config.chips, { hass, host: this }, 'lane chips') ?? nothing}
-      ${config.item === undefined ? nothing : itemRow(hass, config.item, this)}
+      ${config.item === undefined ? nothing : itemLine(hass, config.item, this)}
     </div>`;
   }
 }

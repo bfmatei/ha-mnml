@@ -1,12 +1,12 @@
+import { CONTROL } from '../contract/structure.ts';
 import { isMapping } from '../contract/templates.ts';
 import type { Rule, SlotSpec, Template, Value } from '../contract/templates.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
+import { registriesOf } from '../ha/registries.ts';
 import { discover } from '../templates/discover.ts';
 import { filled } from '../templates/expand.ts';
 
 import { singular, slotLabel } from './fill.ts';
-import { CONTROL } from './kinds.ts';
-import { entities, entity, flag, icon, need, number, part, parts, text, texts } from './shape.ts';
 import type { Field, PlainShape } from './shape.ts';
 
 const TEMPLATE_CARD = 'custom:mnml-template-card';
@@ -22,48 +22,40 @@ function domainsOf(rule: Rule | undefined): readonly string[] | undefined {
 function fieldOf(spec: SlotSpec, id: string, name: string): Field | undefined {
   const base = ((): Field | undefined => {
     switch (spec.kind) {
-      case 'text': {
-        return text();
-      }
-      case 'texts': {
-        return texts();
-      }
-      case 'number': {
-        return number();
-      }
-      case 'icon': {
-        return icon();
-      }
+      case 'text':
+      case 'texts':
+      case 'number':
+      case 'icon':
       case 'flag': {
-        return flag();
+        return { kind: spec.kind };
       }
-      case 'entity': {
-        return entity(domainsOf(spec.discover));
-      }
+      case 'entity':
       case 'entities': {
-        return entities(domainsOf(spec.discover));
+        return { kind: spec.kind, domains: domainsOf(spec.discover) };
       }
       case 'object': {
         return spec.fields === undefined
           ? undefined
-          : part(
-              slotsShape(
+          : {
+              kind: 'part',
+              of: slotsShape(
                 spec.fields,
                 `${id}=${JSON.stringify(spec.fields)}`,
                 slotLabel(name, spec),
               ),
-            );
+            };
       }
       case 'objects': {
         return spec.fields === undefined
           ? undefined
-          : parts(
-              slotsShape(
+          : {
+              kind: 'parts',
+              of: slotsShape(
                 spec.fields,
                 `${id}=${JSON.stringify(spec.fields)}`,
                 singular(slotLabel(name, spec)),
               ),
-            );
+            };
       }
     }
   })();
@@ -73,7 +65,7 @@ function fieldOf(spec: SlotSpec, id: string, name: string): Field | undefined {
   const labelled = { ...base, label: slotLabel(name, spec) };
   const withDefault =
     spec.default === undefined ? labelled : { ...labelled, default: spec.default };
-  return spec.required === true ? need(withDefault) : withDefault;
+  return spec.required === true ? { ...withDefault, required: true } : withDefault;
 }
 
 export function slotsShape(
@@ -126,12 +118,7 @@ export function previewConfig(
     required.length > 0 &&
     required.every(([, spec]) => spec.discover !== undefined)
   ) {
-    const registries = {
-      areas: hass.areas,
-      devices: hass.devices,
-      entities: hass.entities,
-      states: hass.states,
-    };
+    const registries = registriesOf(hass);
     const fitting = Object.values(hass.areas).flatMap((area) => {
       const found = discover(template, area.area_id, registries);
       return required.every(([slot]) => filled(found[slot]))

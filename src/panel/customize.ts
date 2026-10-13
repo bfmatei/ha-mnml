@@ -5,6 +5,8 @@ import type { Value } from '../contract/templates.ts';
 import { field } from '../ha/field.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
 
+let opened = 0;
+
 interface Editable {
   getConfigElement(): Promise<unknown>;
 }
@@ -50,7 +52,9 @@ export async function customize(
     }
   });
   const dialog = document.createElement('dialog');
+  const named = `mnml-customize-${(opened += 1)}`;
   dialog.className = 'dialog customize';
+  dialog.setAttribute('aria-labelledby', named);
   const { promise, resolve } = Promise.withResolvers<Record<string, Value> | undefined>();
   let problem: string | undefined;
   const close = (value: Record<string, Value> | undefined): void => {
@@ -60,7 +64,7 @@ export async function customize(
   };
   const draw = (): void => {
     render(
-      html`<h2>${title}</h2>
+      html`<h2 id=${named}>${title}</h2>
         <div class="customize-body">${editor}</div>
         ${problem === undefined ? nothing : html`<p class="problem-line">${problem}</p>`}
         <div class="dialog-actions">

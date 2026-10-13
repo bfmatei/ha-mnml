@@ -33,7 +33,15 @@ export function createShipped(
   const familiesOf = (names: readonly string[]): string[] => [
     ...new Set(names.flatMap((name) => owner[name] ?? [])),
   ];
+  const expire = (family: string): void => {
+    const failure = failed.get(family);
+    if (failure !== undefined && !failure.missing && now() - failure.at >= RETRY_AFTER) {
+      failed.delete(family);
+      pending.delete(family);
+    }
+  };
   const fetchFamily = (family: string): Promise<void> => {
+    expire(family);
     const known = pending.get(family);
     if (known !== undefined) {
       return known;
@@ -57,15 +65,6 @@ export function createShipped(
     pending.set(family, started);
     return started;
   };
-  const stillFailed = (family: string): Failure | undefined => {
-    const failure = failed.get(family);
-    if (failure === undefined || failure.missing || now() - failure.at < RETRY_AFTER) {
-      return failure;
-    }
-    failed.delete(family);
-    pending.delete(family);
-    return undefined;
-  };
   return {
     templates: () => merged,
     later: () => new Set(Object.keys(owner).filter((name) => !loaded.has(owner[name] ?? ''))),
@@ -78,7 +77,8 @@ export function createShipped(
     },
     failure: (names) => {
       for (const family of familiesOf(names)) {
-        const failure = stillFailed(family);
+        expire(family);
+        const failure = failed.get(family);
         if (failure !== undefined) {
           return `mnml: the shipped templates could not be loaded: ${failure.reason}`;
         }

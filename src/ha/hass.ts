@@ -30,6 +30,8 @@ interface DeviceRegistryEntry {
   serial_number?: string | null;
   manufacturer?: string | null;
   model?: string | null;
+  entry_type?: string | null;
+  via_device_id?: string | null;
   labels?: string[];
 }
 
@@ -57,6 +59,8 @@ export interface HomeAssistant {
   entities: Readonly<Record<string, EntityRegistryEntry>>;
   devices: Readonly<Record<string, DeviceRegistryEntry>>;
   locale: { language: string };
+  config: { state: string };
+  localize(key: string, values?: Record<string, unknown>): string;
   formatEntityState(stateObj: HassEntity, state?: string): string;
   formatEntityAttributeValue(stateObj: HassEntity, attribute: string, value?: unknown): string;
   callApi(method: 'GET', path: string): Promise<unknown>;

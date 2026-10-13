@@ -393,7 +393,7 @@ const SECTION_TITLES = {
   rooms: 'Rooms',
   people: 'People',
   garage: 'Garage',
-  infrastructure: 'Infrastructure',
+  system: 'Infrastructure',
 } as const;
 
 const ROOMS: readonly Room[] = [

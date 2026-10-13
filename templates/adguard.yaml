@@ -79,7 +79,8 @@ adguard:
       - id: toggle
         type: toggle
         entity: '[[protection]]'
-        color: amber
+        color: orange
+        when: { is: ['off'] }
     grid_options: { columns: 12 }
   popups:
     - id: adguard-popup

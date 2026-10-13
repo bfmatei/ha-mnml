@@ -3,7 +3,7 @@ import type { TemplateResult } from 'lit';
 import { live } from 'lit/directives/live.js';
 
 import { isMapping } from '../contract/templates.ts';
-import type { Template, Value } from '../contract/templates.ts';
+import type { Template, Value, WrittenTemplate } from '../contract/templates.ts';
 import { COLORS } from '../editors/lists.ts';
 import { field } from '../ha/field.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
@@ -73,7 +73,7 @@ function looksOf(part: Part, shipped: Template | undefined): SimpleLook[] {
   );
 }
 
-function listAt(template: Template | undefined, path: Path): Value[] {
+function listAt(template: WrittenTemplate | undefined, path: Path): Value[] {
   const found = template === undefined ? undefined : valueAt(template, path);
   return Array.isArray(found) ? found : [];
 }
@@ -197,7 +197,7 @@ function walk(
 }
 
 export function simpleOf(
-  template: Template,
+  template: WrittenTemplate,
   shipped: Template | undefined,
   kept: Kept = new Map(),
 ): SimpleRow[] {
@@ -215,16 +215,16 @@ export function simpleOf(
   return rows;
 }
 
-export function switchedOff(template: Template, path: Path): Template {
+export function switchedOff(template: WrittenTemplate, path: Path): WrittenTemplate {
   return withValue(template, path, undefined);
 }
 
 export function switchedOn(
-  template: Template,
+  template: WrittenTemplate,
   shipped: Template | undefined,
   path: Path,
   kept: KeptPart | undefined,
-): Template {
+): WrittenTemplate {
   const listPath = path.slice(0, -1);
   const segment = path.at(-1) ?? '';
   const value = kept?.value ?? (shipped === undefined ? undefined : valueAt(shipped, path));
@@ -249,7 +249,7 @@ export function switchedOn(
   );
 }
 
-export function keptPart(template: Template, path: Path): KeptPart {
+export function keptPart(template: WrittenTemplate, path: Path): KeptPart {
   const list = listAt(template, path.slice(0, -1));
   const index = list.findIndex((item) => `#${idOf(item) ?? ''}` === path.at(-1));
   const before = index > 0 ? list[index - 1] : undefined;

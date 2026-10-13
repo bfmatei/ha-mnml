@@ -110,27 +110,32 @@ def section_order(value: list[str]) -> list[str]:
 
 
 ORDER = vol.All([vol.In(SECTION_KEYS)], section_order)
+PERSON = vol.All(str, vol.Match(r"\Aperson\.[a-z0-9_]+\Z"))
+FOUND = {vol.Optional("slots"): dict}
+TRUE = vol.All(bool, vol.In([True]))
+SPELLED = {vol.Required("slots"): dict, vol.Required("spelled"): TRUE}
+
+
+def found_or_spelled(subject: dict[Any, Any]) -> vol.Any:
+    return vol.Any(vol.Schema({**subject, **FOUND}), vol.Schema({**subject, **SPELLED}))
+
+
 PLAN = vol.Schema(
     {
         vol.Required("title"): TEXT,
         vol.Required("icon"): ICON,
+        vol.Optional("glances"): found_or_spelled({}),
         vol.Required("rooms"): [
-            vol.Schema({vol.Required("area"): TEXT, vol.Optional("slots"): dict})
-        ],
-        vol.Required("people"): [
-            vol.Schema(
-                {
-                    vol.Required("entity"): vol.All(str, vol.Match(r"\Aperson\.[a-z0-9_]+\Z")),
-                    vol.Optional("slots"): dict,
-                }
+            vol.Any(
+                vol.Schema({vol.Required("area"): TEXT, **FOUND}),
+                vol.Schema(SPELLED),
             )
         ],
+        vol.Required("people"): [found_or_spelled({vol.Required("entity"): PERSON})],
         vol.Required("cars"): [
             vol.Schema({vol.Required("key"): NAME, vol.Required("slots"): dict})
         ],
-        vol.Required("system"): [
-            vol.Schema({vol.Required("template"): NAME, vol.Optional("slots"): dict})
-        ],
+        vol.Required("system"): [found_or_spelled({vol.Required("template"): NAME})],
         vol.Required("open"): vol.Schema(
             {vol.Optional(device): OPENING for device in ("phone", "tablet", "desktop")}
         ),

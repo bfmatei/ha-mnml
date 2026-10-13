@@ -1,6 +1,6 @@
 import { LitElement, css, html, nothing } from 'lit';
 import type { CSSResultGroup, TemplateResult } from 'lit';
-import { property, state } from 'lit/decorators.js';
+import { property, query, queryAll, state } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
 
 import { BASE_STYLE } from '../cards/styles.ts';
@@ -74,12 +74,24 @@ const ROW_MENU_STYLE = css`
   }
 `;
 
+const STEPS: Readonly<Record<string, (at: number, count: number) => number>> = {
+  ArrowDown: (at) => at + 1,
+  ArrowUp: (at) => at - 1,
+  Home: () => 0,
+  End: (_, count) => count - 1,
+};
+
 export class MnmlRowMenu extends LitElement {
   static override styles: CSSResultGroup = [BASE_STYLE, ROW_MENU_STYLE];
 
   @property({ attribute: false }) label = '';
   @property({ attribute: false }) items: readonly MenuItem[] = [];
   @state() private open = false;
+  @query('.row-menu-button') private button: HTMLButtonElement | null | undefined;
+  @query('.row-menu-list') private list: HTMLElement | null | undefined;
+  @queryAll('.row-menu-item:not(:disabled)') private usable:
+    | NodeListOf<HTMLButtonElement>
+    | undefined;
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
@@ -98,6 +110,8 @@ export class MnmlRowMenu extends LitElement {
         class="row-menu-button"
         aria-label=${more}
         title=${more}
+        aria-haspopup="menu"
+        aria-expanded=${String(this.open)}
         @click=${quietly(this.toggle)}
       >
         ${icon('mdi:dots-vertical')}
@@ -136,13 +150,13 @@ export class MnmlRowMenu extends LitElement {
     this.open = true;
     void this.updateComplete.then(() => {
       this.place();
+      this.usable?.[0]?.focus();
     });
   };
 
   private place(): void {
-    const list = this.renderRoot.querySelector<HTMLElement>('.row-menu-list');
-    const button = this.renderRoot.querySelector<HTMLElement>('.row-menu-button');
-    if (list === null || button === null || !this.open) {
+    const { list, button } = this;
+    if (!this.open || !list || !button) {
       return;
     }
     if (typeof list.showPopover === 'function' && !list.matches(':popover-open')) {
@@ -161,8 +175,7 @@ export class MnmlRowMenu extends LitElement {
     if (event.composedPath().includes(this)) {
       return;
     }
-    const button = this.renderRoot.querySelector<HTMLElement>('.row-menu-button');
-    const anchor = button?.getBoundingClientRect();
+    const anchor = this.button?.getBoundingClientRect();
     if (anchor === undefined || anchor.bottom < 0 || anchor.top > window.innerHeight) {
       this.close();
       return;
@@ -174,7 +187,7 @@ export class MnmlRowMenu extends LitElement {
     window.removeEventListener('pointerdown', this.outside, true);
     window.removeEventListener('scroll', this.scrolled, true);
     window.removeEventListener('resize', this.scrolled);
-    const list = this.renderRoot.querySelector<HTMLElement>('.row-menu-list');
+    const list = this.list;
     if (typeof list?.hidePopover === 'function' && list.matches(':popover-open')) {
       list.hidePopover();
     }
@@ -188,10 +201,23 @@ export class MnmlRowMenu extends LitElement {
   };
 
   private readonly pressed = (event: KeyboardEvent): void => {
-    if (event.key === 'Escape' && this.open) {
+    if (!this.open) {
+      return;
+    }
+    if (event.key === 'Escape') {
       event.stopPropagation();
       this.close();
+      this.button?.focus();
+      return;
     }
+    const items = [...(this.usable ?? [])];
+    const at = items.findIndex((item) => item === this.shadowRoot?.activeElement);
+    const to = STEPS[event.key]?.(at, items.length);
+    if (to === undefined || items.length === 0) {
+      return;
+    }
+    event.preventDefault();
+    items[(to + items.length) % items.length]?.focus();
   };
 
   private readonly left = (event: FocusEvent): void => {

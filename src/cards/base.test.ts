@@ -34,6 +34,12 @@ define('mnml-probe-card', ProbeCard);
 const ENTITIES = {};
 const DEVICES = {};
 const LOCALE = { language: 'en' };
+const FORMATTERS = {
+  config: { state: 'RUNNING' },
+  localize: (): string => '',
+  formatEntityState: (): string => '',
+  formatEntityAttributeValue: (): string => '',
+};
 
 function hassOf(states: Record<string, unknown>): HomeAssistant {
   return {
@@ -169,4 +175,33 @@ test('a change that came during a hold is drawn when the card comes back to the 
   document.body.append(card);
   await card.updateComplete;
   assert.equal(text(card.shadowRoot), '');
+});
+
+test('a new language or formatter draws the card again, though no state it watches changed', async () => {
+  const states = { 'light.a': { entity_id: 'light.a', state: 'on', attributes: {} } };
+  const same = { states, entities: ENTITIES, devices: DEVICES, locale: LOCALE, ...FORMATTERS };
+  const hass = (changes: Record<string, unknown>): HomeAssistant =>
+    ({ ...same, ...changes }) as unknown as HomeAssistant;
+  const card = probe();
+  card.setConfig({ type: 'probe', entity: 'light.a' });
+  card.hass = hass({});
+  await mounted(card);
+  const redraws = async (changes: Record<string, unknown>): Promise<boolean> => {
+    const before = card.draws;
+    card.hass = hass(changes);
+    await card.updateComplete;
+    card.hass = hass({});
+    await card.updateComplete;
+    return card.draws > before;
+  };
+  assert.equal(await redraws({}), false, 'the same hass draws nothing');
+  assert.equal(await redraws({ localize: (): string => '' }), true, 'localize');
+  assert.equal(await redraws({ formatEntityState: (): string => '' }), true, 'state formatter');
+  assert.equal(
+    await redraws({ formatEntityAttributeValue: (): string => '' }),
+    true,
+    'attribute formatter',
+  );
+  assert.equal(await redraws({ config: { state: 'NOT_RUNNING' } }), true, 'core state');
+  card.remove();
 });

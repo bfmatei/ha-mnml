@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import { html, render } from 'lit';
+import { html, nothing, render } from 'lit';
 import { afterEach, beforeEach, test, vi } from 'vitest';
 
 import { MnmlTooltip, tip, tipOf } from './tooltip.ts';
@@ -83,5 +83,22 @@ test('Escape closes it, and a tooltip taken away is not shown', async () => {
   render(html`<button ${tip(undefined)}>Go</button>`, host);
   button.dispatchEvent(new Event('pointerenter'));
   await vi.advanceTimersByTimeAsync(450);
+  assert.equal(bubble()?.shown, false);
+});
+
+test('a tooltip whose element a redraw takes away closes with it', async () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  const draw = (alarm: boolean): void => {
+    render(html`${alarm ? html`<button ${tip('Doors: open')}>Doors</button>` : nothing}`, host);
+  };
+  draw(true);
+  const button = host.querySelector('button');
+  assert.ok(button);
+  button.dispatchEvent(new Event('pointerenter'));
+  await vi.advanceTimersByTimeAsync(450);
+  assert.ok(bubble()?.shown);
+  draw(false);
+  assert.equal(button.isConnected, false);
   assert.equal(bubble()?.shown, false);
 });

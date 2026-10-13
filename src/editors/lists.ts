@@ -1,37 +1,6 @@
-import type { AgendaSource, Color, ModeAttribute, SliderKind } from '../contract/cards.ts';
 import type { ServiceName } from '../contract/entities.ts';
 
-export const COLORS: readonly string[] = Object.keys({
-  red: true,
-  orange: true,
-  amber: true,
-  blue: true,
-} satisfies Record<Color, true>);
-
-export const SLIDER_KINDS: readonly string[] = Object.keys({
-  brightness: true,
-  color_temp: true,
-  hue: true,
-  temperature: true,
-  value: true,
-  volume: true,
-  position: true,
-  percentage: true,
-  humidity: true,
-} satisfies Record<SliderKind, true>);
-
-export const MODE_ATTRIBUTES: readonly string[] = Object.keys({
-  hvac_modes: true,
-  preset_modes: true,
-  fan_modes: true,
-  swing_modes: true,
-  swing_horizontal_modes: true,
-} satisfies Record<ModeAttribute, true>);
-
-export const AGENDA_KINDS: readonly string[] = Object.keys({
-  episodes: true,
-  movies: true,
-} satisfies Record<AgendaSource['kind'], true>);
+export { COLORS } from '../contract/structure.ts';
 
 export const SERVICES: readonly string[] = Object.keys({
   'alarm_control_panel.alarm_arm_away': true,

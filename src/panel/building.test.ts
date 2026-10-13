@@ -183,6 +183,40 @@ test('a rebuild MNML refuses to keep leaves the cards as they are', async () => 
   );
 });
 
+test('a rebuild whose cards Home Assistant refuses puts back the plan and the version before it', async () => {
+  const { call, sent } = recorder({
+    'lovelace/config': BEFORE,
+    'lovelace/config/save': new Error('Cannot save'),
+  });
+  const older = { plan: { ...PLAN, title: 'Old' }, config: CONFIG };
+  const plan: Plan = { ...PLAN, title: 'Our flat' };
+  await assert.rejects(
+    rebuildDashboard(call, { ...BUILT, previous: older }, BOARD, plan, CONFIG),
+    /Cannot save/,
+  );
+  assert.deepEqual(sent.at(-1), {
+    type: 'mnml/dashboards/save',
+    url_path: 'dashboard-home',
+    plan: PLAN,
+    previous: older,
+  });
+});
+
+test('a dashboard made again that Home Assistant refuses keeps the version before it too', async () => {
+  const { call, sent } = recorder({ 'lovelace/dashboards/create': new Error('taken') });
+  const older = { plan: { ...PLAN, title: 'Old' }, config: CONFIG };
+  await assert.rejects(
+    rebuildDashboard(call, { ...BUILT, previous: older }, undefined, PLAN, CONFIG),
+    /taken/,
+  );
+  assert.deepEqual(sent.at(-1), {
+    type: 'mnml/dashboards/save',
+    url_path: 'dashboard-home',
+    plan: PLAN,
+    previous: older,
+  });
+});
+
 test('a rebuild with the same title and icon leaves the dashboard entry alone', async () => {
   const { call, sent } = recorder({ 'lovelace/config': BEFORE });
   await rebuildDashboard(call, BUILT, BOARD, PLAN, CONFIG);

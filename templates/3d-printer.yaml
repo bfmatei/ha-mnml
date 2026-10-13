@@ -2,15 +2,10 @@
   description: A 3D printer's Cancel, Pause, Resume and Continue buttons, each shown in the job state it applies to.
   slots:
     entity: { kind: entity, required: true }
-    actions:
-      kind: object
-      fields:
-        pause: { kind: entity }
-        resume: { kind: entity }
-        continue: { kind: entity }
-        cancel: { kind: entity }
+    actions: { shape: printer3d_actions }
   card:
     - id: cancel
+      if: actions.cancel
       type: service
       entity: '[[actions.cancel]]'
       service: button.press
@@ -18,6 +13,7 @@
       icon: mdi:stop
       show: { entity: '[[entity]]', is: [printing, paused, attention] }
     - id: pause
+      if: actions.pause
       type: service
       entity: '[[actions.pause]]'
       service: button.press
@@ -25,6 +21,7 @@
       icon: mdi:pause
       show: { entity: '[[entity]]', is: [printing] }
     - id: resume
+      if: actions.resume
       type: service
       entity: '[[actions.resume]]'
       service: button.press
@@ -32,6 +29,7 @@
       icon: mdi:play
       show: { entity: '[[entity]]', is: [paused] }
     - id: continue
+      if: actions.continue
       type: service
       entity: '[[actions.continue]]'
       service: button.press
@@ -52,46 +50,7 @@
   description: A 3D printer as an item, its outlet or its state and job progress, opening its pop-up.
   slots:
     key: { kind: text, required: true }
-    printer3d:
-      kind: object
-      required: true
-      fields:
-        entity: { kind: entity, required: true }
-        progress: { kind: entity }
-        filename: { kind: entity }
-        material: { kind: entity }
-        speed: { kind: entity }
-        start: { kind: entity }
-        finish: { kind: entity }
-        nozzle:
-          kind: object
-          fields:
-            temperature: { kind: entity }
-            target: { kind: entity }
-        bed:
-          kind: object
-          fields:
-            temperature: { kind: entity }
-            target: { kind: entity }
-        camera: { kind: entity }
-        actions:
-          kind: object
-          required: true
-          fields:
-            pause: { kind: entity }
-            resume: { kind: entity }
-            continue: { kind: entity }
-            cancel: { kind: entity }
-        outlet:
-          kind: object
-          fields:
-            entity: { kind: entity, required: true }
-            energy:
-              kind: object
-              fields:
-                power: { kind: entity }
-                today: { kind: entity }
-                total: { kind: entity }
+    printer3d: { shape: printer3d, required: true }
   card:
     type: custom:mnml-entity-card
     entity: '[[printer3d.entity]]'
@@ -106,6 +65,7 @@
         if: printer3d.outlet
         when: { entity: '[[printer3d.outlet.entity]]', not: ['off'] }
       - id: printer3d-progress
+        if: printer3d.progress
         entity: '[[printer3d.progress]]'
         when: { entity: '[[printer3d.entity]]', is: [printing, paused, attention] }
     popup: '#[[key]]-3d-printer'
@@ -138,48 +98,7 @@
   slots:
     key: { kind: text, required: true }
     name: { kind: text, required: true }
-    printer3d:
-      kind: object
-      required: true
-      fields:
-        entity: { kind: entity, required: true }
-        progress: { kind: entity, required: true }
-        filename: { kind: entity, required: true }
-        material: { kind: entity, required: true }
-        speed: { kind: entity, required: true }
-        start: { kind: entity, required: true }
-        finish: { kind: entity, required: true }
-        nozzle:
-          kind: object
-          required: true
-          fields:
-            temperature: { kind: entity, required: true }
-            target: { kind: entity }
-        bed:
-          kind: object
-          required: true
-          fields:
-            temperature: { kind: entity, required: true }
-            target: { kind: entity }
-        camera: { kind: entity }
-        actions:
-          kind: object
-          required: true
-          fields:
-            pause: { kind: entity }
-            resume: { kind: entity }
-            continue: { kind: entity }
-            cancel: { kind: entity }
-        outlet:
-          kind: object
-          fields:
-            entity: { kind: entity, required: true }
-            energy:
-              kind: object
-              fields:
-                power: { kind: entity, required: true }
-                today: { kind: entity }
-                total: { kind: entity }
+    printer3d: { shape: printer3d_popup, required: true }
   card:
     hash: '#[[key]]-3d-printer'
     cards:

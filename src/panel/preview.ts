@@ -1,4 +1,4 @@
-import { LitElement, html, nothing } from 'lit';
+import { LitElement, css, html, nothing } from 'lit';
 import type { PropertyValues, TemplateResult } from 'lit';
 import { property, query, state } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
@@ -8,16 +8,19 @@ import { styleMap } from 'lit/directives/style-map.js';
 import { checkPopups } from '../cards/parts/popup-registry.ts';
 import type { Popup } from '../contract/cards.ts';
 import { PART_KEY, isMapping } from '../contract/templates.ts';
-import type { Template, Templates, Value } from '../contract/templates.ts';
+import type { Template, Templates, Value, WrittenTemplate } from '../contract/templates.ts';
 import type { ChildCard } from '../ha/card-helpers.ts';
 import { field } from '../ha/field.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
 import { navigate } from '../ha/navigation.ts';
+import { registriesOf } from '../ha/registries.ts';
 import { icon } from '../ha/templates.ts';
 import { discover } from '../templates/discover.ts';
 import { expand, filled } from '../templates/expand.ts';
 import type { Marking } from '../templates/expand.ts';
 
+import { shapedOf } from './data.ts';
+import { messageOf } from './message.ts';
 import { PANEL_STYLE } from './style.ts';
 
 export interface Trial {
@@ -40,21 +43,17 @@ function sourcesOf(list: readonly Value[]): string[] {
 export function tryDraft(
   templates: Templates,
   name: string,
-  draft: Template,
+  draft: WrittenTemplate,
   on: TrialOn,
   hass: HomeAssistant | undefined,
   marking?: Marking,
 ): Trial {
-  const all: Templates = { ...templates, [name]: draft };
+  const shaped = shapedOf(name, draft);
+  const all: Templates = { ...templates, [name]: shaped };
   const found =
     on.area === undefined || hass === undefined
       ? {}
-      : discover(draft, on.area, {
-          areas: hass.areas,
-          devices: hass.devices,
-          entities: hass.entities,
-          states: hass.states,
-        });
+      : discover(shaped, on.area, registriesOf(hass));
   const expanded = expand(
     all,
     { template: name, slots: on.slots ?? {} },
@@ -89,12 +88,7 @@ export function richestArea(
   const counted: { area: string; count: number }[] = [];
   for (const area of areas) {
     try {
-      const found = discover(template, area.value, {
-        areas: hass.areas,
-        devices: hass.devices,
-        entities: hass.entities,
-        states: hass.states,
-      });
+      const found = discover(template, area.value, registriesOf(hass));
       counted.push({
         area: area.value,
         count: Object.values(found).filter((value) => filled(value)).length,
@@ -117,7 +111,7 @@ export function richestArea(
   return undefined;
 }
 
-export function trialOf(template: Template, area: string | undefined): TrialOn {
+export function trialOf(template: WrittenTemplate, area: string | undefined): TrialOn {
   return area === undefined ? { slots: template.example ?? {} } : { area };
 }
 
@@ -190,8 +184,94 @@ function markNative(root: ParentNode): void {
   }
 }
 
+const PREVIEW_STYLE = css`
+  .preview {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .preview-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .stage {
+    max-width: 560px;
+  }
+  .cards {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .popup-list {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+  .preview.staged .stage {
+    position: relative;
+    max-width: 640px;
+  }
+  .preview.staged .cards {
+    cursor: pointer;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+  .cards.sheet {
+    box-sizing: border-box;
+    max-width: 560px;
+    padding: 10px;
+    border-radius: 22px;
+    background: var(--card-background-color);
+    box-shadow: 0 8px 28px rgb(0 0 0 / 0.18);
+  }
+  .marks {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  .mark {
+    position: absolute;
+    box-sizing: border-box;
+    border-radius: 12px;
+    outline-offset: 2px;
+  }
+  .mark.hover {
+    outline: 2px dashed color-mix(in srgb, var(--primary-color) 70%, transparent);
+  }
+  .mark.drop {
+    outline: 3px solid var(--primary-color);
+    background: color-mix(in srgb, var(--primary-color) 18%, transparent);
+  }
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    margin: 0;
+    white-space: nowrap;
+  }
+  .stage-box:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 4px;
+    border-radius: 22px;
+  }
+  .mark.chosen {
+    outline: 2px solid var(--primary-color);
+    background: color-mix(in srgb, var(--primary-color) 9%, transparent);
+  }
+  .view-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-right: auto;
+  }
+`;
+
 export class MnmlPreview extends LitElement {
-  static override styles = PANEL_STYLE;
+  static override styles = [PANEL_STYLE, PREVIEW_STYLE];
 
   @property({ attribute: false }) hass: HomeAssistant | undefined;
   @property({ attribute: false }) trial: (() => Trial) | undefined;
@@ -209,6 +289,7 @@ export class MnmlPreview extends LitElement {
   @state() private hovered = '';
   @state() private dropping = '';
   @state() private boxes: Box[] = [];
+  @state() private helpless = false;
   @query('.cards') private stage: HTMLElement | null | undefined;
   @query('.stage-box') private frame: HTMLElement | null | undefined;
   private made: Trial | undefined;
@@ -237,7 +318,7 @@ export class MnmlPreview extends LitElement {
         this.problem = undefined;
       } catch (error) {
         this.made = undefined;
-        this.problem = error instanceof Error ? error.message : String(error);
+        this.problem = messageOf(error);
       }
     }
     if (changed.has('hass') && this.hass !== undefined) {
@@ -520,16 +601,24 @@ export class MnmlPreview extends LitElement {
         ${
           this.problem === undefined
             ? html`<div
-                class=${classMap({ cards: true, sheet: this.staged && this.shownView() !== 'card' })}
-                @click=${this.staged ? this.onClick : nothing}
-                @pointerdown=${this.staged ? this.onDown : nothing}
-                @pointerup=${this.staged ? this.onUp : nothing}
-                @pointercancel=${this.staged ? this.onCancel : nothing}
-                @touchmove=${this.staged ? this.onTouch : nothing}
-                @pointermove=${this.staged ? this.onMove : nothing}
-                @pointerleave=${this.staged ? this.onLeave : nothing}
-                @keydown=${this.staged ? this.onSilence : nothing}
-              ></div>`
+                  class=${classMap({ cards: true, sheet: this.staged && this.shownView() !== 'card' })}
+                  @click=${this.staged ? this.onClick : nothing}
+                  @pointerdown=${this.staged ? this.onDown : nothing}
+                  @pointerup=${this.staged ? this.onUp : nothing}
+                  @pointercancel=${this.staged ? this.onCancel : nothing}
+                  @touchmove=${this.staged ? this.onTouch : nothing}
+                  @pointermove=${this.staged ? this.onMove : nothing}
+                  @pointerleave=${this.staged ? this.onLeave : nothing}
+                  @keydown=${this.staged ? this.onSilence : nothing}
+                ></div>
+                ${
+                  this.helpless
+                    ? html`<p class="muted">
+                        Home Assistant has not loaded its card helpers on this page, so the preview
+                        cannot draw. Open a dashboard once, then come back.
+                      </p>`
+                    : nothing
+                }`
             : html`<div class="problem">
                 ${icon('mdi:alert-circle-outline')}<span>${this.problem}</span>
               </div>`
@@ -654,12 +743,9 @@ export class MnmlPreview extends LitElement {
     this.drawing += 1;
     const mine = this.drawing;
     const load = window.loadCardHelpers;
+    this.helpless = load === undefined;
     if (load === undefined) {
-      const said = document.createElement('p');
-      said.className = 'muted';
-      said.textContent =
-        'Home Assistant has not loaded its card helpers on this page, so the preview cannot draw. Open a dashboard once, then come back.';
-      box.replaceChildren(said);
+      box.replaceChildren();
       return;
     }
     const helpers = await load();

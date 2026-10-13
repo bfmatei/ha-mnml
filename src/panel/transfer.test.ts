@@ -46,8 +46,35 @@ test('a file of templates is a mapping of names to templates, or a configuration
   );
   assert.throws(() => templatesIn('Garden:\n  card: { type: x }\n'), /lower case/);
   assert.throws(() => templatesIn('garden:\n  slots: {}\n'), /a mapping with a card/);
+  assert.throws(() => templatesIn('garden:\n  card: ~\n'), /card is a mapping/);
+  assert.throws(() => templatesIn('garden:\n  card: [{ type: toggle }]\n'), /card is a mapping/);
+  assert.deepEqual(
+    Object.keys(templatesIn('batteries:\n  card: [{ type: toggle }]\n', new Set(['batteries']))),
+    ['batteries'],
+  );
   assert.throws(() => templatesIn('- garden\n'), /no mapping/);
   assert.throws(() => templatesIn('garden: !secret token\n'), /YAML tag/);
+});
+
+test('a file of templates whose slot names a shape that cannot be resolved is refused, naming the template and why', () => {
+  assert.deepEqual(
+    Object.keys(templatesIn('yard:\n  slots: { energy: { shape: meter } }\n  card: { type: x }\n')),
+    ['yard'],
+  );
+  assert.throws(
+    () =>
+      templatesIn(
+        'garden:\n  card: { type: x }\nyard:\n  slots: { energy: { shape: metre } }\n  card: { type: x }\n',
+      ),
+    { message: 'yard: the slot energy uses the shape metre, which is not known' },
+  );
+  assert.throws(
+    () =>
+      templatesIn(
+        'views: []\nmnml_templates:\n  yard:\n    slots: { energy: { shape: meter, fields: { watts: { required: true } } } }\n    card: { type: x }\n',
+      ),
+    { message: 'yard: the slot energy uses the shape meter, which has no field named watts' },
+  );
 });
 
 test('an import named like a shipped template comes in as changes to it, any other as the home own, and one that is already kept is left out', () => {
@@ -246,6 +273,13 @@ test('a rename reads each dashboard again before it writes it, says which it cou
   });
 });
 
+test("a dashboard's template whose card is not a mapping is not offered", () => {
+  const { templates } = dashboardTemplates([
+    board('Home', null, { mnml_templates: { garden: { card: null }, hall: HEADING('Hall') } }),
+  ]);
+  assert.deepEqual(Object.keys(templates), ['hall']);
+});
+
 test('the dashboards that hold different versions of one name are said, so the import can name them', () => {
   const { differ } = dashboardTemplates([
     board('Home', null, {
@@ -256,4 +290,50 @@ test('the dashboards that hold different versions of one name are said, so the i
     }),
   ]);
   assert.deepEqual(differ, ['garden']);
+});
+
+test("a template of the home's own brought in as it is written, or with its shapes resolved, is the same, and comes in as written", () => {
+  const written = {
+    slots: { energy: { shape: 'meter' } },
+    card: { type: 'custom:mnml-heading-card', title: 'Yard', icon: 'mdi:barn' },
+  };
+  const resolved = {
+    slots: {
+      energy: {
+        kind: 'object' as const,
+        fields: {
+          power: { kind: 'entity' as const },
+          today: { kind: 'entity' as const },
+          total: { kind: 'entity' as const },
+        },
+      },
+    },
+    card: written.card,
+  };
+  const kept: Kept = { own: { yard: written }, changes: {} };
+  assert.deepEqual(
+    planImport({ yard: written }, SHIPPED, kept, { ...SHIPPED, yard: resolved }).map(
+      (each) => each.fate,
+    ),
+    ['same'],
+  );
+  assert.deepEqual(
+    planImport({ yard: resolved }, SHIPPED, kept, { ...SHIPPED, yard: resolved }).map(
+      (each) => each.fate,
+    ),
+    ['same'],
+  );
+  const [fresh] = planImport({ yard: written }, SHIPPED, NOTHING, SHIPPED);
+  assert.ok(fresh);
+  assert.deepEqual(entryFor(fresh, SHIPPED), { kind: 'own', template: written });
+  const [changed] = planImport(
+    { room: { ...ROOM, slots: { energy: { shape: 'meter' } } } },
+    SHIPPED,
+    NOTHING,
+    SHIPPED,
+  );
+  assert.ok(changed);
+  const entry = entryFor(changed, SHIPPED);
+  assert.ok(entry?.kind === 'changes');
+  assert.deepEqual(applyChanges(ROOM, entry.changes).template.slots, resolved.slots);
 });

@@ -14,6 +14,7 @@ import {
   slotIn,
   slotLabel,
 } from './binding.ts';
+import { readableOf } from './data.ts';
 import { chainTo, partOf } from './outline.ts';
 
 const TEMPLATE: Template = {
@@ -136,7 +137,7 @@ test('finding it in every room makes a slot with a rule from the entity, and bin
       assert.ok(found);
       return found;
     })(),
-    made,
+    readableOf('hall', made),
     TEMPLATES,
   );
   assert.equal(again[0]?.slot, 'door');

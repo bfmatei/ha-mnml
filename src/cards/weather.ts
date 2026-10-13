@@ -10,9 +10,9 @@ import type { HassEntity, HomeAssistant } from '../ha/hass.ts';
 import { icon } from '../ha/templates.ts';
 
 import { MnmlCard, requireString } from './base.ts';
-import { schema } from './keys.ts';
 import type { KeySchema } from './keys.ts';
 import { SECTION_STYLE, section } from './parts/section.ts';
+import { WEATHER_CARD } from './schemas.ts';
 import { BASE_STYLE, HEADING_STYLE } from './styles.ts';
 
 const WEATHER_STYLE = css`
@@ -99,10 +99,6 @@ const WEATHER_STYLE = css`
   .step .range .low {
     color: var(--secondary-text-color);
   }
-  .note {
-    color: var(--secondary-text-color);
-    font-size: 13px;
-  }
 `;
 
 const DEFAULT_TITLE = 'Weather';
@@ -111,11 +107,15 @@ const DEFAULT_ICON: MdiIcon = 'mdi:weather-partly-cloudy';
 
 const FALLBACK_ICON: MdiIcon = 'mdi:weather-cloudy';
 
-const STEPS = { daily: 7, hourly: 8 };
+type Kind = 'daily' | 'twice_daily' | 'hourly';
 
-const DAILY = 1;
+const STEPS: Readonly<Record<Kind, number>> = { daily: 7, twice_daily: 8, hourly: 8 };
 
-const HOURLY = 2;
+const FEATURES: readonly (readonly [Kind, number])[] = [
+  ['daily', 1],
+  ['twice_daily', 4],
+  ['hourly', 2],
+];
 
 const CONDITIONS: Readonly<Record<string, MdiIcon>> = {
   'clear-night': 'mdi:weather-night',
@@ -181,40 +181,35 @@ function stepOf(raw: unknown): Step | undefined {
   };
 }
 
-function whenOf(language: string, step: Step, kind: string): string {
+function whenOf(language: string, step: Step, kind: Kind): string {
   if (kind === 'hourly') {
     return new Intl.DateTimeFormat(language, { hour: 'numeric', minute: '2-digit' }).format(
       step.at,
     );
   }
-  const today = new Date();
-  if (step.at.toDateString() === today.toDateString()) {
+  if (step.at.toDateString() === new Date().toDateString()) {
     return 'Today';
   }
   return new Intl.DateTimeFormat(language, { weekday: 'long' }).format(step.at);
 }
 
-function featureOf(stateObj: HassEntity | undefined): 'daily' | 'hourly' | undefined {
+function featureOf(stateObj: HassEntity | undefined): Kind | undefined {
   const features = stateObj?.attributes['supported_features'];
   if (typeof features !== 'number') {
     return undefined;
   }
-  if ((features & DAILY) !== 0) {
-    return 'daily';
-  }
-  return (features & HOURLY) === 0 ? undefined : 'hourly';
+  return FEATURES.find(([, bit]) => (features & bit) !== 0)?.[0];
 }
-
-const SCHEMA = schema<WeatherCard>({ type: true, entity: true, title: true });
 
 export class MnmlWeatherCard extends MnmlCard<WeatherCard> {
   static override styles = [BASE_STYLE, HEADING_STYLE, SECTION_STYLE, WEATHER_STYLE];
 
   @state() private steps: Step[] = [];
   private subscribed = '';
+  private unfollow: (() => void) | undefined;
 
   protected schema(): KeySchema {
-    return SCHEMA;
+    return WEATHER_CARD;
   }
 
   protected override validate(config: WeatherCard): void {
@@ -227,27 +222,46 @@ export class MnmlWeatherCard extends MnmlCard<WeatherCard> {
     this.requestUpdate();
   }
 
-  private follow(hass: HomeAssistant, config: WeatherCard, kind: string): void {
+  private follow(hass: HomeAssistant, config: WeatherCard, kind: Kind): void {
     const key = `${config.entity}/${kind}`;
     if (key === this.subscribed) {
       return;
     }
+    this.unfollow?.();
     this.subscribed = key;
     this.steps = [];
+    let live = true;
     const stop = hass.connection.subscribeMessage<{ forecast?: unknown[] | null }>(
       (message) => {
-        const list = message.forecast ?? [];
-        this.steps = list.flatMap((raw) => stepOf(raw) ?? []);
+        if (live) {
+          const list = message.forecast ?? [];
+          this.steps = list.flatMap((raw) => stepOf(raw) ?? []);
+        }
       },
       { type: 'weather/subscribe_forecast', forecast_type: kind, entity_id: config.entity },
     );
-    const release = this.register(() => {
-      this.subscribed = '';
+    const end = (): void => {
+      if (!live) {
+        return;
+      }
+      live = false;
+      if (this.unfollow === unfollow) {
+        this.unfollow = undefined;
+      }
       void stop.then(
         (off) => off(),
         () => undefined,
       );
+    };
+    const release = this.register(() => {
+      this.subscribed = '';
+      end();
     });
+    const unfollow = (): void => {
+      release();
+      end();
+    };
+    this.unfollow = unfollow;
     void stop.catch(() => {
       release();
     });

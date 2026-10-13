@@ -1,4 +1,4 @@
-import { html, LitElement } from 'lit';
+import { css, html, LitElement } from 'lit';
 import type { TemplateResult } from 'lit';
 import { property, state } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
@@ -59,8 +59,79 @@ const STATUS_ICON = {
 const offerText = (offer: Offer): string =>
   `${offer.dashboards === 1 ? 'A dashboard holds' : `${offer.dashboards} dashboards hold`} ${offer.templates} ${offer.templates === 1 ? 'template' : 'templates'} under mnml_templates: that MNML does not keep. The cards do not read them there.`;
 
+const LIBRARY_STYLE = css`
+  .switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 32px;
+    padding: 0 8px 0 0;
+    color: var(--secondary-text-color);
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .switch input {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    accent-color: var(--primary-color);
+  }
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .search {
+    box-sizing: border-box;
+    width: 100%;
+    height: 44px;
+    padding: 0 14px;
+    border-radius: 22px;
+    border: 1px solid var(--divider-color);
+    background: var(--card-background-color);
+    color: var(--primary-text-color);
+    font-size: 15px;
+  }
+  .offer {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 12px;
+    border: 1px solid var(--primary-color);
+    border-radius: 12px;
+  }
+  .offer > ha-icon {
+    color: var(--primary-color);
+  }
+  .offer > span {
+    flex: 1;
+    min-width: 200px;
+  }
+  .library-open:hover .library-name {
+    color: var(--primary-color);
+  }
+  .status-customised .library-icon {
+    color: var(--primary-color);
+  }
+  .status-conflict .library-icon {
+    color: var(--warning-color, var(--error-color));
+  }
+  .library-name {
+    font-family: var(--ha-font-family-code, monospace);
+    font-size: 14px;
+  }
+  .library-status {
+    color: var(--secondary-text-color);
+    font-size: 12px;
+  }
+  .status-conflict .library-status {
+    color: var(--warning-color, var(--error-color));
+  }
+`;
+
 export class MnmlLibrary extends LitElement {
-  static override styles = PANEL_STYLE;
+  static override styles = [PANEL_STYLE, LIBRARY_STYLE];
 
   @property({ attribute: false }) rows: readonly Row[] = [];
   @property({ attribute: false }) offer: Offer | undefined;

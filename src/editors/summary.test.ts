@@ -2,7 +2,11 @@ import assert from 'node:assert/strict';
 
 import { test } from 'vitest';
 
-import { entities, entity, icon, need, part, parts, plain, text } from './shape.ts';
+import { entities, entity, icon, need, part, parts, plain, text } from '../contract/structure.ts';
+import type { Structure } from '../contract/structure.ts';
+
+import { describer } from './cards.ts';
+import type { PlainShape } from './shape.ts';
 import { nameOf, summarize } from './summary.ts';
 
 const hass = {
@@ -15,21 +19,36 @@ const hass = {
   },
 } as never;
 
-const SHAPE = plain<{
-  name?: string;
-  icon?: string;
-  heating?: { entity: string };
-  scenes?: string[];
-  rows?: { entity: string }[];
-  window?: string;
-}>('t', 'T', {
-  name: text(),
-  icon: icon(),
-  heating: part(plain<{ entity: string }>('h', 'Heating', { entity: need(entity()) })),
-  scenes: entities(),
-  rows: parts(plain<{ entity: string }>('r', 'Row', { entity: need(entity()) })),
-  window: entity(),
+const describe = describer({
+  t: { label: 'T', keys: {} },
+  h: { label: 'Heating', keys: {} },
+  r: { label: 'Row', keys: {} },
+  l: { label: 'L', keys: { glasses: 'Glass' } },
 });
+
+const plainOf = (structure: Structure): PlainShape => {
+  const shape = describe(structure);
+  assert.ok(shape.kind === 'plain');
+  return shape;
+};
+
+const SHAPE = plainOf(
+  plain<{
+    name?: string;
+    icon?: string;
+    heating?: { entity: string };
+    scenes?: string[];
+    rows?: { entity: string }[];
+    window?: string;
+  }>('t', {
+    name: text(),
+    icon: icon(),
+    heating: part(plain<{ entity: string }>('h', { entity: need(entity()) })),
+    scenes: entities(),
+    rows: parts(plain<{ entity: string }>('r', { entity: need(entity()) })),
+    window: entity(),
+  }),
+);
 
 test('an entity reads as its friendly name, falling back to its id', () => {
   assert.equal(nameOf(hass, 'climate.living'), 'Living Heating');
@@ -68,10 +87,12 @@ test('a summary names what is set, counts lists, and says not set when nothing i
 });
 
 test('a count of one names the item as singular does, so a word ending in ss keeps it', () => {
-  const lists = plain<{ glasses?: string[]; batteries?: string[] }>('l', 'L', {
-    glasses: { ...entities(), label: 'Glass' },
-    batteries: entities(),
-  });
+  const lists = plainOf(
+    plain<{ glasses?: string[]; batteries?: string[] }>('l', {
+      glasses: entities(),
+      batteries: entities(),
+    }),
+  );
   assert.equal(summarize(lists, ['glasses'], { glasses: ['sensor.a'] }, hass), '1 glass');
   assert.equal(summarize(lists, ['batteries'], { batteries: ['sensor.a'] }, hass), '1 battery');
 });

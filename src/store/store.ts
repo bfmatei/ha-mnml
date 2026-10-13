@@ -1,19 +1,27 @@
 import { isMapping, isTemplate } from '../contract/templates.ts';
-import type { Template, Templates } from '../contract/templates.ts';
+import type { Template, Templates, WrittenTemplate } from '../contract/templates.ts';
 import { field } from '../ha/field.ts';
 import type { HassConnection } from '../ha/hass.ts';
 import { applyChanges, isChange } from '../templates/changes.ts';
 import type { Change } from '../templates/changes.ts';
+import { TemplateError } from '../templates/expand.ts';
+import { SLOT_SHAPES } from '../templates/families.ts';
+import { withShapes } from '../templates/slot-shapes.ts';
 
 type Changes = Readonly<Record<string, readonly Change[]>>;
 
 export type SharedState =
   | { status: 'waiting' }
-  | { status: 'ready'; own: Templates; changes: Changes }
+  | {
+      status: 'ready';
+      own: Templates;
+      written: Readonly<Record<string, WrittenTemplate>>;
+      changes: Changes;
+    }
   | { status: 'failed'; error: string };
 
 const WAITING: SharedState = { status: 'waiting' };
-const EMPTY: SharedState = { status: 'ready', own: {}, changes: {} };
+const EMPTY: SharedState = { status: 'ready', own: {}, written: {}, changes: {} };
 const CONNECTION_LOST = 3;
 const RETRY = 5000;
 const RETRIES = 60;
@@ -40,15 +48,28 @@ function reason(error: unknown): string {
   return error === CONNECTION_LOST ? 'the connection was lost' : String(error);
 }
 
+function shaped(name: string, template: Template): Template {
+  try {
+    return withShapes(name, template, SLOT_SHAPES);
+  } catch (error) {
+    console.error(
+      error instanceof TemplateError ? `mnml: ${error.message}` : `mnml: ${name}: ${reason(error)}`,
+    );
+    return template;
+  }
+}
+
 function storeOf(message: unknown): SharedState {
   const kept = field(message, 'templates');
   const own: Record<string, Template> = {};
+  const written: Record<string, WrittenTemplate> = {};
   const changes: Record<string, Change[]> = {};
   for (const [name, entry] of Object.entries(isMapping(kept) ? kept : {})) {
     const template = field(entry, 'template');
     const list = field(entry, 'changes');
     if (field(entry, 'kind') === 'own' && isTemplate(template)) {
-      own[name] = template;
+      own[name] = shaped(name, template);
+      written[name] = template;
     } else if (field(entry, 'kind') === 'changes' && Array.isArray(list)) {
       if (list.every(isChange)) {
         changes[name] = list;
@@ -59,7 +80,7 @@ function storeOf(message: unknown): SharedState {
       }
     }
   }
-  return { status: 'ready', own, changes };
+  return { status: 'ready', own, written, changes };
 }
 
 function settle(entry: Entry, next: SharedState): void {

@@ -173,13 +173,7 @@ camera-card:
 camera-activity:
   description: 'A folding list of what the cameras of a room detect: motion, a person, a ring at the door. Orange while detected.'
   slots:
-    cameras:
-      kind: objects
-      fields:
-        entity: { kind: entity, required: true }
-        motion: { kind: entity }
-        person: { kind: entity }
-        doorbell: { kind: entity }
+    cameras: { shape: camera, kind: objects }
   card:
     type: custom:mnml-list-card
     title: Activity
@@ -224,7 +218,7 @@ appliance-card:
     type: custom:mnml-entity-card
     entity: '[[entity]]'
     color: blue
-    when: { is: [running, washing, drying, rinsing, spinning, in_use, 'on'] }
+    when: { is: [run, running, washing, drying, rinsing, spinning, in_use, 'on'] }
     state:
       - { id: part }
       - { id: remaining, if: remaining, entity: '[[remaining]]' }
@@ -262,10 +256,7 @@ pet-card:
 plants:
   description: A folding list of the plants' soil moisture, driest first, orange under 30 % and red under 15 %.
   slots:
-    plants:
-      kind: objects
-      fields:
-        moisture: { kind: entity, required: true }
+    plants: { shape: plant, kind: objects }
     low: { kind: number, default: 30 }
     critical: { kind: number, default: 15 }
   card:

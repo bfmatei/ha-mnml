@@ -1,5 +1,6 @@
 import { css, html, nothing, svg } from 'lit';
 import type { SVGTemplateResult, TemplateResult } from 'lit';
+import { classMap } from 'lit/directives/class-map.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
 import type { CarPlanCard } from '../contract/cards.ts';
@@ -10,9 +11,9 @@ import type { HassEntity, HomeAssistant } from '../ha/hass.ts';
 import { normalise, tyreBand } from '../ha/rules.ts';
 
 import { MnmlCard, requireList, requireNumber, requireString } from './base.ts';
-import { schema } from './keys.ts';
 import type { KeySchema } from './keys.ts';
 import { SECTION_STYLE, section } from './parts/section.ts';
+import { CAR_PLAN_CARD } from './schemas.ts';
 import { BASE_STYLE, HEADING_STYLE } from './styles.ts';
 
 const CAR_STYLE = css`
@@ -315,28 +316,11 @@ function pressure(
   return unit === '' ? text : `${text} ${unit}`;
 }
 
-const SCHEMA = schema<CarPlanCard>({
-  type: true,
-  title: true,
-  icon: true,
-  doors: true,
-  hood: true,
-  tailgate: true,
-  windows: true,
-  sunroof: true,
-  open_states: true,
-  half_states: true,
-  tyres: true,
-  tyre_targets: true,
-  tyre_low_share: true,
-  tyre_warn_share: true,
-});
-
 export class MnmlCarPlanCard extends MnmlCard<CarPlanCard> {
   static override styles = [BASE_STYLE, HEADING_STYLE, SECTION_STYLE, CAR_STYLE];
 
   protected schema(): KeySchema {
-    return SCHEMA;
+    return CAR_PLAN_CARD;
   }
 
   protected override validate(config: CarPlanCard): void {
@@ -352,12 +336,15 @@ export class MnmlCarPlanCard extends MnmlCard<CarPlanCard> {
 
   protected draw(hass: HomeAssistant, config: CarPlanCard): TemplateResult {
     const problems: string[] = [];
+    const titles: string[] = [];
     const mark = (name: string, stateObj: HassEntity | undefined): Mark => {
       const state = openness(config, stateObj);
       if (state !== undefined) {
         problems.push(`${name} ${state === 'half' ? 'half open' : 'open'}`);
       }
-      return { state, title: `${name}: ${describe(hass, stateObj)}` };
+      const title = `${name}: ${describe(hass, stateObj)}`;
+      titles.push(title);
+      return { state, title };
     };
     const hood = rect(HOOD, 'part', mark('Hood', stateOf(hass, config.hood)));
     const tailgate = rect(TAILGATE, 'part', mark('Tailgate', stateOf(hass, config.tailgate)));
@@ -408,7 +395,7 @@ export class MnmlCarPlanCard extends MnmlCard<CarPlanCard> {
         <div class="labels">
           ${tyres.filter((_, index) => index % 2 === 1).map((tyre) => tyre.label)}
         </div>
-        <svg viewBox=${VIEW_BOX} role="img">
+        <svg viewBox=${VIEW_BOX} role="img" aria-label=${titles.join('. ')}>
           <g transform=${PLAN}>
             ${tyres.map((tyre) => rect(tyre.shape, classOf('tyre', tyre.band)))}
             <clipPath id="body"><path d=${BODY}></path></clipPath>
@@ -428,7 +415,7 @@ export class MnmlCarPlanCard extends MnmlCard<CarPlanCard> {
           ${tyres.filter((_, index) => index % 2 === 0).map((tyre) => tyre.label)}
         </div>
       </div>
-      <div class=${problems.length > 0 ? 'caption alert' : 'caption'}>
+      <div class=${classMap({ caption: true, alert: problems.length > 0 })}>
         ${problems.length > 0 ? problems.join(' • ') : 'All closed'}
       </div>
     </div>`;

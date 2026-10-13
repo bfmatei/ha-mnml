@@ -15,10 +15,9 @@ import { UNAVAILABLE } from '../ha/rules.ts';
 import { colorStyle, icon, onPress, quietly, relativeTime } from '../ha/templates.ts';
 
 import { MnmlCard, requireString } from './base.ts';
-import { schema } from './keys.ts';
 import type { KeySchema } from './keys.ts';
 import { tip } from './parts/tooltip.ts';
-import { MESSAGE_SOURCE } from './schemas.ts';
+import { MESSAGES_CARD } from './schemas.ts';
 import { BASE_STYLE, CONTROL_STYLE, ROW_STYLE } from './styles.ts';
 
 const MESSAGES_STYLE = css`
@@ -117,18 +116,13 @@ function messagesOf(stateObj: HassEntity): Message[] {
   return Array.isArray(raw) ? raw.filter(isMessage) : [];
 }
 
-const SCHEMA = schema<MessagesCard>(
-  { type: true, entity: true, clear: true, sources: true },
-  { sources: MESSAGE_SOURCE },
-);
-
 export class MnmlMessagesCard extends MnmlCard<MessagesCard> {
   static override styles = [BASE_STYLE, ROW_STYLE, CONTROL_STYLE, MESSAGES_STYLE];
 
   @state() private open: ReadonlySet<string> = new Set<string>();
 
   protected schema(): KeySchema {
-    return SCHEMA;
+    return MESSAGES_CARD;
   }
 
   protected override validate(config: MessagesCard): void {
@@ -169,7 +163,12 @@ export class MnmlMessagesCard extends MnmlCard<MessagesCard> {
       this.toggle(entry.id);
     };
     const clear = (): void => {
-      run(this, callService(hass, config.clear, 'script.turn_on', { variables: { id: entry.id } }));
+      run(
+        this,
+        callService(this.hass ?? hass, config.clear, 'script.turn_on', {
+          variables: { id: entry.id },
+        }),
+      );
     };
     return html`<div class=${classMap({ card: true, open })}>
       <div

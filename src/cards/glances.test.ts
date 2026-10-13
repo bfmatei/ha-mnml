@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 
 import { test } from 'vitest';
 
+import { DEMO } from '../../demo/home.ts';
+import { drawn } from '../home/view.ts';
 import { define, mounted, text } from '../test/render.ts';
 
 import { MnmlGlancesCard } from './glances.ts';
@@ -74,16 +76,14 @@ async function paint(failed: string, batteries: string[], calls: Call[] = []) {
   return mounted(made);
 }
 
-test('the glances are pills on the page: the card paints no surface, edge or divider of its own', () => {
-  const css = MnmlGlancesCard.styles
-    .flat()
-    .map((sheet) => ('cssText' in sheet ? sheet.cssText : ''))
-    .join('\n');
-  assert.match(css, /\.glances\.card\s*\{[^}]*background:\s*none/);
-  assert.match(css, /\.glances\.card\s*\{[^}]*box-shadow:\s*none/);
-  assert.match(css, /\.glances\.card\s*\{[^}]*overflow:\s*visible/);
-  assert.match(css, /\.glances\.card::after\s*\{[^}]*content:\s*none/);
-  assert.doesNotMatch(css, /border-left/, 'and no divider between the groups');
+test('the glances are pills on the page: the card paints no surface or edge of its own', async () => {
+  const root = await paint('2', ['3']);
+  const card = root.querySelector('.glances.card');
+  assert.ok(card);
+  const style = getComputedStyle(card);
+  assert.equal(style.background, 'rgba(0, 0, 0, 0)', 'no surface');
+  assert.equal(style.boxShadow, 'none', 'no shadow');
+  assert.equal(style.overflow, 'visible', 'so the pills are not clipped');
 });
 
 test('what does not need you is not drawn: no failed checks, no low battery', async () => {
@@ -261,4 +261,164 @@ test('a summed item adds its sensors together, drawn while the total is above 0 
   const both = await paint('1', '2');
   assert.equal(text(both.querySelector('.glance .state')), '3');
   assert.ok(both.querySelector('.glance.critical'));
+});
+
+test('a glance that acts is a button named with what its tooltip says, its value included', async () => {
+  const made = document.createElement('mnml-glances-card');
+  assert.ok(made instanceof MnmlGlancesCard);
+  made.setConfig({
+    type: 'custom:mnml-glances-card',
+    items: [
+      { entity: 'weather.home', popup: '#weather' },
+      { entity: 'input_boolean.away', name: 'Vacation', toggle: true },
+      {
+        entities: ['sensor.a_battery', 'sensor.b_battery'],
+        name: 'Low batteries',
+        below: 20,
+        popup: '#batteries',
+      },
+      { entity: 'sensor.c_battery' },
+    ],
+  } as never);
+  made.hass = hassWith('0', ['14', '3', '80']) as never;
+  const root = await mounted(made);
+  assert.deepEqual(
+    [...root.querySelectorAll('.glance')].map((glance) => [
+      glance.getAttribute('role'),
+      glance.getAttribute('aria-label'),
+    ]),
+    [
+      ['button', 'weather.home: sunny'],
+      ['button', 'Vacation: off'],
+      [null, null],
+      ['button', 'Low batteries. sensor.a_battery: 14. sensor.b_battery: 3'],
+    ],
+  );
+});
+
+test("a count's is and not match a state as a rule does, lower-cased and without hyphens, and skip an unavailable one", async () => {
+  const made = document.createElement('mnml-glances-card');
+  assert.ok(made instanceof MnmlGlancesCard);
+  made.setConfig({
+    type: 'custom:mnml-glances-card',
+    items: [
+      {
+        entities: ['sensor.sedan_doors', 'sensor.suv_doors', 'sensor.van_doors'],
+        name: 'Unlocked',
+        color: 'red',
+        is: ['unlocked', 'selectivelocked'],
+      },
+      {
+        entities: ['sensor.router_state', 'sensor.switch_state', 'sensor.ap_state'],
+        name: 'Network devices down',
+        color: 'red',
+        not: ['connected', 'upgrading'],
+      },
+    ],
+  } as never);
+  made.hass = {
+    ...(hassWith('0', []) as object),
+    states: Object.fromEntries([
+      reading('sensor.sedan_doors', 'UNLOCKED'),
+      reading('sensor.suv_doors', 'SELECTIVE-LOCKED'),
+      reading('sensor.van_doors', 'SECURED'),
+      reading('sensor.router_state', 'Connected'),
+      reading('sensor.switch_state', 'heartbeat_missed'),
+      reading('sensor.ap_state', 'unavailable'),
+    ]),
+  } as never;
+  const root = await mounted(made);
+  assert.deepEqual(
+    [...root.querySelectorAll('.glance')].map((glance) => text(glance.querySelector('.state'))),
+    ['2', '1'],
+  );
+});
+
+function glancesOf(value: unknown): Record<string, unknown> | undefined {
+  if (Array.isArray(value)) {
+    return value.map(glancesOf).find((found) => found !== undefined);
+  }
+  if (typeof value !== 'object' || value === null) {
+    return undefined;
+  }
+  const node = Object.fromEntries(Object.entries(value));
+  return node['type'] === 'custom:mnml-glances-card' ? node : glancesOf(Object.values(node));
+}
+
+const NEEDS_YOU: ReadonlySet<unknown> = new Set([
+  'Stopped guests',
+  'Network devices down',
+  'Tailscale offline',
+  'Media health',
+  'Unlocked',
+  'Car security',
+]);
+
+async function demoGlances(states: Record<string, string>): Promise<Element[]> {
+  const glances = glancesOf(drawn(DEMO));
+  const items = glances?.['items'];
+  assert.ok(Array.isArray(items));
+  const made = document.createElement('mnml-glances-card');
+  assert.ok(made instanceof MnmlGlancesCard);
+  made.setConfig({
+    type: 'custom:mnml-glances-card',
+    items: items.filter(
+      (item: unknown) =>
+        typeof item === 'object' && item !== null && NEEDS_YOU.has(Reflect.get(item, 'name')),
+    ),
+  } as never);
+  made.hass = {
+    ...(hassWith('0', []) as object),
+    states: Object.fromEntries(Object.entries(states).map(([id, state]) => reading(id, state))),
+  } as never;
+  const root = await mounted(made);
+  return [...root.querySelectorAll('.group.problems .glance')];
+}
+
+test("the demo home's Glances show a stopped guest, a device down or offline, the media server's health, a lock and each car left open, each opening its pop-up", async () => {
+  const { proxmox, network, tailscale, media } = DEMO.system;
+  const room = DEMO.rooms.find((one) => one.lock !== undefined);
+  const [sedan, suv] = DEMO.cars;
+  assert.ok(proxmox && network && tailscale && media?.movies?.health && room?.lock);
+  assert.ok(sedan && suv);
+  const [router, exit] = tailscale.devices.filter((device) => device.essential === true);
+  const personal = tailscale.devices.find((device) => device.essential !== true);
+  const [guest] = proxmox.guests;
+  const [switched] = network.devices;
+  assert.ok(router && exit && personal && guest && switched);
+  const calm: Record<string, string> = {
+    ...Object.fromEntries(proxmox.guests.map((one) => [one.status, 'on'])),
+    ...Object.fromEntries(network.devices.map((device) => [device, 'connected'])),
+    ...Object.fromEntries(tailscale.devices.map((device) => [device.connected, 'on'])),
+    [media.movies.health]: 'off',
+    [room.lock]: 'locked',
+    [sedan.lock]: 'SECURED',
+    [sedan.alarm]: 'doorsOnly',
+    [suv.lock]: 'LOCKED',
+    [suv.alarm]: 'doorsTiltCabin',
+  };
+  assert.deepEqual(await demoGlances({ ...calm, [personal.connected]: 'off' }), []);
+  const wells = await demoGlances({
+    ...calm,
+    [guest.status]: 'off',
+    [switched]: 'heartbeat_missed',
+    [exit.connected]: 'off',
+    [media.movies.health]: 'on',
+    [room.lock]: 'unlocked',
+    [sedan.alarm]: 'unarmed',
+    [suv.lock]: 'SELECTIVE-LOCKED',
+  });
+  assert.deepEqual(
+    wells.map((well) => [tipOf(well)?.split('\n')[0], text(well.querySelector('.state'))]),
+    [
+      ['Stopped guests', '1'],
+      ['Network devices down', '1'],
+      ['Tailscale offline', '1'],
+      ['Media health', '1'],
+      ['Unlocked', '1'],
+      ['Car security', '1'],
+      ['Car security', '1'],
+    ],
+  );
+  assert.ok(wells.every((well) => well.getAttribute('role') === 'button'));
 });

@@ -20,7 +20,11 @@ vi.mock('../store/store.ts', () => ({
 vi.mock('./lovelace.ts', () => ({ loadLovelace: () => Promise.resolve() }));
 
 vi.mock('../store/shipped.ts', () => ({
-  SHIPPED_TEMPLATES: { need: () => Promise.resolve(), templates: () => ({}) },
+  SHIPPED_TEMPLATES: {
+    need: () => Promise.resolve(),
+    templates: () => ({}),
+    failure: () => undefined,
+  },
 }));
 
 vi.mock(import('../editors/ha-form.ts'), async (original) => ({

@@ -116,3 +116,31 @@ test('the subscription is let go when the card leaves the page, and taken again 
   await made.updateComplete;
   assert.equal(asked.length, 2);
 });
+
+test('a forecast kind that changes lets the old subscription go before it takes the new one', async () => {
+  const asked: Asked[] = [];
+  const { made, root } = await paint(asked, hassWith(asked, 1));
+  made.hass = hassWith(asked, 2) as never;
+  await made.updateComplete;
+  await Promise.resolve();
+  assert.deepEqual(
+    asked.map((entry) => [entry.message['forecast_type'], entry.stopped]),
+    [
+      ['daily', true],
+      ['hourly', false],
+    ],
+  );
+  asked[1]?.push({ forecast: [day(0, 20, 10)] });
+  asked[0]?.push({ forecast: [day(0, 30, 20), day(1, 30, 20)] });
+  await made.updateComplete;
+  assert.equal(root.querySelectorAll('.step').length, 1, 'a late daily message changes nothing');
+});
+
+test('the full card follows a twice-daily forecast when the entity has no daily one', async () => {
+  const asked: Asked[] = [];
+  const { made, root } = await paint(asked, hassWith(asked, 6));
+  assert.equal(asked[0]?.message['forecast_type'], 'twice_daily');
+  asked[0]?.push({ forecast: [day(0, 24, 14), day(0.5, 15, 10)] });
+  await made.updateComplete;
+  assert.equal(root.querySelectorAll('.step').length, 2);
+});

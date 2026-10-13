@@ -22,11 +22,21 @@ test('a store the integration could not read is an empty one, so the cards draw 
   const connection = refusing('not_loaded');
   sharedTemplates(connection);
   await settle();
-  assert.deepEqual(sharedTemplates(connection), { status: 'ready', own: {}, changes: {} });
+  assert.deepEqual(sharedTemplates(connection), {
+    status: 'ready',
+    own: {},
+    written: {},
+    changes: {},
+  });
 });
 
 test('the templates are worked out once for the same store and shipped templates', () => {
-  const shared = { status: 'ready' as const, own: { garden: GARDEN }, changes: {} };
+  const shared = {
+    status: 'ready' as const,
+    own: { garden: GARDEN },
+    written: { garden: GARDEN },
+    changes: {},
+  };
   const shipped = { garden: GARDEN };
   assert.equal(resolvedTemplates(shared, shipped), resolvedTemplates(shared, shipped));
   assert.notEqual(resolvedTemplates(shared, shipped), resolvedTemplates(shared, { ...shipped }));
