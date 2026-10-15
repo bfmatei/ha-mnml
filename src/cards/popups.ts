@@ -7,25 +7,38 @@ import { keyed } from 'lit/directives/keyed.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
 import type {
-  Condition,
   LovelaceCardConfig,
   Popup,
+  PopupAlert,
   PopupOpening,
+  PopupScreen,
   PopupsCard,
 } from '../contract/cards.ts';
-import { OPENINGS } from '../contract/structure.ts';
+import type { PopupHash } from '../contract/entities.ts';
+import { CARD_STRUCTURES } from '../contract/structure.ts';
 import type { ChildCard } from '../ha/card-helpers.ts';
-import { visible } from '../ha/conditions.ts';
+import { Judge } from '../ha/conditions.ts';
+import { rightToLeft } from '../ha/direction.ts';
 import { field } from '../ha/field.ts';
+import { stateOf } from '../ha/hass.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
 import { letGoOfFocus, trackInput } from '../ha/modality.ts';
 import { leave, narrow, reduced } from '../ha/motion.ts';
 import { nameOf } from '../ha/names.ts';
-import { PREBUILD_EVENT, closePopup, originOf, popupDepth, whenOrigin } from '../ha/navigation.ts';
+import {
+  PREBUILD_EVENT,
+  back,
+  closePopup,
+  navigate,
+  originOf,
+  popupDepth,
+  whenOrigin,
+} from '../ha/navigation.ts';
+import { active } from '../ha/rules.ts';
 import { scrollable, scrollableAncestors } from '../ha/scroll.ts';
 
-import { requireOneOf } from './base.ts';
-import { requireKnownKeys } from './keys.ts';
+import { requireCard } from './keys.ts';
+import { cardOf } from './parts/card-element.ts';
 import { announced, checkPopups, onAnnounce } from './parts/popup-registry.ts';
 import { swipeToClose } from './parts/popup-swipe.ts';
 import {
@@ -38,12 +51,12 @@ import {
   unfolded,
 } from './parts/popup-unfold.ts';
 import type { Place } from './parts/popup-unfold.ts';
-import { POPUPS_CARD } from './schemas.ts';
 import { MOTION_STYLE } from './styles.ts';
 
 interface Child {
   card: ChildCard;
-  visibility: Condition[] | undefined;
+  entity: unknown;
+  visibility: unknown;
 }
 
 interface View {
@@ -70,6 +83,32 @@ const SLIDE_SHIFT = 20;
 const FOLD = 220;
 const FADE_LEAVE = 140;
 const SHEET_LEAVE = 200;
+const INPUT_EVENTS = ['pointerdown', 'pointermove', 'keydown', 'wheel', 'touchstart', 'scroll'];
+const reported = new Set<string>();
+
+function screen(): PopupScreen {
+  return narrow(SHEET) ? 'phone' : narrow(TABLET) ? 'tablet' : 'desktop';
+}
+
+function alerted(alert: PopupAlert, hass: HomeAssistant): boolean {
+  return active(
+    alert.is === undefined && alert.not === undefined
+      ? { attribute: alert.attribute, is: ['on'] }
+      : alert,
+    stateOf(hass, alert.entity),
+  );
+}
+
+function causedBy(previous: HomeAssistant | undefined, hass: HomeAssistant): boolean {
+  const user = hass.user?.id;
+  if (previous === undefined || user === undefined || previous.states === hass.states) {
+    return false;
+  }
+  return Object.values(hass.states).some(
+    (stateObj) =>
+      stateObj !== previous.states[stateObj.entity_id] && stateObj.context?.user_id === user,
+  );
+}
 
 function headerName(
   header: LovelaceCardConfig | undefined,
@@ -84,11 +123,6 @@ function headerName(
     return undefined;
   }
   return nameOf(hass, entity, header?.['label'] === 'device' ? { label: 'device' } : {});
-}
-
-function feed(child: Child, hass: HomeAssistant): void {
-  child.card.hass = hass;
-  child.card.hidden = !visible(hass, child.visibility);
 }
 
 const POPUPS_STYLE = css`
@@ -112,7 +146,7 @@ const POPUPS_STYLE = css`
   dialog[open] {
     position: fixed;
     top: 0;
-    left: 0;
+    inset-inline-start: 0;
     width: 100%;
     height: 100dvh;
     max-width: none;
@@ -258,6 +292,33 @@ export class MnmlPopupsCard extends LitElement {
   private readonly pending = new Map<string, Promise<Child[]>>();
   private unsubscribe: (() => void) | undefined;
   private sizes: ResizeObserver | undefined;
+  private held: boolean[] | undefined;
+  private readonly raised = new Map<number, PopupHash>();
+  private idle: ReturnType<typeof setTimeout> | undefined;
+  private lastInput = 0;
+  private readonly judge = new Judge(() => {
+    this.rejudge();
+  });
+
+  private readonly input = (): void => {
+    this.lastInput = performance.now();
+  };
+
+  private readonly idled = (): void => {
+    this.idle = undefined;
+    const seconds = this.config?.idle_close;
+    if (seconds === undefined || this.shownHash === undefined) {
+      this.stopIdle();
+      return;
+    }
+    const left = seconds * 1000 - (performance.now() - this.lastInput);
+    if (left > 0) {
+      this.idle = setTimeout(this.idled, left);
+      return;
+    }
+    this.stopIdle();
+    closePopup();
+  };
 
   private readonly route = (): void => {
     const hash = location.hash;
@@ -354,20 +415,19 @@ export class MnmlPopupsCard extends LitElement {
   }
 
   setConfig(config: PopupsCard): void {
-    requireKnownKeys(config, POPUPS_CARD);
+    requireCard(config, CARD_STRUCTURES['custom:mnml-popups-card']);
     if (!/^\d+(?:\.\d+)?px$/.test(config.width)) {
       throw new Error('width must be a size in pixels, such as 560px');
     }
-    if (config.popups !== undefined && !Array.isArray(config.popups)) {
-      throw new Error('popups must be a list');
-    }
-    for (const [device, opening] of Object.entries(config.open ?? {})) {
-      requireOneOf(`open.${device}`, opening, OPENINGS);
+    if (config.idle_close !== undefined && config.idle_close <= 0) {
+      throw new Error('idle_close must be a number of seconds above zero');
     }
     checkPopups(config.popups ?? []);
     this.shut();
     this.ready = undefined;
     this.pending.clear();
+    this.held = undefined;
+    this.raised.clear();
     this.config = config;
     if (this.isConnected) {
       this.route();
@@ -379,15 +439,111 @@ export class MnmlPopupsCard extends LitElement {
   }
 
   set hass(hass: HomeAssistant | undefined) {
+    const previous = this.current;
     this.current = hass;
     if (hass === undefined) {
       return;
     }
-    for (const child of this.fed) {
-      feed(child, hass);
+    if (this.idle !== undefined && causedBy(previous, hass)) {
+      this.input();
     }
-    for (const child of this.ready?.cards ?? []) {
-      feed(child, hass);
+    for (const child of [...this.fed, ...(this.ready?.cards ?? [])]) {
+      this.feed(child, hass);
+    }
+    this.alert(hass);
+  }
+
+  private feed(child: Child, hass: HomeAssistant): void {
+    child.card.hass = hass;
+    child.card.hidden = !this.judge.shown(child.visibility, hass, child.entity);
+  }
+
+  private rejudge(): void {
+    const hass = this.current;
+    if (hass === undefined) {
+      return;
+    }
+    for (const child of [...this.fed, ...(this.ready?.cards ?? [])]) {
+      child.card.hidden = !this.judge.shown(child.visibility, hass, child.entity);
+    }
+  }
+
+  private alert(hass: HomeAssistant): void {
+    const alerts = this.config?.alerts ?? [];
+    const held = alerts.map((alert) => alerted(alert, hass));
+    const before = this.held;
+    this.held = held;
+    if (before === undefined || !this.isConnected) {
+      return;
+    }
+    for (const [index, alert] of alerts.entries()) {
+      if (held[index] === before[index]) {
+        continue;
+      }
+      if (held[index] === true) {
+        this.raise(index, alert, hass);
+      } else {
+        this.lower(index);
+      }
+    }
+  }
+
+  private raise(index: number, alert: PopupAlert, hass: HomeAssistant): void {
+    const user = hass.user?.id;
+    if (
+      (alert.screens !== undefined && !alert.screens.includes(screen())) ||
+      (alert.users !== undefined && (user === undefined || !alert.users.includes(user))) ||
+      location.hash === alert.popup
+    ) {
+      return;
+    }
+    if (!this.entries().some((popup) => popup.hash === alert.popup)) {
+      this.report(`alerts[${index}] opens ${alert.popup}, and no pop-up has that hash`);
+      return;
+    }
+    this.raised.set(index, alert.popup);
+    navigate(alert.popup);
+  }
+
+  private report(message: string): void {
+    if (reported.has(message)) {
+      return;
+    }
+    reported.add(message);
+    this.dispatchEvent(
+      new CustomEvent('hass-notification', {
+        bubbles: true,
+        composed: true,
+        detail: { message },
+      }),
+    );
+  }
+
+  private lower(index: number): void {
+    const hash = this.raised.get(index);
+    this.raised.delete(index);
+    if (hash !== undefined && location.hash === hash) {
+      back();
+    }
+  }
+
+  private watchIdle(): void {
+    const seconds = this.config?.idle_close;
+    this.lastInput = performance.now();
+    if (seconds === undefined || this.idle !== undefined) {
+      return;
+    }
+    for (const name of INPUT_EVENTS) {
+      window.addEventListener(name, this.input, { capture: true, passive: true });
+    }
+    this.idle = setTimeout(this.idled, seconds * 1000);
+  }
+
+  private stopIdle(): void {
+    clearTimeout(this.idle);
+    this.idle = undefined;
+    for (const name of INPUT_EVENTS) {
+      window.removeEventListener(name, this.input, { capture: true });
     }
   }
 
@@ -402,6 +558,7 @@ export class MnmlPopupsCard extends LitElement {
   override connectedCallback(): void {
     super.connectedCallback();
     trackInput();
+    this.held = undefined;
     this.landing = location.hash === '' ? undefined : location.hash;
     for (const name of ROUTE_EVENTS) {
       window.addEventListener(name, this.route);
@@ -424,6 +581,7 @@ export class MnmlPopupsCard extends LitElement {
     this.ready = undefined;
     this.pending.clear();
     this.shut();
+    this.judge.close();
   }
 
   protected override render(): TemplateResult | typeof nothing {
@@ -464,11 +622,16 @@ export class MnmlPopupsCard extends LitElement {
           @pointercancel=${this.swipe.cancel}
         >
           <div class="head">${first?.card ?? nothing}</div>
-          <div class="body" @scroll=${this.measure}>${rest.map((child) => child.card)}</div>
+          <div class="body" @scroll=${this.scrolled}>${rest.map((child) => child.card)}</div>
         </div>`,
       )}
     </dialog>`;
   }
+
+  private readonly scrolled = (): void => {
+    this.input();
+    this.measure();
+  };
 
   private readonly measure = (): void => {
     const body = this.renderRoot.querySelector('.body');
@@ -512,18 +675,20 @@ export class MnmlPopupsCard extends LitElement {
     return announced(this.config?.popups ?? []);
   }
 
-  private async build(entry: Popup): Promise<Child[]> {
-    const helpers = await window.loadCardHelpers?.();
-    if (helpers === undefined) {
-      return [];
-    }
-    return entry.cards.map((config) => {
-      const child = { card: helpers.createCardElement(config), visibility: config.visibility };
-      if (this.current !== undefined) {
-        feed(child, this.current);
-      }
-      return child;
-    });
+  private build(entry: Popup): Promise<Child[]> {
+    return Promise.all(
+      entry.cards.map(async (config) => {
+        const child = {
+          card: await cardOf(config),
+          entity: config['entity'],
+          visibility: config.visibility,
+        };
+        if (this.current !== undefined) {
+          this.feed(child, this.current);
+        }
+        return child;
+      }),
+    );
   }
 
   private async show(entry: Popup): Promise<void> {
@@ -531,6 +696,7 @@ export class MnmlPopupsCard extends LitElement {
       return;
     }
     this.shownHash = entry.hash;
+    this.watchIdle();
     this.turn += 1;
     const turn = this.turn;
     const label = headerName(entry.cards[0], this.current);
@@ -569,7 +735,7 @@ export class MnmlPopupsCard extends LitElement {
     const anchor = from;
     const open = before !== undefined && this.dialog?.open === true && !reduced();
     const session = open ? before.session : ++this.sessions;
-    const direction = popupDepth() >= this.shownDepth ? 1 : -1;
+    const direction = (popupDepth() >= this.shownDepth ? 1 : -1) * (rightToLeft(this) ? -1 : 1);
     this.shownDepth = popupDepth();
     const ready = this.ready;
     this.ready = undefined;
@@ -688,7 +854,7 @@ export class MnmlPopupsCard extends LitElement {
   }
 
   private opening(): PopupOpening {
-    const device = narrow(SHEET) ? 'phone' : narrow(TABLET) ? 'tablet' : 'desktop';
+    const device = screen();
     return this.config?.open?.[device] ?? DEFAULT_OPEN[device];
   }
 
@@ -709,6 +875,7 @@ export class MnmlPopupsCard extends LitElement {
 
   private shut(): void {
     this.shownHash = undefined;
+    this.stopIdle();
     this.unlock();
     if (this.leaving) {
       return;
@@ -767,8 +934,10 @@ export class MnmlPopupsCard extends LitElement {
     }
     this.motion = [];
     this.swipe.reset();
+    this.follower.stop();
     this.dialog?.close();
     letGoOfFocus();
+    this.judge.close();
     this.view = undefined;
     this.leaving = false;
   }

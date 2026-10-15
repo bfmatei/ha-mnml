@@ -3,9 +3,9 @@ import { join, resolve } from 'node:path';
 
 import { isMapping } from '../contract/templates.ts';
 import type { Value } from '../contract/templates.ts';
+import type { Registries } from '../ha/registries.ts';
 
 import { discover } from './discover.ts';
-import type { Registries } from './discover.ts';
 import { SHIPPED } from './shipped.ts';
 
 export const CORPUS_DIR = resolve(import.meta.dirname, 'corpus');

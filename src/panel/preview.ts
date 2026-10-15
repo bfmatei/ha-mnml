@@ -5,19 +5,28 @@ import { classMap } from 'lit/directives/class-map.js';
 import { live } from 'lit/directives/live.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
+import { cardOf } from '../cards/parts/card-element.ts';
 import { checkPopups } from '../cards/parts/popup-registry.ts';
 import type { Popup } from '../contract/cards.ts';
-import { PART_KEY, isMapping } from '../contract/templates.ts';
+import { isMapping, sameValue } from '../contract/templates.ts';
 import type { Template, Templates, Value, WrittenTemplate } from '../contract/templates.ts';
+import { popupChoices } from '../editors/popup-names.ts';
 import type { ChildCard } from '../ha/card-helpers.ts';
+import { rightToLeft } from '../ha/direction.ts';
 import { field } from '../ha/field.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
 import { navigate } from '../ha/navigation.ts';
-import { registriesOf } from '../ha/registries.ts';
+import { partName } from '../ha/part.ts';
+import { registriesOf } from '../ha/snapshot.ts';
 import { icon } from '../ha/templates.ts';
 import { discover } from '../templates/discover.ts';
-import { expand, filled } from '../templates/expand.ts';
+import { expand } from '../templates/expand.ts';
 import type { Marking } from '../templates/expand.ts';
+import { byFit, fitOf } from '../templates/rank.ts';
+import type { Fit } from '../templates/rank.ts';
+import type { PanelWords } from '../words/panel/en.ts';
+import { panelWordsFor } from '../words/panel/words.ts';
+import { wordsFor } from '../words/words.ts';
 
 import { shapedOf } from './data.ts';
 import { messageOf } from './message.ts';
@@ -35,9 +44,7 @@ export interface TrialOn {
 }
 
 function sourcesOf(list: readonly Value[]): string[] {
-  return list.map((each) =>
-    isMapping(each) && typeof each[PART_KEY] === 'string' ? each[PART_KEY] : '',
-  );
+  return list.map((each) => (isMapping(each) ? partName(each) : undefined) ?? '');
 }
 
 export function tryDraft(
@@ -60,9 +67,10 @@ export function tryDraft(
     found,
     new Set(),
     marking,
+    hass === undefined ? undefined : wordsFor(hass.locale.language).templates,
   );
   if (expanded.missing !== undefined) {
-    throw new Error(`waiting for ${expanded.missing.join(', ')}`);
+    throw new Error(panelWordsFor(hass?.locale.language).preview.waiting(expanded.missing));
   }
   const card = expanded.card;
   const popup = isMapping(card) && card['type'] === undefined && typeof card['hash'] === 'string';
@@ -85,25 +93,22 @@ export function richestArea(
   if (hass === undefined) {
     return undefined;
   }
-  const counted: { area: string; count: number }[] = [];
+  const registries = registriesOf(hass);
+  const fits: Fit[] = [];
   for (const area of areas) {
     try {
-      const found = discover(template, area.value, registriesOf(hass));
-      counted.push({
-        area: area.value,
-        count: Object.values(found).filter((value) => filled(value)).length,
-      });
+      fits.push(fitOf(template, { area: area.value }, registries));
     } catch {
       continue;
     }
   }
-  for (const { area, count } of counted.toSorted((a, b) => b.count - a.count)) {
+  for (const { scope, count } of fits.toSorted(byFit)) {
     if (count === 0) {
-      return undefined;
+      continue;
     }
     try {
-      tryDraft(templates, name, template, { area }, hass);
-      return area;
+      tryDraft(templates, name, template, { area: scope.area }, hass);
+      return scope.area;
     } catch {
       continue;
     }
@@ -113,6 +118,15 @@ export function richestArea(
 
 export function trialOf(template: WrittenTemplate, area: string | undefined): TrialOn {
   return area === undefined ? { slots: template.example ?? {} } : { area };
+}
+
+async function partCard(config: object): Promise<ChildCard> {
+  const card = await cardOf(config);
+  const part = partName(config);
+  if (part !== undefined && !card.hasAttribute('data-part')) {
+    card.setAttribute('data-part', part);
+  }
+  return card;
 }
 
 export interface Area {
@@ -173,8 +187,8 @@ function markNative(root: ParentNode): void {
   for (const child of root.querySelectorAll('*')) {
     if (!child.hasAttribute('data-part')) {
       const config: unknown = Reflect.get(child, 'config') ?? Reflect.get(child, '_config');
-      const part = isMapping(config) ? config[PART_KEY] : undefined;
-      if (typeof part === 'string') {
+      const part = isMapping(config) ? partName(config) : undefined;
+      if (part !== undefined) {
         child.setAttribute('data-part', part);
       }
     }
@@ -266,7 +280,7 @@ const PREVIEW_STYLE = css`
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
-    margin-right: auto;
+    margin-inline-end: auto;
   }
 `;
 
@@ -289,7 +303,6 @@ export class MnmlPreview extends LitElement {
   @state() private hovered = '';
   @state() private dropping = '';
   @state() private boxes: Box[] = [];
-  @state() private helpless = false;
   @query('.cards') private stage: HTMLElement | null | undefined;
   @query('.stage-box') private frame: HTMLElement | null | undefined;
   private made: Trial | undefined;
@@ -306,6 +319,10 @@ export class MnmlPreview extends LitElement {
     super.disconnectedCallback();
     this.watcher?.disconnect();
     this.watcher = undefined;
+  }
+
+  private words(): PanelWords['preview'] {
+    return panelWordsFor(this.hass?.locale.language).preview;
   }
 
   protected override willUpdate(changed: PropertyValues<this>): void {
@@ -484,15 +501,18 @@ export class MnmlPreview extends LitElement {
           this.pick?.(next);
         }
       };
-      if (event.altKey && ['ArrowLeft', 'ArrowUp'].includes(event.key)) {
+      const mirrored = rightToLeft(this);
+      const back = new Set(['ArrowUp', mirrored ? 'ArrowRight' : 'ArrowLeft']);
+      const ahead = new Set(['ArrowDown', mirrored ? 'ArrowLeft' : 'ArrowRight']);
+      if (event.altKey && back.has(event.key)) {
         event.preventDefault();
         this.act?.('earlier');
-      } else if (event.altKey && ['ArrowRight', 'ArrowDown'].includes(event.key)) {
+      } else if (event.altKey && ahead.has(event.key)) {
         event.preventDefault();
         this.act?.('later');
-      } else if (['ArrowRight', 'ArrowDown'].includes(event.key)) {
+      } else if (ahead.has(event.key)) {
         go(at + 1);
-      } else if (['ArrowLeft', 'ArrowUp'].includes(event.key)) {
+      } else if (back.has(event.key)) {
         go(at <= 0 ? 0 : at - 1);
       } else if (event.key === 'Home') {
         go(0);
@@ -542,8 +562,8 @@ export class MnmlPreview extends LitElement {
       return nothing;
     }
     const views = [
-      ...(made.card === null ? [] : ['card']),
-      ...made.popups.map((popup) => popup.hash),
+      ...(made.card === null ? [] : [{ value: 'card', label: this.words().card }]),
+      ...popupChoices(made.popups, this.hass),
     ];
     const now = this.shownView();
     return html`<div class="view-tabs">
@@ -551,13 +571,14 @@ export class MnmlPreview extends LitElement {
         (view) =>
           html`<button
             type="button"
-            class=${classMap({ chip: true, active: view === now })}
-            aria-pressed=${view === now}
+            class=${classMap({ chip: true, active: view.value === now })}
+            aria-pressed=${view.value === now}
+            title=${view.value === 'card' ? nothing : view.value}
             @click=${() => {
-              this.show?.(view);
+              this.show?.(view.value);
             }}
           >
-            ${view === 'card' ? 'Card' : view}
+            ${view.label}
           </button>`,
       )}
     </div>`;
@@ -565,20 +586,21 @@ export class MnmlPreview extends LitElement {
 
   protected override render(): TemplateResult {
     const made = this.made;
+    const said = this.words();
     return html`<div class=${classMap({ preview: true, staged: this.staged })}>
       <div class="preview-head">
         ${this.drawViews(made)}
-        <span class="muted">Try it on</span>
+        <span class="muted">${said.tryOn}</span>
         <select
           class="area-picker"
-          aria-label="Try it on"
+          aria-label=${said.tryOn}
           .value=${live(this.area ?? '')}
           @change=${(event: Event) => {
             const value = field(event.target, 'value');
             this.choose?.(typeof value === 'string' && value !== '' ? value : undefined);
           }}
         >
-          <option value="" ?selected=${this.area === undefined}>The example</option>
+          <option value="" ?selected=${this.area === undefined}>${said.example}</option>
           ${this.areas.map(
             (area) =>
               html`<option value=${area.value} ?selected=${area.value === this.area}>
@@ -591,34 +613,22 @@ export class MnmlPreview extends LitElement {
         class="stage stage-box"
         tabindex=${this.staged ? 0 : nothing}
         role=${this.staged ? 'application' : nothing}
-        aria-label=${
-          this.staged
-            ? 'The card. Click a part, or use the arrow keys to move between parts. Delete removes the part, Alt and the arrows move it.'
-            : nothing
-        }
+        aria-label=${this.staged ? said.stage : nothing}
         @keydown=${this.staged ? this.onKeys : nothing}
       >
         ${
           this.problem === undefined
             ? html`<div
-                  class=${classMap({ cards: true, sheet: this.staged && this.shownView() !== 'card' })}
-                  @click=${this.staged ? this.onClick : nothing}
-                  @pointerdown=${this.staged ? this.onDown : nothing}
-                  @pointerup=${this.staged ? this.onUp : nothing}
-                  @pointercancel=${this.staged ? this.onCancel : nothing}
-                  @touchmove=${this.staged ? this.onTouch : nothing}
-                  @pointermove=${this.staged ? this.onMove : nothing}
-                  @pointerleave=${this.staged ? this.onLeave : nothing}
-                  @keydown=${this.staged ? this.onSilence : nothing}
-                ></div>
-                ${
-                  this.helpless
-                    ? html`<p class="muted">
-                        Home Assistant has not loaded its card helpers on this page, so the preview
-                        cannot draw. Open a dashboard once, then come back.
-                      </p>`
-                    : nothing
-                }`
+                class=${classMap({ cards: true, sheet: this.staged && this.shownView() !== 'card' })}
+                @click=${this.staged ? this.onClick : nothing}
+                @pointerdown=${this.staged ? this.onDown : nothing}
+                @pointerup=${this.staged ? this.onUp : nothing}
+                @pointercancel=${this.staged ? this.onCancel : nothing}
+                @touchmove=${this.staged ? this.onTouch : nothing}
+                @pointermove=${this.staged ? this.onMove : nothing}
+                @pointerleave=${this.staged ? this.onLeave : nothing}
+                @keydown=${this.staged ? this.onSilence : nothing}
+              ></div>`
             : html`<div class="problem">
                 ${icon('mdi:alert-circle-outline')}<span>${this.problem}</span>
               </div>`
@@ -647,19 +657,19 @@ export class MnmlPreview extends LitElement {
         this.staged || made === undefined || made.popups.length === 0
           ? nothing
           : html`<div class="popup-list">
-              <span class="muted">Pop-ups</span>
-              ${made.popups.map(
+              <span class="muted">${said.popups}</span>
+              ${popupChoices(made.popups, this.hass).map(
                 (popup) =>
                   html`<button
                     type="button"
                     class="chip"
-                    aria-label=${`Open ${popup.hash}`}
-                    title=${`Open ${popup.hash}`}
+                    aria-label=${said.open(popup.label)}
+                    title=${said.openAt(popup.label, popup.value)}
                     @click=${() => {
-                      navigate(popup.hash);
+                      navigate(popup.value);
                     }}
                   >
-                    ${popup.hash}
+                    ${popup.label}
                   </button>`,
               )}
             </div>`
@@ -729,7 +739,7 @@ export class MnmlPreview extends LitElement {
     add('drop', this.dropping);
     add('hover', this.hovered);
     add('chosen', this.selected);
-    if (JSON.stringify(boxes) !== JSON.stringify(this.boxes)) {
+    if (!sameValue(boxes, this.boxes)) {
       this.boxes = boxes;
     }
   }
@@ -742,42 +752,22 @@ export class MnmlPreview extends LitElement {
     }
     this.drawing += 1;
     const mine = this.drawing;
-    const load = window.loadCardHelpers;
-    this.helpless = load === undefined;
-    if (load === undefined) {
-      box.replaceChildren();
-      return;
-    }
-    const helpers = await load();
-    if (mine !== this.drawing) {
-      return;
-    }
-    const create = (config: object): ChildCard => {
-      const card = helpers.createCardElement(config);
-      const part: unknown = Reflect.get(config, PART_KEY);
-      if (typeof part === 'string' && !card.hasAttribute('data-part')) {
-        card.setAttribute('data-part', part);
-      }
-      return card;
-    };
     const sheet = this.staged
       ? made.popups.find((popup) => popup.hash === this.shownView())
       : undefined;
-    const cards =
+    const cards = await Promise.all(
       sheet === undefined
         ? [
-            ...(isMapping(made.card) ? [create(made.card)] : []),
+            ...(isMapping(made.card) ? [partCard(made.card)] : []),
             ...(made.popups.length > 0 && !this.staged
-              ? [
-                  helpers.createCardElement({
-                    type: 'custom:mnml-popups-card',
-                    width: '600px',
-                    popups: made.popups,
-                  }),
-                ]
+              ? [cardOf({ type: 'custom:mnml-popups-card', width: '600px', popups: made.popups })]
               : []),
           ]
-        : sheet.cards.map((card) => create(card));
+        : sheet.cards.map((card) => partCard(card)),
+    );
+    if (mine !== this.drawing) {
+      return;
+    }
     for (const card of cards) {
       card.preview = true;
       if (this.hass !== undefined) {

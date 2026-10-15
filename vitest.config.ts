@@ -7,8 +7,9 @@ export default defineConfig({
         test: {
           name: 'node',
           environment: 'node',
+          pool: 'threads',
           include: [
-            'src/{contract,templates,home,builder,theme,build}/**/*.test.ts',
+            'src/{contract,interface,templates,home,builder,theme,build,words}/**/*.test.ts',
             'tools/**/*.test.ts',
             'demo/**/*.test.ts',
           ],
@@ -18,7 +19,8 @@ export default defineConfig({
         test: {
           name: 'browser',
           environment: 'jsdom',
-          include: ['src/{cards,ha,store,editors,panel,test}/**/*.test.ts'],
+          pool: 'threads',
+          include: ['src/{cards,ha,store,editors,panel,test,strategy}/**/*.test.ts'],
         },
       },
     ],

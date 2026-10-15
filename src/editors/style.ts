@@ -80,7 +80,7 @@ export const EDITOR_STYLE = css`
     align-items: center;
     gap: 4px;
     min-height: 48px;
-    padding-left: 4px;
+    padding-inline-start: 4px;
   }
   .part-title {
     all: unset;
@@ -158,13 +158,34 @@ export const EDITOR_STYLE = css`
     justify-content: space-between;
     gap: 8px;
   }
+  .template-icon {
+    flex: none;
+    color: var(--secondary-text-color);
+  }
   .template-name {
+    flex: 1;
     font-size: 16px;
     color: var(--primary-text-color);
   }
   .template-description {
     color: var(--secondary-text-color);
     font-size: 13px;
+  }
+  .which {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+  }
+  .which p {
+    flex-basis: 100%;
+    margin: 0;
+  }
+  .template-code {
+    font-family: var(--ha-font-family-code, monospace);
+    font-size: 11px;
+    color: var(--secondary-text-color);
   }
   .sources {
     display: flex;

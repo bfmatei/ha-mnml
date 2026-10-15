@@ -32,6 +32,16 @@ template:
         unique_id: fixture_steps
         unit_of_measurement: steps
         state: '{{ none }}'
+      - name: Fixture power a
+        unique_id: fixture_power_a
+        unit_of_measurement: W
+        device_class: power
+        state: '12.5'
+      - name: Fixture power b
+        unique_id: fixture_power_b
+        unit_of_measurement: W
+        device_class: power
+        state: '80'
       - name: Fixture window front left
         unique_id: fixture_window_front_left
         state: OPEN

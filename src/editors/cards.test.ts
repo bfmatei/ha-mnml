@@ -10,8 +10,8 @@ import type { Value } from '../contract/templates.ts';
 import { drawn } from '../home/view.ts';
 
 import { DESCRIPTIONS } from './cards.ts';
-import { checkValue, cleanValue } from './shape.ts';
-import type { Shape } from './shape.ts';
+import { checkValue, cleanValue } from './form.ts';
+import type { Form } from './form.ts';
 
 function collect(value: unknown, into: Record<string, Value>[]): Record<string, Value>[] {
   if (Array.isArray(value)) {
@@ -33,19 +33,19 @@ function collect(value: unknown, into: Record<string, Value>[]): Record<string, 
 const examples: unknown = parse(readFileSync('examples/cards.yaml', 'utf8'));
 const CARDS = [...collect(drawn(DEMO), []), ...collect(examples, [])];
 
-const shapeFor = (card: Record<string, Value>): Shape => {
+const formFor = (card: Record<string, Value>): Form => {
   const type = card['type'];
-  const shape = typeof type === 'string' ? DESCRIPTIONS[type] : undefined;
-  assert.ok(shape, `a description for ${JSON.stringify(type)}`);
-  return shape;
+  const form = typeof type === 'string' ? DESCRIPTIONS[type] : undefined;
+  assert.ok(form, `a description for ${JSON.stringify(type)}`);
+  return form;
 };
 
 test('every card the demo home draws, and every example card, goes through the editor unchanged', () => {
   assert.ok(CARDS.length > 300, `${CARDS.length} cards`);
   for (const card of CARDS) {
-    const shape = shapeFor(card);
-    checkValue(shape, card);
-    assert.equal(JSON.stringify(cleanValue(shape, card)), JSON.stringify(card));
+    const form = formFor(card);
+    checkValue(form, card);
+    assert.equal(JSON.stringify(cleanValue(form, card)), JSON.stringify(card));
   }
 });
 
@@ -73,12 +73,12 @@ test('the round trip meets every card with a description, and every kind of cont
   ]);
 });
 
-function plains(shape: Shape, seen = new Set<Shape>()): Set<Shape> {
-  if (seen.has(shape)) {
+function plains(form: Form, seen = new Set<Form>()): Set<Form> {
+  if (seen.has(form)) {
     return seen;
   }
-  seen.add(shape);
-  const own = shape.kind === 'plain' ? [shape] : shape.variants.map((variant) => variant.shape);
+  seen.add(form);
+  const own = form.kind === 'plain' ? [form] : form.variants.map((variant) => variant.form);
   for (const each of own) {
     seen.add(each);
     for (const field of Object.values(each.fields)) {
@@ -90,14 +90,14 @@ function plains(shape: Shape, seen = new Set<Shape>()): Set<Shape> {
   return seen;
 }
 
-test('every field of every shape is in exactly one of its sections', () => {
+test('every field of every form is in exactly one of its sections', () => {
   for (const top of Object.values(DESCRIPTIONS)) {
-    for (const shape of plains(top)) {
-      if (shape.kind !== 'plain') {
+    for (const form of plains(top)) {
+      if (form.kind !== 'plain') {
         continue;
       }
-      const listed = shape.sections.flatMap((section) => section.keys);
-      assert.deepEqual(listed.toSorted(), Object.keys(shape.fields).toSorted(), shape.id);
+      const listed = form.sections.flatMap((section) => section.keys);
+      assert.deepEqual(listed.toSorted(), Object.keys(form.fields).toSorted(), form.id);
     }
   }
 });

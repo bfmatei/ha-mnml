@@ -1,7 +1,10 @@
 import type { SlotSpec, Template, Value } from '../contract/templates.ts';
+import type { EntityEntry, Registries } from '../ha/registries.ts';
 
-import { areaOf, describe, deviceName, discoverSlot, fromDevice, matches } from './discover.ts';
-import type { Registries, Step } from './discover.ts';
+import { discoverSlot, fromDevice } from './discover.ts';
+import type { Step } from './discover.ts';
+import { areaOf, deviceName, indexOf, relativesOf } from './entity-index.ts';
+import { describe, matches } from './filters.ts';
 
 export interface DeviceFit {
   id: string;
@@ -18,14 +21,36 @@ export interface Trace {
 }
 
 const ELSEWHERE = 3;
+const NEEDS_AREA = 'needs an area: without one only whole-home rules run';
 
-function reasonOf(steps: Step[], registries: Registries): string | undefined {
+function roomOf(
+  area: string | undefined,
+  device: string | undefined,
+  registries: Registries,
+): string | undefined {
+  return (
+    area ?? (device === undefined ? undefined : (registries.devices[device]?.area_id ?? undefined))
+  );
+}
+
+function reasonOf(
+  steps: Step[],
+  registries: Registries,
+  area: string | undefined,
+  device: string | undefined,
+): string | undefined {
   const first = steps.find((step) => step.filter !== undefined);
   if (first?.filter === undefined) {
     const named = steps[0];
-    return named?.area === null || named?.area === undefined
-      ? 'needs an area: without one only whole-home rules run'
-      : 'the area has none';
+    if (named?.missing !== undefined) {
+      return named.missing;
+    }
+    if (device !== undefined) {
+      return roomOf(area, device, registries) === undefined
+        ? `${deviceName(device, registries)} is in no area`
+        : 'the area has none';
+    }
+    return named?.area === null || named?.area === undefined ? NEEDS_AREA : 'the area has none';
   }
   if (first.devices !== undefined && first.devices.length > 0) {
     const names = first.devices.map((id) => deviceName(id, registries));
@@ -33,13 +58,16 @@ function reasonOf(steps: Step[], registries: Registries): string | undefined {
   }
   const { filter } = first;
   const everywhere = first.everywhere;
-  if (!everywhere && (first.area === null || first.area === undefined)) {
-    return 'needs an area: without one only whole-home rules run';
+  const unplaced = first.area === null || first.area === undefined;
+  const on = !everywhere && unplaced ? device : undefined;
+  if (!everywhere && unplaced && on === undefined) {
+    return NEEDS_AREA;
   }
-  const where = everywhere
-    ? 'the home'
-    : (registries.areas[first.area ?? '']?.name ?? String(first.area));
-  const parts = [`no ${first.devices === undefined ? describe(filter) : first.rule} in ${where}`];
+  const where =
+    on === undefined
+      ? `in ${everywhere ? 'the home' : (registries.areas[first.area ?? '']?.name ?? String(first.area))}`
+      : `on ${deviceName(on, registries)}`;
+  const parts = [`no ${first.devices === undefined ? describe(filter) : first.rule} ${where}`];
   const near = steps.flatMap((step) => step.near).slice(0, ELSEWHERE);
   if (near.length > 0) {
     parts.push(
@@ -47,10 +75,13 @@ function reasonOf(steps: Step[], registries: Registries): string | undefined {
     );
   }
   if (!everywhere) {
-    const elsewhere = Object.values(registries.entities)
-      .filter((entry) => entry.hidden !== true && matches(entry, filter, registries))
-      .filter((entry) => areaOf(entry, registries) !== first.area)
-      .toSorted((a, b) => a.entity_id.localeCompare(b.entity_id))
+    const mine = on === undefined ? undefined : new Set([on, ...relativesOf(on, registries)]);
+    const away = (entry: EntityEntry): boolean =>
+      mine === undefined
+        ? areaOf(entry, registries) !== first.area
+        : !mine.has(entry.device_id ?? '');
+    const elsewhere = indexOf(registries)
+      .visible.filter((entry) => matches(entry, filter, registries) && away(entry))
       .slice(0, ELSEWHERE);
     if (elsewhere.length > 0) {
       parts.push(
@@ -66,7 +97,7 @@ function reasonOf(steps: Step[], registries: Registries): string | undefined {
   return parts.join('; ');
 }
 
-function fitOf(id: string, registries: Registries): DeviceFit {
+export function deviceFit(id: string, registries: Registries): DeviceFit {
   const area = registries.devices[id]?.area_id;
   const named = area === undefined || area === null ? undefined : registries.areas[area]?.name;
   return {
@@ -89,7 +120,7 @@ function fitting(
   const devices = [...new Set(anchors.flatMap((step) => step.devices ?? []))]
     .filter((id) => registries.devices[id] !== undefined)
     .filter((id) => fromDevice(spec, id, area, registries) !== undefined)
-    .map((id) => fitOf(id, registries));
+    .map((id) => deviceFit(id, registries));
   const device = anchors
     .flatMap((step) => step.chosen ?? [])
     .find((id) => devices.some((fit) => fit.id === id));
@@ -103,6 +134,7 @@ export function explain(
   template: Template,
   area: string | undefined,
   registries: Registries,
+  device?: string,
 ): Record<string, Trace> {
   const traces: Record<string, Trace> = {};
   for (const [slot, spec] of Object.entries(template.slots ?? {})) {
@@ -110,12 +142,19 @@ export function explain(
       continue;
     }
     const steps: Step[] = [];
-    const value = discoverSlot(slot, spec, area, registries, { step: (step) => steps.push(step) });
+    const value = discoverSlot(
+      slot,
+      spec,
+      area,
+      registries,
+      { step: (step) => steps.push(step) },
+      device,
+    );
     traces[slot] = {
       value,
       steps,
-      ...(value === undefined ? { reason: reasonOf(steps, registries) } : {}),
-      ...fitting(spec, steps, area, registries),
+      ...(value === undefined ? { reason: reasonOf(steps, registries, area, device) } : {}),
+      ...fitting(spec, steps, roomOf(area, device, registries), registries),
     };
   }
   return traces;

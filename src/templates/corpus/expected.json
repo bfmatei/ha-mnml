@@ -1,5 +1,41 @@
 {
   "demo": {
+    "3d-printer-card": {
+      "bedroom": {
+        "key": "bedroom",
+        "name": "Bedroom"
+      },
+      "kitchen": {
+        "key": "kitchen",
+        "name": "Kitchen"
+      },
+      "living": {
+        "key": "living",
+        "name": "Living"
+      },
+      "living_room": {
+        "key": "living_room",
+        "name": "Living Room"
+      }
+    },
+    "ac-item": {
+      "bedroom": {
+        "key": "bedroom",
+        "name": "Bedroom"
+      },
+      "kitchen": {
+        "key": "kitchen",
+        "name": "Kitchen"
+      },
+      "living": {
+        "key": "living",
+        "name": "Living"
+      },
+      "living_room": {
+        "key": "living_room",
+        "name": "Living Room"
+      }
+    },
     "glances": {
       "*": {
         "alarm": "alarm_control_panel.infrastructure_home_alarm",
@@ -55,6 +91,12 @@
         ],
         "leaks": ["binary_sensor.basement_floor_wet", "binary_sensor.hall_laundry_water_leak"],
         "people": ["person.demo", "person.jane", "person.joe"],
+        "room_leaks": [
+          {
+            "room": "kitchen",
+            "sensors": ["binary_sensor.basement_floor_wet"]
+          }
+        ],
         "smoke": ["binary_sensor.hall_smoke", "binary_sensor.kitchen_smoke"],
         "updates": [
           "update.bathroom_climate_firmware",
@@ -167,6 +209,12 @@
         ],
         "leaks": ["binary_sensor.basement_floor_wet", "binary_sensor.hall_laundry_water_leak"],
         "people": ["person.demo", "person.jane", "person.joe"],
+        "room_leaks": [
+          {
+            "room": "kitchen",
+            "sensors": ["binary_sensor.basement_floor_wet"]
+          }
+        ],
         "smoke": ["binary_sensor.hall_smoke", "binary_sensor.kitchen_smoke"],
         "updates": [
           "update.bathroom_climate_firmware",
@@ -279,6 +327,12 @@
         ],
         "leaks": ["binary_sensor.basement_floor_wet", "binary_sensor.hall_laundry_water_leak"],
         "people": ["person.demo", "person.jane", "person.joe"],
+        "room_leaks": [
+          {
+            "room": "kitchen",
+            "sensors": ["binary_sensor.basement_floor_wet"]
+          }
+        ],
         "smoke": ["binary_sensor.hall_smoke", "binary_sensor.kitchen_smoke"],
         "updates": [
           "update.bathroom_climate_firmware",
@@ -391,6 +445,12 @@
         ],
         "leaks": ["binary_sensor.basement_floor_wet", "binary_sensor.hall_laundry_water_leak"],
         "people": ["person.demo", "person.jane", "person.joe"],
+        "room_leaks": [
+          {
+            "room": "kitchen",
+            "sensors": ["binary_sensor.basement_floor_wet"]
+          }
+        ],
         "smoke": ["binary_sensor.hall_smoke", "binary_sensor.kitchen_smoke"],
         "updates": [
           "update.bathroom_climate_firmware",
@@ -503,6 +563,12 @@
         ],
         "leaks": ["binary_sensor.basement_floor_wet", "binary_sensor.hall_laundry_water_leak"],
         "people": ["person.demo", "person.jane", "person.joe"],
+        "room_leaks": [
+          {
+            "room": "kitchen",
+            "sensors": ["binary_sensor.basement_floor_wet"]
+          }
+        ],
         "smoke": ["binary_sensor.hall_smoke", "binary_sensor.kitchen_smoke"],
         "updates": [
           "update.bathroom_climate_firmware",
@@ -562,6 +628,26 @@
         "weather": "weather.demo_weather_north"
       }
     },
+    "heating-item": {
+      "bedroom": {
+        "key": "bedroom",
+        "name": "Bedroom"
+      },
+      "kitchen": {
+        "entity": "climate.heatpump",
+        "key": "kitchen",
+        "name": "Kitchen"
+      },
+      "living": {
+        "entity": "climate.hvac",
+        "key": "living",
+        "name": "Living"
+      },
+      "living_room": {
+        "key": "living_room",
+        "name": "Living Room"
+      }
+    },
     "home-assistant": {
       "*": {
         "all_firmware": [
@@ -597,6 +683,14 @@
           "update.demo_update_with_decimal_progress",
           "update.demo_update_with_progress"
         ]
+      }
+    },
+    "light-card": {
+      "kitchen": {
+        "entity": "light.kitchen_lights"
+      },
+      "living": {
+        "entity": "light.ceiling_lights"
       }
     },
     "person": {
@@ -705,9 +799,194 @@
           "update.demo_update_with_progress"
         ]
       }
+    },
+    "vacuum-card": {
+      "bedroom": {
+        "key": "bedroom",
+        "name": "Bedroom"
+      },
+      "kitchen": {
+        "key": "kitchen",
+        "name": "Kitchen"
+      },
+      "living": {
+        "key": "living",
+        "name": "Living"
+      },
+      "living_room": {
+        "key": "living_room",
+        "name": "Living Room"
+      }
     }
   },
   "devices": {
+    "3d-printer-card": {
+      "bedroom": {
+        "key": "bedroom",
+        "name": "Bedroom"
+      },
+      "hall": {
+        "key": "hall",
+        "name": "Hall"
+      },
+      "kitchen": {
+        "key": "kitchen",
+        "name": "Kitchen"
+      },
+      "laundry": {
+        "key": "laundry",
+        "name": "Laundry"
+      },
+      "living": {
+        "key": "living",
+        "name": "Living"
+      },
+      "office": {
+        "key": "office",
+        "name": "Office",
+        "printer3d": {
+          "actions": {
+            "cancel": "button.prusa_mk4_cancel_job",
+            "pause": "button.prusa_mk4_pause_job",
+            "resume": "button.prusa_mk4_resume_job"
+          },
+          "bed": {
+            "target": "sensor.prusa_mk4_heatbed_target_temperature",
+            "temperature": "sensor.prusa_mk4_heatbed_temperature"
+          },
+          "camera": "camera.prusa_mk4_preview",
+          "entity": "sensor.prusa_mk4",
+          "filename": "sensor.prusa_mk4_filename",
+          "finish": "sensor.prusa_mk4_print_finish",
+          "material": "sensor.prusa_mk4_material",
+          "nozzle": {
+            "target": "sensor.prusa_mk4_nozzle_target_temperature",
+            "temperature": "sensor.prusa_mk4_nozzle_temperature"
+          },
+          "progress": "sensor.prusa_mk4_progress",
+          "speed": "sensor.prusa_mk4_print_speed",
+          "start": "sensor.prusa_mk4_print_start"
+        }
+      }
+    },
+    "3d-printer-controls": {
+      "office": {
+        "printer3d": {
+          "actions": {
+            "cancel": "button.prusa_mk4_cancel_job",
+            "pause": "button.prusa_mk4_pause_job",
+            "resume": "button.prusa_mk4_resume_job"
+          },
+          "bed": {
+            "target": "sensor.prusa_mk4_heatbed_target_temperature",
+            "temperature": "sensor.prusa_mk4_heatbed_temperature"
+          },
+          "camera": "camera.prusa_mk4_preview",
+          "entity": "sensor.prusa_mk4",
+          "filename": "sensor.prusa_mk4_filename",
+          "finish": "sensor.prusa_mk4_print_finish",
+          "material": "sensor.prusa_mk4_material",
+          "nozzle": {
+            "target": "sensor.prusa_mk4_nozzle_target_temperature",
+            "temperature": "sensor.prusa_mk4_nozzle_temperature"
+          },
+          "progress": "sensor.prusa_mk4_progress",
+          "speed": "sensor.prusa_mk4_print_speed",
+          "start": "sensor.prusa_mk4_print_start"
+        }
+      }
+    },
+    "3d-printer-popup": {
+      "office": {
+        "printer3d": {
+          "actions": {
+            "cancel": "button.prusa_mk4_cancel_job",
+            "pause": "button.prusa_mk4_pause_job",
+            "resume": "button.prusa_mk4_resume_job"
+          },
+          "bed": {
+            "target": "sensor.prusa_mk4_heatbed_target_temperature",
+            "temperature": "sensor.prusa_mk4_heatbed_temperature"
+          },
+          "camera": "camera.prusa_mk4_preview",
+          "entity": "sensor.prusa_mk4",
+          "filename": "sensor.prusa_mk4_filename",
+          "finish": "sensor.prusa_mk4_print_finish",
+          "material": "sensor.prusa_mk4_material",
+          "nozzle": {
+            "target": "sensor.prusa_mk4_nozzle_target_temperature",
+            "temperature": "sensor.prusa_mk4_nozzle_temperature"
+          },
+          "progress": "sensor.prusa_mk4_progress",
+          "speed": "sensor.prusa_mk4_print_speed",
+          "start": "sensor.prusa_mk4_print_start"
+        }
+      }
+    },
+    "3d-printer-state": {
+      "office": {
+        "printer3d": {
+          "actions": {
+            "cancel": "button.prusa_mk4_cancel_job",
+            "pause": "button.prusa_mk4_pause_job",
+            "resume": "button.prusa_mk4_resume_job"
+          },
+          "bed": {
+            "target": "sensor.prusa_mk4_heatbed_target_temperature",
+            "temperature": "sensor.prusa_mk4_heatbed_temperature"
+          },
+          "camera": "camera.prusa_mk4_preview",
+          "entity": "sensor.prusa_mk4",
+          "filename": "sensor.prusa_mk4_filename",
+          "finish": "sensor.prusa_mk4_print_finish",
+          "material": "sensor.prusa_mk4_material",
+          "nozzle": {
+            "target": "sensor.prusa_mk4_nozzle_target_temperature",
+            "temperature": "sensor.prusa_mk4_nozzle_temperature"
+          },
+          "progress": "sensor.prusa_mk4_progress",
+          "speed": "sensor.prusa_mk4_print_speed",
+          "start": "sensor.prusa_mk4_print_start"
+        }
+      }
+    },
+    "ac-item": {
+      "bedroom": {
+        "energy": {
+          "power": "sensor.bedroom_ac_estimated_power_consumption",
+          "today": "sensor.bedroom_ac_energy_today",
+          "total": "sensor.bedroom_ac_energy_consumption"
+        },
+        "entity": "climate.bedroom_ac",
+        "key": "bedroom",
+        "name": "Bedroom"
+      },
+      "hall": {
+        "key": "hall",
+        "name": "Hall"
+      },
+      "kitchen": {
+        "key": "kitchen",
+        "name": "Kitchen"
+      },
+      "laundry": {
+        "key": "laundry",
+        "name": "Laundry"
+      },
+      "living": {
+        "key": "living",
+        "name": "Living"
+      },
+      "office": {
+        "key": "office",
+        "name": "Office"
+      }
+    },
+    "camera-card": {
+      "office": {
+        "entity": "camera.prusa_mk4_preview"
+      }
+    },
     "glances": {
       "*": {
         "batteries": [
@@ -764,6 +1043,40 @@
           "sensor.roborock_s8_battery"
         ],
         "updates": ["update.kettle_plug_firmware", "update.radiator_valve_firmware"]
+      }
+    },
+    "heating-item": {
+      "bedroom": {
+        "entity": "climate.bedroom_heating",
+        "key": "bedroom",
+        "name": "Bedroom",
+        "thermostats": [
+          {
+            "battery": "sensor.radiator_valve_battery",
+            "valve": "sensor.radiator_valve_valve_position"
+          }
+        ]
+      },
+      "hall": {
+        "entity": "climate.hall_heater",
+        "key": "hall",
+        "name": "Hall"
+      },
+      "kitchen": {
+        "key": "kitchen",
+        "name": "Kitchen"
+      },
+      "laundry": {
+        "key": "laundry",
+        "name": "Laundry"
+      },
+      "living": {
+        "key": "living",
+        "name": "Living"
+      },
+      "office": {
+        "key": "office",
+        "name": "Office"
       }
     },
     "home-assistant": {
@@ -857,6 +1170,11 @@
             "name": "Kitchen"
           }
         ]
+      }
+    },
+    "media-card": {
+      "living": {
+        "entity": "media_player.living_room"
       }
     },
     "person": {
@@ -1051,6 +1369,68 @@
         "temperature": "sensor.desk_sensor_temperature"
       }
     },
+    "room-popup": {
+      "living": {
+        "vacuum": {
+          "area": "sensor.roborock_s8_cleaning_area",
+          "battery": "sensor.roborock_s8_battery",
+          "current_room": "sensor.roborock_s8_current_room",
+          "dock": {
+            "dust_emptying": "switch.roborock_s8_dock_dust_emptying",
+            "error": "sensor.roborock_s8_dock_dock_error",
+            "mop_drying": "switch.roborock_s8_dock_mop_drying",
+            "mop_drying_time_left": "sensor.roborock_s8_dock_mop_drying_remaining_time",
+            "mop_washing": "switch.roborock_s8_dock_mop_washing",
+            "warnings": [
+              "binary_sensor.roborock_s8_dock_clean_water_box",
+              "binary_sensor.roborock_s8_dock_dirty_water_box"
+            ]
+          },
+          "entity": "vacuum.roborock_s8",
+          "error": "sensor.roborock_s8_vacuum_error",
+          "last_clean": "sensor.roborock_s8_last_clean_end",
+          "map": "image.roborock_s8_downstairs",
+          "mop_attached": "binary_sensor.roborock_s8_mop_attached",
+          "progress": "sensor.roborock_s8_cleaning_progress",
+          "routines": ["button.roborock_s8_daily_clean"],
+          "settings": ["select.roborock_s8_mop_intensity", "select.roborock_s8_mop_mode"],
+          "status": "sensor.roborock_s8_status",
+          "time": "sensor.roborock_s8_cleaning_time",
+          "totals": {
+            "area": "sensor.roborock_s8_total_cleaning_area",
+            "count": "sensor.roborock_s8_total_cleaning_count",
+            "time": "sensor.roborock_s8_total_cleaning_time"
+          },
+          "warnings": ["binary_sensor.roborock_s8_water_shortage"],
+          "water_box_attached": "binary_sensor.roborock_s8_water_box_attached"
+        }
+      },
+      "office": {
+        "printer3d": {
+          "actions": {
+            "cancel": "button.prusa_mk4_cancel_job",
+            "pause": "button.prusa_mk4_pause_job",
+            "resume": "button.prusa_mk4_resume_job"
+          },
+          "bed": {
+            "target": "sensor.prusa_mk4_heatbed_target_temperature",
+            "temperature": "sensor.prusa_mk4_heatbed_temperature"
+          },
+          "camera": "camera.prusa_mk4_preview",
+          "entity": "sensor.prusa_mk4",
+          "filename": "sensor.prusa_mk4_filename",
+          "finish": "sensor.prusa_mk4_print_finish",
+          "material": "sensor.prusa_mk4_material",
+          "nozzle": {
+            "target": "sensor.prusa_mk4_nozzle_target_temperature",
+            "temperature": "sensor.prusa_mk4_nozzle_temperature"
+          },
+          "progress": "sensor.prusa_mk4_progress",
+          "speed": "sensor.prusa_mk4_print_speed",
+          "start": "sensor.prusa_mk4_print_start"
+        }
+      }
+    },
     "system-popup": {
       "*": {
         "all_firmware": ["update.kettle_plug_firmware", "update.radiator_valve_firmware"],
@@ -1143,9 +1523,167 @@
           }
         ]
       }
+    },
+    "vacuum-card": {
+      "bedroom": {
+        "key": "bedroom",
+        "name": "Bedroom"
+      },
+      "hall": {
+        "key": "hall",
+        "name": "Hall"
+      },
+      "kitchen": {
+        "key": "kitchen",
+        "name": "Kitchen"
+      },
+      "laundry": {
+        "key": "laundry",
+        "name": "Laundry"
+      },
+      "living": {
+        "key": "living",
+        "name": "Living",
+        "vacuum": {
+          "area": "sensor.roborock_s8_cleaning_area",
+          "battery": "sensor.roborock_s8_battery",
+          "current_room": "sensor.roborock_s8_current_room",
+          "dock": {
+            "dust_emptying": "switch.roborock_s8_dock_dust_emptying",
+            "error": "sensor.roborock_s8_dock_dock_error",
+            "mop_drying": "switch.roborock_s8_dock_mop_drying",
+            "mop_drying_time_left": "sensor.roborock_s8_dock_mop_drying_remaining_time",
+            "mop_washing": "switch.roborock_s8_dock_mop_washing",
+            "warnings": [
+              "binary_sensor.roborock_s8_dock_clean_water_box",
+              "binary_sensor.roborock_s8_dock_dirty_water_box"
+            ]
+          },
+          "entity": "vacuum.roborock_s8",
+          "error": "sensor.roborock_s8_vacuum_error",
+          "last_clean": "sensor.roborock_s8_last_clean_end",
+          "map": "image.roborock_s8_downstairs",
+          "mop_attached": "binary_sensor.roborock_s8_mop_attached",
+          "progress": "sensor.roborock_s8_cleaning_progress",
+          "routines": ["button.roborock_s8_daily_clean"],
+          "settings": ["select.roborock_s8_mop_intensity", "select.roborock_s8_mop_mode"],
+          "status": "sensor.roborock_s8_status",
+          "time": "sensor.roborock_s8_cleaning_time",
+          "totals": {
+            "area": "sensor.roborock_s8_total_cleaning_area",
+            "count": "sensor.roborock_s8_total_cleaning_count",
+            "time": "sensor.roborock_s8_total_cleaning_time"
+          },
+          "warnings": ["binary_sensor.roborock_s8_water_shortage"],
+          "water_box_attached": "binary_sensor.roborock_s8_water_box_attached"
+        }
+      },
+      "office": {
+        "key": "office",
+        "name": "Office"
+      }
+    },
+    "vacuum-popup": {
+      "living": {
+        "vacuum": {
+          "area": "sensor.roborock_s8_cleaning_area",
+          "battery": "sensor.roborock_s8_battery",
+          "current_room": "sensor.roborock_s8_current_room",
+          "dock": {
+            "dust_emptying": "switch.roborock_s8_dock_dust_emptying",
+            "error": "sensor.roborock_s8_dock_dock_error",
+            "mop_drying": "switch.roborock_s8_dock_mop_drying",
+            "mop_drying_time_left": "sensor.roborock_s8_dock_mop_drying_remaining_time",
+            "mop_washing": "switch.roborock_s8_dock_mop_washing",
+            "warnings": [
+              "binary_sensor.roborock_s8_dock_clean_water_box",
+              "binary_sensor.roborock_s8_dock_dirty_water_box"
+            ]
+          },
+          "entity": "vacuum.roborock_s8",
+          "error": "sensor.roborock_s8_vacuum_error",
+          "last_clean": "sensor.roborock_s8_last_clean_end",
+          "map": "image.roborock_s8_downstairs",
+          "mop_attached": "binary_sensor.roborock_s8_mop_attached",
+          "progress": "sensor.roborock_s8_cleaning_progress",
+          "routines": ["button.roborock_s8_daily_clean"],
+          "settings": ["select.roborock_s8_mop_intensity", "select.roborock_s8_mop_mode"],
+          "status": "sensor.roborock_s8_status",
+          "time": "sensor.roborock_s8_cleaning_time",
+          "totals": {
+            "area": "sensor.roborock_s8_total_cleaning_area",
+            "count": "sensor.roborock_s8_total_cleaning_count",
+            "time": "sensor.roborock_s8_total_cleaning_time"
+          },
+          "warnings": ["binary_sensor.roborock_s8_water_shortage"],
+          "water_box_attached": "binary_sensor.roborock_s8_water_box_attached"
+        }
+      }
+    },
+    "vacuum-state": {
+      "living": {
+        "vacuum": {
+          "area": "sensor.roborock_s8_cleaning_area",
+          "battery": "sensor.roborock_s8_battery",
+          "current_room": "sensor.roborock_s8_current_room",
+          "dock": {
+            "dust_emptying": "switch.roborock_s8_dock_dust_emptying",
+            "error": "sensor.roborock_s8_dock_dock_error",
+            "mop_drying": "switch.roborock_s8_dock_mop_drying",
+            "mop_drying_time_left": "sensor.roborock_s8_dock_mop_drying_remaining_time",
+            "mop_washing": "switch.roborock_s8_dock_mop_washing",
+            "warnings": [
+              "binary_sensor.roborock_s8_dock_clean_water_box",
+              "binary_sensor.roborock_s8_dock_dirty_water_box"
+            ]
+          },
+          "entity": "vacuum.roborock_s8",
+          "error": "sensor.roborock_s8_vacuum_error",
+          "last_clean": "sensor.roborock_s8_last_clean_end",
+          "map": "image.roborock_s8_downstairs",
+          "mop_attached": "binary_sensor.roborock_s8_mop_attached",
+          "progress": "sensor.roborock_s8_cleaning_progress",
+          "routines": ["button.roborock_s8_daily_clean"],
+          "settings": ["select.roborock_s8_mop_intensity", "select.roborock_s8_mop_mode"],
+          "status": "sensor.roborock_s8_status",
+          "time": "sensor.roborock_s8_cleaning_time",
+          "totals": {
+            "area": "sensor.roborock_s8_total_cleaning_area",
+            "count": "sensor.roborock_s8_total_cleaning_count",
+            "time": "sensor.roborock_s8_total_cleaning_time"
+          },
+          "warnings": ["binary_sensor.roborock_s8_water_shortage"],
+          "water_box_attached": "binary_sensor.roborock_s8_water_box_attached"
+        }
+      }
     }
   },
   "labelled": {
+    "3d-printer-card": {
+      "den": {
+        "key": "den",
+        "name": "Den"
+      },
+      "loft": {
+        "key": "loft",
+        "name": "Loft"
+      }
+    },
+    "ac-item": {
+      "den": {
+        "key": "den",
+        "name": "Den"
+      },
+      "loft": {
+        "key": "loft",
+        "name": "Loft"
+      }
+    },
+    "camera-card": {
+      "den": {
+        "entity": "camera.cams_front"
+      }
+    },
     "glances": {
       "*": {
         "batteries": ["sensor.multi_battery"]
@@ -1155,6 +1693,22 @@
       },
       "loft": {
         "batteries": ["sensor.multi_battery"]
+      }
+    },
+    "heating-item": {
+      "den": {
+        "entity": "climate.ac",
+        "key": "den",
+        "name": "Den"
+      },
+      "loft": {
+        "key": "loft",
+        "name": "Loft"
+      }
+    },
+    "light-card": {
+      "den": {
+        "entity": "light.den_group"
       }
     },
     "person": {
@@ -1195,9 +1749,44 @@
         "key": "loft",
         "name": "Loft"
       }
+    },
+    "vacuum-card": {
+      "den": {
+        "key": "den",
+        "name": "Den"
+      },
+      "loft": {
+        "key": "loft",
+        "name": "Loft"
+      }
     }
   },
   "messy": {
+    "3d-printer-card": {
+      "den": {
+        "key": "den",
+        "name": "Den"
+      },
+      "loft": {
+        "key": "loft",
+        "name": "Loft"
+      }
+    },
+    "ac-item": {
+      "den": {
+        "key": "den",
+        "name": "Den"
+      },
+      "loft": {
+        "key": "loft",
+        "name": "Loft"
+      }
+    },
+    "camera-card": {
+      "den": {
+        "entity": "camera.cams_front"
+      }
+    },
     "glances": {
       "*": {
         "batteries": ["sensor.multi_battery"]
@@ -1207,6 +1796,22 @@
       },
       "loft": {
         "batteries": ["sensor.multi_battery"]
+      }
+    },
+    "heating-item": {
+      "den": {
+        "entity": "climate.ac",
+        "key": "den",
+        "name": "Den"
+      },
+      "loft": {
+        "key": "loft",
+        "name": "Loft"
+      }
+    },
+    "light-card": {
+      "den": {
+        "entity": "light.den_group"
       }
     },
     "person": {
@@ -1238,6 +1843,16 @@
       "loft": {
         "batteries": ["sensor.multi_battery"],
         "icon": "mdi:home-roof",
+        "key": "loft",
+        "name": "Loft"
+      }
+    },
+    "vacuum-card": {
+      "den": {
+        "key": "den",
+        "name": "Den"
+      },
+      "loft": {
         "key": "loft",
         "name": "Loft"
       }
@@ -1332,14 +1947,52 @@
     }
   },
   "tidy": {
+    "3d-printer-card": {
+      "kitchen": {
+        "key": "kitchen",
+        "name": "Kitchen"
+      },
+      "living": {
+        "key": "living",
+        "name": "Living"
+      },
+      "office": {
+        "key": "office",
+        "name": "Office"
+      }
+    },
+    "ac-item": {
+      "kitchen": {
+        "key": "kitchen",
+        "name": "Kitchen"
+      },
+      "living": {
+        "key": "living",
+        "name": "Living"
+      },
+      "office": {
+        "key": "office",
+        "name": "Office"
+      }
+    },
+    "camera-card": {
+      "living": {
+        "entity": "camera.doorbell"
+      }
+    },
+    "cover-card": {
+      "living": {
+        "entity": "cover.blind"
+      }
+    },
     "glances": {
       "*": {
         "batteries": ["sensor.desk_battery", "sensor.window_battery"],
         "leaks": ["binary_sensor.kitchen_leak"],
-        "locks": [
+        "room_leaks": [
           {
-            "entity": "lock.front_door",
-            "room": "living"
+            "room": "kitchen",
+            "sensors": ["binary_sensor.kitchen_leak"]
           }
         ],
         "updates": ["update.plug_firmware"]
@@ -1347,10 +2000,10 @@
       "kitchen": {
         "batteries": ["sensor.desk_battery", "sensor.window_battery"],
         "leaks": ["binary_sensor.kitchen_leak"],
-        "locks": [
+        "room_leaks": [
           {
-            "entity": "lock.front_door",
-            "room": "living"
+            "room": "kitchen",
+            "sensors": ["binary_sensor.kitchen_leak"]
           }
         ],
         "updates": ["update.plug_firmware"]
@@ -1358,10 +2011,10 @@
       "living": {
         "batteries": ["sensor.desk_battery", "sensor.window_battery"],
         "leaks": ["binary_sensor.kitchen_leak"],
-        "locks": [
+        "room_leaks": [
           {
-            "entity": "lock.front_door",
-            "room": "living"
+            "room": "kitchen",
+            "sensors": ["binary_sensor.kitchen_leak"]
           }
         ],
         "updates": ["update.plug_firmware"]
@@ -1369,13 +2022,28 @@
       "office": {
         "batteries": ["sensor.desk_battery", "sensor.window_battery"],
         "leaks": ["binary_sensor.kitchen_leak"],
-        "locks": [
+        "room_leaks": [
           {
-            "entity": "lock.front_door",
-            "room": "living"
+            "room": "kitchen",
+            "sensors": ["binary_sensor.kitchen_leak"]
           }
         ],
         "updates": ["update.plug_firmware"]
+      }
+    },
+    "heating-item": {
+      "kitchen": {
+        "key": "kitchen",
+        "name": "Kitchen"
+      },
+      "living": {
+        "entity": "climate.radiator",
+        "key": "living",
+        "name": "Living"
+      },
+      "office": {
+        "key": "office",
+        "name": "Office"
       }
     },
     "home-assistant": {
@@ -1414,6 +2082,16 @@
             "name": "Kitchen"
           }
         ]
+      }
+    },
+    "light-card": {
+      "living": {
+        "entity": "light.living_group"
+      }
+    },
+    "media-card": {
+      "living": {
+        "entity": "media_player.arc"
       }
     },
     "person": {
@@ -1531,6 +2209,20 @@
             "name": "Kitchen"
           }
         ]
+      }
+    },
+    "vacuum-card": {
+      "kitchen": {
+        "key": "kitchen",
+        "name": "Kitchen"
+      },
+      "living": {
+        "key": "living",
+        "name": "Living"
+      },
+      "office": {
+        "key": "office",
+        "name": "Office"
       }
     }
   }

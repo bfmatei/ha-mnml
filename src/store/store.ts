@@ -1,4 +1,4 @@
-import { isMapping, isTemplate } from '../contract/templates.ts';
+import { isMapping, isTemplate, sameValue } from '../contract/templates.ts';
 import type { Template, Templates, WrittenTemplate } from '../contract/templates.ts';
 import { field } from '../ha/field.ts';
 import type { HassConnection } from '../ha/hass.ts';
@@ -31,10 +31,6 @@ interface Entry {
   subscriptions: number;
   subscribed: boolean;
 }
-
-const entries = new WeakMap<HassConnection, Entry>();
-let latest: Entry | undefined;
-const listeners = new Set<() => void>();
 
 function lost(error: unknown): boolean {
   return error === CONNECTION_LOST || field(field(error, 'error'), 'code') === CONNECTION_LOST;
@@ -83,99 +79,108 @@ function storeOf(message: unknown): SharedState {
   return { status: 'ready', own, written, changes };
 }
 
-function same(next: SharedState, state: SharedState): boolean {
+function sameState(next: SharedState, state: SharedState): boolean {
   try {
-    return JSON.stringify(next) === JSON.stringify(state);
+    return sameValue(next, state);
   } catch {
     return false;
   }
 }
 
-function settle(entry: Entry, next: SharedState): void {
-  if (same(next, entry.state)) {
-    return;
-  }
-  entry.state = next;
-  for (const listener of listeners) {
-    try {
-      listener();
-    } catch (error) {
-      console.error(error);
+interface Store {
+  sharedTemplates: (connection: HassConnection) => SharedState;
+  knownShared: () => SharedState;
+  onShared: (listener: () => void) => () => void;
+}
+
+export function createStore(): Store {
+  const entries = new WeakMap<HassConnection, Entry>();
+  let latest: Entry | undefined;
+  const listeners = new Set<() => void>();
+  const settle = (entry: Entry, next: SharedState): void => {
+    if (sameState(next, entry.state)) {
+      return;
     }
-  }
-}
-
-function subscribe(connection: HassConnection, entry: Entry, tries: number): void {
-  entry.subscriptions += 1;
-  const mine = entry.subscriptions;
-  connection
-    .subscribeMessage(
-      (message: unknown) => {
-        if (mine === entry.subscriptions) {
-          entry.subscribed = true;
-          settle(entry, storeOf(message));
+    entry.state = next;
+    for (const listener of listeners) {
+      try {
+        listener();
+      } catch (error) {
+        console.error(error);
+      }
+    }
+  };
+  const subscribe = (connection: HassConnection, entry: Entry, tries: number): void => {
+    entry.subscriptions += 1;
+    const mine = entry.subscriptions;
+    connection
+      .subscribeMessage(
+        (message: unknown) => {
+          if (mine === entry.subscriptions) {
+            entry.subscribed = true;
+            settle(entry, storeOf(message));
+          }
+        },
+        { type: 'mnml/templates/subscribe' },
+        { resubscribe: false },
+      )
+      .catch((error: unknown) => {
+        if (mine !== entry.subscriptions) {
+          return;
         }
-      },
-      { type: 'mnml/templates/subscribe' },
-      { resubscribe: false },
-    )
-    .catch((error: unknown) => {
-      if (mine !== entry.subscriptions) {
-        return;
-      }
-      const code = field(error, 'code');
-      const unknown = code === 'unknown_command';
-      if (unknown && entry.subscribed) {
-        if (tries < RETRIES) {
-          setTimeout(() => {
-            if (mine === entry.subscriptions) {
-              subscribe(connection, entry, tries + 1);
-            }
-          }, RETRY);
+        const code = field(error, 'code');
+        const unknown = code === 'unknown_command';
+        if (unknown && entry.subscribed) {
+          if (tries < RETRIES) {
+            setTimeout(() => {
+              if (mine === entry.subscriptions) {
+                subscribe(connection, entry, tries + 1);
+              }
+            }, RETRY);
+          }
+          return;
         }
-        return;
+        if (lost(error) && entry.state.status === 'ready') {
+          return;
+        }
+        settle(
+          entry,
+          unknown || code === 'not_loaded'
+            ? EMPTY
+            : {
+                status: 'failed',
+                error: `mnml: the templates MNML keeps could not be read: ${reason(error)}`,
+              },
+        );
+      });
+  };
+  return {
+    sharedTemplates: (connection) => {
+      const known = entries.get(connection);
+      if (known !== undefined) {
+        latest = known;
+        return known.state;
       }
-      if (lost(error) && entry.state.status === 'ready') {
-        return;
-      }
-      settle(
-        entry,
-        unknown || code === 'not_loaded'
-          ? EMPTY
-          : {
-              status: 'failed',
-              error: `mnml: the templates MNML keeps could not be read: ${reason(error)}`,
-            },
-      );
-    });
-}
-
-export function sharedTemplates(connection: HassConnection): SharedState {
-  const known = entries.get(connection);
-  if (known !== undefined) {
-    latest = known;
-    return known.state;
-  }
-  const entry: Entry = { state: WAITING, subscriptions: 0, subscribed: false };
-  entries.set(connection, entry);
-  latest = entry;
-  subscribe(connection, entry, 0);
-  connection.addEventListener('ready', () => {
-    subscribe(connection, entry, 0);
-  });
-  return entry.state;
-}
-
-export function knownShared(): SharedState {
-  return latest?.state ?? WAITING;
-}
-
-export function onShared(listener: () => void): () => void {
-  listeners.add(listener);
-  return () => {
-    listeners.delete(listener);
+      const entry: Entry = { state: WAITING, subscriptions: 0, subscribed: false };
+      entries.set(connection, entry);
+      latest = entry;
+      subscribe(connection, entry, 0);
+      connection.addEventListener('ready', () => {
+        subscribe(connection, entry, 0);
+      });
+      return entry.state;
+    },
+    knownShared: () => latest?.state ?? WAITING,
+    onShared: (listener) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
   };
 }
+
+export const { sharedTemplates, knownShared, onShared } = createStore();
 
 const resolved = new WeakMap<SharedState, WeakMap<Templates, Templates>>();
 

@@ -21,7 +21,8 @@ export const SECTION_STYLE = css`
   .heading .chevron {
     appearance: none;
     border: 0;
-    margin: 0 -4px 0 auto;
+    margin-block: 0;
+    margin-inline: auto -4px;
     padding: 0;
     width: 28px;
     height: 28px;
@@ -36,7 +37,7 @@ export const SECTION_STYLE = css`
     -webkit-tap-highlight-color: transparent;
   }
   .heading .state ~ .chevron {
-    margin-left: 0;
+    margin-inline-start: 0;
   }
   .heading.fold:active .chevron {
     transform: scale(0.9);

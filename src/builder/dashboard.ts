@@ -1,22 +1,26 @@
-import { lookOf, orderOf } from '../contract/builder.ts';
+import type { TemplateCard } from '../contract/cards.ts';
+import type { Card, Dashboard, Section } from '../contract/dashboard.ts';
+import { lookOf, orderOf } from '../contract/plan.ts';
 import type {
   CarChoice,
+  DeviceChoice,
   GlancesChoice,
   PersonChoice,
   Plan,
+  PlanSection,
   RoomChoice,
-  SectionKey,
   SystemChoice,
-} from '../contract/builder.ts';
-import type { TemplateCard } from '../contract/cards.ts';
+} from '../contract/plan.ts';
 import { isMapping } from '../contract/templates.ts';
 import type { SlotSpec, Templates, Value } from '../contract/templates.ts';
-import { headingSlots } from '../home/slots.ts';
-import type { Card, Dashboard, Section } from '../home/types.ts';
+import type { Registries } from '../ha/registries.ts';
 import { discover } from '../templates/discover.ts';
-import type { Registries } from '../templates/discover.ts';
 
 import { personOf } from './person.ts';
+
+function headingSlots(title: string, icon: string): Record<string, Value> {
+  return { title, icon };
+}
 
 function declared(
   slots: Readonly<Record<string, Value>>,
@@ -67,6 +71,10 @@ export function roomCard(
   return card(template, templates, room.slots, room.area);
 }
 
+export function deviceCard(choice: DeviceChoice): TemplateCard {
+  return { type: 'custom:mnml-template-card', template: choice.template, device: choice.device };
+}
+
 export function personCard(
   person: PersonChoice,
   registries: Registries,
@@ -108,7 +116,7 @@ function glancesCard(
   return systemCard({ template: 'glances', ...choice }, registries, templates);
 }
 
-function heading(plan: Plan, key: SectionKey, templates: Templates): TemplateCard {
+function heading(plan: Plan, key: PlanSection, templates: Templates): TemplateCard {
   const { title, icon } = lookOf(plan, key);
   return card('section-heading', templates, headingSlots(title, icon));
 }
@@ -121,10 +129,13 @@ export function dashboardOf(plan: Plan, registries: Registries, templates: Templ
   const rooms = lookOf(plan, 'rooms').template;
   const people = lookOf(plan, 'people').template;
   const cars = lookOf(plan, 'garage').template;
-  const parts: Record<SectionKey, TemplateCard[]> = {
+  const parts: Record<PlanSection, TemplateCard[]> = {
     rooms: plan.rooms
       .filter((room) => room.spelled === true || Object.hasOwn(registries.areas, room.area))
       .map((room) => roomCard(room, rooms, templates)),
+    devices: (plan.devices ?? [])
+      .filter((choice) => Object.hasOwn(registries.devices, choice.device))
+      .map((choice) => deviceCard(choice)),
     people: plan.people
       .filter(
         (person) => person.spelled === true || Object.hasOwn(registries.states, person.entity),
@@ -154,6 +165,8 @@ export function dashboardOf(plan: Plan, registries: Registries, templates: Templ
               type: 'custom:mnml-popups-card',
               width: '560px',
               open: Object.keys(plan.open).length > 0 ? plan.open : undefined,
+              idle_close: plan.idle_close,
+              alerts: plan.alerts !== undefined && plan.alerts.length > 0 ? plan.alerts : undefined,
             },
           ]),
         ],

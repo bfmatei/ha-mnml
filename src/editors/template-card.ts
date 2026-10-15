@@ -4,26 +4,38 @@ import { property, state } from 'lit/decorators.js';
 import { cache } from 'lit/directives/cache.js';
 import { repeat } from 'lit/directives/repeat.js';
 
-import { LAYOUT } from '../cards/keys.ts';
+import { TYPE_AND_LAYOUT } from '../cards/keys.ts';
+import { startOf } from '../cards/stubs.ts';
 import { BASE_STYLE, CONTROL_STYLE } from '../cards/styles.ts';
-import { isMapping } from '../contract/templates.ts';
-import type { SlotSpec, Template, Templates, Value } from '../contract/templates.ts';
+import {
+  isMapping,
+  sameValue,
+  sameWritten,
+  slotLabel,
+  templateIcon,
+  templateTitle,
+} from '../contract/templates.ts';
+import type { Filter, SlotSpec, Template, Templates, Value } from '../contract/templates.ts';
 import { field } from '../ha/field.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
-import { registriesOf } from '../ha/registries.ts';
+import { registriesOf } from '../ha/snapshot.ts';
 import { icon, quietly } from '../ha/templates.ts';
 import { SHIPPED_TEMPLATES } from '../store/shipped.ts';
 import { onShared, resolvedTemplates, sharedTemplates } from '../store/store.ts';
 import type { SharedState } from '../store/store.ts';
 import { fromDevice, relativesOf } from '../templates/discover.ts';
 import { filled, toValue } from '../templates/expand.ts';
-import { explain } from '../templates/explain.ts';
+import { deviceFit, explain } from '../templates/explain.ts';
 import type { DeviceFit, Trace } from '../templates/explain.ts';
 import { OWNER } from '../templates/families.ts';
 import { overridesOf } from '../templates/overrides.ts';
+import type { Fit, Scope } from '../templates/rank.ts';
+import { anchorOf, devicesFor, templateIndex } from '../templates/stands.ts';
+import type { EditorWords } from '../words/panel/editors-en.ts';
 
-import { adder, formOf, keysForm } from './draw.ts';
-import type { Context, Slot } from './draw.ts';
+import { adder, formOf, keysForm, wordsOf } from './draw.ts';
+import type { Context, Lens } from './draw.ts';
+import { REDRAW } from './drawing.ts';
 import {
   defaultArea,
   deviceIn,
@@ -31,41 +43,62 @@ import {
   groupsOf,
   homeWide,
   noteOf,
-  slotLabel,
   sourceOf,
   valuesOf,
 } from './fill.ts';
 import type { Source } from './fill.ts';
-import { isSimple, slotsFromForm } from './form.ts';
-import type { FormItem } from './form.ts';
-import { haForm } from './ha-form.ts';
+import { UnsupportedConfig, place } from './form.ts';
+import type { PlainForm } from './form.ts';
+import { isSimple, slotsFromForm } from './ha-form-data.ts';
+import type { FormItem } from './ha-form-data.ts';
+import { formMissing, haForm } from './ha-form.ts';
 import { openPanel } from './leave.ts';
 import { sectionPanel } from './panel.ts';
 import type { Related } from './related.ts';
-import { Unsupported, place } from './shape.ts';
-import type { PlainShape } from './shape.ts';
-import { kept, previewConfig, slotsShape } from './slots.ts';
+import { kept, slotsForm } from './slots.ts';
 import { EDITOR_STYLE } from './style.ts';
 import { summarize } from './summary.ts';
 
 const TYPE = 'custom:mnml-template-card';
-const KEYS = new Set(['template', 'area', 'slots']);
-const PICKED = new Set(['type', 'template', 'area', 'slots']);
-const KEY_ORDER: PlainShape = {
+const KEYS = new Set(['template', 'device', 'area', 'slots']);
+const PICKED = new Set(['type', 'template', 'device', 'area', 'slots']);
+const KEY_ORDER: PlainForm = {
   kind: 'plain',
   id: 'template-card',
   label: 'Template',
-  fields: { template: { kind: 'text' }, area: { kind: 'text' }, slots: { kind: 'text' } },
+  fields: {
+    template: { kind: 'text' },
+    device: { kind: 'text' },
+    area: { kind: 'text' },
+    slots: { kind: 'text' },
+  },
   sections: [],
 };
 const AREA_SCHEMA: readonly FormItem[] = [{ name: 'area', required: true, selector: { area: {} } }];
 const NO_TEMPLATES: Templates = {};
 
+const entityFilter = (filter: Filter): Record<string, Value> => ({
+  ...(filter.domain === undefined ? {} : { domain: filter.domain }),
+  ...(filter.device_class === undefined ? {} : { device_class: filter.device_class }),
+  ...(filter.platform === undefined ? {} : { integration: filter.platform }),
+});
+
+const deviceSchema = (anchor: readonly Filter[]): readonly FormItem[] => [
+  { name: 'device', required: true, selector: { device: { entity: anchor.map(entityFilter) } } },
+];
+
 interface Explained {
   readonly template: Template;
   readonly area: string | undefined;
+  readonly device: string | undefined;
   readonly registries: readonly object[];
   readonly traces: Record<string, Trace>;
+}
+
+interface Fitting {
+  readonly template: Template;
+  readonly registries: readonly object[];
+  readonly fits: readonly Fit[];
 }
 
 interface Origin {
@@ -76,15 +109,8 @@ interface Origin {
   readonly where: string;
 }
 
-const SOURCES: readonly [Source, string, string][] = [
-  ['area', 'Find in an area', 'The template finds its devices in the area you pick.'],
-  ['yourself', 'Fill in yourself', 'You pick each device.'],
-];
-const HOME: [Source, string, string] = [
-  'home',
-  'Find in the whole home',
-  'The template finds what it needs anywhere in your home.',
-];
+const sameAll = (a: readonly object[], b: readonly object[]): boolean =>
+  a.every((registry, index) => registry === b[index]);
 
 interface Devices {
   readonly using: DeviceFit | undefined;
@@ -100,6 +126,24 @@ const foundIn = (traces: Readonly<Record<string, Trace>>): Record<string, Value>
     ),
   );
 
+function overExample(
+  values: Readonly<Record<string, Value>>,
+  example: Readonly<Record<string, Value>> | undefined,
+  found: Readonly<Record<string, Value>>,
+): Record<string, Value> {
+  return Object.fromEntries(
+    Object.entries(values).flatMap(([slot, value]) => {
+      const lent =
+        example !== undefined && Object.hasOwn(example, slot) && sameValue(example[slot], value);
+      const there = found[slot];
+      if (!lent) {
+        return [[slot, value]];
+      }
+      return there === undefined ? [] : [[slot, there]];
+    }),
+  );
+}
+
 function lacks(spec: SlotSpec, value: Value | undefined): boolean {
   if (!filled(value)) {
     return spec.required === true;
@@ -111,6 +155,8 @@ function lacks(spec: SlotSpec, value: Value | undefined): boolean {
   );
 }
 
+let everyCard = false;
+
 export class MnmlTemplateCardEditor extends LitElement {
   static override styles: CSSResultGroup = [BASE_STYLE, CONTROL_STYLE, EDITOR_STYLE];
 
@@ -120,9 +166,11 @@ export class MnmlTemplateCardEditor extends LitElement {
   @state() private browsing = false;
   @state() private loaded = false;
   @state() private values: Record<string, Value> | undefined;
-  @state() private pendingArea = false;
+  @state() private pending: 'area' | 'device' | undefined;
+  @state() private asking: 'which' | 'only' | undefined;
   private loading = false;
   private explained: Explained | undefined;
+  private fitted: Fitting | undefined;
   private stopShared: (() => void) | undefined;
   private readonly open = new Map<string, boolean>();
 
@@ -143,30 +191,34 @@ export class MnmlTemplateCardEditor extends LitElement {
   }
 
   setConfig(config: unknown): void {
-    if (customElements.get('ha-form') === undefined) {
-      throw new Unsupported("Home Assistant's form is not loaded");
+    const missing = formMissing();
+    if (missing !== undefined) {
+      throw new UnsupportedConfig(this.words().forms[missing]);
     }
     if (!isMapping(config)) {
-      throw new Unsupported('the card is not a mapping');
+      throw new UnsupportedConfig('the card is not a mapping');
     }
     for (const key of Object.keys(config)) {
-      if (!KEYS.has(key) && !LAYOUT.has(key)) {
-        throw new Unsupported(`${key} is not a key the editor knows`);
+      if (!KEYS.has(key) && !TYPE_AND_LAYOUT.has(key)) {
+        throw new UnsupportedConfig(`${key} is not a key the editor knows`);
       }
     }
     if (config['area'] !== undefined && typeof config['area'] !== 'string') {
-      throw new Unsupported('area is not an area');
+      throw new UnsupportedConfig('area is not an area');
+    }
+    if (config['device'] !== undefined && typeof config['device'] !== 'string') {
+      throw new UnsupportedConfig('device is not a device');
     }
     if (config['slots'] !== undefined && !isMapping(config['slots'])) {
-      throw new Unsupported('slots is not a mapping');
+      throw new UnsupportedConfig('slots is not a mapping');
     }
     const value = toValue(config);
-    if (!isMapping(value) || JSON.stringify(value) === JSON.stringify(this.config)) {
+    if (!isMapping(value) || sameWritten(value, this.config)) {
       return;
     }
     this.config = value;
     this.values = undefined;
-    this.pendingArea = false;
+    this.pending = undefined;
   }
 
   protected override willUpdate(): void {
@@ -201,9 +253,7 @@ export class MnmlTemplateCardEditor extends LitElement {
       ${
         unknown === undefined
           ? nothing
-          : html`<div class="problem">
-              ${unknown} is not a template this dashboard knows: pick one
-            </div>`
+          : html`<div class="problem">${this.words().template.unknown(unknown)}</div>`
       }
       ${cache(
         ready || loading
@@ -215,15 +265,21 @@ export class MnmlTemplateCardEditor extends LitElement {
               @template-picked=${this.picked}
             ></mnml-template-gallery>`,
       )}
-      ${loading ? html`<div class="template-description">Loading the templates...</div>` : nothing}
+      ${
+        loading
+          ? html`<div class="template-description">${this.words().template.loading}</div>`
+          : nothing
+      }
       ${ready ? this.chosen(name, template) : nothing}
     </div>`;
   }
 
   private readonly picked = (event: Event): void => {
-    const name = field(field(event, 'detail'), 'template');
+    const detail = field(event, 'detail');
+    const name = field(detail, 'template');
+    const device = field(detail, 'device');
     if (typeof name === 'string') {
-      this.pick(name);
+      this.pick(name, typeof device === 'string' ? device : undefined);
     }
   };
 
@@ -253,10 +309,14 @@ export class MnmlTemplateCardEditor extends LitElement {
     );
   }
 
+  private words(): EditorWords {
+    return wordsOf(this);
+  }
+
   private drawing(): Context {
     return {
       hass: this.hass,
-      hashes: [],
+      popups: [],
       open: this.open,
       redraw: (): void => {
         this.requestUpdate();
@@ -264,26 +324,34 @@ export class MnmlTemplateCardEditor extends LitElement {
     };
   }
 
-  private pick(name: string): void {
+  private pick(name: string, device?: string): void {
     this.browsing = false;
     const template = this.templates[name];
-    if (name === this.config['template'] || template === undefined) {
+    const same =
+      name === this.config['template'] &&
+      (device === undefined || device === this.config['device']);
+    if (same || template === undefined) {
       return;
     }
     this.values = undefined;
-    this.pendingArea = false;
+    this.pending = undefined;
     this.open.clear();
-    const start = previewConfig(name, template, this.hass);
     const layout = Object.fromEntries(
       Object.entries(this.config).filter(([key]) => !PICKED.has(key)),
     );
-    const empty =
-      start['area'] === undefined &&
-      start['slots'] === undefined &&
-      !homeWide(template.slots ?? {});
     const named = place(KEY_ORDER, { type: TYPE, ...layout }, 'template', name);
+    if (device !== undefined) {
+      this.write(place(KEY_ORDER, named, 'device', device));
+      return;
+    }
+    const start = startOf(name, template, this.hass);
     const placed = place(KEY_ORDER, named, 'area', start['area']);
-    this.write(place(KEY_ORDER, placed, 'slots', empty ? {} : start['slots']));
+    this.write(place(KEY_ORDER, placed, 'slots', start['slots']));
+  }
+
+  private given(key: 'area' | 'device'): string | undefined {
+    const value = this.config[key];
+    return typeof value === 'string' && value !== '' ? value : undefined;
   }
 
   private areaForm(template: Template): TemplateResult {
@@ -291,15 +359,15 @@ export class MnmlTemplateCardEditor extends LitElement {
       hass: this.hass,
       data: { area: this.config['area'] ?? '' },
       schema: AREA_SCHEMA,
-      computeLabel: () => 'Area',
+      computeLabel: () => this.words().template.area,
       changed: (data) => {
         const area = data['area'];
         if (typeof area !== 'string' || area === '') {
           return;
         }
-        if (this.pendingArea) {
-          this.pendingArea = false;
-          this.toArea(template, area, this.values ?? {});
+        if (this.pending === 'area') {
+          this.pending = undefined;
+          this.toPlace(template, { area }, this.values);
           return;
         }
         this.values = undefined;
@@ -308,7 +376,94 @@ export class MnmlTemplateCardEditor extends LitElement {
     });
   }
 
-  private tracesFor(template: Template, area: string | undefined): Record<string, Trace> {
+  private deviceForm(name: string, template: Template): TemplateResult {
+    const using = this.given('device');
+    const others = this.fitting(name, template).flatMap((fit) =>
+      fit.scope.device === undefined || fit.scope.device === using ? [] : [fit.scope.device],
+    );
+    const moveTo = (device: string): void => {
+      if (this.pending === 'device') {
+        this.pending = undefined;
+        this.toPlace(template, { device }, this.values);
+        return;
+      }
+      this.values = undefined;
+      this.write(place(KEY_ORDER, this.config, 'device', device));
+    };
+    return html`${haForm({
+      hass: this.hass,
+      data: { device: using ?? '' },
+      schema: deviceSchema(anchorOf(template) ?? []),
+      computeLabel: () => this.words().template.device,
+      changed: (data) => {
+        const device = data['device'];
+        if (typeof device === 'string' && device !== '') {
+          moveTo(device);
+        }
+      },
+    })}
+    ${
+      others.length === 0
+        ? nothing
+        : html`<div
+            class="alternatives"
+            role="group"
+            aria-label=${this.words().template.otherDevices}
+          >
+            <span class="alt-note">${this.words().template.useAnother}</span>
+            ${others.map((device) => {
+              const words = this.deviceWhere(device, undefined);
+              return html`<button
+                type="button"
+                class="alt"
+                aria-label=${this.words().template.use(words)}
+                @click=${quietly(() => {
+                  moveTo(device);
+                })}
+              >
+                ${words}
+              </button>`;
+            })}
+          </div>`
+    }`;
+  }
+
+  private fitting(name: string, template: Template): readonly Fit[] {
+    const hass = this.hass;
+    if (hass === undefined) {
+      return [];
+    }
+    const registries = [hass.areas, hass.devices, hass.entities];
+    const known = this.fitted;
+    if (
+      known !== undefined &&
+      known.template === template &&
+      sameAll(known.registries, registries)
+    ) {
+      return known.fits;
+    }
+    const fits = devicesFor(templateIndex({ [name]: template }), name, registriesOf(hass));
+    this.fitted = { template, registries, fits };
+    return fits;
+  }
+
+  private deviceWhere(device: string, area: string | undefined): string {
+    const hass = this.hass;
+    if (hass === undefined) {
+      return device;
+    }
+    const fit = deviceFit(device, registriesOf(hass));
+    return deviceWords(
+      area === undefined ? fit : { ...fit, area: hass.areas[area]?.name ?? area },
+      this.words(),
+    );
+  }
+
+  private tracesFor(
+    template: Template,
+    area: string | undefined,
+    device?: string,
+  ): Record<string, Trace> {
     const hass = this.hass;
     if (hass === undefined) {
       return {};
@@ -320,56 +475,69 @@ export class MnmlTemplateCardEditor extends LitElement {
       known !== undefined &&
       known.template === template &&
       known.area === where &&
-      known.registries.every((registry, index) => registry === registries[index])
+      known.device === device &&
+      sameAll(known.registries, registries)
     ) {
       return known.traces;
     }
-    const traces = explain(template, where, registriesOf(hass));
-    this.explained = { template, area: where, registries, traces };
+    const traces = explain(template, where, registriesOf(hass), device);
+    this.explained = { template, area: where, device, registries, traces };
     return traces;
   }
 
   private origin(template: Template): Origin {
-    const source = this.pendingArea ? 'area' : sourceOf(this.config);
-    const area = typeof this.config['area'] === 'string' ? this.config['area'] : undefined;
-    const placeless = source === 'area' && (area === undefined || area === '');
+    const source = this.pending ?? sourceOf(this.config);
+    const area = this.given('area');
+    const device = this.given('device');
+    const placeless =
+      (source === 'area' && area === undefined) || (source === 'device' && device === undefined);
     const traces =
       source === 'yourself' || placeless
         ? {}
-        : this.tracesFor(template, source === 'home' ? undefined : area);
+        : this.tracesFor(
+            template,
+            source === 'home' ? undefined : area,
+            source === 'device' ? device : undefined,
+          );
     const own = isMapping(this.config['slots']) ? this.config['slots'] : {};
-    const where = area === undefined || area === '' ? '' : (this.hass?.areas[area]?.name ?? area);
+    const where =
+      source === 'device' && device !== undefined
+        ? this.deviceWhere(device, area)
+        : area === undefined
+          ? ''
+          : (this.hass?.areas[area]?.name ?? area);
     return { source, found: foundIn(traces), traces, own, where };
   }
 
   private chosen(name: string, template: Template): TemplateResult {
     const slots = template.slots ?? {};
-    const shape = slotsShape(slots, name);
+    const form = slotsForm(slots, name);
     const origin = this.origin(template);
     const home = origin.source === 'home';
     const values = home
       ? valuesOf('home', origin.found, origin.own)
       : (this.values ?? valuesOf(origin.source, origin.found, origin.own));
-    const slot: Slot = {
+    const lens: Lens = {
       get: (): Record<string, Value> => (home ? values : (this.values ?? values)),
       set: (next): void => {
         this.edit(template, next);
       },
     };
     const context = this.drawing();
-    const groups = groupsOf(slots);
+    const groups = groupsOf(slots, this.words().template.basics);
     const finds =
       origin.source !== 'yourself' &&
       (origin.source === 'home' || origin.where !== '') &&
       Object.values(slots).some((spec) => spec.discover !== undefined);
     const missing = new Set(
       Object.entries(slots)
-        .filter(([slotName, spec]) => lacks(spec, slot.get()[slotName]))
+        .filter(([slotName, spec]) => lacks(spec, lens.get()[slotName]))
         .map(([slotName]) => slotName),
     );
     return html`<div class="object">
       ${this.header(name, template)} ${this.sources(template, slots)}
       ${origin.source === 'area' ? this.areaForm(template) : nothing}
+      ${origin.source === 'device' ? this.deviceForm(name, template) : nothing}
       ${
         finds
           ? this.findings(slots, origin, missing, () => {
@@ -391,13 +559,18 @@ export class MnmlTemplateCardEditor extends LitElement {
             {
               icon: group.icon,
               title: group.name,
-              summary: summarize(shape, group.slots, slot.get(), this.hass),
+              summary: summarize(form, group.slots, lens.get(), this.hass, this.words()),
               body: () =>
-                this.groupBody(template, group.name, group.slots, shape, slot, context, origin),
+                this.groupBody(template, group.name, group.slots, form, lens, context, origin),
             },
           ),
       )}
-      ${kept(slots).map((leftover) => html`<div class="heading">${leftover}: set in YAML</div>`)}
+      ${kept(slots).map(
+        (leftover) =>
+          html`<div class="heading">
+            ${this.words().template.inYaml(slotLabel(leftover, slots[leftover]))}
+          </div>`,
+      )}
     </div>`;
   }
 
@@ -410,74 +583,113 @@ export class MnmlTemplateCardEditor extends LitElement {
     const found = Object.entries(slots)
       .filter(([slotName]) => filled(origin.found[slotName]))
       .map(([slotName, spec]) => slotLabel(slotName, spec));
-    const where = origin.source === 'home' ? 'the whole home' : origin.where;
+    const said = this.words().template;
+    const where =
+      origin.source === 'home'
+        ? said.inHome
+        : (origin.source === 'device' ? said.on : said.in)(origin.where);
     return html`<div class="findings">
       ${
         found.length === 0
-          ? html`<div class="found">Nothing found in ${where}</div>`
-          : html`<div class="found">Found in ${where}: ${found.join(', ')}</div>`
+          ? html`<div class="found">${said.nothingFound(where)}</div>`
+          : html`<div class="found">${said.found(where, found.join(', '))}</div>`
       }
       ${
         missing.size === 0
           ? nothing
           : html`<div class="needs">
-              Needs:
-              ${[...missing].map((slotName) => slotLabel(slotName, slots[slotName] ?? { kind: 'text' })).join(', ')}
+              ${said.needs}
+              ${[...missing].map((slotName) => slotLabel(slotName, slots[slotName])).join(', ')}
             </div>`
       }
-      ${adder('Change what it found', 'mdi:pencil-outline', openAll, 'Change what it found')}
+      ${adder(said.changeFound, 'mdi:pencil-outline', openAll, said.changeFound)}
     </div>`;
   }
 
   private header(name: string, template: Template): TemplateResult {
+    const said = this.words().template;
     return html`<div class="template-head">
       <div class="template-top">
-        <div class="template-name">Template: ${name}</div>
+        <ha-icon class="template-icon" .icon=${templateIcon(template)}></ha-icon>
+        <div class="template-name">${templateTitle(template, name)}</div>
         ${adder(
-          'Change the template',
+          said.changeTemplate,
           'mdi:swap-horizontal',
           () => {
             this.browsing = true;
           },
-          'Change',
+          said.change,
         )}
         ${
           this.hass?.user?.is_admin === true
             ? adder(
-                'Edit this template in MNML',
+                said.editInPanel,
                 'mdi:view-dashboard-edit',
                 () => {
-                  void openPanel(this, `/mnml/templates/${name}`);
+                  if (everyCard) {
+                    void openPanel(this, `/mnml/templates/${name}`);
+                  } else {
+                    this.asking = 'which';
+                  }
                 },
-                'Edit this template',
+                said.edit,
               )
             : nothing
         }
       </div>
+      ${this.whichCards(name)}
       <div class="template-description">${template.description ?? ''}</div>
+      <code class="template-code">${name}</code>
+    </div>`;
+  }
+
+  private whichCards(name: string): TemplateResult | typeof nothing {
+    const said = this.words().template;
+    if (this.asking === 'only') {
+      return html`<div class="which" role="status"><p>${said.onlyThisSaid}</p></div>`;
+    }
+    if (this.asking !== 'which') {
+      return nothing;
+    }
+    return html`<div class="which" role="group" aria-label=${said.whichCards}>
+      <p>${said.whichCards}</p>
+      ${adder(said.onlyThis, 'mdi:card-outline', () => {
+        this.asking = 'only';
+      })}
+      ${adder(said.everyCard, 'mdi:cards-outline', () => {
+        everyCard = true;
+        this.asking = undefined;
+        void openPanel(this, `/mnml/templates/${name}`);
+      })}
     </div>`;
   }
 
   private sources(template: Template, slots: Readonly<Record<string, SlotSpec>>): TemplateResult {
-    const current = this.pendingArea ? 'area' : sourceOf(this.config);
-    const choices = homeWide(slots) ? [...SOURCES, HOME] : SOURCES;
+    const current = this.pending ?? sourceOf(this.config);
+    const choices: Source[] = [
+      'area',
+      ...(current === 'device' || anchorOf(template) !== undefined ? ['device' as const] : []),
+      'yourself',
+      ...(homeWide(slots) ? ['home' as const] : []),
+    ];
+    const said = this.words().sources;
     return html`<div class="sources" role="radiogroup">
       ${choices.map(
-        ([source, title, help]) =>
+        (source) =>
           html`<button
             type="button"
             class="source"
             role="radio"
-            aria-label=${title}
-            title=${title}
+            aria-label=${said[source].title}
+            title=${said[source].title}
             aria-checked=${String(source === current)}
             @click=${quietly(() => {
               this.switchSource(template, source);
             })}
           >
             ${icon(source === current ? 'mdi:radiobox-marked' : 'mdi:radiobox-blank')}
-            <span class="source-title">${title}</span>
-            <span class="source-help">${help}</span>
+            <span class="source-title">${said[source].title}</span>
+            <span class="source-help">${said[source].help}</span>
           </button>`,
       )}
     </div>`;
@@ -487,49 +699,60 @@ export class MnmlTemplateCardEditor extends LitElement {
     template: Template,
     title: string,
     names: readonly string[],
-    shape: PlainShape,
-    slot: Slot,
+    form: PlainForm,
+    lens: Lens,
     context: Context,
     origin: Origin,
   ): TemplateResult[] {
+    const words = this.words();
+    const said = words.template;
     const specs = template.slots ?? {};
     const drawn: TemplateResult[] = [];
     const simple = names.filter((name) => {
-      const shaped = shape.fields[name];
-      return shaped !== undefined && isSimple(shaped);
+      const field = form.fields[name];
+      return field !== undefined && isSimple(field);
     });
     if (simple.length > 0) {
       const helper = (name: string): string | undefined => {
-        const note = noteOf(origin.source, name, origin.found, origin.own, origin.where);
-        const words = [specs[name]?.help, note].filter(
+        const note = noteOf(
+          origin.source,
+          name,
+          origin.found,
+          origin.own,
+          origin.where,
+          undefined,
+          words,
+        );
+        const parts = [specs[name]?.help, note].filter(
           (part): part is string => part !== undefined,
         );
-        return words.length === 0 ? undefined : words.join(' ');
+        return parts.length === 0 ? undefined : parts.join(' ');
       };
-      drawn.push(formOf(shape, simple, slot, context, { helper, read: slotsFromForm }));
+      drawn.push(formOf(form, simple, lens, context, { helper, read: slotsFromForm }));
     }
     for (const name of names.filter((each) => !simple.includes(each))) {
       const spec = specs[name];
-      if (spec === undefined || shape.fields[name] === undefined) {
+      if (spec === undefined || form.fields[name] === undefined) {
         continue;
       }
       const label = slotLabel(name, spec);
       const optional = spec.kind === 'object' && spec.required !== true;
-      const current = slot.get()[name];
+      const current = lens.get()[name];
       if (optional && (current === undefined || current === null)) {
         drawn.push(
-          adder(`Add ${label}`, 'mdi:plus', () => {
-            slot.set({ ...slot.get(), [name]: {} }, true);
+          adder(said.addSlot(label), 'mdi:plus', () => {
+            lens.set({ ...lens.get(), [name]: {} }, REDRAW);
           }),
         );
         continue;
       }
       const alone = names.length === 1 && label === title;
-      const fields = keysForm(shape, [name], slot, context, 'slots', !alone);
+      const fields = keysForm(form, [name], lens, context, 'slots', !alone);
       const devices = spec.kind === 'object' ? this.devicesOf(name, origin) : NO_DEVICES;
-      const words =
-        noteOf(origin.source, name, origin.found, origin.own, origin.where, devices.using) ?? '';
-      const note = html`<div class="slot-note" ?hidden=${words === ''}>${words}</div>`;
+      const noted =
+        noteOf(origin.source, name, origin.found, origin.own, origin.where, devices.using, words) ??
+        '';
+      const note = html`<div class="slot-note" ?hidden=${noted === ''}>${noted}</div>`;
       const body =
         spec.kind === 'object'
           ? [
@@ -541,28 +764,28 @@ export class MnmlTemplateCardEditor extends LitElement {
       drawn.push(
         ...(alone ? [] : fields.slice(0, 1)),
         note,
-        ...this.another(name, spec, devices, slot),
+        ...this.another(name, spec, devices, lens),
         ...body,
       );
       if (optional) {
         drawn.push(
           adder(
-            `Remove ${label}`,
+            said.removeSlot(label),
             'mdi:delete-outline',
             () => {
-              slot.set(
-                Object.fromEntries(Object.entries(slot.get()).filter(([key]) => key !== name)),
-                true,
+              lens.set(
+                Object.fromEntries(Object.entries(lens.get()).filter(([key]) => key !== name)),
+                REDRAW,
               );
             },
-            'Remove',
+            said.remove,
           ),
         );
       }
     }
-    drawn.push(...this.alternatives(names, template.slots ?? {}, slot, origin));
-    if (origin.source === 'area') {
-      const back = 'Use what the area found';
+    drawn.push(...this.alternatives(names, template.slots ?? {}, lens, origin));
+    if (origin.source === 'area' || origin.source === 'device') {
+      const back = said.useFound[origin.source];
       drawn.push(
         html`<button
           type="button"
@@ -572,7 +795,7 @@ export class MnmlTemplateCardEditor extends LitElement {
           ?hidden=${!names.some((name) => Object.hasOwn(origin.own, name))}
           @click=${quietly(() => {
             const next = Object.fromEntries(
-              Object.entries(slot.get()).filter(([key]) => !names.includes(key)),
+              Object.entries(lens.get()).filter(([key]) => !names.includes(key)),
             );
             for (const name of names) {
               const found = origin.found[name];
@@ -580,7 +803,7 @@ export class MnmlTemplateCardEditor extends LitElement {
                 next[name] = found;
               }
             }
-            slot.set(next, true);
+            lens.set(next, REDRAW);
           })}
         >
           ${icon('mdi:restore')}<span>${back}</span>
@@ -593,7 +816,7 @@ export class MnmlTemplateCardEditor extends LitElement {
   private alternatives(
     names: readonly string[],
     specs: Readonly<Record<string, SlotSpec>>,
-    slot: Slot,
+    lens: Lens,
     origin: Origin,
   ): TemplateResult[] {
     return names.flatMap((name) => {
@@ -604,21 +827,20 @@ export class MnmlTemplateCardEditor extends LitElement {
         return [];
       }
       const using = Object.hasOwn(origin.own, name) ? origin.own[name] : origin.found[name];
+      const label = slotLabel(name, specs[name]);
+      const said = this.words().template;
       return [
-        html`<div class="alternatives" role="group" aria-label=${`${name} choices`}>
-          <span class="alt-note"
-            >${slotLabel(name, specs[name] ?? { kind: 'entity' })}: ${tied.length} fit equally. Pick
-            one:</span
-          >
+        html`<div class="alternatives" role="group" aria-label=${said.choices(label)}>
+          <span class="alt-note">${said.tied(label, tied.length)}</span>
           ${tied.map(
             (id) =>
               html`<button
                 type="button"
                 class="alt"
-                aria-label=${`Use ${id}`}
+                aria-label=${said.use(id)}
                 aria-pressed=${String(id === using)}
                 @click=${quietly(() => {
-                  slot.set({ ...slot.get(), [name]: id }, true);
+                  lens.set({ ...lens.get(), [name]: id }, REDRAW);
                 })}
               >
                 ${id}
@@ -656,28 +878,33 @@ export class MnmlTemplateCardEditor extends LitElement {
     };
   }
 
-  private another(name: string, spec: SlotSpec, devices: Devices, slot: Slot): TemplateResult[] {
+  private another(name: string, spec: SlotSpec, devices: Devices, lens: Lens): TemplateResult[] {
     if (devices.others.length === 0) {
       return [];
     }
     const area = typeof this.config['area'] === 'string' ? this.config['area'] : undefined;
+    const words = this.words();
     return [
-      html`<div class="alternatives" role="group" aria-label=${`${name} devices`}>
-        <span class="alt-note">Use another:</span>
+      html`<div
+        class="alternatives"
+        role="group"
+        aria-label=${words.template.devices(slotLabel(name, spec))}
+      >
+        <span class="alt-note">${words.template.useAnother}</span>
         ${devices.others.map(
           (fit) =>
             html`<button
               type="button"
               class="alt"
-              aria-label=${`Use ${deviceWords(fit)}`}
+              aria-label=${words.template.use(deviceWords(fit, words))}
               @click=${quietly(() => {
                 const value = fromDevice(spec, fit.id, area, registriesOf(this.hass));
                 if (value !== undefined) {
-                  slot.set({ ...slot.get(), [name]: value }, true);
+                  lens.set({ ...lens.get(), [name]: value }, REDRAW);
                 }
               })}
             >
-              ${deviceWords(fit)}
+              ${deviceWords(fit, words)}
             </button>`,
         )}
       </div>`,
@@ -686,9 +913,11 @@ export class MnmlTemplateCardEditor extends LitElement {
 
   private edit(template: Template, next: Record<string, Value>): void {
     this.values = next;
-    if (sourceOf(this.config) === 'area') {
-      const area = typeof this.config['area'] === 'string' ? this.config['area'] : undefined;
-      const overrides = overridesOf(foundIn(this.tracesFor(template, area)), next);
+    const source = sourceOf(this.config);
+    if (source === 'area' || source === 'device') {
+      const device = source === 'device' ? this.given('device') : undefined;
+      const found = foundIn(this.tracesFor(template, this.given('area'), device));
+      const overrides = overridesOf(found, next);
       const overridden = Object.keys(overrides).length === 0 ? undefined : overrides;
       this.write(place(KEY_ORDER, this.config, 'slots', overridden));
       return;
@@ -705,8 +934,10 @@ export class MnmlTemplateCardEditor extends LitElement {
       origin.source === 'home'
         ? valuesOf('home', origin.found, origin.own)
         : (this.values ?? valuesOf(origin.source, origin.found, origin.own));
-    this.values = to === 'home' ? undefined : values;
-    this.pendingArea = false;
+    const moved = origin.source === 'area' || origin.source === 'device';
+    const carried = moved ? undefined : values;
+    this.values = to === 'yourself' ? values : to === 'home' ? undefined : carried;
+    this.pending = undefined;
     const rest = this.placeless();
     if (to === 'home') {
       this.write(rest);
@@ -716,31 +947,63 @@ export class MnmlTemplateCardEditor extends LitElement {
       this.write(place(KEY_ORDER, rest, 'slots', values));
       return;
     }
-    const current =
-      typeof this.config['area'] === 'string' && this.config['area'] !== ''
-        ? this.config['area']
-        : undefined;
-    const area = current ?? defaultArea({ ...this.config, slots: values }, this.hass?.areas ?? {});
-    if (area === undefined) {
-      this.pendingArea = true;
+    if (to === 'device') {
+      const device = this.given('device') ?? this.likelyDevice(template, values);
+      if (device === undefined) {
+        this.pending = 'device';
+        return;
+      }
+      this.toPlace(template, { device }, carried);
       return;
     }
-    this.toArea(template, area, values);
+    const device = this.given('device');
+    const placed = device === undefined ? undefined : this.hass?.devices[device]?.area_id;
+    const area =
+      this.given('area') ??
+      placed ??
+      defaultArea({ ...this.config, slots: values }, this.hass?.areas ?? {});
+    if (area === undefined) {
+      this.pending = 'area';
+      return;
+    }
+    this.toPlace(template, { area }, carried);
+  }
+
+  private likelyDevice(template: Template, values: Record<string, Value>): string | undefined {
+    const name = this.config['template'];
+    const hass = this.hass;
+    if (typeof name !== 'string' || hass === undefined) {
+      return undefined;
+    }
+    const registries = registriesOf(hass);
+    const fits = this.fitting(name, template).flatMap((fit) =>
+      fit.scope.device === undefined ? [] : [deviceFit(fit.scope.device, registries)],
+    );
+    return (deviceIn(values, fits, hass.entities) ?? fits[0])?.id;
   }
 
   private placeless(): Record<string, Value> {
     return Object.fromEntries(
-      Object.entries(this.config).filter(([key]) => key !== 'area' && key !== 'slots'),
+      Object.entries(this.config).filter(
+        ([key]) => key !== 'area' && key !== 'device' && key !== 'slots',
+      ),
     );
   }
 
-  private toArea(template: Template, area: string, values: Record<string, Value>): void {
-    const overrides = overridesOf(foundIn(this.tracesFor(template, area)), values);
-    const withArea = place(KEY_ORDER, this.placeless(), 'area', area);
+  private toPlace(template: Template, at: Scope, given: Record<string, Value> | undefined): void {
+    const found = foundIn(this.tracesFor(template, at.area, at.device));
+    const own = isMapping(this.config['slots']) ? this.config['slots'] : {};
+    const values = overExample(given ?? { ...found, ...own }, template.example, found);
+    if (!sameValue(values, given)) {
+      this.values = undefined;
+    }
+    const overrides = overridesOf(found, values);
+    const placed =
+      at.device === undefined
+        ? place(KEY_ORDER, this.placeless(), 'area', at.area)
+        : place(KEY_ORDER, this.placeless(), 'device', at.device);
     this.write(
-      Object.keys(overrides).length === 0
-        ? withArea
-        : place(KEY_ORDER, withArea, 'slots', overrides),
+      Object.keys(overrides).length === 0 ? placed : place(KEY_ORDER, placed, 'slots', overrides),
     );
   }
 }

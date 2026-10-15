@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict';
 
+import { CSSResult } from 'lit';
 import { test } from 'vitest';
 
+import type { HomeAssistant } from '../ha/hass.ts';
 import { originOf } from '../ha/navigation.ts';
-import { define, mounted, text } from '../test/render.ts';
+import { fakeHass } from '../test/hass.ts';
+import { configure, created, define, mounted, text } from '../test/render.ts';
+import { until } from '../test/until.ts';
 
 import { MnmlEntityCard } from './entity.ts';
 import { MnmlTileCard } from './tile.ts';
@@ -23,24 +27,14 @@ const LAST_RUN = {
   attributes: { friendly_name: 'Last run', device_class: 'timestamp' },
 };
 
-const HASS = {
-  states: { 'person.jane': JANE, 'sensor.last_run': LAST_RUN },
-  entities: {},
-  devices: {},
-  locale: { language: 'en' },
-  formatEntityState: (stateObj: { state: string }): string => stateObj.state,
-};
+const HASS = fakeHass({ states: { 'person.jane': JANE, 'sensor.last_run': LAST_RUN } });
 
-function card(): MnmlTileCard {
-  const made = document.createElement('mnml-tile-card');
-  assert.ok(made instanceof MnmlTileCard);
-  return made;
-}
+const card = (): MnmlTileCard => created('mnml-tile-card', MnmlTileCard);
 
-async function paint(config: unknown, hass: unknown = HASS): Promise<ShadowRoot> {
+async function paint(config: unknown, hass: HomeAssistant = HASS): Promise<ShadowRoot> {
   const made = card();
-  made.setConfig(config as never);
-  made.hass = hass as never;
+  configure(made, config);
+  made.hass = hass;
   return mounted(made);
 }
 
@@ -54,8 +48,13 @@ test('a tile with an entity and no icon takes the name and the icon from the ent
   assert.equal(text(out.querySelector('.name')), 'Jane');
   assert.equal(text(out.querySelector('.state')), 'home');
   const pill = out.querySelector('.pill');
-  const icon = pill?.querySelector('ha-state-icon') as unknown as { stateObj: unknown } | null;
-  assert.equal(icon?.stateObj, JANE, "the icon follows the entity's state");
+  const icon = pill?.querySelector('ha-state-icon');
+  assert.ok(icon);
+  assert.equal(
+    Reflect.get(icon, 'stateObj'),
+    HASS.states['person.jane'],
+    "the icon follows the entity's state",
+  );
   assert.equal(pill?.querySelector('ha-icon'), null);
 });
 
@@ -66,8 +65,9 @@ test('a named tile keeps the icon it is given', async () => {
     icon: 'mdi:server',
     popup: '#system',
   });
-  const icon = out.querySelector('.pill ha-icon') as unknown as { icon: string } | null;
-  assert.equal(icon?.icon, 'mdi:server');
+  const icon = out.querySelector('.pill ha-icon');
+  assert.ok(icon);
+  assert.equal(Reflect.get(icon, 'icon'), 'mdi:server');
 });
 
 test("a name item prints another entity's name in the state line", async () => {
@@ -89,10 +89,9 @@ test('a relative item prints a timestamp as a relative time', async () => {
     popup: '#checks',
     state: [{ entity: 'sensor.last_run', relative: true }],
   });
-  const time = out.querySelector('.state ha-relative-time') as unknown as {
-    datetime: string;
-  } | null;
-  assert.equal(time?.datetime, '2026-10-12T07:00:00+00:00');
+  const time = out.querySelector('.state ha-relative-time');
+  assert.ok(time);
+  assert.equal(Reflect.get(time, 'datetime'), '2026-10-12T07:00:00+00:00');
 });
 
 test('a relative item takes the entity of its card, and nothing prints while the entity has no value', async () => {
@@ -112,23 +111,79 @@ test('a relative item takes the entity of its card, and nothing prints while the
   assert.equal(none.querySelector('.state ha-relative-time'), null);
 });
 
+test('a relative attribute prints the attribute as a relative time, and nothing while it is empty', async () => {
+  const schedule = {
+    entity_id: 'schedule.coffee',
+    state: 'on',
+    attributes: { friendly_name: 'Coffee', next_event: '2026-10-14T22:00:00+00:00' },
+    last_changed: '2026-10-14T06:00:00+00:00',
+  };
+  const idle = { ...schedule, entity_id: 'schedule.idle', attributes: { next_event: null } };
+  const hass = fakeHass({
+    ...HASS,
+    states: { ...HASS.states, 'schedule.coffee': schedule, 'schedule.idle': idle },
+  });
+  const out = await paint(
+    {
+      type: 'custom:mnml-tile-card',
+      entity: 'schedule.coffee',
+      popup: '#kitchen',
+      state: [{ attribute: 'next_event', relative: true }],
+    },
+    hass,
+  );
+  const time = out.querySelector('.state ha-relative-time');
+  assert.ok(time);
+  assert.equal(Reflect.get(time, 'datetime'), '2026-10-14T22:00:00+00:00');
+  const empty = await paint(
+    {
+      type: 'custom:mnml-tile-card',
+      entity: 'schedule.idle',
+      popup: '#kitchen',
+      state: [{ attribute: 'next_event', relative: true }],
+    },
+    hass,
+  );
+  assert.equal(empty.querySelector('.state ha-relative-time'), null);
+});
+
+test('a since item prints how long ago its entity last changed, as a relative time', async () => {
+  const leak = {
+    entity_id: 'binary_sensor.leak',
+    state: 'on',
+    attributes: { friendly_name: 'Leak' },
+    last_changed: '2026-10-14T09:12:00+00:00',
+  };
+  const out = await paint(
+    {
+      type: 'custom:mnml-tile-card',
+      entity: 'binary_sensor.leak',
+      popup: '#bathroom',
+      state: [{}, { since: true }],
+    },
+    fakeHass({ ...HASS, states: { ...HASS.states, 'binary_sensor.leak': leak } }),
+  );
+  const time = out.querySelector('.state ha-relative-time');
+  assert.ok(time);
+  assert.equal(Reflect.get(time, 'datetime'), '2026-10-14T09:12:00+00:00');
+  assert.match(text(out.querySelector('.state')), /^on/);
+});
+
 const CORNERS = ['front_left', 'front_right', 'rear_left', 'rear_right'] as const;
 
-function tyreHass(pressures: Record<string, string>): unknown {
-  const states: Record<string, unknown> = {};
+function tyreHass(pressures: Record<string, string>): HomeAssistant {
+  const states: Record<string, { state: string; attributes: Record<string, unknown> }> = {};
   for (const corner of CORNERS) {
     states[`sensor.tyre_${corner}`] = {
-      entity_id: `sensor.tyre_${corner}`,
       state: pressures[corner] ?? '2.4',
       attributes: { friendly_name: `Tyre ${corner}` },
     };
     states[`sensor.target_${corner}`] = {
-      entity_id: `sensor.target_${corner}`,
       state: '2.4',
       attributes: { friendly_name: `Target ${corner}` },
     };
   }
-  return { ...HASS, states: { ...HASS.states, ...states } };
+  return fakeHass({ ...HASS, states: { ...HASS.states, ...states } });
 }
 
 const TYRES = {
@@ -187,17 +242,10 @@ function alarmChips(rules: unknown[], state: string): Promise<Element[]> {
         },
       ],
     },
-    {
+    fakeHass({
       ...HASS,
-      states: {
-        ...HASS.states,
-        'sensor.alarm': {
-          entity_id: 'sensor.alarm',
-          state,
-          attributes: { friendly_name: 'Alarm' },
-        },
-      },
-    },
+      states: { ...HASS.states, 'sensor.alarm': { state, attributes: { friendly_name: 'Alarm' } } },
+    }),
   ).then((out) => [...out.querySelectorAll('.chips .control')]);
 }
 
@@ -249,17 +297,13 @@ function expiryChips(state: string, withinDays = 14): Promise<Element[]> {
         },
       ],
     },
-    {
+    fakeHass({
       ...HASS,
       states: {
         ...HASS.states,
-        'sensor.key': {
-          entity_id: 'sensor.key',
-          state,
-          attributes: { friendly_name: 'Key', device_class: 'timestamp' },
-        },
+        'sensor.key': { state, attributes: { friendly_name: 'Key', device_class: 'timestamp' } },
       },
-    },
+    }),
   ).then((out) => [...out.querySelectorAll('.chips .control')]);
 }
 
@@ -302,29 +346,47 @@ test('a chip, or a control of the item, of a type the tile does not know is an e
   const made = card();
   const tile = { type: 'custom:mnml-tile-card', entity: 'person.jane', popup: '#jane' };
   assert.throws(() => {
-    made.setConfig({ ...tile, chips: [{ type: 'toggel', entity: 'light.a' }] } as never);
+    configure(made, { ...tile, chips: [{ type: 'toggel', entity: 'light.a' }] });
   }, /chips\[0\]\.type must be one of toggle, /);
   assert.throws(() => {
-    made.setConfig({
+    configure(made, {
       ...tile,
       item: {
         entity: 'light.a',
         controls: [{ type: 'nav', entity: 'light.a', popup: '#a' }, { type: 'slide' }],
       },
-    } as never);
+    });
   }, /item\.controls\[1\]\.type must be one of toggle, /);
+});
+
+test('a tile without its pop-up, or with a name and no icon, is an error card that names what it lacks', () => {
+  const made = card();
+  assert.throws(() => {
+    configure(made, { type: 'custom:mnml-tile-card', entity: 'person.jane' });
+  }, /^Error: popup is required$/);
+  assert.throws(() => {
+    configure(made, { type: 'custom:mnml-tile-card', name: 'Hall', popup: '#hall' });
+  }, /^Error: icon is required$/);
+  assert.throws(() => {
+    configure(made, {
+      type: 'custom:mnml-tile-card',
+      entity: 'person.jane',
+      popup: '#jane',
+      item: { entity: 'light.a', controls: [{ type: 'toggle' }] },
+    });
+  }, /^Error: item\.controls\[0\]\.entity is required$/);
 });
 
 test('a tile with a name of its own takes no label', () => {
   const made = card();
   assert.throws(() => {
-    made.setConfig({
+    configure(made, {
       type: 'custom:mnml-tile-card',
       name: 'Hall',
       icon: 'mdi:door',
       label: 'device',
       popup: '#hall',
-    } as never);
+    });
   }, /unknown key: label/);
 });
 
@@ -352,12 +414,11 @@ const LIGHT = {
 
 const RELAX = { entity_id: 'scene.relax', state: '2026-10-12T07:00:00+00:00', attributes: {} };
 
-const LIGHTS_HASS = {
+const LIGHTS_HASS = fakeHass({
   ...HASS,
   states: { ...HASS.states, 'light.a': LIGHT, 'scene.relax': RELAX },
-  formatEntityAttributeValue: (_stateObj: unknown, _name: string, value: unknown): string =>
-    `${String(value)}%`,
-};
+  formatEntityAttributeValue: (_stateObj, _name, value) => `${String(value)}%`,
+});
 
 const LIGHT_ITEM = {
   entity: 'light.a',
@@ -383,11 +444,12 @@ const WITH_LIGHTS = {
   item: LIGHT_ITEM,
 };
 
-test('the item row of a tile is its item minified: a small icon, the name and the state on one line, and every control of the item at a smaller size', async () => {
+test("the item row of a tile is its item minified: a small icon, the state on one line with the name its icon's label, and every control of the item at a smaller size", async () => {
   const out = await paint(WITH_LIGHTS, LIGHTS_HASS);
   const row = out.querySelector('.tile > .row');
   assert.ok(row, 'the lights row');
-  assert.equal(text(row.querySelector('.line')), 'Lights • 80%', 'one line');
+  assert.equal(text(row.querySelector('.line')), '80%', 'one line');
+  assert.equal(row.querySelector('.pill')?.getAttribute('aria-label'), 'Lights');
   assert.equal(row.querySelector('.text'), null, 'not the two lines of an item');
   assert.ok(row.querySelector('[aria-haspopup]'), 'the scenes button');
   const brightness = row.querySelector('[aria-label="Brightness"]');
@@ -410,12 +472,57 @@ test('the item row of a tile is its item minified: a small icon, the name and th
   assert.equal(getComputedStyle(row).minHeight, '36px', 'one slim line');
 });
 
+function coarseRules(): CSSStyleRule[] {
+  const style = document.createElement('style');
+  style.textContent = MnmlTileCard.styles
+    .flat()
+    .map((sheet) => (sheet instanceof CSSResult ? sheet.cssText : ''))
+    .join('\n');
+  document.head.append(style);
+  const rules = [...(style.sheet?.cssRules ?? [])].flatMap((rule) =>
+    rule instanceof CSSMediaRule && rule.conditionText === '(pointer: coarse)'
+      ? [...rule.cssRules].filter((inner) => inner instanceof CSSStyleRule)
+      : [],
+  );
+  style.remove();
+  return rules;
+}
+
+function px(rules: CSSStyleRule[], selector: string, property: string): number {
+  const found = rules.find((rule) => rule.selectorText === selector);
+  assert.ok(found, selector);
+  return Number.parseFloat(found.style.getPropertyValue(property));
+}
+
+test("on a touch screen each control of a tile's Lights row keeps its 28 px look and has a 44 px target of its own", async () => {
+  const out = await paint(WITH_LIGHTS, LIGHTS_HASS);
+  const control = out.querySelector<HTMLElement>('.tile > .row .control');
+  assert.ok(control);
+  const size = Number.parseFloat(getComputedStyle(control).height);
+  assert.equal(size, 28);
+  const coarse = coarseRules();
+  const reach = -px(coarse, '.tile > .row .control:not(.inert)::after', 'inset');
+  const gap = px(coarse, '.tile > .row > .lane', 'gap');
+  assert.ok(size + 2 * reach >= 44, 'a target of at least 44 by 44 px');
+  assert.ok(gap >= 2 * reach, 'that does not overlap its neighbour');
+});
+
+test("a press between two controls of a tile's Lights row opens nothing", async () => {
+  history.replaceState(null, '', location.pathname);
+  const out = await paint(WITH_LIGHTS, LIGHTS_HASS);
+  const lane = out.querySelector<HTMLElement>('.tile > .row > .lane');
+  assert.ok(lane);
+  lane.click();
+  assert.equal(location.hash, '', 'neither the row nor the tile opens its pop-up');
+  history.replaceState(null, '', location.pathname);
+});
+
 test("a slider button on a tile's item row opens its slider over that row alone, so the tile's header stays", async () => {
   const out = await paint(WITH_LIGHTS, LIGHTS_HASS);
   const row = out.querySelector<HTMLElement>('.tile > .row');
   assert.ok(row);
   row.querySelector<HTMLElement>('[aria-label="Brightness"]')?.click();
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await until(() => out.querySelector('.overlay') !== null, 'a slider');
   const overlay = out.querySelector('.overlay');
   assert.ok(overlay, 'a slider opened');
   assert.equal(overlay.parentElement, row, 'inside the row');
@@ -423,14 +530,17 @@ test("a slider button on a tile's item row opens its slider over that row alone,
 });
 
 test('the item row of a tile reads its state on the same line while the light is off', async () => {
-  const out = await paint(WITH_LIGHTS, {
-    ...LIGHTS_HASS,
-    states: {
-      ...LIGHTS_HASS.states,
-      'light.a': { ...LIGHT, state: 'off', attributes: { friendly_name: 'Lights' } },
-    },
-  });
-  assert.equal(text(out.querySelector('.tile > .row .line')), 'Lights • off');
+  const out = await paint(
+    WITH_LIGHTS,
+    fakeHass({
+      ...LIGHTS_HASS,
+      states: {
+        ...LIGHTS_HASS.states,
+        'light.a': { ...LIGHT, state: 'off', attributes: { friendly_name: 'Lights' } },
+      },
+    }),
+  );
+  assert.equal(text(out.querySelector('.tile > .row .line')), 'off');
 });
 
 test("tapping the item row of a tile opens the item's pop-up, not the tile's", async () => {
@@ -446,8 +556,8 @@ test("tapping the item row of a tile opens the item's pop-up, not the tile's", a
 test("the same item in a pop-up's entity card keeps every control", async () => {
   const made = document.createElement('mnml-entity-card');
   assert.ok(made instanceof MnmlEntityCard);
-  made.setConfig({ type: 'custom:mnml-entity-card', ...LIGHT_ITEM } as never);
-  made.hass = LIGHTS_HASS as never;
+  configure(made, { type: 'custom:mnml-entity-card', ...LIGHT_ITEM });
+  made.hass = LIGHTS_HASS;
   const out = await mounted(made);
   assert.deepEqual(
     [...out.querySelectorAll('.row .control')].map((control) => control.getAttribute('aria-label')),
@@ -484,8 +594,8 @@ test('a part the template marked carries its path on the card, its chips, its st
     _part: 'card',
   };
   const made = card();
-  made.setConfig(marked as never);
-  made.hass = HASS as never;
+  configure(made, marked);
+  made.hass = HASS;
   const out = await mounted(made);
   assert.equal(made.getAttribute('data-part'), 'card');
   assert.deepEqual(

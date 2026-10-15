@@ -2,11 +2,12 @@ import assert from 'node:assert/strict';
 
 import { test } from 'vitest';
 
-import { isPlan } from '../contract/builder.ts';
-import type { Template } from '../contract/templates.ts';
+import { isPlan } from '../contract/plan.ts';
+import type { Filter, Rule, Template } from '../contract/templates.ts';
+import type { Registries } from '../ha/registries.ts';
 import { homes } from '../templates/corpus.ts';
 import { discover } from '../templates/discover.ts';
-import type { Registries } from '../templates/discover.ts';
+import { describe, matches } from '../templates/filters.ts';
 import { readTemplates } from '../templates/shipped.ts';
 
 import { HOME, HOUSE } from './fixture.ts';
@@ -84,7 +85,7 @@ test("a reading on a service device, a server's or an integration's own, does no
 
 test('the devices in no area are counted when they hold something a room shows', () => {
   assert.equal(
-    unplaced(HOUSE),
+    unplaced(HOUSE).devices,
     2,
     'the bulb and the thermometer; not the car, which moves, nor the plug, whose switch is no outlet',
   );
@@ -92,8 +93,21 @@ test('the devices in no area are counted when they hold something a room shows',
     ...HOUSE,
     states: { ...HOUSE.states, 'switch.plug': { attributes: { device_class: 'outlet' } } },
   };
-  assert.equal(unplaced(outlet), 3, 'an outlet is something a room shows');
-  assert.equal(unplaced(HOME), 0);
+  assert.equal(unplaced(outlet).devices, 3, 'an outlet is something a room shows');
+  assert.deepEqual(unplaced(HOME), { devices: 0, entities: 0, share: 0 });
+});
+
+test('the entities with no device in no area are counted, and the share of what a room shows that is in no area', () => {
+  const loose: Registries = {
+    ...HOUSE,
+    entities: {
+      ...HOUSE.entities,
+      'light.porch': { entity_id: 'light.porch' },
+      'light.shed': { entity_id: 'light.shed', area_id: 'living' },
+    },
+  };
+  assert.equal(unplaced(HOUSE).share, 2 / 3, 'the bulb and the thermometer, beside the lamp');
+  assert.deepEqual(unplaced(loose), { devices: 2, entities: 1, share: 3 / 5 });
 });
 
 function single(
@@ -170,6 +184,91 @@ test('on the corpus home of devices, the kitchen of plugs and the laundry of a w
     defaultPlan(devices, TEMPLATES).rooms.map((each) => each.area),
     ['bedroom', 'hall', 'kitchen', 'laundry', 'living', 'office'],
   );
+});
+
+test('the quick start draws each device through its room, and none on a card of its own', () => {
+  for (const [name, home] of Object.entries(homes())) {
+    const plan = defaultPlan(home, TEMPLATES);
+    assert.equal('devices' in plan, false, name);
+    assert.equal(isPlan(plan), true, name);
+  }
+});
+
+function holding(filter: Filter): Registries {
+  const entity_id = `${filter.domain ?? 'sensor'}.thing`;
+  return {
+    areas: { here: { area_id: 'here', name: 'Here' } },
+    devices: {
+      thing: {
+        id: 'thing',
+        area_id: 'here',
+        name: 'Thing',
+        manufacturer: filter.manufacturer,
+        model: filter.model,
+        entry_type: filter.entry_type === 'service' ? 'service' : undefined,
+        labels: filter.label === undefined ? [] : [filter.label],
+      },
+    },
+    entities: {
+      [entity_id]: {
+        entity_id,
+        device_id: 'thing',
+        platform: filter.platform ?? filter.integration,
+        translation_key: filter.translation_key,
+        entity_category: filter.entity_category === 'none' ? undefined : filter.entity_category,
+      },
+    },
+    states: {
+      [entity_id]: {
+        state: 'on',
+        attributes: {
+          device_class: filter.device_class,
+          unit_of_measurement: filter.unit,
+          state_class: filter.state_class,
+          friendly_name: filter.name ?? 'Thing',
+          ...filter.attribute,
+        },
+      },
+    },
+  };
+}
+
+function lookedFor(rule: Rule | undefined, path: string): (readonly [string, Filter])[] {
+  if (rule === undefined || typeof rule === 'string') {
+    return [];
+  }
+  if (Array.isArray(rule)) {
+    return rule.flatMap((each) => lookedFor(each, path));
+  }
+  if ('per' in rule) {
+    return rule.where === undefined ? [] : [[path, rule.where]];
+  }
+  if ('fields' in rule) {
+    return rule.device === undefined
+      ? Object.entries(rule.fields).flatMap(([field, each]) => lookedFor(each, `${path}.${field}`))
+      : [rule.device].flat().map((anchor) => [path, anchor] as const);
+  }
+  return [[path, rule]];
+}
+
+test('everything the room template looks for in an area makes the area a room, but its batteries, its scenes, its schedules and its timers', () => {
+  const room = TEMPLATES['room'];
+  assert.ok(room);
+  const sought = Object.entries(room.slots ?? {}).flatMap(([slot, spec]) =>
+    lookedFor(spec.discover, slot),
+  );
+  const apart = ['batteries', 'lights.scenes', 'schedules', 'timers'];
+  assert.ok(sought.length > 20);
+  assert.deepEqual(
+    apart.filter((path) => sought.some(([each]) => each === path)),
+    apart,
+  );
+  for (const [path, filter] of sought) {
+    const home = holding(filter);
+    const [entry] = Object.values(home.entities);
+    assert.ok(entry && matches(entry, filter, home), `${path}: the thing fits ${describe(filter)}`);
+    assert.equal(kinds(home) === 'room', !apart.includes(path), `${path}: ${describe(filter)}`);
+  }
 });
 
 test("a router's tracker on a speaker or a bulb does not make it move with someone; a GPS tracker does", () => {

@@ -23,8 +23,10 @@ import type {
   MessagesCard,
   ModeAttribute,
   Popup,
+  PopupAlert,
   PopupOpen,
   PopupOpening,
+  PopupScreen,
   PopupsCard,
   ReportCard,
   SelectCard,
@@ -68,6 +70,7 @@ export interface Key {
   readonly default?: Value;
   readonly options?: readonly string[];
   readonly domains?: readonly string[];
+  readonly holes?: true;
   readonly writes?: string;
   readonly of?: Structure;
 }
@@ -185,12 +188,14 @@ export const texts = (fallback?: readonly string[]): Optional => ({
   kind: 'texts',
   default: fallback === undefined ? undefined : [...fallback],
 });
+const choices = (options: readonly string[]): Optional => ({ kind: 'texts', options });
 export const number = (): Optional => ({ kind: 'number' });
 const share = (): Optional => ({ kind: 'share' });
 export const flag = (writes?: string): Optional => ({ kind: 'flag', writes });
 const choice = (options: readonly string[]): Optional => ({ kind: 'choice', options });
 export const entity = (domains?: readonly string[]): Optional => ({ kind: 'entity', domains });
 export const entities = (domains?: readonly string[]): Optional => ({ kind: 'entities', domains });
+const columns = (): Optional => ({ kind: 'entities', holes: true });
 export const icon = (): Optional => ({ kind: 'icon' });
 const popup = (): Optional => ({ kind: 'popup' });
 const service = (): Optional => ({ kind: 'service' });
@@ -203,12 +208,17 @@ export const parts = (of: Structure): Optional => ({ kind: 'parts', of });
 const cards = (): Optional => ({ kind: 'cards' });
 const slots = (): Optional => ({ kind: 'slots' });
 
-const STATE_RULE = plain<StateRule>('state-rule', { is: texts(), not: texts() });
+const STATE_RULE = plain<StateRule>('state-rule', {
+  is: texts(),
+  not: texts(),
+  attribute: text(),
+});
 
 const ENTITY_RULE = plain<EntityRule>('entity-rule', {
   is: texts(),
   not: texts(),
   entity: entity(),
+  attribute: text(),
 });
 
 export const rule = (): Optional => ({ kind: 'rule', of: STATE_RULE });
@@ -221,7 +231,7 @@ export const COLORS: readonly string[] = Object.keys({
   blue: true,
 } satisfies Record<Color, true>);
 
-export const SLIDER_KINDS: readonly string[] = Object.keys({
+const SLIDER_KINDS: readonly string[] = Object.keys({
   brightness: true,
   color_temp: true,
   hue: true,
@@ -233,7 +243,7 @@ export const SLIDER_KINDS: readonly string[] = Object.keys({
   humidity: true,
 } satisfies Record<SliderKind, true>);
 
-export const MODE_ATTRIBUTES: readonly string[] = Object.keys({
+const MODE_ATTRIBUTES: readonly string[] = Object.keys({
   hvac_modes: true,
   preset_modes: true,
   fan_modes: true,
@@ -241,7 +251,7 @@ export const MODE_ATTRIBUTES: readonly string[] = Object.keys({
   swing_horizontal_modes: true,
 } satisfies Record<ModeAttribute, true>);
 
-export const AGENDA_KINDS: readonly string[] = Object.keys({
+const AGENDA_KINDS: readonly string[] = Object.keys({
   episodes: true,
   movies: true,
 } satisfies Record<AgendaSource['kind'], true>);
@@ -255,9 +265,22 @@ export const OPENINGS: readonly string[] = Object.keys({
 export const STATE_ITEM = marked<StateItem>('state')(
   {
     text: { text: need(text()), when: entityRule() },
-    attribute: { entity: entity(), attribute: need(text()), icon: flag(), when: entityRule() },
+    attribute: {
+      entity: entity(),
+      attribute: need(text()),
+      relative: flag(),
+      icon: flag(),
+      when: entityRule(),
+    },
     minutes: { entity: entity(), minutes: need(flag()), icon: flag(), when: entityRule() },
     relative: { entity: entity(), relative: need(flag()), icon: flag(), when: entityRule() },
+    since: { entity: entity(), since: need(flag()), icon: flag(), when: entityRule() },
+    remaining: {
+      entity: entity(['timer']),
+      remaining: need(flag()),
+      icon: flag(),
+      when: entityRule(),
+    },
     serial: { entity: entity(), serial: need(flag()), when: entityRule() },
     name: { entity: entity(), name: need(flag()), when: entityRule() },
   },
@@ -282,6 +305,7 @@ export const CONTROL = tagged<Control>('control', {
     primary: flag(),
     color: color(),
     when: rule(),
+    confirm: rule(),
     show: entityRule(),
   },
   slider: {
@@ -293,7 +317,7 @@ export const CONTROL = tagged<Control>('control', {
     show: entityRule(),
   },
   select: {
-    entity: need(entity(['select', 'climate'])),
+    entity: need(entity(['select', 'climate', 'timer'])),
     attribute: choice(MODE_ATTRIBUTES),
     primary: flag(),
     color: color(),
@@ -306,6 +330,7 @@ export const CONTROL = tagged<Control>('control', {
     name: need(text()),
     icon: need(icon()),
     primary: flag(),
+    confirm: rule(),
     show: entityRule(),
   },
   nav: {
@@ -338,11 +363,15 @@ export const CONTROL = tagged<Control>('control', {
     icon: need(icon()),
     show: entityRule(),
   },
+  messages: {
+    popup: need(popup()),
+    name: need(text()),
+    icon: need(icon()),
+    color: color(),
+    show: entityRule(),
+  },
+  dismiss: { name: need(text()), icon: need(icon()), show: entityRule() },
 });
-
-export const CONTROL_TYPES: readonly string[] = CONTROL.variants.flatMap(
-  (variant) => variant.when ?? [],
-);
 
 const ITEM = plain<Item>('item', {
   entity: need(entity()),
@@ -364,12 +393,21 @@ const GLANCE = marked<Glance>('glance')(
       name: need(text()),
       icon: icon(),
       color: color(),
+      show: entityRule(),
       popup: popup(),
       is: texts(),
       not: texts(),
       below: number(),
       sum: flag(),
+      total: flag(),
       critical: number(),
+    },
+    messages: {
+      messages: need(flag()),
+      name: need(text()),
+      icon: icon(),
+      color: color(),
+      popup: need(popup()),
     },
   },
   {
@@ -382,7 +420,9 @@ const GLANCE = marked<Glance>('glance')(
     state: parts(STATE_ITEM),
     popup: popup(),
     toggle: flag(),
+    confirm: rule(),
     quiet: flag(),
+    calm: flag(),
     bare: flag(),
     alert: rule(),
     people: entities(['person']),
@@ -405,7 +445,7 @@ export const LIST_ROW = plain<ListRow>('row', {
   critical: number(),
   high: number(),
   critical_high: number(),
-  values: entities(),
+  values: columns(),
   reset: entity(['button']),
   color: color(),
   when: rule(),
@@ -442,6 +482,22 @@ const POPUP_OPEN = plain<PopupOpen>('popup-open', {
 
 const POPUP = plain<Popup>('popup', { hash: need(popup()), cards: need(cards()) });
 
+const POPUP_SCREENS: readonly string[] = Object.keys({
+  phone: true,
+  tablet: true,
+  desktop: true,
+} satisfies Record<PopupScreen, true>);
+
+const POPUP_ALERT = plain<PopupAlert>('popup-alert', {
+  entity: need(entity()),
+  attribute: text(),
+  is: texts(),
+  not: texts(),
+  popup: need(popup()),
+  screens: choices(POPUP_SCREENS),
+  users: texts(),
+});
+
 export const CARD_STRUCTURES: Readonly<Record<CustomCard['type'], Structure>> = {
   'custom:mnml-heading-card': plain<HeadingCard>('heading', {
     title: need(text()),
@@ -451,9 +507,11 @@ export const CARD_STRUCTURES: Readonly<Record<CustomCard['type'], Structure>> = 
   }),
   'custom:mnml-list-card': plain<ListCard>('list', {
     lowest_first: flag(),
+    highest_first: flag(),
     fold: flag(),
     summary: summary(),
     title: text(),
+    entity: entity(),
     icon: icon(),
     headers: texts(),
     rows: need(parts(LIST_ROW)),
@@ -463,11 +521,18 @@ export const CARD_STRUCTURES: Readonly<Record<CustomCard['type'], Structure>> = 
     icon: icon(),
     sources: need(parts(AGENDA_SOURCE)),
   }),
-  'custom:mnml-messages-card': plain<MessagesCard>('messages', {
-    entity: need(entity(['sensor'])),
-    clear: need(entity(['script'])),
-    sources: parts(MESSAGE_SOURCE),
-  }),
+  'custom:mnml-messages-card': marked<MessagesCard>('messages')(
+    {
+      notifications: { notifications: need(flag()) },
+      repairs: { repairs: need(flag()) },
+      popup: { popup: need(popup()), name: need(text()), icon: need(icon()), color: color() },
+    },
+    {
+      entity: need(entity(['sensor'])),
+      clear: need(entity(['script'])),
+      sources: parts(MESSAGE_SOURCE),
+    },
+  ),
   'custom:mnml-clients-card': plain<ClientsCard>('clients', {
     entity: need(entity(['sensor'])),
     attribute: text('data'),
@@ -486,7 +551,9 @@ export const CARD_STRUCTURES: Readonly<Record<CustomCard['type'], Structure>> = 
     entity: need(entity(['weather'])),
     title: text(),
   }),
-  'custom:mnml-glances-card': plain<GlancesCard>('glances', { items: need(parts(GLANCE)) }),
+  'custom:mnml-glances-card': plain<GlancesCard>('glances', {
+    items: need(parts(GLANCE)),
+  }),
   'custom:mnml-button-card': plain<ButtonCard>('button', {
     entity: need(entity(['button'])),
     service: need(service()),
@@ -535,6 +602,7 @@ export const CARD_STRUCTURES: Readonly<Record<CustomCard['type'], Structure>> = 
         name: need(text()),
         icon: need(icon()),
         back: flag(),
+        messages: flag(),
         color: color(),
         when: rule(),
         state: parts(STATE_ITEM),
@@ -546,6 +614,7 @@ export const CARD_STRUCTURES: Readonly<Record<CustomCard['type'], Structure>> = 
       label: flag('device'),
       icon: icon(),
       back: flag(),
+      messages: flag(),
       color: color(),
       when: rule(),
       state: parts(STATE_ITEM),
@@ -596,10 +665,13 @@ export const CARD_STRUCTURES: Readonly<Record<CustomCard['type'], Structure>> = 
   'custom:mnml-popups-card': plain<PopupsCard>('popups', {
     width: need(text()),
     open: part(POPUP_OPEN),
+    idle_close: number(),
+    alerts: parts(POPUP_ALERT),
     popups: parts(POPUP),
   }),
   'custom:mnml-template-card': plain<TemplateCard>('template', {
     template: need(text()),
+    device: text(),
     area: text(),
     slots: slots(),
   }),

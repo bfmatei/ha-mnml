@@ -1,5 +1,7 @@
 adguard:
-  description: An AdGuard Home tile, its block ratio and speed, its update chip and its protection toggle; it brings its pop-up.
+  description: An AdGuard Home tile, its block ratio and speed, its update chip and its protection toggle, which asks before turning protection off; it brings its pop-up.
+  title: AdGuard Home
+  icon: mdi:shield-check
   slots:
     protection:
       help: "The switch that turns AdGuard Home's protection on and off."
@@ -62,7 +64,7 @@ adguard:
       - id: status
         if: update
         type: status
-        name: Update
+        name: '[[words.update]]'
         icon: mdi:package-up
         silent: true
         rules:
@@ -79,6 +81,7 @@ adguard:
       - id: toggle
         type: toggle
         entity: '[[protection]]'
+        confirm: { is: ['on'] }
         color: orange
         when: { is: ['off'] }
     grid_options: { columns: 12 }
@@ -103,6 +106,8 @@ adguard:
 
 adguard-popup:
   description: AdGuard Home's pop-up, its queries, blocklists and update.
+  title: AdGuard Home pop-up
+  icon: mdi:shield-check
   slots:
     protection: { kind: entity, required: true }
     queries: { kind: entity }
@@ -120,22 +125,17 @@ adguard-popup:
         label: device
         color: orange
         when: { is: ['off'] }
-        state:
-          - id: ratio
-            if: ratio
-            entity: '[[ratio]]'
-            icon: true
-          - id: speed
-            if: speed
-            entity: '[[speed]]'
-            icon: true
         controls:
           - id: power
             template: power
-            slots: { entity: '[[protection]]' }
+            slots:
+              entity: '[[protection]]'
+              confirm: { is: ['on'] }
+              color: orange
+              when: { is: ['off'] }
       - id: queries
         type: custom:mnml-list-card
-        title: Queries
+        title: '[[words.queries]]'
         icon: mdi:dns
         rows:
           - id: queries
@@ -154,7 +154,7 @@ adguard-popup:
       - id: rules
         if: rules
         type: custom:mnml-list-card
-        title: Blocklists
+        title: '[[words.blocklists]]'
         icon: mdi:filter-outline
         rows:
           - id: rules
@@ -164,7 +164,7 @@ adguard-popup:
             when: { is: ['0'] }
       - id: update
         type: custom:mnml-list-card
-        title: Update
+        title: '[[words.update]]'
         icon: mdi:package-up
         rows:
           - id: pending-row

@@ -1,32 +1,34 @@
 import { css, html, nothing } from 'lit';
 import type { TemplateResult } from 'lit';
 
+import type { PanelWords } from '../words/panel/en.ts';
+
 import type { Clash } from './data.ts';
 
-function describeClash(clash: Clash): string {
-  const where = clash.change.path.join(' / ') || 'the template';
-  const what =
-    clash.change.op === 'set'
-      ? `${clash.change.key} at ${where}`
-      : `${clash.change.op} at ${where}`;
-  if (clash.reason === 'gone') {
-    return `${what}: this part is gone from the shipped template, so the change is left out`;
-  }
-  return clash.reason === 'taken'
-    ? `${what}: the shipped template has a part of this id now, so yours is left out`
-    : `${what}: the shipped template changed here since; your change still applies`;
+type Said = PanelWords['conflicts'];
+
+function describeClash(clash: Clash, said: Said): string {
+  const where = clash.change.path.join(' / ') || said.template;
+  const what = said.at(
+    clash.change.op === 'set' ? clash.change.key : said.ops[clash.change.op],
+    where,
+  );
+  return said.reasons[clash.reason](what);
 }
 
-export function drawConflicts(clashes: readonly Clash[]): TemplateResult | typeof nothing {
+export function drawConflicts(
+  clashes: readonly Clash[],
+  said: Said,
+): TemplateResult | typeof nothing {
   if (clashes.length === 0) {
     return nothing;
   }
   return html`<div class="conflicts">
-    <strong>A release changed this template under your changes</strong>
+    <strong>${said.heading}</strong>
     <ul>
-      ${clashes.map((clash) => html`<li>${describeClash(clash)}</li>`)}
+      ${clashes.map((clash) => html`<li>${describeClash(clash, said)}</li>`)}
     </ul>
-    <p class="muted">Saving keeps the changes that still apply.</p>
+    <p class="muted">${said.keeps}</p>
   </div>`;
 }
 
@@ -43,7 +45,7 @@ export const CONFLICTS_STYLE = css`
   }
   .conflicts ul {
     margin: 6px 0;
-    padding-left: 20px;
+    padding-inline-start: 20px;
   }
   .conflicts p {
     margin: 0;

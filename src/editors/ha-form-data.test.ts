@@ -1,0 +1,280 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+
+import { test } from 'vitest';
+import { parse } from 'yaml';
+
+import { DEMO } from '../../demo/home.ts';
+import { isMapping } from '../contract/templates.ts';
+import type { Value } from '../contract/templates.ts';
+import { drawn } from '../home/view.ts';
+import { EDITORS_EN } from '../words/panel/editors-en.ts';
+
+import { DESCRIPTIONS } from './cards.ts';
+import { checkValue, variantOf } from './form.ts';
+import type { Form } from './form.ts';
+import { formData, fromForm, labelFor, schemaOf } from './ha-form-data.ts';
+
+const SLIDER = DESCRIPTIONS['custom:mnml-slider-card'];
+const CAR = DESCRIPTIONS['custom:mnml-car-plan-card'];
+
+test("a section's plain fields become one ha-form schema with Home Assistant's pickers", () => {
+  assert.ok(SLIDER?.kind === 'plain');
+  assert.deepEqual(schemaOf(SLIDER, ['entity', 'slider', 'turn_on'], []), [
+    { name: 'entity', required: true, selector: { entity: {} } },
+    {
+      name: 'slider',
+      required: true,
+      selector: {
+        select: {
+          mode: 'dropdown',
+          options: [
+            'brightness',
+            'color_temp',
+            'hue',
+            'temperature',
+            'value',
+            'volume',
+            'position',
+            'percentage',
+            'humidity',
+          ],
+        },
+      },
+    },
+    { name: 'turn_on', required: false, selector: { boolean: {} } },
+  ]);
+});
+
+test('corners become a grid of four entity pickers, labelled by corner', () => {
+  assert.ok(CAR?.kind === 'plain');
+  const [doors] = schemaOf(CAR, ['doors'], []);
+  assert.equal(doors?.type, 'grid');
+  assert.deepEqual(
+    doors?.schema?.map((item) => item.name),
+    ['doors.0', 'doors.1', 'doors.2', 'doors.3'],
+  );
+  assert.equal(labelFor(CAR, 'doors.3', EDITORS_EN), 'Doors: rear right');
+  assert.equal(labelFor(CAR, 'tyre_low_share', EDITORS_EN), 'Tyre low share');
+});
+
+test("a pop-up field offers the dashboard's pop-ups by name, writes their hashes, and takes a new one", () => {
+  const media = DESCRIPTIONS['custom:mnml-media-card'];
+  assert.ok(media?.kind === 'plain');
+  const popups = [
+    { value: '#a', label: 'Living' },
+    { value: '#a-lights', label: 'Living: lights' },
+  ];
+  assert.deepEqual(schemaOf(media, ['popup'], popups), [
+    {
+      name: 'popup',
+      required: false,
+      selector: { select: { mode: 'dropdown', custom_value: true, options: popups } },
+    },
+  ]);
+});
+
+test('a flag that writes a word is a switch, and the word comes back', () => {
+  const entity = DESCRIPTIONS['custom:mnml-entity-card'];
+  assert.ok(entity?.kind === 'plain');
+  const value: Record<string, Value> = { type: 'custom:mnml-entity-card', entity: 'light.a' };
+  assert.deepEqual(formData(entity, ['label'], { ...value, label: 'device' }), { label: true });
+  assert.deepEqual(fromForm(entity, ['label'], { label: true }, value), {
+    ...value,
+    label: 'device',
+  });
+  assert.deepEqual(
+    fromForm(entity, ['label'], { label: false }, { ...value, label: 'device' }),
+    value,
+  );
+});
+
+function sections(form: Form, value: Record<string, Value>): (readonly string[])[] {
+  return variantOf(form, value).sections.map((section) => section.keys);
+}
+
+function roundTrip(form: Form, value: Record<string, Value>): void {
+  const chosen = variantOf(form, value);
+  for (const keys of sections(form, value)) {
+    const back = fromForm(chosen, keys, formData(chosen, keys, value), value);
+    assert.equal(JSON.stringify(back), JSON.stringify(value), `${chosen.id} ${keys.join(',')}`);
+  }
+  for (const [key, field] of Object.entries(chosen.fields)) {
+    const inner = value[key];
+    if (field.of === undefined || inner === undefined) {
+      continue;
+    }
+    for (const item of Array.isArray(inner) ? inner : [inner]) {
+      if (isMapping(item)) {
+        roundTrip(field.of, item);
+      }
+    }
+  }
+}
+
+function collect(value: unknown, into: Record<string, Value>[]): Record<string, Value>[] {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collect(item, into);
+    }
+  } else if (isMapping(value)) {
+    const type = value['type'];
+    if (typeof type === 'string' && Object.hasOwn(DESCRIPTIONS, type)) {
+      into.push(value);
+    }
+    for (const item of Object.values(value)) {
+      collect(item, into);
+    }
+  }
+  return into;
+}
+
+test('every section of every demo and example card, and of every part in it, goes through ha-form data unchanged', () => {
+  const examples: unknown = parse(readFileSync('examples/cards.yaml', 'utf8'));
+  for (const card of [...collect(drawn(DEMO), []), ...collect(examples, [])]) {
+    const type = card['type'];
+    const form = typeof type === 'string' ? DESCRIPTIONS[type] : undefined;
+    assert.ok(form);
+    roundTrip(form, card);
+  }
+});
+
+test('a rule written by hand keeps the order of its keys', () => {
+  const entity = DESCRIPTIONS['custom:mnml-entity-card'];
+  assert.ok(entity?.kind === 'plain');
+  const value: Record<string, Value> = {
+    type: 'custom:mnml-entity-card',
+    entity: 'light.a',
+    when: { not: ['off'], is: ['on'] },
+  };
+  const back = fromForm(entity, ['when'], formData(entity, ['when'], value), value);
+  assert.equal(JSON.stringify(back), JSON.stringify(value));
+});
+
+test("a rule's attribute is a text of its own in the form, before the states it is matched against", () => {
+  const entity = DESCRIPTIONS['custom:mnml-entity-card'];
+  assert.ok(entity?.kind === 'plain');
+  const value: Record<string, Value> = {
+    type: 'custom:mnml-entity-card',
+    entity: 'sensor.notifications',
+    when: { attribute: 'alerts', not: ['0'] },
+  };
+  checkValue(entity, value);
+  const [when] = schemaOf(entity, ['when'], []);
+  assert.deepEqual(
+    when?.schema?.map((item) => [item.name, item.selector]),
+    [
+      ['when.attribute', { text: {} }],
+      ['when.is', { text: { multiple: true } }],
+      ['when.not', { text: { multiple: true } }],
+    ],
+  );
+  assert.equal(labelFor(entity, 'when.attribute', EDITORS_EN), 'When: attribute');
+  const back = fromForm(entity, ['when'], formData(entity, ['when'], value), value);
+  assert.equal(JSON.stringify(back), JSON.stringify(value));
+});
+
+test('a rule whose states are all cleared in the form goes, rather than matching every state', () => {
+  const entity = DESCRIPTIONS['custom:mnml-entity-card'];
+  assert.ok(entity?.kind === 'plain');
+  const value: Record<string, Value> = {
+    type: 'custom:mnml-entity-card',
+    entity: 'light.a',
+    when: { is: ['on'] },
+  };
+  assert.deepEqual(fromForm(entity, ['when'], {}, value), {
+    type: 'custom:mnml-entity-card',
+    entity: 'light.a',
+  });
+});
+
+test('a pop-up typed without its # gets one, so the card takes it', () => {
+  const media = DESCRIPTIONS['custom:mnml-media-card'];
+  assert.ok(media?.kind === 'plain');
+  const value: Record<string, Value> = {
+    type: 'custom:mnml-media-card',
+    entity: 'media_player.tv',
+  };
+  assert.deepEqual(fromForm(media, ['popup'], { popup: 'kitchen' }, value), {
+    ...value,
+    popup: '#kitchen',
+  });
+});
+
+test("a list's sum is labelled as the column it adds up", () => {
+  const list = DESCRIPTIONS['custom:mnml-list-card'];
+  assert.ok(list?.kind === 'plain');
+  assert.equal(
+    labelFor(list, 'summary.sum', EDITORS_EN),
+    'Summary: the column to sum, 0 for the first value',
+  );
+});
+
+test('a required text or entity cleared in the form stays, empty, so the part keeps its kind', () => {
+  const header = DESCRIPTIONS['custom:mnml-header-card'];
+  assert.ok(header?.kind === 'marked');
+  const value: Record<string, Value> = {
+    type: 'custom:mnml-header-card',
+    name: 'Hall',
+    icon: 'mdi:door',
+  };
+  const named = variantOf(header, value);
+  const back = fromForm(named, ['name', 'icon'], { icon: 'mdi:door' }, value);
+  assert.deepEqual(back, { type: 'custom:mnml-header-card', name: '', icon: 'mdi:door' });
+  assert.equal(variantOf(header, back), named);
+});
+
+const PLANNED: Record<string, Value> = {
+  type: 'custom:mnml-car-plan-card',
+  title: 'Car',
+  doors: ['binary_sensor.a', 'binary_sensor.b', 'binary_sensor.c', 'binary_sensor.d'],
+  hood: 'binary_sensor.hood',
+  tailgate: 'binary_sensor.tailgate',
+  windows: ['sensor.a', 'sensor.b', 'sensor.c', 'sensor.d'],
+  open_states: ['open'],
+  half_states: [],
+  tyres: ['sensor.a', 'sensor.b', 'sensor.c', 'sensor.d'],
+  tyre_targets: ['sensor.a', 'sensor.b', 'sensor.c', 'sensor.d'],
+  tyre_low_share: 0.9,
+  tyre_warn_share: 0.95,
+};
+
+test('a form writes only the fields changed in it, and an empty value over a default stays', () => {
+  assert.ok(CAR?.kind === 'plain');
+  const titled = fromForm(
+    CAR,
+    ['title', 'icon'],
+    { ...formData(CAR, ['title', 'icon'], PLANNED), title: 'My car' },
+    PLANNED,
+  );
+  assert.deepEqual(titled, { ...PLANNED, title: 'My car' });
+  const openings = [
+    'doors',
+    'hood',
+    'tailgate',
+    'windows',
+    'sunroof',
+    'open_states',
+    'half_states',
+  ];
+  const opened = fromForm(
+    CAR,
+    openings,
+    { ...formData(CAR, openings, PLANNED), open_states: [] },
+    PLANNED,
+  );
+  assert.deepEqual(opened, { ...PLANNED, open_states: [] });
+});
+
+test('a text with a default that is emptied in a form is left out, so the card takes its default', () => {
+  const clients = DESCRIPTIONS['custom:mnml-clients-card'];
+  assert.ok(clients?.kind === 'plain');
+  const value = {
+    type: 'custom:mnml-clients-card',
+    entity: 'sensor.clients',
+    attribute: 'clients',
+    networks: [],
+  };
+  const { attribute: _attribute, ...rest } = value;
+  assert.deepEqual(fromForm(clients, ['attribute'], { attribute: '' }, value), rest);
+});

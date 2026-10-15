@@ -5,12 +5,15 @@ import type { MdiIcon } from '../contract/entities.ts';
 import type { Template, Value } from '../contract/templates.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
 import { icon } from '../ha/templates.ts';
+import type { PanelWords } from '../words/panel/en.ts';
+import { panelWordsFor } from '../words/panel/words.ts';
+
+type Said = PanelWords['starters'];
 
 interface Starter {
-  label: string;
-  description: string;
+  kind: keyof Said['kinds'];
   icon: MdiIcon;
-  make: (name: string, hass: HomeAssistant | undefined) => Template;
+  make: (name: string, hass: HomeAssistant | undefined, said: Said) => Template;
 }
 
 function sample(hass: HomeAssistant | undefined, domain: string, deviceClass?: string): string {
@@ -29,14 +32,12 @@ function sample(hass: HomeAssistant | undefined, domain: string, deviceClass?: s
 
 const STARTERS: readonly Starter[] = [
   {
-    label: 'A tile',
-    description:
-      'A name and an icon, a few values and chips, and a pop-up that opens when it is tapped.',
+    kind: 'tile',
     icon: 'mdi:card-outline',
-    make: (name, hass) => ({
+    make: (name, hass, said) => ({
       card: {
         type: 'custom:mnml-tile-card',
-        name: 'My tile',
+        name: said.myTile,
         icon: 'mdi:home-outline',
         popup: `#${name}`,
         state: [
@@ -60,7 +61,7 @@ const STARTERS: readonly Starter[] = [
             {
               id: 'header',
               type: 'custom:mnml-header-card',
-              name: 'My tile',
+              name: said.myTile,
               icon: 'mdi:home-outline',
             },
           ],
@@ -69,14 +70,12 @@ const STARTERS: readonly Starter[] = [
     }),
   },
   {
-    label: 'A list',
-    description:
-      'A heading and one row for each thing you want to see: a value, a battery, a status.',
+    kind: 'list',
     icon: 'mdi:format-list-bulleted',
-    make: (_name, hass) => ({
+    make: (_name, hass, said) => ({
       card: {
         type: 'custom:mnml-list-card',
-        title: 'My list',
+        title: said.myList,
         icon: 'mdi:format-list-bulleted',
         rows: [
           { id: 'first', entity: sample(hass, 'sensor', 'temperature') },
@@ -86,9 +85,7 @@ const STARTERS: readonly Starter[] = [
     }),
   },
   {
-    label: 'A strip of statuses',
-    description:
-      'One line across the dashboard for what matters at a glance: the weather, the alarm.',
+    kind: 'strip',
     icon: 'mdi:dots-horizontal-circle-outline',
     make: (_name, hass) => ({
       card: {
@@ -98,22 +95,20 @@ const STARTERS: readonly Starter[] = [
     }),
   },
   {
-    label: 'A pop-up',
-    description:
-      'A sheet that opens over the dashboard, with a header and the cards you put in it.',
+    kind: 'popup',
     icon: 'mdi:window-maximize',
-    make: (name, hass) => {
+    make: (name, hass, said) => {
       const cards: Value[] = [
         {
           id: 'header',
           type: 'custom:mnml-header-card',
-          name: 'My pop-up',
+          name: said.myPopup,
           icon: 'mdi:star-outline',
         },
         {
           id: 'list',
           type: 'custom:mnml-list-card',
-          title: 'Things to see',
+          title: said.toSee,
           icon: 'mdi:format-list-bulleted',
           rows: [{ id: 'first', entity: sample(hass, 'sensor', 'temperature') }],
         },
@@ -128,11 +123,10 @@ export function drawStarters(
   hass: HomeAssistant | undefined,
   pick: (template: Template | undefined) => void,
 ): TemplateResult {
+  const said = panelWordsFor(hass?.locale.language).starters;
   return html`<div class="design-start">
-    <h2>What do you want to make?</h2>
-    <p class="muted">
-      Pick a starting point. You change everything afterwards by clicking what you see.
-    </p>
+    <h2>${said.heading}</h2>
+    <p class="muted">${said.about}</p>
     <div class="starts">
       ${STARTERS.map(
         (start) =>
@@ -140,11 +134,11 @@ export function drawStarters(
             type="button"
             class="start"
             @click=${() => {
-              pick(start.make(name, hass));
+              pick(start.make(name, hass, said));
             }}
           >
-            ${icon(start.icon)}<strong>${start.label}</strong
-            ><span class="muted">${start.description}</span>
+            ${icon(start.icon)}<strong>${said.kinds[start.kind].label}</strong
+            ><span class="muted">${said.kinds[start.kind].about}</span>
           </button>`,
       )}
     </div>
@@ -155,7 +149,7 @@ export function drawStarters(
         pick(undefined);
       }}
     >
-      Start with a heading
+      ${said.plain}
     </button>
   </div>`;
 }

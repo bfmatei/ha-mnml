@@ -6,6 +6,7 @@ import { html } from 'lit';
 import { test } from 'vitest';
 
 import { stateLine } from '../ha/format.ts';
+import { fakeHass } from '../test/hass.ts';
 import { styled } from '../test/render.ts';
 
 import { MENU_STYLE } from './parts/menu.ts';
@@ -107,6 +108,91 @@ test('each of the eight washed surfaces holds its overlay under its own content,
   assert.notEqual(getComputedStyle(inert).isolation, 'isolate');
 });
 
+function values(value: string): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let word = '';
+  for (const letter of value) {
+    depth += letter === '(' ? 1 : letter === ')' ? -1 : 0;
+    if (letter === ' ' && depth === 0) {
+      out.push(word);
+      word = '';
+    } else {
+      word += letter;
+    }
+  }
+  return [...out, word].filter((each) => each !== '');
+}
+
+const SIDES = new Set([
+  'margin',
+  'padding',
+  'inset',
+  'scroll-margin',
+  'scroll-padding',
+  'border-width',
+  'border-style',
+  'border-color',
+]);
+
+function physical(property: string, value: string): boolean {
+  const named = value.replaceAll(/--[\w-]+/g, '');
+  const each = values(named);
+  if (/(^|-)(left|right)(-|$)/.test(property) || /\b(left|right)\b/.test(named)) {
+    return true;
+  }
+  if (SIDES.has(property) && each.length === 4) {
+    return each[1] !== each[3];
+  }
+  if (property === 'border-radius' && !named.includes('/')) {
+    const [a, b = a, c = a, d = b] = each;
+    return a !== b || c !== d;
+  }
+  return /translate(X|3d)?\((?!-50%\))/.test(named) && !/translate\((0|-50%), /.test(named);
+}
+
+test('no card style names a physical side, so a card mirrors when Home Assistant reads right to left', () => {
+  const sided = sources(import.meta.dirname).flatMap((file) =>
+    [...readFileSync(file, 'utf8').matchAll(/css`([^`]*)`/g)].flatMap((block) =>
+      (block[1] ?? '').split(/[;{}]/).flatMap((part) => {
+        const found = /^\s*([a-z-]+)\s*:\s*([^]*?)\s*$/.exec(part);
+        const [, property = '', value = ''] = found ?? [];
+        return found !== null && physical(property, value.replaceAll(/\s+/g, ' '))
+          ? [`${file.slice(import.meta.dirname.length + 1)}: ${property}: ${value.trim()}`]
+          : [];
+      }),
+    ),
+  );
+  assert.deepEqual(sided, []);
+});
+
+test('the side check knows a physical side from a logical one', () => {
+  assert.deepEqual(
+    [
+      physical('margin-left', 'auto'),
+      physical('text-align', 'left'),
+      physical('padding', '0 34px 0 14px'),
+      physical('inset', '0 auto 0 0'),
+      physical('border-radius', '4px 0 0 4px'),
+      physical('transform', 'translateX(8px)'),
+    ],
+    [true, true, true, true, true, true],
+  );
+  assert.deepEqual(
+    [
+      physical('margin-inline-start', 'auto'),
+      physical('text-align', 'start'),
+      physical('padding', '6px 8px 0'),
+      physical('inset', 'auto 0 0'),
+      physical('border-radius', 'var(--ha-card-border-radius, 22px)'),
+      physical('transform', 'translateX(-50%)'),
+      physical('transform', 'translateY(8px)'),
+      physical('color', 'var(--mnml-left-color)'),
+    ],
+    [false, false, false, false, false, false, false, false],
+  );
+});
+
 test('a menu item and a select ease into their hover too', () => {
   const root = styled(
     [MENU_STYLE, SELECT_STYLE],
@@ -120,22 +206,13 @@ test('a menu item and a select ease into their hover too', () => {
   assert.equal(getComputedStyle(select).transition, 'border-color 120ms ease-out');
 });
 
-const ROOM = {
-  states: {
-    'sensor.temperature': {
-      entity_id: 'sensor.temperature',
-      state: '21',
-      attributes: { friendly_name: 'Temperature' },
-    },
-  },
-  entities: {},
-  devices: {},
-  locale: { language: 'en' },
-  formatEntityState: (stateObj: { state: string }): string => `${stateObj.state} °C`,
-};
+const ROOM = fakeHass({
+  states: { 'sensor.temperature': { state: '21', attributes: { friendly_name: 'Temperature' } } },
+  formatEntityState: (stateObj) => `${stateObj.state} °C`,
+});
 
 test("each part of a row's state line is the box that centres its icon on its value and cuts the value with an ellipsis", () => {
-  const line = stateLine(ROOM as never, 'sensor.temperature', [{ icon: true }, { text: 'Warm' }]);
+  const line = stateLine(ROOM, 'sensor.temperature', [{ icon: true }, { text: 'Warm' }]);
   const root = styled([BASE_STYLE, ROW_STYLE], html`<div class="state">${line}</div>`);
   const parts = [...root.querySelectorAll('.state > span')];
   assert.equal(parts.length, 2);

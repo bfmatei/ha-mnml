@@ -5,7 +5,10 @@ import { test } from 'vitest';
 
 import type { Template, WrittenTemplate } from '../contract/templates.ts';
 import { homes } from '../templates/corpus.ts';
+import { TEXT_FILTERS, filterWords } from '../templates/filters.ts';
+import { fakeHass } from '../test/hass.ts';
 import { drawn } from '../test/render.ts';
+import { PANEL_EN } from '../words/panel/en.ts';
 
 import { drawSlots } from './slots-tab.ts';
 import type { SlotsActions } from './slots-tab.ts';
@@ -159,17 +162,14 @@ test('a choice shows the value the template holds after a redraw, even one the u
 function messyHass(): SlotsActions['hass'] {
   const registries = homes()['messy'];
   assert.ok(registries);
-  return {
+  return fakeHass({
     areas: registries.areas,
     devices: registries.devices,
     entities: registries.entities,
     states: Object.fromEntries(
-      Object.entries(registries.states).map(([id, state]) => [
-        id,
-        { entity_id: id, state: 'on', ...state },
-      ]),
+      Object.entries(registries.states).map(([id, state]) => [id, { state: 'on', ...state }]),
     ),
-  } as unknown as SlotsActions['hass'];
+  });
 }
 
 test('trying a rule in an area explains the matches, the pick and what almost matched', () => {
@@ -230,6 +230,39 @@ test('a rule with the newer filters is drawn as a sentence, and the rest can be 
   }
 });
 
+test('a rule on the energy settings is drawn as their value, and choosing them starts from the first', () => {
+  let template: WrittenTemplate = {
+    slots: { grid: { kind: 'entity', discover: 'energy.battery_charge' } },
+    card: { type: 'x' },
+  };
+  const draw = (): HTMLElement =>
+    drawn(
+      drawSlots(
+        () => template,
+        actions((next) => {
+          template = next;
+        }),
+      ),
+    );
+  const box = draw();
+  const [how, value] = box.querySelectorAll('.finding select');
+  assert.ok(how instanceof HTMLSelectElement && value instanceof HTMLSelectElement);
+  assert.equal(how.value, 'energy');
+  assert.equal(value.value, 'energy.battery_charge');
+  assert.equal(
+    value.selectedOptions[0]?.textContent?.trim(),
+    "the battery's charge in the energy settings",
+  );
+  how.value = 'area';
+  how.dispatchEvent(new Event('change'));
+  assert.equal(template.slots?.['grid']?.discover, 'area.temperature');
+  const again = draw().querySelector('.finding select');
+  assert.ok(again instanceof HTMLSelectElement);
+  again.value = 'energy';
+  again.dispatchEvent(new Event('change'));
+  assert.equal(template.slots?.['grid']?.discover, 'energy.grid_power');
+});
+
 function slotNamed(root: ParentNode, name: string): Element {
   const found = [...root.querySelectorAll('.slot')].find(
     (slot) => slot.querySelector(':scope > .slot-head .slot-name')?.textContent === name,
@@ -270,10 +303,11 @@ test('a slot that names a shape shows the shape by name with its fields, and an 
   );
   assert.deepEqual(fields, ['power', 'today', 'total']);
   assert.equal(
-    energy.querySelector('button[aria-label="Delete the slot power"]'),
+    energy.querySelector('button[aria-label="Delete the slot Power"]'),
     null,
     "a shape's field stays",
   );
+  assert.equal(energy.querySelector(':scope > .slot-head .slot-label')?.textContent, 'Energy');
   assert.equal(energy.querySelector('.fields .add-slot'), null, 'and none is added to it');
   tick(slotNamed(energy, 'power'), 'Required');
   assert.deepEqual(template.slots?.['energy'], {
@@ -401,7 +435,7 @@ test('a slot naming a shape that is not known says why, and can be deleted', () 
   );
   const energy = slotNamed(box, 'energy');
   assert.match(energy.textContent ?? '', /the shape metre, which is not known/);
-  const remove = energy.querySelector('button[aria-label="Delete the slot energy"]');
+  const remove = energy.querySelector('button[aria-label="Delete the slot Energy"]');
   assert.ok(remove instanceof HTMLButtonElement);
   remove.click();
   assert.deepEqual(template.slots, { title: { kind: 'text' } });
@@ -452,4 +486,11 @@ test("the device words come from discovery's vocabulary, and a rule on an attrib
   anchored.value = 'device: { attribute: { hvac_modes: [cool] } }\nfields: {}';
   anchored.dispatchEvent(new Event('change', { bubbles: true }));
   assert.equal(anchored.getAttribute('aria-invalid'), 'true', 'an attribute takes one word');
+});
+
+test("the panel's English words for the filters are the rules' own", () => {
+  assert.deepEqual(
+    TEXT_FILTERS.map((key) => PANEL_EN.slots.filters[key]),
+    TEXT_FILTERS.map((key) => filterWords(key)),
+  );
 });

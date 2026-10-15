@@ -5,6 +5,7 @@ import { classMap } from 'lit/directives/class-map.js';
 
 import { BASE_STYLE } from '../cards/styles.ts';
 import type { MdiIcon } from '../contract/entities.ts';
+import { rightToLeft } from '../ha/direction.ts';
 import { icon, quietly } from '../ha/templates.ts';
 
 export interface MenuItem {
@@ -99,7 +100,7 @@ export class MnmlRowMenu extends LitElement {
   }
 
   protected override render(): TemplateResult {
-    const more = `More for ${this.label}`;
+    const more = this.label;
     return html`<div
       class=${classMap({ 'row-menu': true, open: this.open })}
       @keydown=${this.pressed}
@@ -166,7 +167,8 @@ export class MnmlRowMenu extends LitElement {
     const box = list.getBoundingClientRect();
     const below = anchor.bottom + 4;
     const top = below + box.height > window.innerHeight - 8 ? anchor.top - box.height - 4 : below;
-    const left = Math.min(Math.max(anchor.right - box.width, 8), window.innerWidth - box.width - 8);
+    const start = rightToLeft(this) ? anchor.left : anchor.right - box.width;
+    const left = Math.min(Math.max(start, 8), window.innerWidth - box.width - 8);
     list.style.top = `${Math.max(Math.round(top), 8)}px`;
     list.style.left = `${Math.round(left)}px`;
   }

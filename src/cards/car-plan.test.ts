@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 
 import { test } from 'vitest';
 
-import { define, mounted, text } from '../test/render.ts';
+import type { HomeAssistant } from '../ha/hass.ts';
+import { fakeHass } from '../test/hass.ts';
+import { configure, created, define, mounted, paint, text } from '../test/render.ts';
 
 import { MnmlCarPlanCard } from './car-plan.ts';
 
@@ -22,7 +24,7 @@ const CONFIG = {
   tyre_warn_share: 0.95,
 };
 
-function hassOf(states: Record<string, string>): unknown {
+function hassOf(states: Record<string, string>): HomeAssistant {
   const all: Record<string, string> = {
     'binary_sensor.hood': 'off',
     'binary_sensor.tailgate': 'off',
@@ -34,28 +36,15 @@ function hassOf(states: Record<string, string>): unknown {
     all[`sensor.target_${corner}`] = '2.4';
   }
   Object.assign(all, states);
-  return {
-    states: Object.fromEntries(
-      Object.entries(all).map(([id, state]) => [id, { entity_id: id, state, attributes: {} }]),
-    ),
-    entities: {},
-    devices: {},
-    locale: { language: 'en' },
-    formatEntityState: (stateObj: { state: string }): string => stateObj.state,
-  };
+  return fakeHass({
+    states: Object.fromEntries(Object.entries(all).map(([id, state]) => [id, { state }])),
+  });
 }
 
-function card(): MnmlCarPlanCard {
-  const made = document.createElement('mnml-car-plan-card');
-  assert.ok(made instanceof MnmlCarPlanCard);
-  return made;
-}
+const card = (): MnmlCarPlanCard => created('mnml-car-plan-card', MnmlCarPlanCard);
 
 async function problems(config: unknown, states: Record<string, string>): Promise<string> {
-  const made = card();
-  made.setConfig(config as never);
-  made.hass = hassOf(states) as never;
-  return text(await mounted(made));
+  return text(await paint(card(), config, hassOf(states)));
 }
 
 test('by default, BMW words: OPEN is open and INTERMEDIATE half open', async () => {
@@ -93,17 +82,17 @@ test('a car plan without a number for each tyre share is an error card', () => {
   const made = card();
   const { tyre_low_share: _low, ...withoutLow } = CONFIG;
   assert.throws(() => {
-    made.setConfig(withoutLow as never);
-  }, /tyre_low_share must be a number/);
+    configure(made, withoutLow);
+  }, /tyre_low_share is required/);
   assert.throws(() => {
-    made.setConfig({ ...CONFIG, tyre_warn_share: '0.95' } as never);
+    configure(made, { ...CONFIG, tyre_warn_share: '0.95' });
   }, /tyre_warn_share must be a number/);
 });
 
 test('the drawing is an image named by what it shows, part by part', async () => {
   const made = card();
-  made.setConfig(CONFIG as never);
-  made.hass = hassOf({ 'binary_sensor.door_front_left': 'on' }) as never;
+  configure(made, CONFIG);
+  made.hass = hassOf({ 'binary_sensor.door_front_left': 'on' });
   const root = await mounted(made);
   const drawing = root.querySelector('svg');
   assert.equal(drawing?.getAttribute('role'), 'img');

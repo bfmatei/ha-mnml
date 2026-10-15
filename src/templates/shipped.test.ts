@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path';
 
 import { test } from 'vitest';
 
+import { isIcon } from '../contract/entities.ts';
 import type { SlotSpec } from '../contract/templates.ts';
 
 import { SHIPPED, familyNames, readShapes, readTemplates } from './shipped.ts';
@@ -91,6 +92,55 @@ test('every shipped template has a card, a description and an example', () => {
     );
     assert.ok(template.example !== undefined, `${name}: example`);
   }
+});
+
+test('every shipped template has a title in plain words and an icon, each one its own', () => {
+  const missing = Object.entries(SHIPPED).flatMap(([name, template]) =>
+    typeof template.title === 'string' && template.title !== '' && isIcon(template.icon)
+      ? []
+      : [name],
+  );
+  assert.deepEqual(missing, []);
+  const titles = Object.values(SHIPPED).map((template) => template.title);
+  assert.deepEqual(
+    titles.filter((title, index) => titles.indexOf(title) !== index),
+    [],
+  );
+  const coded = Object.entries(SHIPPED).flatMap(([name, template]) =>
+    template.title === name || /[_[\]#]/.test(template.title ?? '') ? [name] : [],
+  );
+  assert.deepEqual(coded, []);
+  const lines = familyNames().flatMap((family) =>
+    readFileSync(resolve(import.meta.dirname, `../../templates/${family}.yaml`), 'utf8')
+      .split('\n')
+      .filter((line) => /^ {2}(description|title|icon):/.test(line))
+      .map((line) => line.trim().split(':')[0]),
+  );
+  const order = lines.join(' ').replaceAll('description title icon', '').trim();
+  assert.equal(order, '');
+});
+
+function keysOf(value: unknown, at: string): string[] {
+  if (Array.isArray(value)) {
+    return value.flatMap((item, index) => keysOf(item, `${at}[${index}]`));
+  }
+  if (typeof value !== 'object' || value === null) {
+    return [];
+  }
+  const entries = Object.entries(value);
+  return [
+    ...entries.map(([key]) => `${at}.${key}`),
+    ...entries.flatMap(([key, inner]) => keysOf(inner, `${at}.${key}`)),
+  ];
+}
+
+test("a shipped template writes a list row's values as values!, so an unfilled column keeps its place", () => {
+  const loose = Object.entries(SHIPPED).flatMap(([name, template]) =>
+    [...keysOf(template.card, `${name}.card`), ...keysOf(template.popups, `${name}.popups`)].filter(
+      (path) => /\.values\??$/.test(path),
+    ),
+  );
+  assert.deepEqual(loose, []);
 });
 
 const DESCRIBED = [

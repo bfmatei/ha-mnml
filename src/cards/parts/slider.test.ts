@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import { test, vi } from 'vitest';
 
 import type { HassEntity, HomeAssistant } from '../../ha/hass.ts';
+import { fakeHass } from '../../test/hass.ts';
 import { define, mounted } from '../../test/render.ts';
+import { until } from '../../test/until.ts';
 import type { Host } from '../base.ts';
 
 import { sliderSpec } from './slider-spec.ts';
@@ -17,19 +19,12 @@ interface Call {
 
 function recorder(): { hass: HomeAssistant; calls: Call[] } {
   const calls: Call[] = [];
-  const hass = {
-    states: {},
-    entities: {},
-    devices: {},
-    locale: { language: 'en' },
-    formatEntityState: (stateObj: HassEntity): string => stateObj.state,
-    formatEntityAttributeValue: (_stateObj: HassEntity, _name: string, value: unknown): string =>
-      String(value),
-    callService: (domain: string, service: string, data: unknown): Promise<unknown> => {
+  const hass = fakeHass({
+    callService: (domain, service, data) => {
       calls.push({ service: `${domain}.${service}`, data });
       return Promise.resolve();
     },
-  } as unknown as HomeAssistant;
+  });
   return { hass, calls };
 }
 
@@ -84,7 +79,7 @@ test('the slider shows the value it is dragged to, and commits it once the drag 
   assert.equal(track.getAttribute('aria-valuenow'), '75', 'the value follows the pointer');
   assert.equal(held, 1, 'the card holds its redraws while the slider is dragged');
   track.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, bubbles: true }));
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await until(() => calls.length > 0, 'the call');
   assert.deepEqual(calls, [{ service: 'light.turn_on', data: { brightness_pct: 75 } }]);
   assert.equal(released, 0, 'and keeps holding until the new state can arrive');
 });
@@ -115,7 +110,7 @@ test('a value set by key is sent even when the slider closes before the pause en
   track.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
   await slider.updateComplete;
   slider.remove();
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await until(() => released === 1, 'the release');
   assert.deepEqual(calls, [{ service: 'light.turn_on', data: { brightness_pct: 51 } }]);
   assert.equal(released, 1, 'and the card is not left held');
 });
@@ -256,7 +251,7 @@ test('a value set by key that fails as the slider closes reaches the user as a m
   assert.ok(track instanceof HTMLElement);
   press(track, 'ArrowRight');
   slider.remove();
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await until(() => notified.length > 0, 'the failure');
   assert.deepEqual(notified, ['The light is offline']);
 });
 
@@ -318,4 +313,120 @@ test('a slider opened from the keyboard takes the focus once it is drawn, and on
   } finally {
     spy.mockRestore();
   }
+});
+
+test("a value the slider commits fires Home Assistant's selection haptic", async () => {
+  const felt: unknown[] = [];
+  const listener = (event: Event): void => {
+    felt.push(event instanceof CustomEvent ? event.detail : undefined);
+  };
+  window.addEventListener('haptic', listener);
+  try {
+    const slider = keyedSlider(
+      { min: 0, max: 100, step: 1, value: 50, format: String, commit: () => Promise.resolve() },
+      {
+        hass: undefined,
+        hold: () => () => {},
+        register: () => () => {},
+        notify: () => {},
+        refresh: () => {},
+        isConnected: true,
+      },
+    );
+    const root = await mounted(slider);
+    const track = root.querySelector('.slider');
+    assert.ok(track instanceof HTMLElement);
+    press(track, 'ArrowRight');
+    assert.deepEqual(felt, [], 'nothing while another key may follow');
+    slider.remove();
+    assert.deepEqual(felt, ['selection']);
+  } finally {
+    window.removeEventListener('haptic', listener);
+  }
+});
+
+test('read right to left, the slider fills from the right: the pointer, the arrows and the gradient follow', async () => {
+  document.documentElement.setAttribute('dir', 'rtl');
+  try {
+    const slider = keyedSlider(
+      {
+        min: 0,
+        max: 100,
+        step: 1,
+        value: 50,
+        stops: 'red, blue',
+        format: String,
+        commit: () => Promise.resolve(),
+      },
+      {
+        hass: undefined,
+        hold: () => () => {},
+        register: () => () => {},
+        notify: () => {},
+        refresh: () => {},
+        isConnected: true,
+      },
+    );
+    const root = await mounted(slider);
+    const track = root.querySelector('.slider');
+    assert.ok(track instanceof HTMLElement);
+    assert.equal(track.style.getPropertyValue('--gradient'), 'linear-gradient(to left, red, blue)');
+    press(track, 'ArrowLeft');
+    await slider.updateComplete;
+    assert.equal(track.getAttribute('aria-valuenow'), '51', 'the arrow toward the end steps up');
+    press(track, 'ArrowRight');
+    press(track, 'ArrowRight');
+    await slider.updateComplete;
+    assert.equal(track.getAttribute('aria-valuenow'), '49');
+    press(track, 'ArrowUp');
+    await slider.updateComplete;
+    assert.equal(track.getAttribute('aria-valuenow'), '50', 'up is up in either direction');
+    track.getBoundingClientRect = () => ({
+      left: 0,
+      width: 200,
+      top: 0,
+      height: 40,
+      right: 200,
+      bottom: 40,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+    track.setPointerCapture = () => {};
+    track.dispatchEvent(
+      new PointerEvent('pointerdown', { clientX: 150, pointerId: 1, bubbles: true }),
+    );
+    await slider.updateComplete;
+    assert.equal(track.getAttribute('aria-valuenow'), '25', 'measured from the right edge');
+    slider.remove();
+  } finally {
+    document.documentElement.removeAttribute('dir');
+  }
+});
+
+test('read left to right, the gradient runs to the right', async () => {
+  const slider = keyedSlider(
+    {
+      min: 0,
+      max: 100,
+      step: 1,
+      value: 50,
+      stops: 'red, blue',
+      format: String,
+      commit: () => Promise.resolve(),
+    },
+    {
+      hass: undefined,
+      hold: () => () => {},
+      register: () => () => {},
+      notify: () => {},
+      refresh: () => {},
+      isConnected: true,
+    },
+  );
+  const root = await mounted(slider);
+  const track = root.querySelector('.slider');
+  assert.ok(track instanceof HTMLElement);
+  assert.equal(track.style.getPropertyValue('--gradient'), 'linear-gradient(to right, red, blue)');
+  slider.remove();
 });

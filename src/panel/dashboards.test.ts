@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 import { test } from 'vitest';
 
-import type { Plan } from '../contract/builder.ts';
+import type { Plan } from '../contract/plan.ts';
 import { define, mounted, text } from '../test/render.ts';
 
 import type { Built } from './building.ts';

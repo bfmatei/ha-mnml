@@ -1,4 +1,4 @@
-import { isMapping, isTemplate } from '../contract/templates.ts';
+import { idOf, isMapping, isTemplate } from '../contract/templates.ts';
 import type { Template, Value } from '../contract/templates.ts';
 
 import { toValue } from './expand.ts';
@@ -50,14 +50,30 @@ const UNSAFE = new Set(['__proto__', 'constructor', 'prototype']);
 const isSegment = (value: unknown): value is string =>
   typeof value === 'string' && value !== '' && !UNSAFE.has(value);
 
-const isAfter = (value: unknown): boolean => value === null || typeof value === 'string';
+const isAfter = (value: unknown): boolean => value === null || isSegment(value);
+
+const KEYS: Record<Change['op'], ReadonlySet<string>> = {
+  set: new Set(['op', 'path', 'key', 'value', 'base']),
+  remove: new Set(['op', 'path', 'base']),
+  insert: new Set(['op', 'path', 'after', 'value', 'base']),
+  move: new Set(['op', 'path', 'id', 'after', 'base']),
+};
+
+const isOp = (value: unknown): value is Change['op'] =>
+  typeof value === 'string' && Object.hasOwn(KEYS, value);
 
 export function isChange(value: unknown): value is Change {
   if (!isMapping(value)) {
     return false;
   }
   const { op, path, base } = value;
-  if (!Array.isArray(path) || !path.every(isSegment) || typeof base !== 'string') {
+  if (
+    !isOp(op) ||
+    !Object.keys(value).every((key) => KEYS[op].has(key)) ||
+    !Array.isArray(path) ||
+    !path.every(isSegment) ||
+    typeof base !== 'string'
+  ) {
     return false;
   }
   if (op === 'set') {
@@ -70,12 +86,7 @@ export function isChange(value: unknown): value is Change {
     const inserted = value['value'];
     return isAfter(value['after']) && isMapping(inserted) && isSegment(inserted['id']);
   }
-  return (
-    op === 'move' &&
-    isSegment(value['id']) &&
-    isAfter(value['after']) &&
-    value['after'] !== value['id']
-  );
+  return isSegment(value['id']) && isAfter(value['after']) && value['after'] !== value['id'];
 }
 
 export interface Conflict {
@@ -118,10 +129,6 @@ export function nodeHash(value: Value | undefined): string {
     Math.imul(second ^ (second >>> 16), 2_246_822_507) ^
     Math.imul(first ^ (first >>> 13), 3_266_489_909);
   return `${(second >>> 0).toString(16).padStart(8, '0')}${(first >>> 0).toString(16).padStart(8, '0')}`;
-}
-
-function idOf(item: Value): string | undefined {
-  return isMapping(item) && typeof item['id'] === 'string' ? item['id'] : undefined;
 }
 
 function child(node: Value | undefined, segment: string): Value | undefined {
@@ -224,7 +231,7 @@ export function applyChanges(template: Template, changes: readonly Change[]): Ap
   return { template: isTemplate(root) ? root : template, conflicts };
 }
 
-function same(a: Value | undefined, b: Value | undefined): boolean {
+function sameNode(a: Value | undefined, b: Value | undefined): boolean {
   return nodeHash(a) === nodeHash(b);
 }
 
@@ -274,7 +281,7 @@ function diff(before: Value, after: Value, path: string[], out: Change[]): void 
   }
   for (const [key, now] of Object.entries(after)) {
     const was = before[key];
-    if (Object.hasOwn(before, key) && same(was, now)) {
+    if (Object.hasOwn(before, key) && sameNode(was, now)) {
       continue;
     }
     if (isMapping(was) && isMapping(now)) {

@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 
+import { nothing } from 'lit';
 import { test, vi } from 'vitest';
 
 import type { Template, Value } from '../contract/templates.ts';
 import { define, drawn, mounted } from '../test/render.ts';
 
 import { dataFields } from './binding.ts';
-import { chainTo, groupOf, partOf, singlesOf } from './outline.ts';
+import { chainTo, groupOf, outlinePart, singlesOf } from './outline.ts';
 import { MnmlPreview } from './preview.ts';
 import type { Trial } from './preview.ts';
 import { simpleOf } from './simple.ts';
@@ -32,7 +33,7 @@ const TEMPLATE: Template = {
 function rootOf(template: Template) {
   const card = template.card;
   assert.ok(typeof card === 'object' && card !== null && !Array.isArray(card));
-  return partOf(card, ['card'], undefined, 0);
+  return outlinePart(card, ['card'], undefined, 0);
 }
 
 test('the single parts of a card are the ones without a list, and the card itself', () => {
@@ -64,12 +65,13 @@ function actions(calls: string[]): StageActions {
     move: (_group, from, to) => calls.push(`move ${from} ${to}`),
     add: (group, starter) => calls.push(`add ${group.label} ${starter.label}`),
     open: (template) => calls.push(`open ${template}`),
-    detach: (part) => calls.push(`detach ${part.path.join('/')}`),
+    editHere: (part) => calls.push(`editHere ${part.path.join('/')}`),
     pick: (data, entity) => calls.push(`pick ${data.key} ${entity}`),
     fix: (data) => calls.push(`fix ${data.key}`),
     automate: (data) => calls.push(`automate ${data.key}`),
     condition: (part, show, slots) =>
       calls.push(`condition ${part.path.join('/')} ${show} ${slots.join(',')}`),
+    retitle: (key, value) => calls.push(`retitle ${key} ${value}`),
   };
 }
 
@@ -79,16 +81,17 @@ function panel(selected: string, calls: string[]): HTMLElement {
     drawStagePanel(
       {
         root,
+        name: 'room',
         selected,
         template: TEMPLATE,
         templates: {},
         values: {},
         data: [],
-        detachable: false,
+        editableHere: false,
         chain: chainTo(root, selected),
         rows: simpleOf(TEMPLATE, TEMPLATE),
         hass: undefined,
-        advanced: undefined as never,
+        advanced: nothing,
       },
       actions(calls),
     ),
@@ -105,6 +108,22 @@ test('with nothing picked the panel says to click a part and offers what can be 
   assert.ok(add instanceof HTMLButtonElement);
   add.click();
   assert.deepEqual(calls, ['add chips Toggle']);
+});
+
+test('with nothing picked, the template is given its title and icon, its name in YAML said small', () => {
+  const calls: string[] = [];
+  const box = panel('', calls);
+  assert.match(box.textContent ?? '', /Its name/);
+  assert.equal(box.querySelector('.stage-section code.code-name')?.textContent, 'room');
+  const title = box.querySelector<HTMLInputElement>('input[aria-label="Template: title"]');
+  assert.ok(title);
+  title.value = ' Living room ';
+  title.dispatchEvent(new Event('change'));
+  const icon = box.querySelector<HTMLInputElement>('input[aria-label="Template: icon"]');
+  assert.ok(icon);
+  icon.value = 'mdi:sofa';
+  icon.dispatchEvent(new Event('change'));
+  assert.deepEqual(calls, ['retitle title Living room', 'retitle icon mdi:sofa']);
 });
 
 test('a part picked is named by its id, with its place and the moves, copy and delete', () => {
@@ -151,7 +170,7 @@ function trial(card: Value): Trial {
 test('in the stage a click on a part picks it, and nothing the card would do', async () => {
   const picked: string[] = [];
   let pressed = 0;
-  window.loadCardHelpers = (): Promise<never> =>
+  window.loadCardHelpers = () =>
     Promise.resolve({
       createCardElement: () => {
         const card = document.createElement('div');
@@ -164,7 +183,7 @@ test('in the stage a click on a part picks it, and nothing the card would do', a
         root.append(chip);
         return Object.assign(card, { hass: undefined, preview: false });
       },
-    }) as never;
+    });
   const stage = document.createElement('mnml-preview');
   assert.ok(stage instanceof MnmlPreview);
   stage.trial = () => trial({ type: 'custom:mnml-tile-card' });
@@ -193,16 +212,17 @@ function panelWith(selected: string, calls: string[], values: Record<string, str
     drawStagePanel(
       {
         root,
+        name: 'room',
         selected,
         template: TEMPLATE,
         templates: {},
         values,
         data: dataFields(part, TEMPLATE, {}),
-        detachable: false,
+        editableHere: false,
         chain,
         rows: simpleOf(TEMPLATE, TEMPLATE),
         hass: undefined,
-        advanced: undefined as never,
+        advanced: nothing,
       },
       actions(calls),
     ),
@@ -238,7 +258,7 @@ test('a part that changes with the room says what it found, and can be made fixe
   const calls: string[] = [];
   const card = template.card;
   assert.ok(typeof card === 'object' && card !== null && !Array.isArray(card));
-  const root = partOf(card, ['card'], undefined, 0);
+  const root = outlinePart(card, ['card'], undefined, 0);
   const chain = chainTo(root, 'card/chips/#door');
   const part = chain.at(-1);
   assert.ok(part);
@@ -246,16 +266,17 @@ test('a part that changes with the room says what it found, and can be made fixe
     drawStagePanel(
       {
         root,
+        name: 'room',
         selected: 'card/chips/#door',
         template,
         templates: {},
         values: { door: 'binary_sensor.hall_door' },
         data: dataFields(part, template, {}),
-        detachable: false,
+        editableHere: false,
         chain,
         rows: simpleOf(template, template),
         hass: undefined,
-        advanced: undefined as never,
+        advanced: nothing,
       },
       actions(calls),
     ),
@@ -271,22 +292,21 @@ test('a part that changes with the room says what it found, and can be made fixe
 });
 
 function fakeStage(): void {
-  window.loadCardHelpers = (): Promise<never> =>
+  window.loadCardHelpers = () =>
     Promise.resolve({
-      createCardElement: (config: Record<string, unknown>) => {
+      createCardElement: (config: object) => {
         const card = document.createElement('div');
         const root = card.attachShadow({ mode: 'open' });
         for (const [index, key] of ['card/chips/#a', 'card/chips/#b', 'card/chips/#c'].entries()) {
           const chip = document.createElement('button');
           chip.setAttribute('data-part', key);
-          chip.getBoundingClientRect = () =>
-            ({ left: index * 50, top: 0, width: 40, height: 20, right: 0, bottom: 0 }) as DOMRect;
+          chip.getBoundingClientRect = () => new DOMRect(index * 50, 0, 40, 20);
           root.append(chip);
         }
-        card.setAttribute('data-part', String(config['_part']));
+        card.setAttribute('data-part', String(Reflect.get(config, '_part')));
         return Object.assign(card, { hass: undefined, preview: false });
       },
-    }) as never;
+    });
 }
 
 async function staged(extra: (stage: MnmlPreview) => void): Promise<{
@@ -423,7 +443,7 @@ test('a touch drags after a press, and a touch that moves first is a scroll and 
 });
 
 test('a native card inside a native card is picked by the configuration it was given', async () => {
-  window.loadCardHelpers = (): Promise<never> =>
+  window.loadCardHelpers = () =>
     Promise.resolve({
       createCardElement: () => {
         const stack = document.createElement('div');
@@ -434,7 +454,7 @@ test('a native card inside a native card is picked by the configuration it was g
         root.append(inner);
         return Object.assign(stack, { hass: undefined, preview: false });
       },
-    }) as never;
+    });
   const stage = document.createElement('mnml-preview');
   assert.ok(stage instanceof MnmlPreview);
   stage.trial = () => trial({ type: 'vertical-stack', _part: 'card' });

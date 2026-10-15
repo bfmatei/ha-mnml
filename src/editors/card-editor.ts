@@ -4,22 +4,29 @@ import { property, state } from 'lit/decorators.js';
 
 import { announced, onAnnounce } from '../cards/parts/popup-registry.ts';
 import { BASE_STYLE, CONTROL_STYLE } from '../cards/styles.ts';
-import { isMapping } from '../contract/templates.ts';
+import { isMapping, sameValue, sameWritten } from '../contract/templates.ts';
 import type { Value } from '../contract/templates.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
 import { toValue } from '../templates/expand.ts';
 
-import { DESCRIPTIONS } from './cards.ts';
-import { objectForm } from './draw.ts';
-import type { Context, Slot } from './draw.ts';
-import { Unsupported, checkValue, cleanValue } from './shape.ts';
-import type { Shape } from './shape.ts';
+import { DESCRIPTIONS, descriptionsFor } from './cards.ts';
+import { objectForm, wordsOf } from './draw.ts';
+import type { Context, Lens } from './draw.ts';
+import { UnsupportedConfig, checkValue, cleanValue } from './form.ts';
+import type { Form } from './form.ts';
+import { formMissing } from './ha-form.ts';
+import { popupChoices } from './popup-names.ts';
 import { EDITOR_STYLE } from './style.ts';
 
 const POPUPS = 'custom:mnml-popups-card';
 
-export function hashesOf(lovelace: unknown): string[] {
-  const found: string[] = [];
+interface Listed {
+  readonly hash: string;
+  readonly cards?: unknown;
+}
+
+export function popupsOf(lovelace: unknown): Listed[] {
+  const found: Listed[] = [];
   const walk = (value: unknown, inPopups: boolean): void => {
     if (Array.isArray(value)) {
       for (const item of value) {
@@ -28,8 +35,8 @@ export function hashesOf(lovelace: unknown): string[] {
     } else if (isMapping(value)) {
       const here = inPopups || value['type'] === POPUPS;
       const hash = value['hash'];
-      if (here && typeof hash === 'string' && !found.includes(hash)) {
-        found.push(hash);
+      if (here && typeof hash === 'string' && !found.some((popup) => popup.hash === hash)) {
+        found.push({ hash, cards: value['cards'] });
       }
       for (const [key, item] of Object.entries(value)) {
         walk(item, here && key !== 'cards');
@@ -47,9 +54,10 @@ export class MnmlCardEditor extends LitElement {
 
   @property({ attribute: false }) hass: HomeAssistant | undefined;
   @state() private config: Record<string, Value> = {};
-  @state() private shape: Shape | undefined;
-  @state() private hashes: readonly string[] = [];
-  private listed: readonly string[] = [];
+  @state() private form: Form | undefined;
+  private type = '';
+  @state() private popups: readonly Listed[] = [];
+  private listed: readonly Listed[] = [];
   private stopAnnounced: (() => void) | undefined;
   private readonly open = new Map<string, boolean>();
 
@@ -66,57 +74,62 @@ export class MnmlCardEditor extends LitElement {
   }
 
   set lovelace(lovelace: unknown) {
-    this.listed = hashesOf(lovelace);
+    this.listed = popupsOf(lovelace);
     this.gather();
   }
 
   private readonly gather = (): void => {
-    const hashes = [...new Set([...this.listed, ...announced().map((popup) => popup.hash)])];
-    if (JSON.stringify(hashes) !== JSON.stringify(this.hashes)) {
-      this.hashes = hashes;
+    const popups = [...this.listed, ...announced()].filter(
+      (popup, index, all) => all.findIndex((other) => other.hash === popup.hash) === index,
+    );
+    if (!sameValue(popups, this.popups)) {
+      this.popups = popups;
     }
   };
 
   setConfig(config: unknown): void {
-    if (customElements.get('ha-form') === undefined) {
-      throw new Unsupported("Home Assistant's form is not loaded");
+    const missing = formMissing();
+    if (missing !== undefined) {
+      throw new UnsupportedConfig(wordsOf(this).forms[missing]);
     }
     const type = isMapping(config) ? config['type'] : undefined;
-    const shape = typeof type === 'string' ? DESCRIPTIONS[type] : undefined;
-    if (shape === undefined) {
-      throw new Unsupported(
+    const form = typeof type === 'string' ? DESCRIPTIONS[type] : undefined;
+    if (form === undefined) {
+      throw new UnsupportedConfig(
         `${typeof type === 'string' ? type : 'a card without a type'} has no visual editor`,
       );
     }
-    checkValue(shape, config);
+    checkValue(form, config);
     const value = toValue(config);
     if (!isMapping(value)) {
-      throw new Unsupported('the card is not a mapping');
+      throw new UnsupportedConfig('the card is not a mapping');
     }
-    if (shape === this.shape && JSON.stringify(value) === JSON.stringify(this.config)) {
+    if (form === this.form && sameWritten(value, this.config)) {
       return;
     }
-    this.shape = shape;
+    this.form = form;
+    this.type = typeof type === 'string' ? type : '';
     this.config = value;
   }
 
   protected override render(): TemplateResult | typeof nothing {
-    const shape = this.shape;
-    if (shape === undefined) {
+    const form = this.form;
+    if (form === undefined) {
       return nothing;
     }
+    const drawn = descriptionsFor(wordsOf(this))[this.type] ?? form;
     const context: Context = {
       hass: this.hass,
-      hashes: this.hashes,
+      popups: popupChoices(this.popups, this.hass),
       open: this.open,
       redraw: (): void => {
         this.requestUpdate();
       },
     };
-    const slot: Slot = {
+    const lens: Lens = {
       get: (): Record<string, Value> => this.config,
       set: (next): void => {
-        this.config = cleanValue(shape, next, this.config);
+        this.config = cleanValue(form, next, this.config);
         this.dispatchEvent(
           new CustomEvent('config-changed', {
             detail: { config: this.config },
@@ -126,6 +139,6 @@ export class MnmlCardEditor extends LitElement {
         );
       },
     };
-    return objectForm(shape, slot, context, '', true);
+    return objectForm(drawn, lens, context, '', true);
   }
 }

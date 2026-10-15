@@ -5,8 +5,9 @@ import { isMapping } from '../contract/templates.ts';
 import type { Value } from '../contract/templates.ts';
 import { field } from '../ha/field.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
+import type { EditorWords } from '../words/panel/editors-en.ts';
 
-import type { FormItem } from './form.ts';
+import type { FormItem } from './ha-form-data.ts';
 
 const WAIT = 5000;
 
@@ -27,21 +28,42 @@ const settle = (wanted: string): Promise<unknown> =>
     }),
   ]);
 
-export async function loadHaForm(): Promise<void> {
+export type FormFailure = keyof EditorWords['forms'];
+
+export function formMissing(): FormFailure | undefined {
   if (customElements.get('ha-form') !== undefined) {
-    return;
+    return undefined;
   }
+  return window.loadCardHelpers === undefined ? 'unopened' : 'failed';
+}
+
+async function load(): Promise<FormFailure | undefined> {
   try {
     const helpers = await window.loadCardHelpers?.();
-    helpers?.createCardElement({ type: 'entities', entities: [] });
-    await settle('hui-entities-card');
-    const made = customElements.get('hui-entities-card');
-    const open = field(made, 'getConfigElement');
-    if (typeof open === 'function') {
-      await open.call(made);
+    if (helpers !== undefined) {
+      helpers.createCardElement({ type: 'entities', entities: [] });
+      await settle('hui-entities-card');
+      const made = customElements.get('hui-entities-card');
+      const open = field(made, 'getConfigElement');
+      if (typeof open === 'function') {
+        await open.call(made);
+      }
+      await settle('ha-form');
     }
-    await settle('ha-form');
   } catch {}
+  return formMissing();
+}
+
+let loading: Promise<FormFailure | undefined> | undefined;
+
+export async function loadHaForm(): Promise<FormFailure | undefined> {
+  if (customElements.get('ha-form') !== undefined) {
+    return undefined;
+  }
+  loading ??= load();
+  const missing = await loading;
+  loading = undefined;
+  return missing;
 }
 
 export function haForm(options: FormOptions): TemplateResult {

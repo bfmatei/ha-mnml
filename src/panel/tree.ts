@@ -1,14 +1,10 @@
-import { isMapping, isTemplate } from '../contract/templates.ts';
+import { idOf, isMapping, isTemplate } from '../contract/templates.ts';
 import type { Value, WrittenTemplate } from '../contract/templates.ts';
 import { toValue } from '../templates/expand.ts';
 
 export type Path = readonly string[];
 
 const OWN = 'my-';
-
-function idOf(item: Value): string | undefined {
-  return isMapping(item) && typeof item['id'] === 'string' ? item['id'] : undefined;
-}
 
 function step(node: Value | undefined, segment: string): Value | undefined {
   if (segment.startsWith('#')) {
@@ -52,9 +48,13 @@ function replaced(node: Value, path: Path, next: Value | undefined): Value {
   return node;
 }
 
-export function listAt(template: WrittenTemplate, path: Path): Value[] {
+export function listAt(template: WrittenTemplate | undefined, path: Path): Value[] {
   const found =
-    path.length === 1 && path[0] === 'popups' ? (template.popups ?? []) : valueAt(template, path);
+    template === undefined
+      ? undefined
+      : path.length === 1 && path[0] === 'popups'
+        ? (template.popups ?? [])
+        : valueAt(template, path);
   return Array.isArray(found) ? found : [];
 }
 

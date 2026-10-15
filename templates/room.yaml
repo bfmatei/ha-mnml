@@ -1,5 +1,7 @@
 room:
-  description: A room's tile, its temperature and humidity, its window, door, lock and climate chips, its lights, and its leak and low battery chips; it brings the room's pop-ups.
+  description: A room's tile, its temperature and humidity, its window, door, lock and climate chips, its lights, and its chips for a leak and a low battery; it brings the room's pop-ups.
+  title: Room
+  icon: mdi:sofa
   slots:
     key:
       {
@@ -53,6 +55,8 @@ room:
         device: { domain: climate, exclude: { attribute: { hvac_modes: cool } } }
         fields:
           entity: { domain: climate, exclude: { attribute: { hvac_modes: cool } } }
+          preset_temperatures: { domain: number, platform: better_thermostat }
+          schedule: { domain: schedule, name: heating, scope: area }
           thermostats:
             - per: device
               scope: area
@@ -86,139 +90,8 @@ room:
               power: { domain: sensor, device_class: power }
               today: { domain: sensor, device_class: energy, platform: utility_meter }
               total: { domain: sensor, device_class: energy, exclude: { platform: utility_meter } }
-    vacuum:
-      shape: vacuum_popup
-      group: Devices
-      discover:
-        device: { domain: vacuum }
-        fields:
-          entity: { domain: vacuum }
-          status:
-            - { domain: sensor, translation_key: status }
-            - { domain: sensor, name: status }
-          error:
-            - { domain: sensor, translation_key: vacuum_error }
-            - { domain: sensor, name: error, exclude: { name: dock } }
-          battery: { domain: sensor, device_class: battery }
-          current_room:
-            - { domain: sensor, translation_key: current_room }
-            - { domain: sensor, name: current room }
-          progress:
-            - { domain: sensor, translation_key: clean_percent }
-            - { domain: sensor, name: cleaning progress }
-          area:
-            - { domain: sensor, translation_key: cleaning_area }
-            - { domain: sensor, name: cleaning area, exclude: { name: total } }
-          time:
-            - { domain: sensor, translation_key: cleaning_time }
-            - { domain: sensor, name: cleaning time, exclude: { name: total } }
-          last_clean:
-            - { domain: sensor, translation_key: last_clean_end }
-            - { domain: sensor, name: last clean end }
-          mop_attached:
-            - { domain: binary_sensor, translation_key: mop_attached }
-            - { domain: binary_sensor, name: mop attached }
-          water_box_attached:
-            - { domain: binary_sensor, translation_key: water_box_attached }
-            - { domain: binary_sensor, name: water box attached }
-          totals:
-            fields:
-              count:
-                - { domain: sensor, translation_key: total_cleaning_count }
-                - { domain: sensor, name: total cleaning count }
-              area:
-                - { domain: sensor, translation_key: total_cleaning_area }
-                - { domain: sensor, name: total cleaning area }
-              time:
-                - { domain: sensor, translation_key: total_cleaning_time }
-                - { domain: sensor, name: total cleaning time }
-          map: { domain: image }
-          routines: { domain: button, entity_category: none }
-          settings:
-            { domain: select, entity_category: config, exclude: { translation_key: selected_map } }
-          warnings: { domain: binary_sensor, device_class: problem }
-          dock:
-            device:
-              - { domain: sensor, translation_key: dock_error }
-              - { model: dock }
-              - { domain: sensor, name: dock error }
-            scope: area
-            fields:
-              error:
-                - { domain: sensor, translation_key: dock_error }
-                - { domain: sensor, name: error }
-              dust_emptying:
-                - { domain: switch, translation_key: dust_emptying }
-                - { domain: switch, name: dust emptying }
-              mop_drying:
-                - { domain: switch, translation_key: mop_drying }
-                - { domain: switch, name: mop drying }
-              mop_drying_time_left:
-                - { domain: sensor, translation_key: mop_drying_remaining_time }
-                - { domain: sensor, name: mop drying }
-              mop_washing:
-                - { domain: switch, translation_key: mop_washing }
-                - { domain: switch, name: mop washing }
-              warnings: { domain: binary_sensor, device_class: problem }
-    printer3d:
-      shape: printer3d_popup
-      label: 3D printer
-      group: Devices
-      discover:
-        device: { platform: prusalink }
-        fields:
-          entity:
-            - { domain: sensor, translation_key: printer_state }
-            - { domain: sensor, device_class: enum }
-          progress:
-            - { domain: sensor, translation_key: progress }
-            - { domain: sensor, name: progress }
-          filename:
-            - { domain: sensor, translation_key: filename }
-            - { domain: sensor, name: filename }
-          material:
-            - { domain: sensor, translation_key: material }
-            - { domain: sensor, name: material }
-          speed:
-            - { domain: sensor, translation_key: print_speed }
-            - { domain: sensor, name: print speed }
-          start:
-            - { domain: sensor, translation_key: print_start }
-            - { domain: sensor, name: print start }
-          finish:
-            - { domain: sensor, translation_key: print_finish }
-            - { domain: sensor, name: print finish }
-          nozzle:
-            fields:
-              temperature:
-                - { domain: sensor, translation_key: nozzle_temperature }
-                - { domain: sensor, name: nozzle temperature, exclude: { name: target } }
-              target:
-                - { domain: sensor, translation_key: nozzle_target_temperature }
-                - { domain: sensor, name: nozzle target temperature }
-          bed:
-            fields:
-              temperature:
-                - { domain: sensor, translation_key: heatbed_temperature }
-                - { domain: sensor, name: heatbed temperature, exclude: { name: target } }
-              target:
-                - { domain: sensor, translation_key: heatbed_target_temperature }
-                - { domain: sensor, name: heatbed target temperature }
-          camera: { domain: camera }
-          actions:
-            fields:
-              pause:
-                - { domain: button, translation_key: pause_job }
-                - { domain: button, name: pause }
-              resume:
-                - { domain: button, translation_key: resume_job }
-                - { domain: button, name: resume }
-              continue:
-                - { domain: button, translation_key: continue_job }
-                - { domain: button, name: continue }
-              cancel:
-                - { domain: button, translation_key: cancel_job }
-                - { domain: button, name: cancel }
+    vacuum: { shape: vacuum_popup, group: Devices }
+    printer3d: { shape: printer3d_popup, label: 3D printer, group: Devices }
     cameras:
       shape: camera
       kind: objects
@@ -364,6 +237,20 @@ room:
               today: { domain: sensor, device_class: energy, platform: utility_meter }
               total: { domain: sensor, device_class: energy, exclude: { platform: utility_meter } }
     diffuser: { shape: diffuser, group: Devices }
+    timers:
+      {
+        kind: entities,
+        discover: { domain: timer },
+        help: "The room's timers; the pop-up lists them with its other devices, and the glances strip shows each while it runs.",
+        group: Devices,
+      }
+    schedules:
+      {
+        kind: entities,
+        discover: { domain: schedule, exclude: { name: heating } },
+        help: "The room's schedules other than its heating's; the pop-up lists them after the heating's.",
+        group: Schedules,
+      }
     batteries:
       {
         kind: entities,
@@ -408,18 +295,13 @@ room:
         entity: '[[door]]'
         color: orange
         show: { not: ['off'] }
-      - id: lock
-        if: lock
-        type: toggle
-        entity: '[[lock]]'
-        color: red
-        when: { is: [unlocked, open, jammed] }
       - id: each-garage
         each: covers
         as: cover
         if: cover.garage
         type: toggle
         entity: '[[cover.entity]]'
+        confirm: { is: [closed] }
         color: orange
         when: { is: [open, opening, closing] }
         show: { is: [open, opening, closing] }
@@ -439,25 +321,10 @@ room:
         entity: '[[camera.person]]'
         color: orange
         show: { is: ['on'] }
-      - id: ac
-        if: ac
-        template: nav-chip
-        slots:
-          { entity: '[[ac.entity]]', popup: '#[[key]]-ac', color: blue, when: { not: ['off'] } }
-      - id: heating
-        if: heating
-        template: nav-chip
-        slots:
-          {
-            entity: '[[heating.entity]]',
-            popup: '#[[key]]-heating',
-            color: orange,
-            when: { not: ['off'] },
-          }
       - id: leaks
         if: leaks
         type: status
-        name: Leak
+        name: '[[words.leak]]'
         icon: mdi:water-alert-outline
         silent: true
         rules:
@@ -465,7 +332,7 @@ room:
       - id: batteries
         if: batteries
         type: status
-        name: Batteries
+        name: '[[words.batteries]]'
         icon: mdi:battery-alert-variant-outline
         silent: true
         rules:
@@ -485,6 +352,28 @@ room:
               color: orange,
               label: device,
             }
+      - id: lock
+        if: lock
+        type: toggle
+        entity: '[[lock]]'
+        confirm: { is: [locked] }
+        color: red
+        when: { is: [unlocked, open, jammed] }
+      - id: ac
+        if: ac
+        template: nav-chip
+        slots:
+          { entity: '[[ac.entity]]', popup: '#[[key]]-ac', color: blue, when: { not: ['off'] } }
+      - id: heating
+        if: heating
+        template: nav-chip
+        slots:
+          {
+            entity: '[[heating.entity]]',
+            popup: '#[[key]]-heating',
+            color: amber,
+            when: { not: ['off'] },
+          }
     item:
       if: lights.group
       template: light-item
@@ -522,7 +411,10 @@ room:
         media: '[[media]]'
         outlets: '[[outlets]]'
         diffuser: '[[diffuser]]'
+        timers: '[[timers]]'
+        schedules: '[[schedules]]'
         batteries: '[[batteries]]'
+        leaks: '[[leaks]]'
         low: '[[low]]'
         critical: '[[critical]]'
     - id: lights-popup
@@ -536,38 +428,6 @@ room:
         members: '[[lights.members]]'
         scenes: '[[lights.scenes]]'
         active_scene: '[[lights.active_scene]]'
-    - id: heating
-      if: heating
-      template: heating-popup
-      slots:
-        key: '[[key]]'
-        name: '[[name]]'
-        entity: '[[heating.entity]]'
-        preset: '[[heating.preset]]'
-        thermostats: '[[heating.thermostats]]'
-        low: '[[low]]'
-        critical: '[[critical]]'
-    - id: ac
-      if: ac
-      template: ac-popup
-      slots:
-        key: '[[key]]'
-        name: '[[name]]'
-        entity: '[[ac.entity]]'
-        fan: '[[ac.fan]]'
-        swing: '[[ac.swing]]'
-        horizontal_swing: '[[ac.horizontal_swing]]'
-        power_saving: '[[ac.power_saving]]'
-        dehumidifier: '[[ac.dehumidifier]]'
-        energy: '[[ac.energy]]'
-    - id: vacuum
-      if: vacuum
-      template: vacuum-popup
-      slots: { key: '[[key]]', name: '[[name]]', vacuum: '[[vacuum]]' }
-    - id: printer3d
-      if: printer3d
-      template: 3d-printer-popup
-      slots: { key: '[[key]]', name: '[[name]]', printer3d: '[[printer3d]]' }
     - id: each-speakers
       each: speakers
       as: speaker
@@ -583,6 +443,8 @@ room:
 
 room-media-card:
   description: A room's media player, opening its speaker pop-up when it is a speaker.
+  title: Room media player
+  icon: mdi:speaker
   slots:
     key: { kind: text, required: true }
     member: { shape: player, required: true }
@@ -600,7 +462,9 @@ room-media-card:
     member: { entity: media_player.living_tv }
 
 room-popup:
-  description: A room's pop-up, its lights, climate, media and other devices, its batteries and its energy.
+  description: A room's pop-up, a leak while there is one and since when, its lights, climate, media and other devices, its schedules, its batteries and its energy.
+  title: Room pop-up
+  icon: mdi:sofa
   slots:
     key: { kind: text, required: true }
     name: { kind: text, required: true }
@@ -611,10 +475,10 @@ room-popup:
     door: { kind: entity }
     lock: { kind: entity }
     lights: { shape: lights }
-    heating: { shape: heating }
-    ac: { shape: ac }
-    vacuum: { shape: vacuum }
-    printer3d: { shape: printer3d }
+    heating: { shape: heating, fields: { thermostats: { fields: { valve: { required: true } } } } }
+    ac: { shape: ac, fields: { energy: { fields: { power: { required: true } } } } }
+    vacuum: { shape: vacuum_popup }
+    printer3d: { shape: printer3d_popup }
     cameras: { shape: camera, kind: objects }
     covers: { shape: cover, kind: objects }
     fans: { shape: fan, kind: objects }
@@ -625,7 +489,10 @@ room-popup:
     media: { shape: player, kind: objects }
     outlets: { shape: outlet, kind: objects }
     diffuser: { shape: diffuser }
+    timers: { kind: entities }
+    schedules: { kind: entities }
     batteries: { kind: entities }
+    leaks: { kind: entities }
     low: { kind: number, default: 20 }
     critical: { kind: number, default: 5 }
   retired: [meters, heating.batteries]
@@ -646,10 +513,19 @@ room-popup:
             entity: '[[humidity]]'
             icon: true
         controls?:
+          - id: leaks
+            if: leaks
+            type: status
+            name: '[[words.leak]]'
+            icon: mdi:water-alert-outline
+            silent: true
+            rules:
+              - { id: leaks, entities: '[[leaks]]', is: ['on'], color: red, label: device }
           - id: lock
             if: lock
             type: toggle
             entity: '[[lock]]'
+            confirm: { is: [locked] }
             color: red
             when: { is: [unlocked, open, jammed] }
           - id: window
@@ -662,10 +538,18 @@ room-popup:
             type: indicator
             entity: '[[door]]'
             color: orange
+      - id: each-leaks
+        each: leaks
+        as: leak
+        type: custom:mnml-entity-card
+        entity: '[[leak]]'
+        color: red
+        state: [{ id: part }, { id: since, since: true }]
+        visibility: [{ id: wet, condition: state, entity: '[[leak]]', state: 'on' }]
       - id: heading
         if: lights.group
         type: custom:mnml-heading-card
-        title: Lights
+        title: '[[words.lights]]'
         icon: mdi:lightbulb-group
       - id: light-card
         if: lights.group
@@ -679,20 +563,38 @@ room-popup:
       - id: ac-heating
         if: [ac, heating]
         type: custom:mnml-heading-card
-        title: Climate
+        title: '[[words.climate]]'
         icon: mdi:thermostat
       - id: ac
         if: ac
         template: ac-item
-        slots: { key: '[[key]]', entity: '[[ac.entity]]' }
+        slots:
+          key: '[[key]]'
+          name: '[[name]]'
+          entity: '[[ac.entity]]'
+          fan: '[[ac.fan]]'
+          swing: '[[ac.swing]]'
+          horizontal_swing: '[[ac.horizontal_swing]]'
+          power_saving: '[[ac.power_saving]]'
+          dehumidifier: '[[ac.dehumidifier]]'
+          energy: '[[ac.energy]]'
       - id: heating
         if: heating
         template: heating-item
-        slots: { key: '[[key]]', entity: '[[heating.entity]]', preset: '[[heating.preset]]' }
+        slots:
+          key: '[[key]]'
+          name: '[[name]]'
+          entity: '[[heating.entity]]'
+          preset: '[[heating.preset]]'
+          preset_temperatures: '[[heating.preset_temperatures]]'
+          schedule: '[[heating.schedule]]'
+          thermostats: '[[heating.thermostats]]'
+          low: '[[low]]'
+          critical: '[[critical]]'
       - id: fans-humidifiers
         if: [fans, humidifiers]
         type: custom:mnml-heading-card
-        title: Air
+        title: '[[words.air]]'
         icon: mdi:air-filter
       - id: each-fans
         each: fans
@@ -707,7 +609,7 @@ room-popup:
       - id: covers
         if: covers
         type: custom:mnml-heading-card
-        title: Covers
+        title: '[[words.covers]]'
         icon: mdi:blinds-horizontal
       - id: each-covers
         each: covers
@@ -717,7 +619,7 @@ room-popup:
       - id: cameras
         if: cameras
         type: custom:mnml-heading-card
-        title: Cameras
+        title: '[[words.cameras]]'
         icon: mdi:cctv
       - id: each-cameras
         each: cameras
@@ -731,7 +633,7 @@ room-popup:
       - id: appliances
         if: appliances
         type: custom:mnml-heading-card
-        title: Appliances
+        title: '[[words.appliances]]'
         icon: mdi:washing-machine
       - id: each-appliances
         each: appliances
@@ -744,7 +646,7 @@ room-popup:
       - id: pets
         if: pets
         type: custom:mnml-heading-card
-        title: Pets
+        title: '[[words.pets]]'
         icon: mdi:paw
       - id: each-pets
         each: pets
@@ -762,7 +664,7 @@ room-popup:
       - id: media
         if: media
         type: custom:mnml-heading-card
-        title: Media
+        title: '[[words.media]]'
         icon: mdi:multimedia
       - id: each-media
         each: media
@@ -770,18 +672,18 @@ room-popup:
         template: room-media-card
         slots: { key: '[[key]]', member: '[[member]]' }
       - id: vacuum-printer3d-outlets-diffuser
-        if: [vacuum, printer3d, outlets, diffuser]
+        if: [vacuum, printer3d, outlets, diffuser, timers]
         type: custom:mnml-heading-card
-        title: Other
+        title: '[[words.other]]'
         icon: mdi:devices
       - id: vacuum
         if: vacuum
         template: vacuum-card
-        slots: { key: '[[key]]', vacuum: '[[vacuum]]' }
+        slots: { key: '[[key]]', name: '[[name]]', vacuum: '[[vacuum]]' }
       - id: printer3d
         if: printer3d
         template: 3d-printer-card
-        slots: { key: '[[key]]', printer3d: '[[printer3d]]' }
+        slots: { key: '[[key]]', name: '[[name]]', printer3d: '[[printer3d]]' }
       - id: each-outlets
         each: outlets
         as: outlet
@@ -791,6 +693,25 @@ room-popup:
         if: diffuser
         template: diffuser-card
         slots: { entity: '[[diffuser.entity]]', amount: '[[diffuser.amount]]' }
+      - id: each-timers
+        each: timers
+        as: timer
+        template: timer-card
+        slots: { entity: '[[timer]]' }
+      - id: schedules
+        if: [heating.schedule, schedules]
+        type: custom:mnml-heading-card
+        title: '[[words.schedules]]'
+        icon: mdi:calendar-clock
+      - id: heating-schedule
+        if: heating.schedule
+        template: schedule-card
+        slots: { entity: '[[heating.schedule]]' }
+      - id: each-schedules
+        each: schedules
+        as: schedule
+        template: schedule-card
+        slots: { entity: '[[schedule]]' }
       - id: batteries
         template: batteries
         slots: { batteries: '[[batteries]]', low: '[[low]]', critical: '[[critical]]' }

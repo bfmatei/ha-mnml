@@ -4,14 +4,15 @@ import { styleMap } from 'lit/directives/style-map.js';
 
 import type { Color, ReportCard } from '../contract/cards.ts';
 import type { MdiIcon } from '../contract/entities.ts';
+import { CARD_STRUCTURES } from '../contract/structure.ts';
+import type { Structure } from '../contract/structure.ts';
 import { stateOf } from '../ha/hass.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
 import { colorStyle, icon } from '../ha/templates.ts';
+import { wordsFor } from '../words/words.ts';
 
-import { MnmlCard, requireString } from './base.ts';
-import type { KeySchema } from './keys.ts';
+import { MnmlCard } from './base.ts';
 import { SECTION_STYLE, section } from './parts/section.ts';
-import { REPORT_CARD } from './schemas.ts';
 import { BASE_STYLE, HEADING_STYLE } from './styles.ts';
 
 const REPORT_STYLE = css`
@@ -54,8 +55,6 @@ const REPORT_STYLE = css`
     overflow-wrap: anywhere;
   }
 `;
-
-const DEFAULT_TITLE = 'Report';
 
 const DEFAULT_ICON: MdiIcon = 'mdi:text-box-outline';
 
@@ -117,12 +116,8 @@ function group({ label, word, entries }: Group, colors: Record<string, Color>): 
 export class MnmlReportCard extends MnmlCard<ReportCard> {
   static override styles = [BASE_STYLE, HEADING_STYLE, SECTION_STYLE, REPORT_STYLE];
 
-  protected schema(): KeySchema {
-    return REPORT_CARD;
-  }
-
-  protected override validate(config: ReportCard): void {
-    requireString('entity', config.entity);
+  protected structure(): Structure {
+    return CARD_STRUCTURES['custom:mnml-report-card'];
   }
 
   protected draw(hass: HomeAssistant, config: ReportCard): TemplateResult | undefined {
@@ -132,13 +127,14 @@ export class MnmlReportCard extends MnmlCard<ReportCard> {
     if (count === 0) {
       return undefined;
     }
+    const words = wordsFor(hass.locale.language).report;
     return section(
       html`<div class="card">
         <div class="entries">${groups.map((each) => group(each, config.colors ?? {}))}</div>
       </div>`,
-      config.title ?? DEFAULT_TITLE,
+      config.title ?? words.title,
       config.icon ?? DEFAULT_ICON,
-      { text: String(count), label: `${count} ${count === 1 ? 'entry' : 'entries'}` },
+      { text: String(count), label: words.count(count) },
     );
   }
 }

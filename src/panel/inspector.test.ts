@@ -10,7 +10,7 @@ import { drawn } from '../test/render.ts';
 import { readableOf } from './data.ts';
 import { conditionOf, drawInspector, slotPaths, withCondition } from './inspector.ts';
 import type { InspectorActions } from './inspector.ts';
-import { partOf } from './outline.ts';
+import { outlinePart } from './outline.ts';
 import { valueAt, withValue } from './tree.ts';
 
 test("a template's slots are offered with the fields of its object slots", () => {
@@ -83,7 +83,7 @@ test('two bound fields of a part changed one after the other both stay, without 
   };
   const box = drawn(
     drawInspector(
-      partOf(cardOf(template), ['card'], undefined, 0),
+      outlinePart(cardOf(template), ['card'], undefined, 0),
       actionsFor(
         () => template,
         (next) => {
@@ -134,7 +134,7 @@ test('a shared piece shows a slot it is not given as empty, and an edit writes t
       },
     },
   };
-  const box = drawn(drawInspector(partOf(cardOf(template), ['card'], undefined, 0), actions));
+  const box = drawn(drawInspector(outlinePart(cardOf(template), ['card'], undefined, 0), actions));
   const form = (key: string): Element => {
     const found = [...box.querySelectorAll('ha-form')].find((node) =>
       Object.hasOwn(dataOf(node), key),

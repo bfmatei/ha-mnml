@@ -64,6 +64,23 @@ test('a pop-up a card points at and nothing defines is named', () => {
   assert.deepEqual(hashProblems(dashboard), ['#nowhere is opened but no pop-up defines it']);
 });
 
+test('an alert that opens a pop-up the home does not draw is named', () => {
+  const home: Home = {
+    ...DEMO,
+    alerts: [
+      { entity: 'binary_sensor.kitchen_leak', popup: '#nowhere' },
+      { entity: 'lock.front_door', is: ['jammed'], popup: '#system' },
+    ],
+  };
+  assert.deepEqual(problems(home), ['#nowhere is opened but no pop-up defines it']);
+});
+
+test('a pop-up hash defined more than once is named once, as defined twice', () => {
+  const den = { hash: '#den', cards: [] };
+  const dashboard = { views: [{ cards: [{ type: 'x', popup: '#den' }, den, den, den] }] };
+  assert.deepEqual(hashProblems(dashboard), ['#den is defined twice']);
+});
+
 test('a network with an invalid subnet is named', () => {
   const network = DEMO.system.network;
   assert.ok(network?.clients);

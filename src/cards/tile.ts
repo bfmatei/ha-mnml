@@ -2,6 +2,8 @@ import { css, html, nothing } from 'lit';
 import type { TemplateResult } from 'lit';
 
 import type { TileCard } from '../contract/cards.ts';
+import { CARD_STRUCTURES } from '../contract/structure.ts';
+import type { Structure } from '../contract/structure.ts';
 import { stateLine } from '../ha/format.ts';
 import { stateOf } from '../ha/hass.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
@@ -9,11 +11,9 @@ import { cardName } from '../ha/names.ts';
 import { navigate, offerOrigin, prebuild } from '../ha/navigation.ts';
 import { onPress, stateIcon } from '../ha/templates.ts';
 
-import { MnmlCard, requireString } from './base.ts';
-import type { KeySchema } from './keys.ts';
-import { renderControls, requireControls } from './parts/controls.ts';
+import { MnmlCard } from './base.ts';
+import { renderControls } from './parts/controls.ts';
 import { ITEM_STYLE, itemLine } from './parts/item.ts';
-import { TILE_CARD } from './schemas.ts';
 import { BASE_STYLE } from './styles.ts';
 
 const TILE_STYLE = css`
@@ -73,18 +73,28 @@ const TILE_STYLE = css`
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .tile > .row > .line > .name {
-    font-size: 14px;
-  }
   .tile > .row .control {
     min-width: 28px;
     height: 28px;
     border-radius: 50%;
   }
+  .tile > .row .control.armed {
+    border-radius: 14px;
+  }
   .tile > .row .control ha-icon,
   .tile > .row .control ha-state-icon,
   .tile > .row .control ha-attribute-icon {
     --mdc-icon-size: 16px;
+  }
+  @media (pointer: coarse) {
+    .tile > .row > .lane {
+      gap: 16px;
+    }
+    .tile > .row .control:not(.inert)::after {
+      content: '';
+      position: absolute;
+      inset: -8px;
+    }
   }
   .tile > .row > .overlay {
     padding: 0;
@@ -109,18 +119,8 @@ export class MnmlTileCard extends MnmlCard<TileCard> {
     }
   }
 
-  protected schema(): KeySchema {
-    return TILE_CARD;
-  }
-
-  protected override validate(config: TileCard): void {
-    if (config.entity === undefined) {
-      requireString('name', config.name);
-      requireString('icon', config.icon);
-    }
-    requireString('popup', config.popup);
-    requireControls('chips', config.chips);
-    requireControls('item.controls', config.item?.controls);
+  protected structure(): Structure {
+    return CARD_STRUCTURES['custom:mnml-tile-card'];
   }
 
   protected draw(hass: HomeAssistant, config: TileCard): TemplateResult {

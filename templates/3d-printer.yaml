@@ -1,5 +1,7 @@
 3d-printer-actions:
   description: A 3D printer's Cancel, Pause, Resume and Continue buttons, each shown in the job state it applies to.
+  title: 3D printer actions
+  icon: mdi:printer-3d-nozzle
   slots:
     entity: { kind: entity, required: true }
     actions: { shape: printer3d_actions }
@@ -9,7 +11,8 @@
       type: service
       entity: '[[actions.cancel]]'
       service: button.press
-      name: Cancel
+      confirm: {}
+      name: '[[words.cancel]]'
       icon: mdi:stop
       show: { entity: '[[entity]]', is: [printing, paused, attention] }
     - id: pause
@@ -17,7 +20,7 @@
       type: service
       entity: '[[actions.pause]]'
       service: button.press
-      name: Pause
+      name: '[[words.pause]]'
       icon: mdi:pause
       show: { entity: '[[entity]]', is: [printing] }
     - id: resume
@@ -25,7 +28,7 @@
       type: service
       entity: '[[actions.resume]]'
       service: button.press
-      name: Resume
+      name: '[[words.resume]]'
       icon: mdi:play
       show: { entity: '[[entity]]', is: [paused] }
     - id: continue
@@ -33,7 +36,7 @@
       type: service
       entity: '[[actions.continue]]'
       service: button.press
-      name: Continue
+      name: '[[words.continue]]'
       icon: mdi:play
       show: { entity: '[[entity]]', is: [attention] }
   example:
@@ -46,44 +49,97 @@
         continue: button.3d_printer_continue,
       }
 
-3d-printer-card:
-  description: A 3D printer as an item, its outlet or its state and job progress, opening its pop-up.
+3d-printer-state:
+  description: "A 3D printer's state line: its outlet's Off while the outlet is off, else its state, then the job's progress while one runs."
+  title: 3D printer state
+  icon: mdi:printer-3d-nozzle
   slots:
-    key: { kind: text, required: true }
     printer3d: { shape: printer3d, required: true }
   card:
-    type: custom:mnml-entity-card
-    entity: '[[printer3d.entity]]'
-    state:
-      - id: not-printer3d-outlet
-        unless: printer3d.outlet
-      - id: printer3d-outlet
-        if: printer3d.outlet
-        entity: '[[printer3d.outlet.entity]]'
-        when: { entity: '[[printer3d.outlet.entity]]', is: ['off'] }
-      - id: printer3d-outlet-2
-        if: printer3d.outlet
-        when: { entity: '[[printer3d.outlet.entity]]', not: ['off'] }
-      - id: printer3d-progress
-        if: printer3d.progress
-        entity: '[[printer3d.progress]]'
-        when: { entity: '[[printer3d.entity]]', is: [printing, paused, attention] }
-    popup: '#[[key]]-3d-printer'
-    controls:
-      - id: 3d-printer-actions
-        template: 3d-printer-actions
-        slots: { entity: '[[printer3d.entity]]', actions: '[[printer3d.actions]]' }
-      - id: printer3d-outlet
-        if: printer3d.outlet
-        template: power
-        slots: { entity: '[[printer3d.outlet.entity]]' }
-        show: { entity: '[[printer3d.entity]]', not: [printing, paused, attention] }
+    - id: not-printer3d-outlet
+      unless: printer3d.outlet
+      entity: '[[printer3d.entity]]'
+    - id: printer3d-outlet
+      if: printer3d.outlet
+      entity: '[[printer3d.outlet.entity]]'
+      when: { entity: '[[printer3d.outlet.entity]]', is: ['off'] }
+    - id: printer3d-outlet-2
+      if: printer3d.outlet
+      entity: '[[printer3d.entity]]'
+      when: { entity: '[[printer3d.outlet.entity]]', not: ['off'] }
+    - id: printer3d-progress
+      if: printer3d.progress
+      entity: '[[printer3d.progress]]'
+      when: { entity: '[[printer3d.entity]]', is: [printing, paused, attention] }
   example:
-    key: office
     printer3d:
       {
         entity: sensor.3d_printer,
         progress: sensor.3d_printer_progress,
+        actions: { cancel: button.3d_printer_cancel },
+      }
+
+3d-printer-controls:
+  description: "A 3D printer's job buttons while a job runs, then its outlet's power button while none does."
+  title: 3D printer controls
+  icon: mdi:printer-3d-nozzle
+  slots:
+    printer3d: { shape: printer3d, required: true }
+  card:
+    - id: 3d-printer-actions
+      template: 3d-printer-actions
+      slots: { entity: '[[printer3d.entity]]', actions: '[[printer3d.actions]]' }
+    - id: printer3d-outlet
+      if: printer3d.outlet
+      template: power
+      slots: { entity: '[[printer3d.outlet.entity]]' }
+      show: { entity: '[[printer3d.entity]]', not: [printing, paused, attention] }
+  example:
+    printer3d:
+      {
+        entity: sensor.3d_printer,
+        actions: { cancel: button.3d_printer_cancel },
+        outlet: { entity: switch.3d_printer_outlet },
+      }
+
+3d-printer-card:
+  description: A 3D printer as an item, its outlet or its state and job progress, opening its pop-up; it brings the pop-up.
+  title: 3D printer
+  icon: mdi:printer-3d
+  slots:
+    key: { kind: text, required: true, discover: area.id }
+    name: { kind: text, required: true, discover: area.name }
+    printer3d: { shape: printer3d_popup, required: true }
+  card:
+    type: custom:mnml-entity-card
+    entity: '[[printer3d.entity]]'
+    state:
+      - id: 3d-printer-state
+        template: 3d-printer-state
+        slots: { printer3d: '[[printer3d]]' }
+    popup: '#[[key]]-3d-printer'
+    controls:
+      - id: 3d-printer-controls
+        template: 3d-printer-controls
+        slots: { printer3d: '[[printer3d]]' }
+  popups:
+    - id: 3d-printer-popup
+      template: 3d-printer-popup
+      slots: { key: '[[key]]', name: '[[name]]', printer3d: '[[printer3d]]' }
+  example:
+    key: office
+    name: Office
+    printer3d:
+      {
+        entity: sensor.3d_printer,
+        material: sensor.3d_printer_material,
+        progress: sensor.3d_printer_progress,
+        filename: sensor.3d_printer_file,
+        speed: sensor.3d_printer_speed,
+        start: sensor.3d_printer_start,
+        finish: sensor.3d_printer_finish,
+        nozzle: { temperature: sensor.nozzle, target: sensor.nozzle_target },
+        bed: { temperature: sensor.bed, target: sensor.bed_target },
         actions:
           {
             cancel: button.3d_printer_cancel,
@@ -94,7 +150,9 @@
       }
 
 3d-printer-popup:
-  description: A room's 3D printer pop-up, its camera, print, temperatures and power.
+  description: "A 3D printer's pop-up, which its card brings: its state and job buttons in its header, its camera, print, temperatures and power."
+  title: 3D printer pop-up
+  icon: mdi:printer-3d
   slots:
     key: { kind: text, required: true }
     name: { kind: text, required: true }
@@ -105,16 +163,28 @@
       - id: header
         type: custom:mnml-header-card
         entity: '[[printer3d.entity]]'
-        state: [{ id: name, text: '[[name]]' }]
+        state:
+          - { id: name, text: '[[name]]' }
+          - id: not-printer3d-outlet
+            unless: printer3d.outlet
+            entity: '[[printer3d.entity]]'
+          - id: printer3d-outlet
+            if: printer3d.outlet
+            entity: '[[printer3d.outlet.entity]]'
+            when: { entity: '[[printer3d.outlet.entity]]', is: ['off'] }
+          - id: printer3d-outlet-2
+            if: printer3d.outlet
+            entity: '[[printer3d.entity]]'
+            when: { entity: '[[printer3d.outlet.entity]]', not: ['off'] }
         controls:
-          - id: 3d-printer-actions
+          - id: job
             template: 3d-printer-actions
             slots: { entity: '[[printer3d.entity]]', actions: '[[printer3d.actions]]' }
         back: true
       - id: printer3d-camera
         if: printer3d.camera
         type: custom:mnml-heading-card
-        title: Camera
+        title: '[[words.camera]]'
         icon: mdi:cctv
       - id: printer3d-camera-2
         if: printer3d.camera
@@ -125,7 +195,7 @@
         camera_view: live
       - id: print
         type: custom:mnml-list-card
-        title: Print
+        title: '[[words.print]]'
         icon: mdi:printer-3d-nozzle
         rows:
           - id: printer3d-material
@@ -149,22 +219,22 @@
             show: { entity: '[[printer3d.entity]]', is: [printing, paused, attention] }
       - id: temperatures
         type: custom:mnml-list-card
-        title: Temperatures
+        title: '[[words.temperatures]]'
         icon: mdi:thermometer
-        headers: [Heater, Now, Target]
+        headers: ['[[words.heater]]', '[[words.now]]', '[[words.target]]']
         rows:
           - id: printer3d-nozzle-temperature
             entity: '[[printer3d.nozzle.temperature]]'
             strip: ' temperature'
-            values: ['[[printer3d.nozzle.temperature]]', '[[printer3d.nozzle.target]]']
+            values!: ['[[printer3d.nozzle.temperature]]', '[[printer3d.nozzle.target]]']
           - id: printer3d-bed-temperature
             entity: '[[printer3d.bed.temperature]]'
             strip: ' temperature'
-            values: ['[[printer3d.bed.temperature]]', '[[printer3d.bed.target]]']
+            values!: ['[[printer3d.bed.temperature]]', '[[printer3d.bed.target]]']
       - id: printer3d-outlet
         if: printer3d.outlet
         type: custom:mnml-heading-card
-        title: Power
+        title: '[[words.power]]'
         icon: mdi:power-plug
       - id: printer3d-outlet-2
         if: printer3d.outlet

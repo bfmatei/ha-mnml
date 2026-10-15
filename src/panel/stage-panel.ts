@@ -2,17 +2,22 @@ import { css, html, nothing } from 'lit';
 import type { TemplateResult } from 'lit';
 import { classMap } from 'lit/directives/class-map.js';
 
+import { slotLabel, templateTitle } from '../contract/templates.ts';
 import type { Template, Templates, Value } from '../contract/templates.ts';
 import { field } from '../ha/field.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
 import { icon } from '../ha/templates.ts';
+import { EDITORS_EN } from '../words/panel/editors-en.ts';
+import { editorWordsFor } from '../words/panel/editors.ts';
+import type { PanelWords } from '../words/panel/en.ts';
+import { panelWordsFor } from '../words/panel/words.ts';
 
-import { findsItself, resolvedEntity, sentence, slotLabel } from './binding.ts';
+import { findsItself, resolvedEntity, sentence } from './binding.ts';
 import type { DataField } from './binding.ts';
 import { pick, simpleForm } from './form.ts';
-import { conditionOf, slotPaths } from './inspector.ts';
-import { startersOf } from './outline.ts';
-import type { Group, Part, Starter } from './outline.ts';
+import { conditionOf, slotChoices, slotPaths } from './inspector.ts';
+import { startersOf, wordingFor } from './outline.ts';
+import type { Group, Part, Starter, Wording } from './outline.ts';
 import { drawLook } from './simple.ts';
 import type { SimpleActions, SimpleRow } from './simple.ts';
 
@@ -23,76 +28,74 @@ export interface StageActions extends SimpleActions {
   move: (group: Group, from: number, to: number) => void;
   add: (group: Group, starter: Starter) => void;
   open: (template: string) => void;
-  detach: (part: Part) => void;
+  editHere: (part: Part) => void;
   pick: (data: DataField, entity: string) => void;
   fix: (data: DataField) => void;
   automate: (data: DataField) => void;
   condition: (part: Part, show: string, slots: readonly string[]) => void;
+  retitle: (key: 'title' | 'icon', value: string) => void;
 }
 
 export interface StageInput {
   root: Part | Group;
   selected: string;
+  name: string;
   template: Template;
   templates: Templates;
   values: Readonly<Record<string, Value>>;
   data: readonly DataField[];
-  detachable: boolean;
+  editableHere: boolean;
   chain: readonly Part[];
   rows: readonly SimpleRow[];
   advanced: TemplateResult | typeof nothing;
   hass: HomeAssistant | undefined;
 }
 
-const LOOK_LABELS: Record<string, string> = {
-  name: 'Name',
-  title: 'Title',
-  icon: 'Icon',
-  color: 'Colour',
-};
+type Said = PanelWords['stage'];
+type Keys = Readonly<Record<string, string>>;
 
 const SHOWN = 5;
 
-const PLACES: Record<string, string> = {
-  state: 'the line under the name',
-  chips: 'the chips',
-  controls: 'the buttons',
-  rows: 'the rows',
-  cards: 'the pop-up',
-  popups: 'the pop-ups',
-  items: 'the items',
+const lookup = (table: object, name: string): string | undefined => {
+  const found: unknown = Object.hasOwn(table, name) ? Reflect.get(table, name) : undefined;
+  return typeof found === 'string' ? found : undefined;
 };
 
-const STATE_WORDS: Record<string, string> = {
-  Text: 'A text',
-  Attribute: 'An attribute',
-  Minutes: 'A duration',
-  'Relative time': 'A relative time',
-  Serial: 'A serial number',
-  Name: 'A name',
-  Value: 'A value',
-};
-
-const placeOf = (group: Group): string =>
-  PLACES[group.label.toLowerCase()] ?? group.label.toLowerCase();
+const placeOf = (group: Group, said: Said): string =>
+  lookup(said.places, group.key) ?? group.label.toLowerCase();
 
 const key = (part: Part): string => part.path.join('/');
 
-export function titleOf(part: Part): string {
+export function titleOf(part: Part, template: Template, keys: Keys = EDITORS_EN.keys): string {
   const last = part.path.at(-1) ?? '';
   if (last.startsWith('#')) {
-    return sentence(last.slice(1));
+    const id = last.slice(1);
+    const slots = template.slots ?? {};
+    return Object.hasOwn(slots, id) ? slotLabel(id, slots[id]) : sentence(id);
   }
-  return last === 'card' ? part.label : sentence(last.replace(/\?$/, ''));
+  const name = last.replace(/\?$/, '');
+  return last === 'card' ? part.label : (lookup(keys, name) ?? sentence(name));
 }
 
-function kindOf(parent: Part | undefined, group: Group | undefined): string | undefined {
+function kindOf(
+  parent: Part | undefined,
+  group: Group | undefined,
+  input: StageInput,
+  said: Said,
+): string | undefined {
   if (parent === undefined || group === undefined) {
     return undefined;
   }
-  const single = group.label.replace(/ies$/, 'y').replace(/s$/, '');
-  const article = /^[aeiou]/i.test(single) ? 'An' : 'A';
-  return `${article} ${single} of the ${titleOf(parent).toLowerCase()}`;
+  return said.partIn(group.label, titleOf(parent, input.template, keysOf(input)));
+}
+
+function keysOf(input: StageInput): Keys {
+  return editorWordsFor(input.hass?.locale.language).keys;
+}
+
+function markOf(starter: Starter): string {
+  const type = starter.value['type'];
+  return typeof type === 'string' ? type : (Object.keys(starter.value)[0] ?? 'value');
 }
 
 function describe(template: string | undefined, templates: Templates): string | undefined {
@@ -101,16 +104,16 @@ function describe(template: string | undefined, templates: Templates): string | 
   return first === undefined || first === '' ? undefined : first;
 }
 
-const STATE_ORDER = ['Value', 'Attribute', 'Text', 'Name', 'Minutes', 'Serial'];
+const STATE_ORDER = ['value', 'attribute', 'text', 'name', 'minutes', 'serial'];
 
-function ordered(group: Group): Starter[] {
-  const starters = startersOf(group);
-  return group.label === 'state'
-    ? starters.toSorted((a, b) => STATE_ORDER.indexOf(a.label) - STATE_ORDER.indexOf(b.label))
+function ordered(group: Group, wording: Wording): Starter[] {
+  const starters = startersOf(group, wording);
+  return group.key === 'state'
+    ? starters.toSorted((a, b) => STATE_ORDER.indexOf(markOf(a)) - STATE_ORDER.indexOf(markOf(b)))
     : starters;
 }
 
-function chip(group: Group, starter: Starter, actions: StageActions): TemplateResult {
+function chip(group: Group, starter: Starter, actions: StageActions, said: Said): TemplateResult {
   return html`<button
     type="button"
     class="chip"
@@ -118,30 +121,38 @@ function chip(group: Group, starter: Starter, actions: StageActions): TemplateRe
       actions.add(group, starter);
     }}
   >
-    ${icon('mdi:plus')}${group.label === 'state' ? (STATE_WORDS[starter.label] ?? starter.label) : starter.label}
+    ${icon('mdi:plus')}${group.key === 'state' ? (lookup(said.states, markOf(starter)) ?? starter.label) : starter.label}
   </button>`;
 }
 
-function adds(groups: readonly Group[], actions: StageActions): TemplateResult | typeof nothing {
+function adds(
+  groups: readonly Group[],
+  input: StageInput,
+  actions: StageActions,
+  said: Said,
+): TemplateResult | typeof nothing {
   const lists = groups.filter((group) => group.list);
   if (lists.length === 0) {
     return nothing;
   }
+  const wording = wordingFor(input.hass?.locale.language);
   return html`<section class="stage-section stage-adds">
-    <h3>Add</h3>
+    <h3>${said.add}</h3>
     ${lists.map((group) => {
-      const starters = ordered(group);
+      const starters = ordered(group, wording);
       const first = starters.slice(0, SHOWN);
       const rest = starters.slice(SHOWN);
       return html`<div class="stage-add">
-        <span class="stage-add-label">To ${placeOf(group)}</span>
-        ${first.map((starter) => chip(group, starter, actions))}
+        <span class="stage-add-label">${said.to(placeOf(group, said))}</span>
+        ${first.map((starter) => chip(group, starter, actions, said))}
         ${
           rest.length === 0
             ? nothing
             : html`<details class="stage-rest">
-                <summary class="chip">More</summary>
-                <div class="stage-add">${rest.map((starter) => chip(group, starter, actions))}</div>
+                <summary class="chip">${said.more}</summary>
+                <div class="stage-add">
+                  ${rest.map((starter) => chip(group, starter, actions, said))}
+                </div>
               </details>`
         }
       </div>`;
@@ -149,8 +160,14 @@ function adds(groups: readonly Group[], actions: StageActions): TemplateResult |
   </section>`;
 }
 
-function crumbs(chain: readonly Part[], actions: StageActions): TemplateResult {
-  return html`<nav class="stage-crumbs" aria-label="Where you are">
+function crumbs(
+  chain: readonly Part[],
+  input: StageInput,
+  actions: StageActions,
+  said: Said,
+): TemplateResult {
+  const keys = keysOf(input);
+  return html`<nav class="stage-crumbs" aria-label=${said.whereYouAre}>
     ${chain.map(
       (part, index) =>
         html`${index === 0 ? nothing : icon('mdi:chevron-right')}<button
@@ -160,13 +177,18 @@ function crumbs(chain: readonly Part[], actions: StageActions): TemplateResult {
               actions.select(key(part));
             }}
           >
-            ${titleOf(part)}
+            ${titleOf(part, input.template, keys)}
           </button>`,
     )}
   </nav>`;
 }
 
-export function groupOfPart(chain: readonly Part[]): { group: Group; index: number } | undefined {
+interface Place {
+  group: Group;
+  index: number;
+}
+
+export function groupOfPart(chain: readonly Part[]): Place | undefined {
   const part = chain.at(-1);
   const parent = chain.at(-2);
   if (part === undefined || parent === undefined) {
@@ -186,20 +208,26 @@ function nameOf(entity: string, hass: HomeAssistant | undefined): string {
   return typeof name === 'string' ? name : entity;
 }
 
-function drawData(data: DataField, input: StageInput, actions: StageActions): TemplateResult {
+function drawData(
+  data: DataField,
+  input: StageInput,
+  actions: StageActions,
+  said: Said,
+): TemplateResult {
   const { template, values, hass } = input;
   const shown = resolvedEntity(values, data);
   const bound = data.slot !== undefined;
   const itself = bound && data.slot !== undefined && findsItself(template, data.slot);
   const note = !bound
-    ? 'The same one everywhere.'
+    ? said.same
     : itself
       ? shown === undefined
-        ? 'Picked for each room by itself. None is found here.'
-        : `Picked for each room by itself. Here: ${nameOf(shown, hass)}.`
-      : 'Chosen where the card is used. The one above is only for this preview.';
+        ? said.noneHere
+        : said.here(nameOf(shown, hass))
+      : said.whereUsed;
+  const label = bound ? data.label : (lookup(keysOf(input), data.key) ?? data.label);
   return html`<div class="stage-field">
-    ${data.label === 'What it shows' ? nothing : html`<span class="stage-field-label">${data.label}</span>`}
+    ${!bound && data.key === 'entity' ? nothing : html`<span class="stage-field-label">${label}</span>`}
     ${simpleForm({
       hass,
       schema: [{ name: 'entity', selector: { entity: {} } }],
@@ -224,7 +252,7 @@ function drawData(data: DataField, input: StageInput, actions: StageActions): Te
           }
         }}
       >
-        Always this one
+        ${said.always}
       </button>
       <button
         type="button"
@@ -237,7 +265,7 @@ function drawData(data: DataField, input: StageInput, actions: StageActions): Te
           }
         }}
       >
-        Changes with the room
+        ${said.withRoom}
       </button>
     </div>
   </div>`;
@@ -247,6 +275,7 @@ function drawWhen(
   part: Part,
   input: StageInput,
   actions: StageActions,
+  said: Said,
 ): TemplateResult | typeof nothing {
   const paths = slotPaths(input.template.slots);
   if (paths.length === 0 || part.kind === 'card') {
@@ -255,13 +284,13 @@ function drawWhen(
   const { show, slots } = conditionOf(part.value);
   const first = paths[0] ?? '';
   return html`<section class="stage-section">
-    <h3>When it shows</h3>
+    <h3>${said.when}</h3>
     ${pick({
-      label: 'Show',
+      label: said.show,
       options: [
-        { value: 'always', label: 'Always' },
-        { value: 'if', label: 'Only when found' },
-        { value: 'unless', label: 'Only when not found' },
+        { value: 'always', label: said.shows.always },
+        { value: 'if', label: said.shows.if },
+        { value: 'unless', label: said.shows.unless },
       ],
       value: show,
       changed: (wanted) => {
@@ -272,8 +301,12 @@ function drawWhen(
       show === 'always'
         ? nothing
         : pick({
-            label: 'Depends on',
-            options: paths.map((path) => ({ value: path, label: slotLabel(input.template, path) })),
+            label: said.dependsOn,
+            options: slotChoices(
+              input.template.slots,
+              paths,
+              panelWordsFor(input.hass?.locale.language).slots.basics,
+            ),
             value: slots[0] ?? first,
             changed: (slot) => {
               actions.condition(part, show, [slot === '' ? first : slot]);
@@ -283,201 +316,279 @@ function drawWhen(
   </section>`;
 }
 
+function drawOff(
+  hidden: SimpleRow,
+  input: StageInput,
+  actions: StageActions,
+  said: Said,
+): TemplateResult {
+  const last = (hidden.path.at(-1) ?? '').replace(/^#/, '');
+  const name = lookup(keysOf(input), last) ?? sentence(last);
+  return html`<div class="stage-panel">
+    <h2 class="stage-title">${name}</h2>
+    <p class="muted">${said.off}</p>
+    <label class="stage-switch">
+      <input
+        type="checkbox"
+        aria-label=${said.showName(name)}
+        data-path=${input.selected}
+        .checked=${false}
+        @change=${(event: Event) => {
+          actions.toggle(hidden, field(event.target, 'checked') === true);
+        }}
+      />
+      <span>${said.showAgain}</span>
+    </label>
+  </div>`;
+}
+
+function drawName(input: StageInput, actions: StageActions, said: Said): TemplateResult {
+  const retitling: SimpleActions = {
+    toggle: () => {},
+    look: (look, value) => {
+      if (look.key === 'title' || look.key === 'icon') {
+        actions.retitle(look.key, value);
+      }
+    },
+  };
+  return html`<section class="stage-section">
+    <h3>${said.itsName}</h3>
+    <div class="stage-looks">
+      ${(['title', 'icon'] as const).map(
+        (look) =>
+          html`<label class="stage-look"
+            ><span>${said.looks[look]}</span>${drawLook(
+              { path: [look], key: look, value: input.template[look] ?? '' },
+              said.template,
+              retitling,
+              input.hass,
+            )}</label
+          >`,
+      )}
+    </div>
+    <p class="muted">${said.titled} <code class="code-name">${input.name}</code>.</p>
+  </section>`;
+}
+
+function drawStart(input: StageInput, actions: StageActions, said: Said): TemplateResult {
+  const root = input.root;
+  const top = 'groups' in root ? root.groups : [root];
+  return html`<div class="stage-panel">
+    <p class="stage-hint">
+      ${icon('mdi:cursor-default-click-outline')}
+      <span>${said.hint}</span>
+    </p>
+    ${adds(top, input, actions, said)} ${drawName(input, actions, said)}
+  </div>`;
+}
+
+function drawHead(
+  part: Part,
+  input: StageInput,
+  row: SimpleRow | undefined,
+  about: string | undefined,
+  actions: StageActions,
+  said: Said,
+): TemplateResult {
+  const title = titleOf(part, input.template, keysOf(input));
+  const kind =
+    kindOf(input.chain.at(-2), groupOfPart(input.chain)?.group, input, said) ?? part.label;
+  return html`<div class="stage-head">
+    <div>
+      <h2 class="stage-title">${title}</h2>
+      ${kind === title ? nothing : html`<p class="muted">${kind}</p>`}
+      ${about === undefined ? nothing : html`<p class="muted">${about}</p>`}
+    </div>
+    ${
+      row?.switchable === true
+        ? html`<label class="stage-switch">
+            <input
+              type="checkbox"
+              aria-label=${said.showName(title)}
+              data-path=${key(part)}
+              .checked=${row.on}
+              @change=${(event: Event) => {
+                actions.toggle(row, field(event.target, 'checked') === true);
+              }}
+            />
+            <span>${said.shown}</span>
+          </label>`
+        : nothing
+    }
+  </div>`;
+}
+
+function drawShows(
+  input: StageInput,
+  actions: StageActions,
+  said: Said,
+): TemplateResult | typeof nothing {
+  if (input.data.length === 0) {
+    return nothing;
+  }
+  return html`<section class="stage-section">
+    <h3>${said.what}</h3>
+    ${input.data.map((data) => drawData(data, input, actions, said))}
+  </section>`;
+}
+
+function drawLooks(
+  row: SimpleRow | undefined,
+  actions: StageActions,
+  hass: HomeAssistant | undefined,
+  said: Said,
+): TemplateResult | typeof nothing {
+  if (row === undefined || row.looks.length === 0) {
+    return nothing;
+  }
+  return html`<section class="stage-section">
+    <h3>${said.look}</h3>
+    <div class="stage-looks">
+      ${row.looks.map(
+        (look) =>
+          html`<label class="stage-look"
+            ><span>${lookup(said.looks, look.key) ?? look.key}</span>${drawLook(
+              look,
+              row.label,
+              actions,
+              hass,
+            )}</label
+          >`,
+      )}
+    </div>
+  </section>`;
+}
+
+function drawOrder(
+  part: Part,
+  place: Place | undefined,
+  actions: StageActions,
+  said: Said,
+): TemplateResult | typeof nothing {
+  if (place === undefined) {
+    return nothing;
+  }
+  return html`<section class="stage-section">
+    <h3>${said.order}</h3>
+    <div class="stage-moves">
+      <button
+        type="button"
+        class="chip"
+        ?disabled=${place.index === 0}
+        @click=${() => {
+          actions.move(place.group, place.index, place.index - 1);
+        }}
+      >
+        ${icon('mdi:arrow-up')}${said.earlier}
+      </button>
+      <button
+        type="button"
+        class="chip"
+        ?disabled=${place.index === place.group.parts.length - 1}
+        @click=${() => {
+          actions.move(place.group, place.index, place.index + 1);
+        }}
+      >
+        ${icon('mdi:arrow-down')}${said.later}
+      </button>
+      <button
+        type="button"
+        class="chip"
+        @click=${() => {
+          actions.duplicate(part);
+        }}
+      >
+        ${icon('mdi:content-copy')}${said.copy}
+      </button>
+      <button
+        type="button"
+        class="chip danger"
+        @click=${() => {
+          actions.remove(part);
+        }}
+      >
+        ${icon('mdi:delete-outline')}${said.delete}
+      </button>
+    </div>
+  </section>`;
+}
+
+function drawShared(
+  part: Part,
+  used: string | undefined,
+  input: StageInput,
+  actions: StageActions,
+  said: Said,
+): TemplateResult | typeof nothing {
+  if (used === undefined || !Object.hasOwn(input.templates, used)) {
+    return nothing;
+  }
+  return html`<section class="stage-section">
+    <h3>${said.shared}</h3>
+    <p class="muted">${said.sharedPiece(templateTitle(input.templates[used], used))}</p>
+    <div class="stage-moves">
+      ${
+        input.editableHere
+          ? html`<button
+              type="button"
+              class="chip"
+              @click=${() => {
+                actions.editHere(part);
+              }}
+            >
+              ${icon('mdi:pencil-outline')}${said.editHere}
+            </button>`
+          : nothing
+      }
+      <button
+        type="button"
+        class="chip"
+        @click=${() => {
+          actions.open(used);
+        }}
+      >
+        ${icon('mdi:open-in-new')}${said.editAll}
+      </button>
+    </div>
+    ${input.editableHere ? html`<p class="muted">${said.editAbout}</p>` : nothing}
+  </section>`;
+}
+
+function drawMore(
+  advanced: TemplateResult | typeof nothing,
+  said: Said,
+): TemplateResult | typeof nothing {
+  if (advanced === nothing) {
+    return nothing;
+  }
+  return html`<details class="stage-more">
+    <summary>${said.settings}</summary>
+    ${advanced}
+  </details>`;
+}
+
 export function drawStagePanel(input: StageInput, actions: StageActions): TemplateResult {
-  const { chain, rows, hass } = input;
+  const { chain, rows } = input;
+  const said = panelWordsFor(input.hass?.locale.language).stage;
   const part = chain.at(-1);
   const hidden =
     part === undefined ? rows.find((each) => each.path.join('/') === input.selected) : undefined;
   if (hidden !== undefined && !hidden.on) {
-    const name = sentence((hidden.path.at(-1) ?? '').replace(/^#/, ''));
-    return html`<div class="stage-panel">
-      <h2 class="stage-title">${name}</h2>
-      <p class="muted">This part is switched off, so it is not on the card.</p>
-      <label class="stage-switch">
-        <input
-          type="checkbox"
-          aria-label=${`Show ${name}`}
-          data-path=${input.selected}
-          .checked=${false}
-          @change=${(event: Event) => {
-            actions.toggle(hidden, field(event.target, 'checked') === true);
-          }}
-        />
-        <span>Show it again</span>
-      </label>
-    </div>`;
+    return drawOff(hidden, input, actions, said);
   }
   if (part === undefined) {
-    const top = 'groups' in input.root ? input.root.groups : [input.root];
-    return html`<div class="stage-panel">
-      <p class="stage-hint">
-        ${icon('mdi:cursor-default-click-outline')}
-        <span>Click anything on the card to change it, or add something below.</span>
-      </p>
-      ${adds(top, actions)}
-    </div>`;
+    return drawStart(input, actions, said);
   }
   const row = rows.find((each) => each.path.join('/') === key(part));
-  const place = groupOfPart(chain);
   const named = part.value['template'];
   const used = part.kind === 'fragment' && typeof named === 'string' ? named : undefined;
-  const said = describe(used, input.templates);
   return html`<div class="stage-panel">
-    ${chain.length > 1 ? crumbs(chain, actions) : nothing}
-    <div class="stage-head">
-      <div>
-        <h2 class="stage-title">${titleOf(part)}</h2>
-        ${
-          (kindOf(chain.at(-2), place?.group) ?? part.label) === titleOf(part)
-            ? nothing
-            : html`<p class="muted">${kindOf(chain.at(-2), place?.group) ?? part.label}</p>`
-        }
-        ${said === undefined ? nothing : html`<p class="muted">${said}</p>`}
-      </div>
-      ${
-        row?.switchable === true
-          ? html`<label class="stage-switch">
-              <input
-                type="checkbox"
-                aria-label=${`Show ${titleOf(part)}`}
-                data-path=${key(part)}
-                .checked=${row.on}
-                @change=${(event: Event) => {
-                  actions.toggle(row, field(event.target, 'checked') === true);
-                }}
-              />
-              <span>Shown</span>
-            </label>`
-          : nothing
-      }
-    </div>
-    ${
-      input.data.length === 0
-        ? nothing
-        : html`<section class="stage-section">
-            <h3>What it shows</h3>
-            ${input.data.map((data) => drawData(data, input, actions))}
-          </section>`
-    }
-    ${
-      row === undefined || row.looks.length === 0
-        ? nothing
-        : html`<section class="stage-section">
-            <h3>How it looks</h3>
-            <div class="stage-looks">
-              ${row.looks.map(
-                (look) =>
-                  html`<label class="stage-look"
-                    ><span>${LOOK_LABELS[look.key] ?? look.key}</span>${drawLook(
-                      look,
-                      row.label,
-                      actions,
-                      hass,
-                    )}</label
-                  >`,
-              )}
-            </div>
-          </section>`
-    }
-    ${drawWhen(part, input, actions)}
-    ${
-      place === undefined
-        ? nothing
-        : html`<section class="stage-section">
-            <h3>Order</h3>
-            <div class="stage-moves">
-              <button
-                type="button"
-                class="chip"
-                ?disabled=${place.index === 0}
-                @click=${() => {
-                  actions.move(place.group, place.index, place.index - 1);
-                }}
-              >
-                ${icon('mdi:arrow-up')}Earlier
-              </button>
-              <button
-                type="button"
-                class="chip"
-                ?disabled=${place.index === place.group.parts.length - 1}
-                @click=${() => {
-                  actions.move(place.group, place.index, place.index + 1);
-                }}
-              >
-                ${icon('mdi:arrow-down')}Later
-              </button>
-              <button
-                type="button"
-                class="chip"
-                @click=${() => {
-                  actions.duplicate(part);
-                }}
-              >
-                ${icon('mdi:content-copy')}Copy
-              </button>
-              <button
-                type="button"
-                class="chip danger"
-                @click=${() => {
-                  actions.remove(part);
-                }}
-              >
-                ${icon('mdi:delete-outline')}Delete
-              </button>
-            </div>
-          </section>`
-    }
-    ${
-      used !== undefined && Object.hasOwn(input.templates, used)
-        ? html`<section class="stage-section">
-            <h3>Shared design</h3>
-            <p class="muted">
-              This is a shared piece (${sentence(used).toLowerCase()}) that other cards use too.
-            </p>
-            <div class="stage-moves">
-              ${
-                input.detachable
-                  ? html`<button
-                      type="button"
-                      class="chip"
-                      @click=${() => {
-                        actions.detach(part);
-                      }}
-                    >
-                      ${icon('mdi:pencil-outline')}Edit it here
-                    </button>`
-                  : nothing
-              }
-              <button
-                type="button"
-                class="chip"
-                @click=${() => {
-                  actions.open(used);
-                }}
-              >
-                ${icon('mdi:open-in-new')}Edit it for everyone
-              </button>
-            </div>
-            ${
-              input.detachable
-                ? html`<p class="muted">
-                    Editing it here makes a copy for this card only, which stops following the
-                    shared piece. Editing it for everyone changes every card that uses it.
-                  </p>`
-                : nothing
-            }
-          </section>`
-        : nothing
-    }
-    ${adds(part.groups, actions)}
-    ${
-      input.advanced === nothing
-        ? nothing
-        : html`<details class="stage-more">
-            <summary>More settings</summary>
-            ${input.advanced}
-          </details>`
-    }
+    ${chain.length > 1 ? crumbs(chain, input, actions, said) : nothing}
+    ${drawHead(part, input, row, describe(used, input.templates), actions, said)}
+    ${drawShows(input, actions, said)} ${drawLooks(row, actions, input.hass, said)}
+    ${drawWhen(part, input, actions, said)} ${drawOrder(part, groupOfPart(chain), actions, said)}
+    ${drawShared(part, used, input, actions, said)} ${adds(part.groups, input, actions, said)}
+    ${drawMore(input.advanced, said)}
   </div>`;
 }
 
@@ -542,6 +653,9 @@ export const STAGE_STYLE = css`
   }
   .stage-crumbs ha-icon {
     --mdc-icon-size: 14px;
+  }
+  .stage-crumbs ha-icon:dir(rtl) {
+    transform: scaleX(-1);
   }
   .crumb {
     all: unset;

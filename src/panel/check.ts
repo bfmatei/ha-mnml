@@ -1,4 +1,4 @@
-import { isMapping } from '../contract/templates.ts';
+import { ITEM_KEYS, isMapping, lookProblem, plainKey, slotLabel } from '../contract/templates.ts';
 import type {
   SlotSpec,
   Template,
@@ -6,11 +6,15 @@ import type {
   Value,
   WrittenTemplate,
 } from '../contract/templates.ts';
-import { PATH, fitsKind, toValue } from '../templates/expand.ts';
+import { PATH, WORDS, fitsKind, toValue } from '../templates/expand.ts';
+import { PANEL_EN } from '../words/panel/en.ts';
+import type { PanelWords } from '../words/panel/en.ts';
 
 import { shapedOf } from './data.ts';
 import { messageOf } from './message.ts';
 import { tryDraft } from './preview.ts';
+
+type Said = PanelWords['check'];
 
 function mnmlCards(value: Value, found: Record<string, Value>[] = []): Record<string, Value>[] {
   if (Array.isArray(value)) {
@@ -29,13 +33,18 @@ function mnmlCards(value: Value, found: Record<string, Value>[] = []): Record<st
   return found;
 }
 
-function wrongDefault(slots: Readonly<Record<string, SlotSpec>>, prefix = ''): string | undefined {
+function wrongDefault(
+  slots: Readonly<Record<string, SlotSpec>>,
+  said: Said,
+  prefix = '',
+): string | undefined {
   for (const [slot, spec] of Object.entries(slots)) {
+    const label = `${prefix}${slotLabel(slot, spec)}`;
     if (spec.default !== undefined && !fitsKind(spec.kind, spec.default)) {
-      return `the default of ${prefix}${slot} is not of kind ${spec.kind}`;
+      return said.wrongDefault(label, said.kinds[spec.kind]);
     }
     const inner =
-      spec.fields === undefined ? undefined : wrongDefault(spec.fields, `${prefix}${slot}.`);
+      spec.fields === undefined ? undefined : wrongDefault(spec.fields, said, `${label}: `);
     if (inner !== undefined) {
       return inner;
     }
@@ -50,11 +59,17 @@ const names = (rule: Value | undefined): string[] =>
     typeof each === 'string' ? [each.split('.')[0] ?? each] : [],
   );
 
-function unknownRead(value: Value, where: string, known: ReadonlySet<string>): string | undefined {
+function unknownRead(
+  value: Value,
+  where: string,
+  known: ReadonlySet<string>,
+  said: Said,
+): string | undefined {
   if (typeof value === 'string') {
     for (const match of value.matchAll(READ)) {
-      if (!known.has(match[1]?.split('.')[0] ?? '')) {
-        return `${where}: ${match[0]} reads a slot the template does not declare`;
+      const head = match[1]?.split('.')[0] ?? '';
+      if (head !== WORDS && !known.has(head)) {
+        return said.undeclared(where, match[0]);
       }
     }
     return undefined;
@@ -65,10 +80,10 @@ function unknownRead(value: Value, where: string, known: ReadonlySet<string>): s
     );
     const twice = ids.find((id, index) => ids.indexOf(id) !== index);
     if (twice !== undefined) {
-      return `${where}: two parts share the id ${twice}`;
+      return said.sharedId(where, twice);
     }
     for (const [index, item] of value.entries()) {
-      const found = unknownRead(item, `${where}[${index}]`, known);
+      const found = unknownRead(item, `${where}[${index}]`, known, said);
       if (found !== undefined) {
         return found;
       }
@@ -86,17 +101,13 @@ function unknownRead(value: Value, where: string, known: ReadonlySet<string>): s
     ...names(value['each']).filter((slot) => !known.has(slot)),
   ][0];
   if (gate !== undefined) {
-    return `${where}: ${gate} is not a slot the template declares`;
+    return said.notSlot(where, gate);
   }
   for (const [key, entry] of Object.entries(value)) {
-    if (key === 'if' || key === 'unless' || key === 'each' || key === 'as' || key === 'id') {
+    if (ITEM_KEYS.has(key)) {
       continue;
     }
-    const found = unknownRead(
-      entry,
-      `${where}.${key.endsWith('?') ? key.slice(0, -1) : key}`,
-      inner,
-    );
+    const found = unknownRead(entry, `${where}.${plainKey(key)}`, inner, said);
     if (found !== undefined) {
       return found;
     }
@@ -108,6 +119,7 @@ export function problemOf(
   templates: Templates,
   name: string,
   written: WrittenTemplate,
+  said: Said = PANEL_EN.check,
 ): string | undefined {
   let draft: Template;
   try {
@@ -115,13 +127,18 @@ export function problemOf(
   } catch (error) {
     return messageOf(error);
   }
-  const fallback = wrongDefault(draft.slots ?? {});
+  const look = lookProblem(draft);
+  if (look !== undefined) {
+    return `${look.charAt(0).toUpperCase()}${look.slice(1)}`;
+  }
+  const fallback = wrongDefault(draft.slots ?? {}, said);
   if (fallback !== undefined) {
     return fallback;
   }
   const known = new Set(Object.keys(draft.slots ?? {}));
   const unread =
-    unknownRead(draft.card, 'card', known) ?? unknownRead(draft.popups ?? [], 'popups', known);
+    unknownRead(draft.card, 'card', known, said) ??
+    unknownRead(draft.popups ?? [], 'popups', known, said);
   if (unread !== undefined) {
     return unread;
   }
@@ -129,7 +146,7 @@ export function problemOf(
   try {
     made = tryDraft(templates, name, draft, { slots: draft.example ?? {} }, undefined);
   } catch (error) {
-    return `With the example: ${messageOf(error)}`;
+    return said.withExample(messageOf(error));
   }
   for (const config of mnmlCards([made.card, toValue(made.popups)])) {
     const type = config['type'];

@@ -1,19 +1,21 @@
-import { SECTION_ORDER } from '../contract/builder.ts';
-import type { Plan, SectionKey, SectionLook } from '../contract/builder.ts';
-import { isMapping, isStorable, isTemplate } from '../contract/templates.ts';
+import { PLAN_ORDER } from '../contract/plan.ts';
+import type { Plan, PlanSection, SectionLook } from '../contract/plan.ts';
+import { isMapping, isStorable, isTemplate, sameValue } from '../contract/templates.ts';
 import type { Templates, WrittenTemplate } from '../contract/templates.ts';
 import { toYaml } from '../contract/yaml.ts';
 import { field } from '../ha/field.ts';
-import { changesOf, nodeHash } from '../templates/changes.ts';
+import { changesOf } from '../templates/changes.ts';
 import type { Change } from '../templates/changes.ts';
 import { toValue } from '../templates/expand.ts';
+import { PANEL_EN } from '../words/panel/en.ts';
+import type { PanelWords } from '../words/panel/en.ts';
 
 import type { Built, Call } from './building.ts';
 import { shapedOf } from './data.ts';
 import type { Dashboard, Entry, Kept } from './data.ts';
 import { messageOf } from './message.ts';
 import { adoptIds } from './tree.ts';
-import { NOT_A_TEMPLATE, readYaml } from './yaml.ts';
+import { readYaml } from './yaml.ts';
 
 type Fate = 'changes' | 'own' | 'replaces' | 'same';
 
@@ -30,20 +32,21 @@ export type Choice = 'replace' | 'both' | 'skip';
 export function templatesIn(
   text: string,
   shipped: ReadonlySet<string> = new Set(),
+  words: PanelWords = PANEL_EN,
 ): Record<string, WrittenTemplate> {
-  const read = readYaml(text);
+  const read = readYaml(text, words);
   const inner =
     isMapping(read) && isMapping(read['mnml_templates']) ? read['mnml_templates'] : read;
   if (!isMapping(inner)) {
-    throw new Error('the file holds no mapping of names to templates');
+    throw new Error(words.transfer.noMapping);
   }
   const found: Record<string, WrittenTemplate> = {};
   for (const [name, template] of Object.entries(inner)) {
     if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(name)) {
-      throw new Error(`${name}: a template's name is lower case letters, digits, - and _`);
+      throw new Error(words.transfer.badName(name));
     }
     if (!isStorable(template, shipped.has(name))) {
-      throw new Error(`${name}: ${NOT_A_TEMPLATE}`);
+      throw new Error(`${name}: ${words.yaml.notTemplate}`);
     }
     found[name] = template;
   }
@@ -56,9 +59,6 @@ export function resolvable(templates: Readonly<Record<string, WrittenTemplate>>)
     shapedOf(name, template);
   }
 }
-
-const same = (a: WrittenTemplate, b: WrittenTemplate): boolean =>
-  nodeHash(toValue(a)) === nodeHash(toValue(b));
 
 function adopted(
   name: string,
@@ -79,7 +79,7 @@ export function planImport(
   return Object.entries(incoming).map(([name, given]) => {
     const template = adopted(name, given, shipped, kept);
     const fate: Fate = [kept.own[name], resolved[name]].some(
-      (now) => now !== undefined && same(now, template),
+      (now) => now !== undefined && sameValue(now, template),
     )
       ? 'same'
       : kept.own[name] !== undefined
@@ -167,7 +167,7 @@ export function dashboardTemplates(
       const first = templates[name];
       if (first === undefined) {
         templates[name] = template;
-      } else if (!same(first, template)) {
+      } else if (!sameValue(first, template)) {
         differ.add(name);
       }
       from[name] = [...(from[name] ?? []), dashboard.title];
@@ -188,7 +188,7 @@ export function notKept(
       return (
         kept.own[name] === undefined &&
         kept.changes[name] === undefined &&
-        (now === undefined || !same(now, adopted(name, template, shipped, kept)))
+        (now === undefined || !sameValue(now, adopted(name, template, shipped, kept)))
       );
     }),
   );
@@ -270,9 +270,9 @@ export function renamedChanges(
 }
 
 function renamedPlan(plan: Plan, from: string, to: string): Plan | undefined {
-  const sections: Partial<Record<SectionKey, SectionLook>> = {};
+  const sections: Partial<Record<PlanSection, SectionLook>> = {};
   let count = 0;
-  for (const key of SECTION_ORDER) {
+  for (const key of PLAN_ORDER) {
     const look = plan.sections?.[key];
     if (look !== undefined) {
       count += look.template === from ? 1 : 0;
@@ -283,9 +283,18 @@ function renamedPlan(plan: Plan, from: string, to: string): Plan | undefined {
     count += choice.template === from ? 1 : 0;
     return choice.template === from ? { ...choice, template: to } : choice;
   });
+  const devices = plan.devices?.map((choice) => {
+    count += choice.template === from ? 1 : 0;
+    return choice.template === from ? { ...choice, template: to } : choice;
+  });
   return count === 0
     ? undefined
-    : { ...plan, system, ...(plan.sections === undefined ? {} : { sections }) };
+    : {
+        ...plan,
+        system,
+        ...(devices === undefined ? {} : { devices }),
+        ...(plan.sections === undefined ? {} : { sections }),
+      };
 }
 
 export interface Renamed {
@@ -335,6 +344,7 @@ export async function renamePlans(
   built: readonly Built[],
   from: string,
   to: string,
+  words: PanelWords = PANEL_EN,
 ): Promise<string[]> {
   const failed = await Promise.all(
     built.map(async (each): Promise<string[]> => {
@@ -357,7 +367,7 @@ export async function renamePlans(
         });
         return [];
       } catch (error) {
-        return [`the plan of ${each.plan.title}: ${messageOf(error)}`];
+        return [words.transfer.planOf(each.plan.title, messageOf(error))];
       }
     }),
   );

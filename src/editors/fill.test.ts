@@ -2,20 +2,12 @@ import assert from 'node:assert/strict';
 
 import { test } from 'vitest';
 
+import { slotLabel } from '../contract/templates.ts';
 import type { SlotSpec, Value } from '../contract/templates.ts';
 import { overridesOf } from '../templates/overrides.ts';
+import { singular } from '../words/panel/editors-en.ts';
 
-import {
-  defaultArea,
-  deviceIn,
-  groupsOf,
-  homeWide,
-  noteOf,
-  singular,
-  slotLabel,
-  sourceOf,
-  valuesOf,
-} from './fill.ts';
+import { defaultArea, deviceIn, groupsOf, homeWide, noteOf, sourceOf, valuesOf } from './fill.ts';
 
 const ROOM: Record<string, SlotSpec> = {
   key: { kind: 'text', required: true, group: 'Basics' },
@@ -38,6 +30,14 @@ test('the panels follow the groups in the order they first appear, with an icon 
   ]);
 });
 
+test("the simple slots' panel takes its name from the words, and keeps its icon", () => {
+  assert.deepEqual(groupsOf(ROOM, 'De bază')[0], {
+    name: 'De bază',
+    icon: 'mdi:card-text-outline',
+    slots: ['key', 'name'],
+  });
+});
+
 test('slots without a group: the simple ones in Basics, each object in a panel of its own', () => {
   assert.deepEqual(
     groupsOf({
@@ -53,8 +53,8 @@ test('slots without a group: the simple ones in Basics, each object in a panel o
 });
 
 test('a label wins over the name, and a list item is named in the singular', () => {
-  assert.equal(slotLabel('ac', { kind: 'object', label: 'Air conditioning' }), 'Air conditioning');
-  assert.equal(slotLabel('active_scene', { kind: 'entity' }), 'Active scene');
+  assert.equal(slotLabel('ac', { label: 'Air conditioning' }), 'Air conditioning');
+  assert.equal(slotLabel('active_scene', undefined), 'Active scene');
   assert.equal(singular('Speakers'), 'Speaker');
   assert.equal(singular('Batteries'), 'Battery');
   assert.equal(singular('Wi-Fi'), 'Wi-Fi');
@@ -76,8 +76,22 @@ test('the whole home is offered only to a template whose rules look there', () =
 
 test('the source is read from the card', () => {
   assert.equal(sourceOf({ template: 'room', area: 'living' }), 'area');
+  assert.equal(sourceOf({ template: 'vacuum-card', device: 'robo' }), 'device');
+  assert.equal(sourceOf({ template: 'vacuum-card', device: 'robo', area: 'hall' }), 'device');
   assert.equal(sourceOf({ template: 'room', slots: {} }), 'yourself');
   assert.equal(sourceOf({ template: 'room' }), 'home');
+});
+
+test('a card on a device keeps what it finds there, with your changes as overrides, and says so', () => {
+  const found = { key: 'roborock_s8', vacuum: { entity: 'vacuum.robo' } };
+  assert.deepEqual(valuesOf('device', found, { key: 'robot' }), { ...found, key: 'robot' });
+  const place = 'Roborock S8 in Living';
+  assert.equal(noteOf('device', 'vacuum', found, {}, place), 'Found: Roborock S8 in Living');
+  assert.equal(noteOf('device', 'key', found, { key: 'robot' }, place), 'Set by you');
+  assert.equal(
+    noteOf('device', 'battery', found, {}, place),
+    'Nothing found on Roborock S8 in Living',
+  );
 });
 
 const AREAS = {

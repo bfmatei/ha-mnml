@@ -5,17 +5,18 @@ import { styleMap } from 'lit/directives/style-map.js';
 
 import type { Control, MediaCard } from '../contract/cards.ts';
 import type { MediaPlayerId } from '../contract/entities.ts';
+import { CARD_STRUCTURES } from '../contract/structure.ts';
+import type { Structure } from '../contract/structure.ts';
 import { numberAttribute, stateOf, stringAttribute } from '../ha/hass.ts';
 import type { HassEntity, HomeAssistant } from '../ha/hass.ts';
 import { entityName } from '../ha/names.ts';
 import { stateIcon } from '../ha/templates.ts';
+import { wordsFor } from '../words/words.ts';
 
-import { MnmlCard, requireString } from './base.ts';
-import type { KeySchema } from './keys.ts';
+import { MnmlCard } from './base.ts';
 import { renderControls } from './parts/controls.ts';
 import type { ControlContext } from './parts/controls.ts';
 import { ITEM_STYLE, linkTo } from './parts/item.ts';
-import { MEDIA_CARD } from './schemas.ts';
 import { BASE_STYLE } from './styles.ts';
 
 const MEDIA_STYLE = css`
@@ -27,6 +28,7 @@ const MEDIA_STYLE = css`
     display: flex;
     align-items: center;
     flex: none;
+    direction: ltr;
   }
   @media (max-width: 480px) {
     .phone-hidden {
@@ -65,6 +67,7 @@ function mediaLine(hass: HomeAssistant, stateObj: HassEntity): string {
 
 function lanes(entity: MediaPlayerId, stateObj: HassEntity, ctx: ControlContext): TemplateResult {
   const playing = stateObj.state === 'playing';
+  const words = wordsFor(ctx.hass.locale.language).media;
   const drawn: (TemplateResult | undefined)[] = [];
   const append = (controls: Control[], phoneHidden: boolean): void => {
     drawn.push(renderControls(controls, ctx, phoneHidden ? 'lane phone-hidden' : 'lane'));
@@ -76,7 +79,7 @@ function lanes(entity: MediaPlayerId, stateObj: HassEntity, ctx: ControlContext)
           type: 'service',
           entity,
           service: 'media_player.media_previous_track',
-          name: 'Previous',
+          name: words.previous,
           icon: 'mdi:skip-previous',
         },
       ],
@@ -90,7 +93,7 @@ function lanes(entity: MediaPlayerId, stateObj: HassEntity, ctx: ControlContext)
           type: 'service',
           entity,
           service: 'media_player.media_play_pause',
-          name: playing ? 'Pause' : 'Play',
+          name: playing ? words.pause : words.play,
           icon: playing ? 'mdi:pause' : 'mdi:play',
           primary: true,
         },
@@ -105,7 +108,7 @@ function lanes(entity: MediaPlayerId, stateObj: HassEntity, ctx: ControlContext)
           type: 'service',
           entity,
           service: 'media_player.media_next_track',
-          name: 'Next',
+          name: words.next,
           icon: 'mdi:skip-next',
         },
       ],
@@ -118,7 +121,7 @@ function lanes(entity: MediaPlayerId, stateObj: HassEntity, ctx: ControlContext)
       type: 'slider',
       entity,
       slider: 'volume',
-      name: 'Volume',
+      name: words.volume,
       icon: 'mdi:volume-high',
     });
   }
@@ -138,12 +141,8 @@ function lanes(entity: MediaPlayerId, stateObj: HassEntity, ctx: ControlContext)
 export class MnmlMediaCard extends MnmlCard<MediaCard> {
   static override styles = [BASE_STYLE, ...ITEM_STYLE, MEDIA_STYLE];
 
-  protected schema(): KeySchema {
-    return MEDIA_CARD;
-  }
-
-  protected override validate(config: MediaCard): void {
-    requireString('entity', config.entity);
+  protected structure(): Structure {
+    return CARD_STRUCTURES['custom:mnml-media-card'];
   }
 
   protected draw(hass: HomeAssistant, config: MediaCard): TemplateResult {

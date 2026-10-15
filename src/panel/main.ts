@@ -3,24 +3,32 @@ import type { PropertyValues, TemplateResult } from 'lit';
 import { property, query, state } from 'lit/decorators.js';
 
 import { defaultPlan } from '../builder/plan.ts';
-import type { Plan } from '../contract/builder.ts';
+import { MnmlCardNote } from '../cards/parts/card-element.ts';
+import type { Plan } from '../contract/plan.ts';
 import type { Templates, WrittenTemplate } from '../contract/templates.ts';
 import { loadHaForm } from '../editors/ha-form.ts';
+import type { FormFailure } from '../editors/ha-form.ts';
 import { MnmlRowMenu } from '../editors/row-menu.ts';
 import { MnmlWords } from '../editors/words.ts';
+import { energyPrefs } from '../ha/energy.ts';
 import { field } from '../ha/field.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
-import { registriesOf } from '../ha/registries.ts';
+import { registriesOf } from '../ha/snapshot.ts';
 import { icon } from '../ha/templates.ts';
 import { SHIPPED_TEMPLATES } from '../store/shipped.ts';
 import { onShared, sharedTemplates } from '../store/store.ts';
 import { applyChanges } from '../templates/changes.ts';
 import { OWNER } from '../templates/families.ts';
 import { rolesOf } from '../templates/roles.ts';
+import { editorWordsFor } from '../words/panel/editors.ts';
+import type { PanelWords } from '../words/panel/en.ts';
+import { panelWordsFor } from '../words/panel/words.ts';
 
+import { assignAreas, isEmptyUndo, joinedUndo, undoAreas } from './area-writes.ts';
+import type { AreaUndo } from './area-writes.ts';
+import { MnmlAreas } from './areas.ts';
+import type { AreasHost } from './areas.ts';
 import { MnmlBinder } from './binder.ts';
-import { MnmlBuilder } from './builder.ts';
-import type { BuilderHost } from './builder.ts';
 import { addressFor, boardsOf, builtOf } from './building.ts';
 import type { Board, Built } from './building.ts';
 import {
@@ -60,6 +68,8 @@ import { MnmlPlanEditor } from './plan-editor.ts';
 import type { PlanHost } from './plan-editor.ts';
 import { MnmlPreview } from './preview.ts';
 import { PANEL_STYLE } from './style.ts';
+import { MnmlBuilder } from './template-builder.ts';
+import type { BuilderHost } from './template-builder.ts';
 import { MnmlYaml } from './yaml.ts';
 
 interface Route {
@@ -67,10 +77,29 @@ interface Route {
   path?: string;
 }
 
+type Loaded<T> =
+  | { status: 'waiting' }
+  | { status: 'ready'; value: T }
+  | { status: 'failed'; error: string };
+
+interface Shipped {
+  templates: Templates;
+  failure: string | undefined;
+}
+
+const WAITING: Loaded<never> = { status: 'waiting' };
+
+const valueOf = <T>(loaded: Loaded<T>, otherwise: T): T =>
+  loaded.status === 'ready' ? loaded.value : otherwise;
+
+const failureOf = (loaded: Loaded<unknown>): string | undefined =>
+  loaded.status === 'failed' ? loaded.error : undefined;
+
 const BASE = '/mnml';
 const NAME = /^\/templates\/([a-z0-9][a-z0-9_-]{0,63})$/;
 const BOARD = /^(?:|\/dashboards|\/dashboards\/(new|[a-z0-9]+(?:-[a-z0-9]+)+))$/;
 const LIBRARY = '/templates';
+const AREAS = '/areas';
 const NOTHING_KEPT: Kept = { own: {}, changes: {} };
 
 const PAGE_STYLE = css`
@@ -121,21 +150,22 @@ export class MnmlPanel extends LitElement {
   @property({ attribute: false }) narrow = false;
   @state() private kept: Kept | undefined;
   private shaped: Templates = {};
-  @state() private shipped: Templates | undefined;
-  @state() private shippedFailure: string | undefined;
+  @state() private shipped: Shipped | undefined;
   @state() private dashboards: Dashboard[] = [];
-  @state() private built: Built[] | undefined;
-  @state() private builtFailure: string | undefined;
-  @state() private boards: Board[] = [];
-  @state() private boardsFailure: string | undefined;
+  @state() private built: Loaded<Built[]> = WAITING;
+  @state() private boards: Loaded<Board[]> = WAITING;
+  @state() private formFailure: FormFailure | undefined;
   @state() private newPlan: Plan | undefined;
   @state() private failure: string | undefined;
   @state() private path = location.pathname.startsWith(BASE)
     ? location.pathname.slice(BASE.length)
     : '';
   @state() private opened: Draft | undefined;
+  @state() private areaUndo: AreaUndo | undefined;
   @query('mnml-builder') private builder: MnmlBuilder | null | undefined;
   @query('mnml-plan-editor') private planEditor: MnmlPlanEditor | null | undefined;
+  @query('mnml-areas') private areasPage: MnmlAreas | null | undefined;
+  private areasFrom = '';
   private current: HomeAssistant | undefined;
   private started = false;
   private unlisten: (() => void) | undefined;
@@ -147,12 +177,19 @@ export class MnmlPanel extends LitElement {
   };
 
   set hass(hass: HomeAssistant) {
+    const before = this.current?.locale.language;
     this.current = hass;
+    if (before !== undefined && before !== hass.locale.language) {
+      this.requestUpdate();
+    }
     if (this.builder !== null && this.builder !== undefined) {
       this.builder.hass = hass;
     }
     if (this.planEditor !== null && this.planEditor !== undefined) {
       this.planEditor.hass = hass;
+    }
+    if (this.areasPage !== null && this.areasPage !== undefined) {
+      this.areasPage.hass = hass;
     }
     if (!this.started) {
       this.started = true;
@@ -174,7 +211,7 @@ export class MnmlPanel extends LitElement {
       window.dispatchEvent(new CustomEvent('location-changed', { detail: { replace: true } }));
       return;
     }
-    this.path = path;
+    this.moveTo(path);
   }
 
   override connectedCallback(): void {
@@ -295,7 +332,55 @@ export class MnmlPanel extends LitElement {
     save: (plan, address) =>
       buildDashboard(this.flows(), BOARD.exec(this.path)?.[1], plan, address),
     leave: () => {
-      this.go(BASE);
+      this.go(BASE, true);
+    },
+    sortAreas: () => {
+      this.go(`${BASE}${AREAS}`, true);
+    },
+  };
+
+  private readonly areasHost: AreasHost = {
+    assign: async (chosen) => {
+      const flows = this.flows();
+      const said = flows.words.areas;
+      const made = [...new Set(chosen.flatMap(({ to }) => to.create ?? []))];
+      const devices = chosen.filter(({ kind }) => kind === 'device').length;
+      const sure = await flows.dialogs.confirm(
+        said.assignTitle,
+        said.assignText(made, devices, chosen.length - devices),
+        said.assignIt,
+      );
+      if (!sure) {
+        return false;
+      }
+      const { undo, failure } = await assignAreas(flows.call, chosen, registriesOf(this.current));
+      if (!isEmptyUndo(undo)) {
+        this.areaUndo = joinedUndo(this.areaUndo, undo);
+      }
+      if (failure !== undefined) {
+        throw new Error(said.partly(failure));
+      }
+      return true;
+    },
+    undo: async () => {
+      const undo = this.areaUndo;
+      const flows = this.flows();
+      const said = flows.words.areas;
+      if (
+        undo === undefined ||
+        !(await flows.dialogs.confirm(said.undoTitle, said.undoText, said.undoIt))
+      ) {
+        return false;
+      }
+      const failure = await undoAreas(flows.call, undo);
+      if (failure !== undefined) {
+        throw new Error(said.undoFailed(failure));
+      }
+      this.areaUndo = undefined;
+      return true;
+    },
+    leave: () => {
+      this.go(`${BASE}${this.areasFrom}`, true);
     },
   };
 
@@ -313,21 +398,30 @@ export class MnmlPanel extends LitElement {
     if (name === undefined || this.kept === undefined || this.shipped === undefined) {
       this.opened = undefined;
     } else if (before?.name !== name) {
-      this.opened = this.fresh.get(name) ?? draftOf(name, this.shipped, this.kept);
+      this.opened = this.fresh.get(name) ?? draftOf(name, this.shipped.templates, this.kept);
     }
     if (before !== undefined && before !== this.opened) {
       this.fresh.delete(before.name);
     }
   }
 
+  private words(): PanelWords {
+    return panelWordsFor(this.current?.locale.language);
+  }
+
   private mayLeave(path: string): boolean {
     const builder = this.builder;
+    const plan = this.planEditor;
+    const said = this.words().panel;
+    if (plan !== null && plan !== undefined && path !== this.path && plan.dirty()) {
+      return window.confirm(said.leaveUnbuilt);
+    }
     return (
       builder === null ||
       builder === undefined ||
       path === `/templates/${builder.name}` ||
       !builder.dirty() ||
-      window.confirm('Leave without saving your changes?')
+      window.confirm(said.leaveUnsaved)
     );
   }
 
@@ -336,22 +430,35 @@ export class MnmlPanel extends LitElement {
     if (!checked && !this.mayLeave(next)) {
       return false;
     }
-    this.path = next;
+    this.moveTo(next);
     history.pushState(null, '', path);
     window.dispatchEvent(new CustomEvent('location-changed', { detail: { replace: false } }));
     return true;
   }
 
+  private moveTo(path: string): void {
+    if (path === AREAS && this.path !== AREAS) {
+      this.areasFrom = this.path;
+    }
+    this.path = path;
+  }
+
   private attempt(run: () => Promise<void>): void {
     run().catch(async (error: unknown) => {
-      await dialogsOn(this.renderRoot).confirm('That did not work', messageOf(error), 'OK');
+      const words = this.words();
+      await dialogsOn(this.renderRoot, words).confirm(
+        words.panel.failed,
+        messageOf(error),
+        words.dialog.ok,
+      );
     });
   }
 
   private flows(): DashboardHost {
     return {
       call: (message) => this.call(message),
-      dialogs: dialogsOn(this.renderRoot),
+      words: this.words(),
+      dialogs: dialogsOn(this.renderRoot, this.words()),
       state: () => this.state(),
       refresh: () => this.refresh(),
       save: (name, entry) => this.save(name, entry),
@@ -366,15 +473,15 @@ export class MnmlPanel extends LitElement {
   private state(): PanelState {
     return {
       kept: this.kept ?? NOTHING_KEPT,
-      shipped: this.shipped ?? {},
-      shippedFailure: this.shippedFailure,
+      shipped: this.shipped?.templates ?? {},
+      shippedFailure: this.shipped?.failure,
       resolved: this.resolved(),
       taken: this.taken(),
       registries: registriesOf(this.current),
       dashboards: this.dashboards,
-      built: this.built,
-      boards: this.boards,
-      boardsFailure: this.boardsFailure,
+      built: this.built.status === 'ready' ? this.built.value : undefined,
+      boards: valueOf(this.boards, []),
+      boardsFailure: failureOf(this.boards),
       addresses: this.addresses(),
     };
   }
@@ -395,22 +502,28 @@ export class MnmlPanel extends LitElement {
 
   private async start(): Promise<void> {
     await loadLovelace();
-    await loadHaForm();
+    this.formFailure = await loadHaForm();
     this.read();
     await SHIPPED_TEMPLATES.need(Object.keys(OWNER));
-    this.shippedFailure = SHIPPED_TEMPLATES.failure(Object.keys(OWNER));
-    this.shipped = SHIPPED_TEMPLATES.templates();
+    if (this.current !== undefined) {
+      await energyPrefs(this.current.connection);
+    }
+    this.shipped = {
+      templates: SHIPPED_TEMPLATES.templates(),
+      failure: SHIPPED_TEMPLATES.failure(Object.keys(OWNER)),
+    };
     await this.readDashboards();
     await this.readBuilt();
   }
 
   private async readBuilt(): Promise<void> {
     try {
-      this.built = builtOf(await this.call({ type: 'mnml/dashboards/list' }));
-      this.builtFailure = undefined;
+      this.built = {
+        status: 'ready',
+        value: builtOf(await this.call({ type: 'mnml/dashboards/list' })),
+      };
     } catch (error) {
-      this.built = undefined;
-      this.builtFailure = messageOf(error);
+      this.built = { status: 'failed', error: messageOf(error) };
     }
   }
 
@@ -421,8 +534,8 @@ export class MnmlPanel extends LitElement {
 
   private addresses(): Set<string> {
     return new Set([
-      ...this.boards.map((board) => board.url_path),
-      ...(this.built ?? []).map((built) => built.url_path),
+      ...valueOf(this.boards, []).map((board) => board.url_path),
+      ...valueOf(this.built, []).map((built) => built.url_path),
       ...Object.keys(this.current?.panels ?? {}),
     ]);
   }
@@ -435,14 +548,18 @@ export class MnmlPanel extends LitElement {
     let listed: unknown = [];
     try {
       listed = await hass.connection.sendMessagePromise({ type: 'lovelace/dashboards/list' });
-      this.boardsFailure = undefined;
+      this.boards = { status: 'ready', value: boardsOf(listed) };
     } catch (error) {
       listed = [];
-      this.boardsFailure = messageOf(error);
+      this.boards = { status: 'failed', error: messageOf(error) };
     }
-    this.boards = boardsOf(listed);
+    const overview = hass.localize('panel.states');
     const boards: { path: string | null; title: string; storage: boolean }[] = [
-      { path: null, title: 'Overview', storage: true },
+      {
+        path: null,
+        title: overview === '' ? this.words().panel.overview : overview,
+        storage: true,
+      },
       ...(Array.isArray(listed) ? listed : []).flatMap((item) => {
         const path = field(item, 'url_path');
         const title = field(item, 'title');
@@ -474,10 +591,10 @@ export class MnmlPanel extends LitElement {
   }
 
   private resolved(): Templates {
-    if (this.known.kept === this.kept && this.known.shipped === this.shipped) {
+    if (this.known.kept === this.kept && this.known.shipped === this.shipped?.templates) {
       return this.known.all;
     }
-    const shipped = this.shipped ?? {};
+    const shipped = this.shipped?.templates ?? {};
     const kept = this.kept ?? NOTHING_KEPT;
     const changed = Object.fromEntries(
       Object.entries(kept.changes).flatMap(([name, changes]) => {
@@ -487,7 +604,7 @@ export class MnmlPanel extends LitElement {
     );
     this.known = {
       kept: this.kept,
-      shipped: this.shipped,
+      shipped: this.shipped?.templates,
       all: { ...shipped, ...changed, ...this.shaped },
     };
     return this.known.all;
@@ -504,7 +621,7 @@ export class MnmlPanel extends LitElement {
   private async call(message: { type: string } & Record<string, unknown>): Promise<unknown> {
     const hass = this.current;
     if (hass === undefined) {
-      throw new Error('Home Assistant is not connected');
+      throw new Error(this.words().panel.unconnected);
     }
     return hass.connection.sendMessagePromise(message);
   }
@@ -516,7 +633,7 @@ export class MnmlPanel extends LitElement {
 
   private rows(): Row[] {
     return rowsOf(
-      this.shipped ?? {},
+      this.shipped?.templates ?? {},
       OWNER,
       this.kept ?? NOTHING_KEPT,
       usesOf(this.dashboards),
@@ -531,43 +648,44 @@ export class MnmlPanel extends LitElement {
       .rows=${this.rows()}
       .offer=${{ templates: Object.keys(waiting).length, dashboards: boards.size }}
       .actions=${this.libraryActions}
+      .words=${this.words()}
     ></mnml-library>`;
   }
 
   private drawBoards(at: string | undefined): TemplateResult {
-    const built = this.built;
-    if (this.builtFailure !== undefined) {
+    const words = this.words();
+    const said = words.panel;
+    if (this.built.status === 'failed') {
       return html`<div class="problem">
-        ${icon('mdi:alert-circle-outline')}<span
-          >MNML cannot read the dashboards it built: ${this.builtFailure}</span
-        >
+        ${icon('mdi:alert-circle-outline')}<span>${said.unbuilt(this.built.error)}</span>
       </div>`;
     }
-    if (built === undefined) {
-      return html`<p class="muted loading">Reading the dashboards...</p>`;
+    if (this.built.status === 'waiting') {
+      return html`<p class="muted loading">${said.readingBoards}</p>`;
     }
-    if (at === undefined && this.boardsFailure !== undefined) {
+    const built = this.built.value;
+    if (at === undefined && this.boards.status === 'failed') {
       return html`<div class="problem">
-        ${icon('mdi:alert-circle-outline')}<span
-          >MNML cannot read Home Assistant's dashboards: ${this.boardsFailure}</span
-        >
+        ${icon('mdi:alert-circle-outline')}<span>${said.unlisted(this.boards.error)}</span>
       </div>`;
     }
     if (at === undefined) {
+      const boards = valueOf(this.boards, []);
       const rows: DashboardRow[] = built.map((each) => ({
         built: each,
-        board: boardOf(this.boards, each),
+        board: boardOf(boards, each),
       }));
       return html`<mnml-dashboards
         .rows=${rows}
         .actions=${this.dashboardActions}
+        .words=${words}
       ></mnml-dashboards>`;
     }
     const kept = built.find((each) => each.url_path === at);
     const plan = at === 'new' ? this.newPlan : kept?.plan;
     if (plan === undefined) {
       return html`<div class="library">
-        <p>MNML did not build a dashboard at /${at}.</p>
+        <p>${said.notBuilt(at)}</p>
         <button
           type="button"
           class="action"
@@ -575,7 +693,7 @@ export class MnmlPanel extends LitElement {
             this.go(BASE);
           }}
         >
-          Back to the dashboards
+          ${said.backToBoards}
         </button>
       </div>`;
     }
@@ -606,7 +724,8 @@ export class MnmlPanel extends LitElement {
         ${label}
       </button>`;
     return html`<div class="tabs">
-      ${tab('Dashboards', '', boards)} ${tab('Templates', LIBRARY, !boards)}
+      ${tab(this.words().panel.dashboards, '', boards)}
+      ${tab(this.words().panel.templates, LIBRARY, !boards)}
     </div>`;
   }
 
@@ -616,8 +735,9 @@ export class MnmlPanel extends LitElement {
         ${icon('mdi:alert-circle-outline')}<span>${this.failure}</span>
       </div>`;
     }
+    const said = this.words().panel;
     if (this.kept === undefined || this.shipped === undefined) {
-      return html`<p class="muted loading">Reading the templates...</p>`;
+      return html`<p class="muted loading">${said.readingTemplates}</p>`;
     }
     const board = BOARD.exec(this.path);
     if (board !== null) {
@@ -626,13 +746,20 @@ export class MnmlPanel extends LitElement {
     if (this.path === LIBRARY) {
       return this.drawLibrary();
     }
+    if (this.path === AREAS) {
+      return html`<mnml-areas
+        .hass=${this.current}
+        .host=${this.areasHost}
+        .undoable=${this.areaUndo !== undefined}
+      ></mnml-areas>`;
+    }
     const name = nameIn(this.path);
     if (name === undefined) {
       return this.drawBoards(undefined);
     }
     if (this.opened === undefined) {
       return html`<div class="library">
-        <p>No template is named ${name}.</p>
+        <p>${said.noTemplate(name)}</p>
         <button
           type="button"
           class="action"
@@ -640,7 +767,7 @@ export class MnmlPanel extends LitElement {
             this.go(`${BASE}${LIBRARY}`);
           }}
         >
-          Back to the library
+          ${said.backToLibrary}
         </button>
       </div>`;
     }
@@ -659,23 +786,27 @@ export class MnmlPanel extends LitElement {
     } catch (error) {
       content = html`<div class="problem">
         ${icon('mdi:alert-circle-outline')}<span
-          >The panel could not draw this: ${messageOf(error)}</span
+          >${this.words().panel.undrawable(messageOf(error))}</span
         >
       </div>`;
     }
+    const forms = editorWordsFor(this.current?.locale.language).forms;
     return html`<div class="body">
       <div class="toolbar">
         <ha-menu-button .hass=${this.current} .narrow=${this.narrow}></ha-menu-button>
         <span class="toolbar-title">MNML</span>
       </div>
       ${this.drawTabs()}
-      ${
-        this.shippedFailure === undefined
+      ${[
+        this.formFailure === undefined ? undefined : forms[this.formFailure],
+        this.shipped?.failure,
+      ].map((failure) =>
+        failure === undefined
           ? nothing
           : html`<div class="problem">
-              ${icon('mdi:alert-circle-outline')}<span>${this.shippedFailure}</span>
-            </div>`
-      }
+              ${icon('mdi:alert-circle-outline')}<span>${failure}</span>
+            </div>`,
+      )}
       ${content}
     </div>`;
   }
@@ -686,6 +817,7 @@ const ELEMENTS = {
   'mnml-builder': MnmlBuilder,
   'mnml-dashboards': MnmlDashboards,
   'mnml-plan-editor': MnmlPlanEditor,
+  'mnml-areas': MnmlAreas,
   'mnml-live-card': MnmlLiveCard,
   'mnml-library': MnmlLibrary,
   'mnml-preview': MnmlPreview,
@@ -693,6 +825,7 @@ const ELEMENTS = {
   'mnml-binder': MnmlBinder,
   'mnml-row-menu': MnmlRowMenu,
   'mnml-words': MnmlWords,
+  'mnml-card-note': MnmlCardNote,
 };
 
 for (const [tag, element] of Object.entries(ELEMENTS)) {

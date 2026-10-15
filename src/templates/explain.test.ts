@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import { test } from 'vitest';
 
 import type { Rule } from '../contract/templates.ts';
+import type { Registries } from '../ha/registries.ts';
 
 import { homes } from './corpus.ts';
 import { discover } from './discover.ts';
-import type { Registries } from './discover.ts';
 import { explain } from './explain.ts';
 import { SHIPPED } from './shipped.ts';
 
@@ -270,4 +270,34 @@ test('an empty anchored slot says there is no such device, or names the one that
   const trace = explain(room, 'den', registries)['printer3d'];
   assert.equal(trace?.value, undefined);
   assert.equal(trace?.reason, 'found Prusa MK3, without every field the slot needs');
+});
+
+test('on a device, an empty slot says the device has none and where else there is one, and a scope: area rule looks in its area', () => {
+  const home = homes()['devices'];
+  assert.ok(home);
+  const template = {
+    card: {},
+    slots: {
+      climate: { kind: 'entity', discover: { domain: 'climate' } },
+      lock: { kind: 'entity', discover: { domain: 'lock', scope: 'area' } },
+      temperature: { kind: 'entity', discover: 'area.temperature' },
+      vacuum: { kind: 'entity', discover: { domain: 'vacuum' } },
+    },
+  } as const;
+  const traces = explain(template, undefined, home, 'roborock_s8');
+  assert.equal(traces['vacuum']?.value, 'vacuum.roborock_s8');
+  assert.match(
+    traces['climate']?.reason ?? '',
+    /^no climate on Roborock S8; found elsewhere: climate\.bedroom_ac in Bedroom/,
+  );
+  assert.equal(traces['lock']?.reason, 'no lock in Living');
+  assert.equal(traces['temperature']?.reason, 'the area has none');
+  const nowhere: Registries = {
+    ...home,
+    devices: { ...home.devices, roborock_s8: { id: 'roborock_s8', name: 'Roborock S8' } },
+  };
+  assert.equal(
+    explain(template, undefined, nowhere, 'roborock_s8')['temperature']?.reason,
+    'Roborock S8 is in no area',
+  );
 });

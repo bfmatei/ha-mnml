@@ -38,7 +38,7 @@ async function status(page: Page, name: string): Promise<string> {
 async function rowAction(page: Page, name: string, action: string): Promise<void> {
   await row(page, name)
     .first()
-    .getByRole('button', { name: `More for ${name}` })
+    .getByRole('button', { name: /^More for / })
     .click();
   await page.getByRole('menuitem', { name: action }).click();
 }
@@ -51,8 +51,9 @@ async function builderAction(page: Page, name: string, action: string): Promise<
   await page.getByRole('menuitem', { name: action }).click();
 }
 
-async function named(page: Page, name: string): Promise<void> {
-  await page.locator('dialog.dialog input[aria-label="Name"]').fill(name);
+async function titled(page: Page, title: string, name: string): Promise<void> {
+  await page.locator('dialog.dialog input[aria-label="Title"]').fill(title);
+  await page.locator('dialog.dialog input[aria-label="Name in YAML"]').fill(name);
   await page.locator('dialog.dialog').getByRole('button', { name: 'OK' }).click();
 }
 
@@ -105,6 +106,17 @@ async function boardsPage(page: Page): Promise<void> {
 
 const dialogButton = (page: Page, name: string) =>
   page.locator('dialog.dialog').getByRole('button', { name, exact: true });
+
+async function quickStart(page: Page): Promise<void> {
+  await page.locator('mnml-dashboards').getByRole('button', { name: 'Quick start' }).click();
+  const anyway = dialogButton(page, 'Build anyway');
+  const make = dialogButton(page, 'Make it');
+  await anyway.or(make).first().waitFor({ timeout: 30000 });
+  if (await anyway.isVisible()) {
+    await anyway.click();
+  }
+  await make.click();
+}
 
 async function builderProblem(page: Page): Promise<string | undefined> {
   const said = await page.locator('mnml-builder .problem').allTextContents();
@@ -237,7 +249,7 @@ await library(page);
 check((await status(page, 'room')) === 'shipped', 'room is shipped again once saved');
 
 await page.locator('mnml-library').getByRole('button', { name: 'New template' }).click();
-await named(page, NEW);
+await titled(page, 'Walk new', NEW);
 await page.locator('mnml-builder .builder-head').waitFor({ timeout: 30000 });
 await settle(page, 2000);
 check((await builderProblem(page)) === undefined, 'a new template opens');
@@ -246,25 +258,24 @@ await library(page);
 check((await status(page, NEW)) === 'own', 'the new template is kept as one of the home');
 
 await rowAction(page, NEW, 'Duplicate');
-await named(page, `${NEW}-copy`);
+await titled(page, 'Walk new copy', `${NEW}-copy`);
 await page.locator('mnml-builder .builder-head').waitFor({ timeout: 30000 });
 check(
-  ((await page.locator('mnml-builder .builder-title h1').textContent()) ?? '').includes(
-    `${NEW}-copy`,
-  ),
-  'a duplicate opens under its own name',
+  (await page.locator('mnml-builder .builder-title .code-name').textContent()) === `${NEW}-copy` &&
+    (await page.locator('mnml-builder .builder-title h1').textContent()) === 'Walk new copy',
+  'a duplicate opens under its own title and name',
 );
 await page.locator('mnml-builder').getByRole('button', { name: 'Back to the library' }).click();
 await settle(page);
 
 await page.locator('mnml-library').getByRole('button', { name: 'New template' }).click();
-await named(page, LEFT);
+await titled(page, 'Walk left', LEFT);
 await page.locator('mnml-builder .builder-head').waitFor({ timeout: 30000 });
 await page.locator('mnml-builder').getByRole('button', { name: 'Back to the library' }).click();
 await settle(page);
 check((await row(page, LEFT).count()) === 0, 'a new template left unsaved is not in the library');
 await page.locator('mnml-library').getByRole('button', { name: 'New template' }).click();
-await named(page, LEFT);
+await titled(page, 'Walk left', LEFT);
 await settle(page);
 check(
   (await page.locator('dialog.dialog .problem-line').count()) === 0 &&
@@ -287,8 +298,7 @@ check(
   (await page.locator('mnml-dashboards .start').count()) === 1,
   'with no dashboard built, the Dashboards tab offers to build one',
 );
-await page.locator('mnml-dashboards').getByRole('button', { name: 'Quick start' }).click();
-await dialogButton(page, 'Make it').click();
+await quickStart(page);
 await dialogButton(page, 'Open it').click();
 await page.waitForURL(`${env.HA_URL}/dashboard-home**`, { timeout: 30000 });
 await page.locator('mnml-template-card').first().waitFor({ timeout: 30000 });
@@ -335,7 +345,10 @@ check(
   'Done with nothing changed closes it',
 );
 await page.locator('mnml-plan-editor input.fact-input').first().fill('Walk home');
-await page.locator('mnml-plan-editor').getByRole('checkbox', { name: 'Show Kitchen' }).click();
+await page
+  .locator('mnml-plan-editor')
+  .getByRole('checkbox', { name: 'Show Kitchen', exact: true })
+  .click();
 await page.locator('mnml-plan-editor').getByRole('button', { name: 'Rebuild' }).click();
 await dialogButton(page, 'Rebuild').click();
 await dialogButton(page, 'Cancel').click();
@@ -448,8 +461,7 @@ await dropTemplates(['walk-room', 'walk-room-2']);
 try {
   await keepTemplate('walk-room', 'The walk room, as shared.');
   await boardsPage(page);
-  await page.locator('mnml-dashboards').getByRole('button', { name: 'Quick start' }).click();
-  await dialogButton(page, 'Make it').click();
+  await quickStart(page);
   await dialogButton(page, 'Cancel').click();
   await settle(page);
   await page.locator('mnml-dashboards').getByRole('button', { name: 'Edit Home' }).click();

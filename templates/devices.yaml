@@ -1,5 +1,7 @@
 select-card:
   description: A dropdown over a select entity.
+  title: Dropdown
+  icon: mdi:form-dropdown
   slots:
     entity: { kind: entity, required: true }
   card:
@@ -10,6 +12,8 @@ select-card:
 
 number-slider:
   description: A slider over a number entity.
+  title: Number slider
+  icon: mdi:tune-vertical
   slots:
     entity: { kind: entity, required: true }
   card:
@@ -21,6 +25,8 @@ number-slider:
 
 switch-card:
   description: A switch as an item with its power toggle.
+  title: Switch
+  icon: mdi:toggle-switch-outline
   slots:
     entity: { kind: entity, required: true }
   card:
@@ -34,8 +40,73 @@ switch-card:
   example:
     entity: switch.kitchen_outlet
 
+schedule-card:
+  description: A schedule as an item, on or off and when it next changes, amber while on.
+  title: Schedule
+  icon: mdi:calendar-clock
+  slots:
+    entity: { kind: entity, required: true }
+  card:
+    type: custom:mnml-entity-card
+    entity: '[[entity]]'
+    color: amber
+    state: [{ id: part }, { id: next-event, attribute: next_event, relative: true }]
+  example:
+    entity: schedule.kitchen_coffee
+
+timer-card:
+  description: 'A timer as an item, counting down while it runs, amber while it does: Start while it is not running, Pause while it is, Cancel and Finish while it is not idle, and its presets as a menu.'
+  title: Timer
+  icon: mdi:timer-outline
+  slots:
+    entity: { kind: entity, required: true }
+  card:
+    type: custom:mnml-entity-card
+    entity: '[[entity]]'
+    color: amber
+    when: { is: [active] }
+    state: [{ id: remaining, remaining: true }]
+    controls:
+      - id: start
+        type: service
+        entity: '[[entity]]'
+        service: timer.start
+        name: '[[words.start]]'
+        icon: mdi:play
+        primary: true
+        show: { not: [active] }
+      - id: pause
+        type: service
+        entity: '[[entity]]'
+        service: timer.pause
+        name: '[[words.pause]]'
+        icon: mdi:pause
+        primary: true
+        show: { is: [active] }
+      - id: cancel
+        type: service
+        entity: '[[entity]]'
+        service: timer.cancel
+        name: '[[words.cancel]]'
+        icon: mdi:stop
+        show: { not: [idle] }
+      - id: finish
+        type: service
+        entity: '[[entity]]'
+        service: timer.finish
+        name: '[[words.finish]]'
+        icon: mdi:check
+        show: { not: [idle] }
+      - id: presets
+        type: select
+        entity: '[[entity]]'
+  example:
+    entity: timer.kitchen_eggs
+
 diffuser-card:
   description: A diffuser with its amount, an amount slider and its power toggle.
+  title: Diffuser
+  icon: mdi:spray
   slots:
     entity: { kind: entity, required: true }
     amount: { kind: entity }
@@ -50,7 +121,7 @@ diffuser-card:
         type: slider
         entity: '[[amount]]'
         slider: value
-        name: Amount
+        name: '[[words.amount]]'
         icon: mdi:spray
       - id: power
         template: power
@@ -61,8 +132,10 @@ diffuser-card:
 
 media-card:
   description: A media player, opening a pop-up when it has one.
+  title: Media player
+  icon: mdi:play-circle-outline
   slots:
-    entity: { kind: entity, required: true }
+    entity: { kind: entity, required: true, discover: { domain: media_player } }
     popup: { kind: text }
   card:
     type: custom:mnml-media-card
@@ -73,8 +146,10 @@ media-card:
 
 cover-card:
   description: A cover, such as a blind, a shade or a garage door, with its position slider when it has one, and its open, stop and close buttons.
+  title: Cover
+  icon: mdi:blinds-horizontal
   slots:
-    entity: { kind: entity, required: true }
+    entity: { kind: entity, required: true, discover: { domain: cover } }
     garage: { kind: flag }
   card:
     type: custom:mnml-entity-card
@@ -86,13 +161,13 @@ cover-card:
         type: slider
         entity: '[[entity]]'
         slider: position
-        name: Position
+        name: '[[words.position]]'
         icon: mdi:blinds-horizontal
       - id: open
         type: service
         entity: '[[entity]]'
         service: cover.open_cover
-        name: Open
+        name: '[[words.open]]'
         icon: mdi:arrow-up
         show: { not: [open, opening] }
       - id: stop
@@ -100,14 +175,14 @@ cover-card:
         type: service
         entity: '[[entity]]'
         service: cover.stop_cover
-        name: Stop
+        name: '[[words.stop]]'
         icon: mdi:stop
         show: { is: [opening, closing] }
       - id: close
         type: service
         entity: '[[entity]]'
         service: cover.close_cover
-        name: Close
+        name: '[[words.close]]'
         icon: mdi:arrow-down
         show: { not: [closed, closing] }
   example:
@@ -115,8 +190,10 @@ cover-card:
 
 fan-card:
   description: A fan or air purifier with its air quality, its speed slider and its power toggle.
+  title: Fan
+  icon: mdi:fan
   slots:
-    entity: { kind: entity, required: true }
+    entity: { kind: entity, required: true, discover: { domain: fan } }
     quality: { kind: entity }
   card:
     type: custom:mnml-entity-card
@@ -128,7 +205,7 @@ fan-card:
         type: slider
         entity: '[[entity]]'
         slider: percentage
-        name: Speed
+        name: '[[words.speed]]'
         icon: mdi:fan
       - id: power
         template: power
@@ -138,8 +215,10 @@ fan-card:
 
 humidifier-card:
   description: A humidifier or dehumidifier with its target humidity slider and its power toggle.
+  title: Humidifier
+  icon: mdi:air-humidifier
   slots:
-    entity: { kind: entity, required: true }
+    entity: { kind: entity, required: true, discover: { domain: humidifier } }
   card:
     type: custom:mnml-entity-card
     entity: '[[entity]]'
@@ -149,7 +228,7 @@ humidifier-card:
         type: slider
         entity: '[[entity]]'
         slider: humidity
-        name: Target
+        name: '[[words.target]]'
         icon: mdi:water-percent
       - id: power
         template: power
@@ -159,8 +238,10 @@ humidifier-card:
 
 camera-card:
   description: A camera's live picture.
+  title: Camera
+  icon: mdi:cctv
   slots:
-    entity: { kind: entity, required: true }
+    entity: { kind: entity, required: true, discover: { domain: camera } }
   card:
     type: picture-entity
     entity: '[[entity]]'
@@ -172,11 +253,13 @@ camera-card:
 
 camera-activity:
   description: 'A folding list of what the cameras of a room detect: motion, a person, a ring at the door. Orange while detected.'
+  title: Camera activity
+  icon: mdi:motion-sensor
   slots:
     cameras: { shape: camera, kind: objects }
   card:
     type: custom:mnml-list-card
-    title: Activity
+    title: '[[words.activity]]'
     icon: mdi:motion-sensor
     rows:
       - id: each-doorbell
@@ -210,6 +293,8 @@ camera-activity:
 
 appliance-card:
   description: A washer, dryer or dishwasher with its cycle state, the time left and its power draw; blue while a cycle runs.
+  title: Appliance
+  icon: mdi:washing-machine
   slots:
     entity: { kind: entity, required: true }
     remaining: { kind: entity }
@@ -229,6 +314,8 @@ appliance-card:
 
 pet-card:
   description: A pet's feeder with when it last ate, the food and litter levels, and a feed button.
+  title: Pet feeder
+  icon: mdi:paw
   slots:
     feed: { kind: entity, required: true }
     fed: { kind: entity, required: true }
@@ -247,7 +334,7 @@ pet-card:
         type: service
         entity: '[[feed]]'
         service: button.press
-        name: Feed
+        name: '[[words.feed]]'
         icon: mdi:food-drumstick
   example:
     feed: button.kitchen_feeder_feed
@@ -255,6 +342,8 @@ pet-card:
 
 plants:
   description: A folding list of the plants' soil moisture, driest first, orange under 30 % and red under 15 %.
+  title: Plants
+  icon: mdi:flower
   slots:
     plants: { shape: plant, kind: objects }
     low: { kind: number, default: 30 }
@@ -266,7 +355,7 @@ plants:
       lowest_first: true
       fold: true
       summary: lowest
-      title: Plants
+      title: '[[words.plants]]'
       icon: mdi:flower
       rows:
         - id: each-plants

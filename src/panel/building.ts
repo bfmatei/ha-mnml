@@ -1,5 +1,5 @@
-import { isPlan } from '../contract/builder.ts';
-import type { Plan } from '../contract/builder.ts';
+import { isPlan } from '../contract/plan.ts';
+import type { Plan } from '../contract/plan.ts';
 import { isMapping } from '../contract/templates.ts';
 import { field } from '../ha/field.ts';
 

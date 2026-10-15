@@ -2,9 +2,10 @@ import { css, html, nothing } from 'lit';
 import type { TemplateResult } from 'lit';
 import { live } from 'lit/directives/live.js';
 
-import { isMapping } from '../contract/templates.ts';
+import { isMapping, slotLabel } from '../contract/templates.ts';
 import type {
   AreaValue,
+  EnergyValue,
   FilterRule,
   Kind,
   ObjectsRule,
@@ -16,16 +17,21 @@ import type {
   WrittenTemplate,
 } from '../contract/templates.ts';
 import { toYaml } from '../contract/yaml.ts';
+import { IN_PLACE, REDRAW } from '../editors/drawing.ts';
+import type { Drawing } from '../editors/drawing.ts';
 import { field } from '../ha/field.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
-import { registriesOf } from '../ha/registries.ts';
+import { registriesOf } from '../ha/snapshot.ts';
 import { icon } from '../ha/templates.ts';
 import { nodeHash } from '../templates/changes.ts';
-import { TEXT_FILTERS, filterWords } from '../templates/discover.ts';
+import { TEXT_FILTERS } from '../templates/discover.ts';
 import type { Step } from '../templates/discover.ts';
+import { ENERGY_WORDS, isEnergyValue } from '../templates/energy.ts';
 import { toValue } from '../templates/expand.ts';
 import { explain } from '../templates/explain.ts';
 import type { Trace } from '../templates/explain.ts';
+import type { PanelWords } from '../words/panel/en.ts';
+import { panelWordsFor } from '../words/panel/words.ts';
 
 import { slotOf } from './data.ts';
 import { messageOf } from './message.ts';
@@ -37,7 +43,7 @@ export interface SlotsActions {
   open: Map<string, boolean>;
   areas: readonly { value: string; label: string }[];
   shipped: Template | undefined;
-  update: (next: WrittenTemplate, redraw: boolean) => void;
+  update: (next: WrittenTemplate, drawing: Drawing) => void;
   redraw: () => void;
 }
 
@@ -52,21 +58,29 @@ const KINDS: readonly Kind[] = [
   'object',
   'objects',
 ];
-const AREA_VALUES: readonly { value: AreaValue; label: string }[] = [
-  { value: 'area.name', label: 'name' },
-  { value: 'area.icon', label: 'icon' },
-  { value: 'area.id', label: 'id' },
-  { value: 'area.temperature', label: 'temperature sensor' },
-  { value: 'area.humidity', label: 'humidity sensor' },
+const AREA_VALUES: readonly AreaValue[] = [
+  'area.name',
+  'area.icon',
+  'area.id',
+  'area.temperature',
+  'area.humidity',
 ];
-const FILTERS = TEXT_FILTERS.map((key) => ({ key, words: filterWords(key) }));
+const ENERGY_VALUES: readonly EnergyValue[] = Object.keys(ENERGY_WORDS).filter(isEnergyValue);
 const CATEGORIES = ['none', 'diagnostic', 'config'];
+
+type Said = PanelWords['slots'];
+
+const saidOf = (hass: HomeAssistant | undefined): Said =>
+  panelWordsFor(hass?.locale.language).slots;
 const LISTS: readonly Kind[] = ['object', 'objects'];
 const SLOT_NAME = /^[a-z_][a-z0-9_]*$/;
 
-type Mode = 'area' | 'find' | 'per' | 'fields';
+type Mode = 'area' | 'energy' | 'find' | 'per' | 'fields';
 
-const isAreaValue = (rule: Rule): rule is AreaValue => typeof rule === 'string';
+const isAreaValue = (rule: Rule): rule is AreaValue =>
+  typeof rule === 'string' && rule.startsWith('area.');
+const isEnergyRule = (rule: Rule): rule is EnergyValue =>
+  typeof rule === 'string' && isEnergyValue(rule);
 
 const FILTER_KEYS = new Set<string>(['domain', ...TEXT_FILTERS, 'scope']);
 
@@ -90,7 +104,7 @@ const isAnchor = (value: Value | undefined): boolean =>
 
 function isRule(value: unknown): value is Rule {
   if (typeof value === 'string') {
-    return AREA_VALUES.some((each) => each.value === value);
+    return AREA_VALUES.some((each) => each === value) || isEnergyValue(value);
   }
   if (Array.isArray(value)) {
     return value.every(isRule);
@@ -111,6 +125,9 @@ const isFind = (rule: Rule): rule is FilterRule =>
 function modeOf(rule: Rule): Mode {
   if (isAreaValue(rule)) {
     return 'area';
+  }
+  if (isEnergyRule(rule)) {
+    return 'energy';
   }
   if (isPer(rule)) {
     return 'per';
@@ -137,6 +154,9 @@ function withRules(spec: WrittenSlot, rules: readonly Rule[]): WrittenSlot {
 function starterRule(kind: Kind, mode: Mode): Rule {
   if (mode === 'area') {
     return kind === 'entity' ? 'area.temperature' : 'area.name';
+  }
+  if (mode === 'energy') {
+    return kind === 'objects' ? 'energy.devices' : 'energy.grid_power';
   }
   if (mode === 'per') {
     return { per: 'device', fields: {} };
@@ -244,62 +264,63 @@ function drawFind(
   set: (rule: Rule) => void,
 ): TemplateResult[] {
   const facts = known(hass);
+  const said = saidOf(hass);
   const words: TemplateResult[] = [
-    html`<span>${kind === 'entities' ? 'every' : 'the first'}</span>`,
-    typed(rule.domain ?? '', 'domain', facts.domains, (domain) => {
+    html`<span>${kind === 'entities' ? said.every : said.theFirst}</span>`,
+    typed(rule.domain ?? '', said.filterFields.domain, facts.domains, (domain) => {
       const { domain: _old, ...rest } = rule;
       set(domain === '' ? rest : { ...rest, domain });
     }),
   ];
-  for (const filter of FILTERS) {
-    const value = rule[filter.key];
+  for (const key of TEXT_FILTERS) {
+    const value = rule[key];
     if (value === undefined) {
       continue;
     }
     const list =
-      filter.key === 'device_class'
+      key === 'device_class'
         ? facts.classes(rule.domain)
-        : filter.key === 'platform'
+        : key === 'platform'
           ? facts.platforms
-          : filter.key === 'entity_category'
+          : key === 'entity_category'
             ? CATEGORIES
             : [];
     words.push(
-      html`<span>${filter.words}</span>`,
-      typed(value, filter.key.replace('_', ' '), list, (next) => {
-        const { [filter.key]: _old, ...rest } = rule;
-        set(next === '' ? rest : { ...rest, [filter.key]: next });
+      html`<span>${said.filters[key]}</span>`,
+      typed(value, said.filterFields[key], list, (next) => {
+        const { [key]: _old, ...rest } = rule;
+        set(next === '' ? rest : { ...rest, [key]: next });
       }),
     );
   }
   words.push(
-    html`<span>in</span>`,
+    html`<span>${said.in}</span>`,
     choose(
       [
-        { value: 'area', label: 'the area' },
-        { value: 'all', label: 'the whole home' },
+        { value: 'area', label: said.theArea },
+        { value: 'all', label: said.wholeHome },
       ],
       rule.scope ?? 'area',
-      'where',
+      said.where,
       (scope) => {
         const { scope: _old, ...rest } = rule;
         set(scope === 'all' ? { ...rest, scope: 'all' } : rest);
       },
     ),
   );
-  for (const filter of FILTERS) {
-    if (rule[filter.key] === undefined) {
+  for (const key of TEXT_FILTERS) {
+    if (rule[key] === undefined) {
       words.push(
         html`<button
           type="button"
           class="chip"
-          aria-label=${`Add: ${filter.words}`}
-          title=${`Add: ${filter.words}`}
+          aria-label=${said.addFilter(said.filters[key])}
+          title=${said.addFilter(said.filters[key])}
           @click=${() => {
-            set({ ...rule, [filter.key]: '' });
+            set({ ...rule, [key]: '' });
           }}
         >
-          ${icon('mdi:plus')}<span>${filter.words}</span>
+          ${icon('mdi:plus')}<span>${said.filters[key]}</span>
         </button>`,
       );
     }
@@ -307,12 +328,17 @@ function drawFind(
   return words;
 }
 
-function drawYamlRule(rule: Rule, set: (rule: Rule) => void, redraw: () => void): TemplateResult {
+function drawYamlRule(
+  rule: Rule,
+  set: (rule: Rule) => void,
+  redraw: () => void,
+  said: Said,
+): TemplateResult {
   let problem = '';
   return html`<div class="rule-yaml">
     <textarea
       class="yaml-text small"
-      aria-label="The rule in YAML"
+      aria-label=${said.ruleYaml}
       .value=${toYaml(rule)}
       @change=${(event: Event) => {
         try {
@@ -321,7 +347,7 @@ function drawYamlRule(rule: Rule, set: (rule: Rule) => void, redraw: () => void)
             set(read);
             return;
           }
-          problem = 'not a rule: see the rules in the templates guide';
+          problem = said.notRule;
         } catch (error) {
           problem = messageOf(error);
         }
@@ -344,56 +370,74 @@ function drawRule(
   remove: () => void,
 ): TemplateResult {
   const mode = modeOf(rule);
+  const said = saidOf(actions.hass);
   const modes: Option[] = [
-    { value: 'area', label: "Use the area's" },
-    { value: 'find', label: 'Find' },
-    ...(kind === 'objects' ? [{ value: 'per', label: 'Make one' }] : []),
-    ...(kind === 'object' ? [{ value: 'fields', label: 'Fill the fields' }] : []),
+    { value: 'area', label: said.modes.area },
+    { value: 'energy', label: said.modes.energy },
+    { value: 'find', label: said.modes.find },
+    ...(kind === 'objects' ? [{ value: 'per', label: said.modes.per }] : []),
+    ...(kind === 'object' ? [{ value: 'fields', label: said.modes.fields }] : []),
   ];
+  const areaOptions = AREA_VALUES.map((value) => ({ value, label: said.areaValues[value] }));
+  const energyOptions = ENERGY_VALUES.map((value) => ({ value, label: said.energyValues[value] }));
   const rest = isAreaValue(rule)
     ? [
-        choose(AREA_VALUES, rule, "the area's value", (next) => {
-          const found = AREA_VALUES.find((each) => each.value === next);
+        choose(areaOptions, rule, said.areaValue, (next) => {
+          const found = AREA_VALUES.find((each) => each === next);
           if (found !== undefined) {
-            set(found.value);
+            set(found);
           }
         }),
       ]
-    : isPer(rule)
+    : isEnergyRule(rule)
       ? [
-          choose(
-            [
-              { value: 'device', label: 'per device' },
-              { value: 'area', label: 'per area' },
-            ],
-            rule.per,
-            'per',
-            (per) => {
-              set({ ...rule, per: per === 'area' ? 'area' : 'device' });
-            },
-          ),
-          html`<span class="muted">with these fields:</span>`,
-          drawYamlRule(rule, set, actions.redraw),
+          choose(energyOptions, rule, said.energyValue, (next) => {
+            const found = ENERGY_VALUES.find((each) => each === next);
+            if (found !== undefined) {
+              set(found);
+            }
+          }),
         ]
-      : isMapping(rule) && 'fields' in rule
-        ? [drawYamlRule(rule, set, actions.redraw)]
-        : isFind(rule)
-          ? rule.attribute === undefined
-            ? drawFind(rule, kind, actions.hass, set)
-            : [drawYamlRule(rule, set, actions.redraw)]
-          : [];
+      : isPer(rule)
+        ? [
+            choose(
+              [
+                { value: 'device', label: said.perDevice },
+                { value: 'area', label: said.perArea },
+              ],
+              rule.per,
+              said.per,
+              (per) => {
+                set({ ...rule, per: per === 'area' ? 'area' : 'device' });
+              },
+            ),
+            html`<span class="muted">${said.withFields}</span>`,
+            drawYamlRule(rule, set, actions.redraw, said),
+          ]
+        : isMapping(rule) && 'fields' in rule
+          ? [drawYamlRule(rule, set, actions.redraw, said)]
+          : isFind(rule)
+            ? rule.attribute === undefined
+              ? drawFind(rule, kind, actions.hass, set)
+              : [drawYamlRule(rule, set, actions.redraw, said)]
+            : [];
   return html`<div class="sentence">
-    ${choose(modes, mode, 'how', (next) => {
+    ${choose(modes, mode, said.how, (next) => {
       set(
-        starterRule(kind, next === 'area' || next === 'per' || next === 'fields' ? next : 'find'),
+        starterRule(
+          kind,
+          next === 'area' || next === 'energy' || next === 'per' || next === 'fields'
+            ? next
+            : 'find',
+        ),
       );
     })}
     ${rest}
     <button
       type="button"
       class="icon-button"
-      aria-label="Remove this way of finding it"
-      title="Remove this way of finding it"
+      aria-label=${said.removeRule}
+      title=${said.removeRule}
       @click=${remove}
     >
       ${icon('mdi:close')}
@@ -403,7 +447,7 @@ function drawRule(
 
 function describeFound(value: Value | undefined, hass: HomeAssistant | undefined): string {
   if (value === undefined) {
-    return 'nothing';
+    return saidOf(hass).nothing;
   }
   const named = (item: Value): string => {
     if (typeof item === 'string' && hass?.states[item] !== undefined) {
@@ -414,19 +458,16 @@ function describeFound(value: Value | undefined, hass: HomeAssistant | undefined
   };
   return Array.isArray(value)
     ? value.length === 0
-      ? 'nothing'
+      ? saidOf(hass).nothing
       : value.map(named).join(', ')
     : named(value);
 }
 
-function matchesOf(step: Step): string {
-  const count = step.candidates.length;
-  const took = step.picked.length === 0 ? '' : `, took ${step.picked.join(', ')}`;
-  const tie = step.tied === undefined ? '' : `, tied with ${step.tied.slice(1).join(', ')}`;
-  return `${count} ${count === 1 ? 'match' : 'matches'}${took}${tie}`;
+function matchesOf(step: Step, said: Said): string {
+  return said.matches(step.candidates.length, step.picked, step.tied?.slice(1) ?? []);
 }
 
-function drawTrace(trace: Trace): TemplateResult {
+function drawTrace(trace: Trace, said: Said): TemplateResult {
   return html`<ul class="trace">
     ${trace.steps.map(
       (step) =>
@@ -434,14 +475,14 @@ function drawTrace(trace: Trace): TemplateResult {
           ${step.field === '' ? nothing : html`<b>${step.field}</b>: `}${step.rule}${
             step.filter === undefined && step.candidates.length === 0 && step.picked.length === 0
               ? nothing
-              : html`: ${matchesOf(step)}`
+              : html`: ${matchesOf(step, said)}`
           }
           ${
             step.near.length === 0
               ? nothing
               : html`<ul class="near">
                   ${step.near.map(
-                    (near) => html`<li>${near.entity_id} ${near.why.join(' and ')}</li>`,
+                    (near) => html`<li>${near.entity_id} ${said.both(near.why)}</li>`,
                   )}
                 </ul>`
           }
@@ -466,17 +507,18 @@ function drawTrial(
     actions.areas[0]?.value ??
     '';
   const trace = explain({ card: {}, slots: { [name]: spec } }, chosen, registriesOf(hass))[name];
+  const said = saidOf(hass);
   return html`<div class="trial">
-    <span class="muted">In</span>
-    ${choose(actions.areas, chosen, 'Try it in', (where) => {
+    <span class="muted">${said.trialIn}</span>
+    ${choose(actions.areas, chosen, said.tryIn, (where) => {
       for (const each of [...actions.open.keys()].filter((item) => item.startsWith(`${key}=`))) {
         actions.open.delete(each);
       }
       actions.open.set(`${key}=${where}`, true);
       actions.redraw();
     })}
-    <span class="found">it finds ${describeFound(trace?.value, hass)}</span>
-    ${trace === undefined ? nothing : drawTrace(trace)}
+    <span class="found">${said.finds(describeFound(trace?.value, hass))}</span>
+    ${trace === undefined ? nothing : drawTrace(trace, said)}
   </div>`;
 }
 
@@ -527,21 +569,254 @@ function overrideOf(base: SlotSpec, wanted: WrittenSlot): WrittenSlot {
   };
 }
 
-function shapeWords(shape: string, kind: Kind): string {
-  const one = `${/^[aeiou]/.test(shape) ? 'an' : 'a'} ${shape}`;
-  return kind === 'objects' ? `each ${one}` : one;
-}
-
-function drawDelete(name: string, remove: () => void): TemplateResult {
+function drawDelete(label: string, remove: () => void, said: Said): TemplateResult {
   return html`<button
     type="button"
     class="icon-button"
-    aria-label=${`Delete the slot ${name}`}
-    title=${`Delete the slot ${name}`}
+    aria-label=${said.deleteSlot(label)}
+    title=${said.deleteSlot(label)}
     @click=${remove}
   >
     ${icon('mdi:delete-outline')}
   </button>`;
+}
+
+interface Editing {
+  name: string;
+  spec: SlotSpec;
+  floor: SlotSpec | undefined;
+  now: () => WrittenSlot;
+  current: () => SlotSpec;
+  apply: (edit: Edit, drawing: Drawing) => void;
+  actions: SlotsActions;
+}
+
+function drawHead(
+  editing: Editing,
+  changed: boolean,
+  remove: (() => void) | undefined,
+): TemplateResult {
+  const { name, spec } = editing;
+  const said = saidOf(editing.actions.hass);
+  const shape = editing.now().shape;
+  const label = slotLabel(name, spec);
+  return html`<div class="slot-head">
+    <span class="slot-label">${label}</span>
+    <code class="slot-name">${name}</code>
+    <span class="muted">${spec.kind}</span>
+    ${shape === undefined ? nothing : html`<span class="muted">${said.shape(shape, spec.kind === 'objects')}</span>`}
+    ${spec.required === true ? html`<span class="badge">${said.required}</span>` : nothing}
+    ${changed ? html`<span class="badge changed">${said.changed}</span>` : nothing}
+    ${remove === undefined ? nothing : drawDelete(label, remove, said)}
+  </div>`;
+}
+
+function drawKind(editing: Editing, kinds: readonly Kind[]): TemplateResult {
+  const said = saidOf(editing.actions.hass);
+  return html`<label class="fact"
+    ><span class="fact-label">${said.kind}</span>${choose(
+      kinds.map((kind) => ({ value: kind, label: kind })),
+      editing.spec.kind,
+      said.kind,
+      (kind) => {
+        const found = kinds.find((each) => each === kind);
+        if (found !== undefined) {
+          editing.apply((slot) => ({ ...slot, kind: found }), REDRAW);
+        }
+      },
+      kinds.length < 2,
+    )}</label
+  >`;
+}
+
+function drawText(
+  editing: Editing,
+  key: 'label' | 'help' | 'group',
+  label: string,
+): TemplateResult {
+  const { spec, apply } = editing;
+  const shaped = editing.floor?.[key];
+  return html`<label class="fact"
+    ><span class="fact-label">${label}</span
+    ><input
+      class="fact-input"
+      aria-label=${label}
+      .value=${spec[key] === shaped ? '' : (spec[key] ?? '')}
+      .placeholder=${shaped ?? ''}
+      @change=${(event: Event) => {
+        const next = valueOf(event).trim();
+        apply(next === '' ? without(key) : (slot) => ({ ...slot, [key]: next }), IN_PLACE);
+        if (next === shaped && event.target instanceof HTMLInputElement) {
+          event.target.value = '';
+        }
+      }}
+  /></label>`;
+}
+
+function drawRequired(editing: Editing): TemplateResult {
+  const said = saidOf(editing.actions.hass);
+  return html`<label class="fact"
+    ><span class="fact-label">${said.requiredLabel}</span
+    ><input
+      type="checkbox"
+      aria-label=${said.requiredLabel}
+      ?disabled=${editing.floor?.required === true}
+      .checked=${editing.spec.required === true}
+      @change=${(event: Event) => {
+        editing.apply(
+          field(event.target, 'checked') === true
+            ? (slot) => ({ ...slot, required: true })
+            : without('required'),
+          REDRAW,
+        );
+      }}
+  /></label>`;
+}
+
+function drawDefault(editing: Editing): TemplateResult {
+  const { spec, current, apply } = editing;
+  const shapedDefault = editing.floor?.default;
+  const fallback = hashOf(spec.default) === hashOf(shapedDefault) ? '' : oneLine(spec.default);
+  const said = saidOf(editing.actions.hass);
+  return html`<label class="fact"
+    ><span class="fact-label">${said.default}</span
+    ><input
+      class="fact-input"
+      aria-label=${said.default}
+      .value=${fallback}
+      .placeholder=${oneLine(shapedDefault)}
+      @change=${(event: Event) => {
+        const target = event.target;
+        try {
+          const value = parseDefault(current().kind, valueOf(event));
+          apply(
+            value === undefined ? without('default') : (slot) => ({ ...slot, default: value }),
+            IN_PLACE,
+          );
+          if (target instanceof HTMLInputElement) {
+            target.setCustomValidity('');
+            if (value !== undefined && hashOf(value) === hashOf(shapedDefault)) {
+              target.value = '';
+            }
+          }
+        } catch (error) {
+          if (target instanceof HTMLInputElement) {
+            target.setCustomValidity(messageOf(error));
+            target.reportValidity();
+          }
+        }
+      }}
+  /></label>`;
+}
+
+function drawFacts(editing: Editing, kinds: readonly Kind[], depth: number): TemplateResult {
+  const said = saidOf(editing.actions.hass);
+  return html`<div class="slot-facts">
+    ${drawKind(editing, kinds)} ${drawText(editing, 'label', said.label)}
+    ${drawText(editing, 'help', said.help)}
+    ${depth === 0 ? drawText(editing, 'group', said.group) : nothing} ${drawRequired(editing)}
+    ${drawDefault(editing)}
+  </div>`;
+}
+
+function drawFinding(editing: Editing): TemplateResult {
+  const { name, spec, actions, apply } = editing;
+  const said = saidOf(actions.hass);
+  const rules = alternatives(spec);
+  const more = rules.length === 0 ? said.findIt : said.orElseFind;
+  return html`<div class="finding">
+    <h4>${rules.length === 0 ? said.byHand : said.foundBy}</h4>
+    ${rules.map(
+      (rule, index) =>
+        html`${index > 0 ? html`<div class="or">${said.orElse}</div>` : nothing}${drawRule(
+          rule,
+          spec.kind,
+          actions,
+          (next) => {
+            apply(
+              (slot) =>
+                withRules(
+                  slot,
+                  alternatives(slot).map((each, at) => (at === index ? next : each)),
+                ),
+              REDRAW,
+            );
+          },
+          () => {
+            apply(
+              (slot) =>
+                withRules(
+                  slot,
+                  alternatives(slot).filter((_each, at) => at !== index),
+                ),
+              REDRAW,
+            );
+          },
+        )}`,
+    )}
+    <button
+      type="button"
+      class="chip"
+      aria-label=${more}
+      title=${more}
+      @click=${() => {
+        apply(
+          (slot) =>
+            withRules(slot, [
+              ...alternatives(slot),
+              starterRule(spec.kind, spec.kind === 'objects' ? 'per' : 'find'),
+            ]),
+          REDRAW,
+        );
+      }}
+    >
+      ${icon('mdi:magnify')}<span>${more}</span>
+    </button>
+    ${drawTrial(name, spec, actions)}
+  </div>`;
+}
+
+function drawFields(
+  editing: Editing,
+  shipped: SlotSpec | undefined,
+  depth: number,
+): TemplateResult | typeof nothing {
+  const { floor, now, current, apply } = editing;
+  if (!LISTS.includes(editing.spec.kind)) {
+    return nothing;
+  }
+  return html`<div class="fields">
+    <h4>${saidOf(editing.actions.hass).fields}</h4>
+    ${drawSlotList(
+      () => (floor === undefined ? now().fields : current().fields) ?? {},
+      shipped?.fields,
+      editing.actions,
+      (next, drawing) => {
+        apply(
+          Object.keys(next).length === 0
+            ? without('fields')
+            : (slot) => ({ ...slot, fields: next }),
+          drawing,
+        );
+      },
+      depth + 1,
+      floor === undefined ? undefined : (floor.fields ?? {}),
+    )}
+  </div>`;
+}
+
+function kindsOf(
+  spec: SlotSpec,
+  base: SlotSpec | undefined,
+  within: SlotSpec | undefined,
+): readonly Kind[] {
+  if (within !== undefined) {
+    return [spec.kind];
+  }
+  if (base === undefined) {
+    return KINDS;
+  }
+  return LISTS.includes(base.kind) ? LISTS : [base.kind];
 }
 
 function drawSlot(
@@ -549,25 +824,31 @@ function drawSlot(
   now: () => WrittenSlot,
   shipped: SlotSpec | undefined,
   actions: SlotsActions,
-  set: (spec: WrittenSlot | undefined, redraw: boolean) => void,
+  set: (spec: WrittenSlot | undefined, drawing: Drawing) => void,
   depth: number,
   within: SlotSpec | undefined,
 ): TemplateResult {
   const remove = (): void => {
-    set(undefined, true);
+    set(undefined, REDRAW);
   };
   let spec: SlotSpec;
   try {
     spec = slotOf(actions.name, name, now());
   } catch (error) {
     return html`<section class="slot">
-      <div class="slot-head"><code class="slot-name">${name}</code>${drawDelete(name, remove)}</div>
+      <div class="slot-head">
+        <span class="slot-label">${slotLabel(name, now())}</span
+        ><code class="slot-name">${name}</code>${drawDelete(
+          slotLabel(name, now()),
+          remove,
+          saidOf(actions.hass),
+        )}
+      </div>
       <p class="problem-line">${messageOf(error)}</p>
     </section>`;
   }
   const shape = now().shape;
   const base = shape === undefined ? undefined : slotOf(actions.name, name, { shape });
-  const floor = within ?? base;
   const current = (): SlotSpec => {
     try {
       return slotOf(actions.name, name, now());
@@ -575,215 +856,55 @@ function drawSlot(
       return spec;
     }
   };
-  const apply = (edit: Edit, redraw: boolean): void => {
-    set(
-      shape === undefined || base === undefined
-        ? edit(now())
-        : { shape, ...overrideOf(base, edit(current())) },
-      redraw,
-    );
+  const editing: Editing = {
+    name,
+    spec,
+    floor: within ?? base,
+    now,
+    current,
+    apply: (edit, drawing) => {
+      set(
+        shape === undefined || base === undefined
+          ? edit(now())
+          : { shape, ...overrideOf(base, edit(current())) },
+        drawing,
+      );
+    },
+    actions,
   };
-  const kinds =
-    within !== undefined
-      ? [spec.kind]
-      : base === undefined
-        ? KINDS
-        : LISTS.includes(base.kind)
-          ? LISTS
-          : [base.kind];
   const changed =
     actions.shipped !== undefined && (shipped === undefined || hashOf(shipped) !== hashOf(spec));
-  const text = (key: 'label' | 'help' | 'group', label: string): TemplateResult => {
-    const shaped = floor?.[key];
-    return html`<label class="fact"
-      ><span class="fact-label">${label}</span
-      ><input
-        class="fact-input"
-        aria-label=${label}
-        .value=${spec[key] === shaped ? '' : (spec[key] ?? '')}
-        .placeholder=${shaped ?? ''}
-        @change=${(event: Event) => {
-          const next = valueOf(event).trim();
-          apply(next === '' ? without(key) : (slot) => ({ ...slot, [key]: next }), false);
-          if (next === shaped && event.target instanceof HTMLInputElement) {
-            event.target.value = '';
-          }
-        }}
-    /></label>`;
-  };
-  const shapedDefault = floor?.default;
-  const fallback = hashOf(spec.default) === hashOf(shapedDefault) ? '' : oneLine(spec.default);
-  const rules = alternatives(spec);
   return html`<section class="slot">
-    <div class="slot-head">
-      <code class="slot-name">${name}</code>
-      <span class="muted">${spec.kind}</span>
-      ${shape === undefined ? nothing : html`<span class="muted">${shapeWords(shape, spec.kind)}</span>`}
-      ${spec.required === true ? html`<span class="badge">required</span>` : nothing}
-      ${changed ? html`<span class="badge changed">changed</span>` : nothing}
-      ${within === undefined ? drawDelete(name, remove) : nothing}
-    </div>
-    <div class="slot-facts">
-      <label class="fact"
-        ><span class="fact-label">Kind</span>${choose(
-          kinds.map((kind) => ({ value: kind, label: kind })),
-          spec.kind,
-          'Kind',
-          (kind) => {
-            const found = kinds.find((each) => each === kind);
-            if (found !== undefined) {
-              apply((slot) => ({ ...slot, kind: found }), true);
-            }
-          },
-          kinds.length < 2,
-        )}</label
-      >
-      ${text('label', 'Label')} ${text('help', 'Help')}
-      ${depth === 0 ? text('group', 'Group') : nothing}
-      <label class="fact"
-        ><span class="fact-label">Required</span
-        ><input
-          type="checkbox"
-          aria-label="Required"
-          ?disabled=${floor?.required === true}
-          .checked=${spec.required === true}
-          @change=${(event: Event) => {
-            apply(
-              field(event.target, 'checked') === true
-                ? (slot) => ({ ...slot, required: true })
-                : without('required'),
-              true,
-            );
-          }}
-      /></label>
-      <label class="fact"
-        ><span class="fact-label">Default</span
-        ><input
-          class="fact-input"
-          aria-label="Default"
-          .value=${fallback}
-          .placeholder=${oneLine(shapedDefault)}
-          @change=${(event: Event) => {
-            const target = event.target;
-            try {
-              const value = parseDefault(current().kind, valueOf(event));
-              apply(
-                value === undefined ? without('default') : (slot) => ({ ...slot, default: value }),
-                false,
-              );
-              if (target instanceof HTMLInputElement) {
-                target.setCustomValidity('');
-                if (value !== undefined && hashOf(value) === hashOf(shapedDefault)) {
-                  target.value = '';
-                }
-              }
-            } catch (error) {
-              if (target instanceof HTMLInputElement) {
-                target.setCustomValidity(messageOf(error));
-                target.reportValidity();
-              }
-            }
-          }}
-      /></label>
-    </div>
-    <div class="finding">
-      <h4>${rules.length === 0 ? 'Set by hand' : 'Found by'}</h4>
-      ${rules.map(
-        (rule, index) =>
-          html`${index > 0 ? html`<div class="or">or else</div>` : nothing}${drawRule(
-            rule,
-            spec.kind,
-            actions,
-            (next) => {
-              apply(
-                (slot) =>
-                  withRules(
-                    slot,
-                    alternatives(slot).map((each, at) => (at === index ? next : each)),
-                  ),
-                true,
-              );
-            },
-            () => {
-              apply(
-                (slot) =>
-                  withRules(
-                    slot,
-                    alternatives(slot).filter((_each, at) => at !== index),
-                  ),
-                true,
-              );
-            },
-          )}`,
-      )}
-      <button
-        type="button"
-        class="chip"
-        aria-label=${rules.length === 0 ? 'Find it' : 'Or else'}
-        title=${rules.length === 0 ? 'Find it' : 'Or else'}
-        @click=${() => {
-          apply(
-            (slot) =>
-              withRules(slot, [
-                ...alternatives(slot),
-                starterRule(spec.kind, spec.kind === 'objects' ? 'per' : 'find'),
-              ]),
-            true,
-          );
-        }}
-      >
-        ${icon('mdi:magnify')}<span>${rules.length === 0 ? 'Find it' : 'Or else'}</span>
-      </button>
-      ${drawTrial(name, spec, actions)}
-    </div>
-    ${
-      LISTS.includes(spec.kind)
-        ? html`<div class="fields">
-            <h4>Fields</h4>
-            ${drawSlotList(
-              () => (floor === undefined ? now().fields : current().fields) ?? {},
-              shipped?.fields,
-              actions,
-              (next, redraw) => {
-                apply(
-                  Object.keys(next).length === 0
-                    ? without('fields')
-                    : (slot) => ({ ...slot, fields: next }),
-                  redraw,
-                );
-              },
-              depth + 1,
-              floor === undefined ? undefined : (floor.fields ?? {}),
-            )}
-          </div>`
-        : nothing
-    }
+    ${drawHead(editing, changed, within === undefined ? remove : undefined)}
+    ${drawFacts(editing, kindsOf(spec, base, within), depth)} ${drawFinding(editing)}
+    ${drawFields(editing, shipped, depth)}
   </section>`;
 }
 
 function drawAdd(
   names: readonly string[],
   add: (name: string, kind: Kind) => void,
+  said: Said,
 ): TemplateResult {
   return html`<div class="add-slot">
     <input
       class="fact-input"
       placeholder="new_slot"
-      aria-label="The new slot"
+      aria-label=${said.newSlot}
       @input=${(event: Event) => {
         if (event.target instanceof HTMLInputElement) {
           event.target.setCustomValidity('');
         }
       }}
     />
-    <select class="word" aria-label="Its kind">
+    <select class="word" aria-label=${said.itsKind}>
       ${KINDS.map((each) => html`<option value=${each}>${each}</option>`)}
     </select>
     <button
       type="button"
       class="action"
-      aria-label="Add the slot"
-      title="Add the slot"
+      aria-label=${said.addSlot}
+      title=${said.addSlot}
       @click=${(event: Event) => {
         const box =
           event.currentTarget instanceof HTMLElement ? event.currentTarget.parentElement : null;
@@ -791,18 +912,14 @@ function drawAdd(
         const picked = box?.querySelector('select')?.value;
         const wanted = input?.value.trim() ?? '';
         if (!SLOT_NAME.test(wanted) || names.includes(wanted)) {
-          input?.setCustomValidity(
-            names.includes(wanted)
-              ? 'A slot of that name is there already'
-              : 'Lower case letters, digits and _',
-          );
+          input?.setCustomValidity(names.includes(wanted) ? said.taken : said.nameRule);
           input?.reportValidity();
           return;
         }
         add(wanted, KINDS.find((each) => each === picked) ?? 'text');
       }}
     >
-      Add
+      ${said.add}
     </button>
   </div>`;
 }
@@ -819,14 +936,15 @@ function drawSlotList(
   now: () => Readonly<Record<string, WrittenSlot>>,
   shipped: Readonly<Record<string, SlotSpec>> | undefined,
   actions: SlotsActions,
-  set: (next: Record<string, WrittenSlot>, redraw: boolean) => void,
+  set: (next: Record<string, WrittenSlot>, drawing: Drawing) => void,
   depth: number,
   within: Readonly<Record<string, SlotSpec>> | undefined,
 ): TemplateResult {
   const slots = now();
+  const said = saidOf(actions.hass);
   const groups = new Map<string, [string, WrittenSlot][]>();
   for (const entry of Object.entries(slots)) {
-    const group = depth === 0 ? (groupOf(actions.name, ...entry) ?? 'Basics') : '';
+    const group = depth === 0 ? (groupOf(actions.name, ...entry) ?? said.basics) : '';
     groups.set(group, [...(groups.get(group) ?? []), entry]);
   }
   return html`<div class="slot-list">
@@ -839,14 +957,14 @@ function drawSlotList(
               () => now()[name] ?? spec,
               shipped?.[name],
               actions,
-              (next, redraw) => {
+              (next, drawing) => {
                 set(
                   Object.fromEntries(
                     Object.entries(now()).flatMap(([each, inner]) =>
                       each !== name ? [[each, inner]] : next === undefined ? [] : [[each, next]],
                     ),
                   ),
-                  redraw,
+                  drawing,
                 );
               },
               depth,
@@ -856,9 +974,13 @@ function drawSlotList(
     )}
     ${
       within === undefined
-        ? drawAdd(Object.keys(slots), (name, kind) => {
-            set({ ...now(), [name]: { kind } }, true);
-          })
+        ? drawAdd(
+            Object.keys(slots),
+            (name, kind) => {
+              set({ ...now(), [name]: { kind } }, REDRAW);
+            },
+            said,
+          )
         : nothing
     }
   </div>`;
@@ -866,18 +988,14 @@ function drawSlotList(
 
 export function drawSlots(now: () => WrittenTemplate, actions: SlotsActions): TemplateResult {
   return html`<div class="slots-tab">
-    <p class="muted">
-      A slot is what a card of this template is given, or finds on its own in its area. A slot that
-      names a shape takes the shape's fields, and an edit to it writes only what differs from the
-      shape.
-    </p>
+    <p class="muted">${saidOf(actions.hass).about}</p>
     ${drawSlotList(
       () => now().slots ?? {},
       actions.shipped?.slots,
       actions,
-      (next, redraw) => {
+      (next, drawing) => {
         const { slots: _old, ...rest } = now();
-        actions.update(Object.keys(next).length === 0 ? rest : { ...rest, slots: next }, redraw);
+        actions.update(Object.keys(next).length === 0 ? rest : { ...rest, slots: next }, drawing);
       },
       0,
       undefined,
@@ -911,11 +1029,16 @@ export const SLOTS_STYLE = css`
     gap: 8px;
   }
   .slot-head .icon-button {
-    margin-left: auto;
+    margin-inline-start: auto;
+  }
+  .slot-label {
+    font-size: 15px;
+    font-weight: 500;
   }
   .slot-name {
     font-family: var(--ha-font-family-code, monospace);
-    font-size: 14px;
+    font-size: 12px;
+    color: var(--secondary-text-color);
   }
   .slot-facts {
     display: grid;
@@ -981,20 +1104,20 @@ export const SLOTS_STYLE = css`
   .trace {
     flex-basis: 100%;
     margin: 0;
-    padding-left: 18px;
+    padding-inline-start: 18px;
     color: var(--secondary-text-color);
     font-size: 12px;
   }
   .trace .near {
     margin: 2px 0 4px;
-    padding-left: 16px;
+    padding-inline-start: 16px;
   }
   .trace .reason {
     color: var(--primary-text-color);
   }
   .fields {
-    padding-left: 12px;
-    border-left: 2px solid var(--divider-color);
+    padding-inline-start: 12px;
+    border-inline-start: 2px solid var(--divider-color);
     display: flex;
     flex-direction: column;
     gap: 8px;

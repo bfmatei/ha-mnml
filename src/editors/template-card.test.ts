@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 
-import { test } from 'vitest';
+import { test, vi } from 'vitest';
 
-import { fakeStore } from '../test/fake-hass.ts';
-import { define, mounted, text } from '../test/render.ts';
+import type { HomeAssistant } from '../ha/hass.ts';
+import type { EntityEntry } from '../ha/registries.ts';
+import { fakeConnection, fakeHass, fakeState, fakeStore } from '../test/hass.ts';
+import { define, everything, mounted, text, updated } from '../test/render.ts';
 
 import { MnmlTemplateGallery } from './gallery.ts';
 import { MnmlRelated } from './related.ts';
@@ -30,26 +32,6 @@ define('mnml-template-gallery', MnmlTemplateGallery);
 define('mnml-related', MnmlRelated);
 define('mnml-template-card-editor', MnmlTemplateCardEditor);
 
-const settle = async (rounds = 6): Promise<void> => {
-  await new Promise((resolve) => {
-    setTimeout(resolve, 0);
-  });
-  if (rounds > 1) {
-    await settle(rounds - 1);
-  }
-};
-
-function everything(root: ParentNode): Element[] {
-  const out: Element[] = [];
-  for (const element of root.querySelectorAll('*')) {
-    out.push(element);
-    if (element.shadowRoot !== null) {
-      out.push(...everything(element.shadowRoot));
-    }
-  }
-  return out;
-}
-
 const labelled = (root: ParentNode, label: string): HTMLElement | undefined =>
   everything(root).find(
     (node): node is HTMLElement =>
@@ -59,7 +41,7 @@ const labelled = (root: ParentNode, label: string): HTMLElement | undefined =>
 async function click(node: HTMLElement | undefined): Promise<void> {
   assert.ok(node, 'there is something to click');
   node.click();
-  await settle();
+  await updated(document);
 }
 
 const forms = (root: ParentNode): FakeForm[] =>
@@ -71,7 +53,7 @@ const formWith = (root: ParentNode, name: string): FakeForm | undefined =>
 async function fire(form: FakeForm | undefined, value: Record<string, unknown>): Promise<void> {
   assert.ok(form, 'there is a form');
   form.dispatchEvent(new CustomEvent('value-changed', { detail: { value } }));
-  await settle();
+  await updated(document);
 }
 
 const checked = (root: ParentNode): string[] =>
@@ -87,14 +69,10 @@ const own = (templates: Record<string, unknown>): Record<string, unknown> =>
     Object.entries(templates).map(([name, template]) => [name, { kind: 'own', template }]),
   );
 
-function hanging(store: ReturnType<typeof fakeStore>): Record<string, unknown> {
-  return {
-    ...store.hass,
-    connection: {
-      ...store.hass.connection,
-      subscribeMessage: (): Promise<never> => new Promise(() => undefined),
-    },
-  };
+function hanging(): HomeAssistant {
+  return fakeHass({
+    connection: fakeConnection({ subscribeMessage: () => new Promise(() => undefined) }),
+  });
 }
 
 interface Opened {
@@ -113,12 +91,12 @@ function made(): { editor: MnmlTemplateCardEditor; dispatched: unknown[] } {
   return { editor, dispatched };
 }
 
-async function openWith(config: unknown, hass: unknown): Promise<Opened> {
+async function openWith(config: unknown, hass: HomeAssistant): Promise<Opened> {
   const { editor, dispatched } = made();
   editor.setConfig(config);
-  editor.hass = hass as never;
+  editor.hass = hass;
   const root = await mounted(editor);
-  await settle();
+  await updated(document);
   return { editor, root, dispatched };
 }
 
@@ -141,13 +119,55 @@ function lastConfig(dispatched: readonly unknown[]): Record<string, unknown> {
 
 async function again(opened: Opened): Promise<void> {
   opened.editor.setConfig(lastConfig(opened.dispatched));
-  await settle();
+  await updated(document);
 }
+
+test('the editor names its template by the title and icon, its code name small under the description', async () => {
+  const { root } = await open({
+    type: 'custom:mnml-template-card',
+    template: 'section-heading',
+    slots: { title: 'Rooms', icon: 'mdi:floor-plan' },
+  });
+  const head = everything(root).find((node) => node.classList.contains('template-head'));
+  assert.ok(head);
+  assert.equal(text(head.querySelector('.template-name')), 'Section heading');
+  assert.equal(Reflect.get(head.querySelector('.template-icon') ?? {}, 'icon'), 'mdi:format-title');
+  assert.equal(text(head.querySelector('.template-code')), 'section-heading');
+  assert.doesNotMatch(text(head.querySelector('.template-top')), /section-heading/);
+});
+
+test('Edit this template asks whether only this card or every card changes, and remembers Every card while the page is open', async () => {
+  const pushed: string[] = [];
+  const push = vi.spyOn(history, 'pushState').mockImplementation((_state, _title, path) => {
+    pushed.push(String(path));
+  });
+  const { root } = await openWith(
+    { type: 'custom:mnml-template-card', template: 'section-heading', slots: { title: 'Rooms' } },
+    { ...fakeStore().hass, user: { id: 'admin', is_admin: true } },
+  );
+  const edit = (): HTMLElement | undefined => labelled(root, 'Edit this template in MNML');
+  const which = 'Change this card alone, or every card drawn with this template?';
+  assert.equal(labelled(root, which), undefined);
+  await click(edit());
+  assert.ok(labelled(root, which));
+  await click(labelled(root, 'Only this card'));
+  assert.equal(labelled(root, which), undefined);
+  assert.match(text(root.querySelector('[role="status"]')), /changes this card alone/);
+  assert.deepEqual(pushed, []);
+  await click(edit());
+  await click(labelled(root, 'Every card'));
+  assert.deepEqual(pushed, ['/mnml/templates/section-heading']);
+  assert.equal(labelled(root, which), undefined);
+  await click(edit());
+  assert.equal(labelled(root, which), undefined);
+  assert.deepEqual(pushed, ['/mnml/templates/section-heading', '/mnml/templates/section-heading']);
+  push.mockRestore();
+});
 
 test('picking a template writes it as its tile showed it, and switching sources writes where its values come from', async () => {
   const opened = await open({ type: 'custom:mnml-template-card', template: '' });
   const { root, dispatched } = opened;
-  await click(labelled(root, 'Use section-heading'));
+  await click(labelled(root, 'Use Section heading'));
   const picked = {
     type: 'custom:mnml-template-card',
     template: 'section-heading',
@@ -178,9 +198,9 @@ test('the context Home Assistant hands every card editor does not break it', asy
     template: 'section-heading',
     slots: { title: 'MNML', icon: 'mdi:shape' },
   });
-  editor.hass = { ...fakeStore().hass, states: {}, areas: {}, devices: {}, entities: {} } as never;
+  editor.hass = { ...fakeStore().hass, states: {}, areas: {}, devices: {}, entities: {} };
   const root = await mounted(editor);
-  await settle();
+  await updated(document);
   assert.ok(labelled(root, 'Fill in yourself'));
 });
 
@@ -199,7 +219,7 @@ test('choosing another template keeps the layout and visibility of the card', as
         each instanceof HTMLButtonElement && text(each).startsWith('Pop-ups and parts'),
     ),
   );
-  await click(labelled(root, 'Use vacuum-card'));
+  await click(labelled(root, 'Use Vacuum'));
   const config = lastConfig(dispatched);
   assert.equal(config['template'], 'vacuum-card');
   assert.deepEqual(config['grid_options'], { columns: 6 });
@@ -223,13 +243,13 @@ test('a store that cannot be read is named in the gallery', async () => {
     { ...store.hass, states: {}, areas: {}, devices: {}, entities: {} },
   );
   assert.match(text(root), /the templates MNML keeps could not be read: Something broke/);
-  assert.ok(labelled(root, 'Use section-heading'));
+  assert.ok(labelled(root, 'Use Section heading'));
 });
 
 test('a template that does not exist is named, above the gallery', async () => {
   const { root } = await open({ type: 'custom:mnml-template-card', template: 'no-such-template' });
   assert.match(text(root), /no-such-template is not a template this dashboard knows: pick one/);
-  assert.ok(labelled(root, 'Use section-heading'));
+  assert.ok(labelled(root, 'Use Section heading'));
 });
 
 test("a closed editor no longer redraws when the store's templates change", async () => {
@@ -241,23 +261,23 @@ test("a closed editor no longer redraws when the store's templates change", asyn
     { type: 'custom:mnml-template-card', template: '' },
     { ...store.hass, states: {}, areas: {}, devices: {}, entities: {} },
   );
-  assert.ok(labelled(root, 'Use one'));
+  assert.ok(labelled(root, 'Use One'));
   store.keep(
     own({
       two: { card: { type: 'custom:mnml-heading-card', title: 'Two', icon: 'mdi:numeric-2' } },
     }),
   );
-  await settle();
-  assert.ok(labelled(root, 'Use two'), 'an open editor follows the change');
+  await updated(document);
+  assert.ok(labelled(root, 'Use Two'), 'an open editor follows the change');
   editor.remove();
   store.keep(
     own({
       three: { card: { type: 'custom:mnml-heading-card', title: 'Three', icon: 'mdi:numeric-3' } },
     }),
   );
-  await settle();
-  assert.equal(labelled(root, 'Use three'), undefined);
-  assert.ok(labelled(root, 'Use two'));
+  await updated(document);
+  assert.equal(labelled(root, 'Use Three'), undefined);
+  assert.ok(labelled(root, 'Use Two'));
 });
 
 test('a reopened editor draws again, with what changed while it was closed', async () => {
@@ -273,24 +293,24 @@ test('a reopened editor draws again, with what changed while it was closed', asy
     devices: {},
     entities: {},
   });
-  assert.ok(labelled(root, 'Use one'));
+  assert.ok(labelled(root, 'Use One'));
   editor.remove();
   store.keep(
     own({
       two: { card: { type: 'custom:mnml-heading-card', title: 'Two', icon: 'mdi:numeric-2' } },
     }),
   );
-  await settle();
+  await updated(document);
   document.body.append(editor);
   editor.setConfig(config);
-  await settle();
-  assert.ok(labelled(root, 'Use two'));
+  await updated(document);
+  assert.ok(labelled(root, 'Use Two'));
 });
 
 test("a template of the store is not called unknown while the store's templates are still on their way", async () => {
   const { root } = await openWith(
     { type: 'custom:mnml-template-card', template: 'my-own' },
-    { ...hanging(fakeStore()), states: {}, areas: {}, devices: {}, entities: {} },
+    hanging(),
   );
   assert.doesNotMatch(text(root), /is not a template this dashboard knows/);
 });
@@ -298,7 +318,7 @@ test("a template of the store is not called unknown while the store's templates 
 test('a shipped template is not called unknown before its family has arrived', async () => {
   const { editor } = made();
   editor.setConfig({ type: 'custom:mnml-template-card', template: 'vacuum-card' });
-  editor.hass = { ...fakeStore().hass, states: {}, areas: {}, devices: {}, entities: {} } as never;
+  editor.hass = { ...fakeStore().hass, states: {}, areas: {}, devices: {}, entities: {} };
   const root = await mounted(editor);
   assert.doesNotMatch(text(root), /is not a template this dashboard knows/);
 });
@@ -374,7 +394,7 @@ const DEFAULTED = {
   card: { type: 'custom:mnml-heading-card', title: '[[title]]', icon: 'mdi:sofa' },
 };
 
-function roomHass(): Record<string, unknown> {
+function roomHass(): HomeAssistant {
   const store = fakeStore();
   store.kept = own({
     'room-like': ROOM_LIKE,
@@ -382,8 +402,8 @@ function roomHass(): Record<string, unknown> {
     homey: HOMEY,
     defaulted: DEFAULTED,
   });
-  return {
-    ...store.hass,
+  return fakeHass({
+    connection: store.hass.connection,
     areas: {
       bathroom: { area_id: 'bathroom', name: 'Bathroom' },
       living: { area_id: 'living', name: 'Living' },
@@ -405,7 +425,7 @@ function roomHass(): Record<string, unknown> {
         attributes: { friendly_name: 'Living Heating' },
       },
     },
-  };
+  });
 }
 
 const openRoom = (config: Record<string, unknown>): Promise<Opened> => openWith(config, roomHass());
@@ -555,7 +575,7 @@ test('a panel that holds one part named like the panel does not repeat its name 
 test('while the templates load, a card that names one waits for them, with no gallery', async () => {
   const { root } = await openWith(
     { type: 'custom:mnml-template-card', template: 'room-like', area: 'living' },
-    { ...hanging(fakeStore()), areas: {}, devices: {}, entities: {}, states: {} },
+    hanging(),
   );
   assert.equal(labelled(root, 'Filter the templates'), undefined);
   assert.match(text(root), /Loading the templates/);
@@ -568,7 +588,7 @@ test('values remembered for one template do not follow the card to another', asy
   await fire(formWith(root, 'name'), { key: 'living', name: 'Den' });
   await again(opened);
   await click(labelled(root, 'Change the template'));
-  await click(labelled(root, 'Use personish'));
+  await click(labelled(root, 'Use Personish'));
   await again(opened);
   await fire(formWith(root, 'who'), { who: 'person.a' });
   assert.deepEqual(lastConfig(dispatched)['slots'], { who: 'person.a' });
@@ -578,7 +598,7 @@ test('picking the template already chosen closes the gallery and keeps the card'
   const { root, dispatched } = await openRoom(MINE);
   const before = dispatched.length;
   await click(labelled(root, 'Change the template'));
-  await click(labelled(root, 'Use room-like'));
+  await click(labelled(root, 'Use Room like'));
   assert.equal(dispatched.length, before);
   assert.ok(labelled(root, 'Fill in yourself'));
 });
@@ -589,8 +609,8 @@ test("the gallery is drawn with the editor's hass, and follows a new one", async
   assert.ok(gallery instanceof MnmlTemplateGallery);
   assert.equal(gallery.hass, editor.hass);
   const latest = { ...fakeStore().hass, states: {}, areas: {}, devices: {}, entities: {} };
-  editor.hass = latest as never;
-  await settle();
+  editor.hass = latest;
+  await updated(document);
   assert.equal(gallery.hass, latest);
 });
 
@@ -602,8 +622,8 @@ test('the gallery opened again by Change is the one left, its filter kept', asyn
   assert.ok(filter instanceof HTMLInputElement);
   filter.value = 'person';
   filter.dispatchEvent(new Event('input'));
-  await settle();
-  await click(labelled(root, 'Use personish'));
+  await updated(document);
+  await click(labelled(root, 'Use Personish'));
   await again(opened);
   await click(labelled(root, 'Change the template'));
   assert.equal(labelled(root, 'Filter the templates'), filter);
@@ -614,7 +634,7 @@ test('a template picked from the gallery starts as its tile showed it, with one 
   const opened = await openRoom(MINE);
   const { root, dispatched } = opened;
   await click(labelled(root, 'Change the template'));
-  await click(labelled(root, 'Use personish'));
+  await click(labelled(root, 'Use Personish'));
   assert.deepEqual(lastConfig(dispatched), {
     type: 'custom:mnml-template-card',
     template: 'personish',
@@ -623,7 +643,7 @@ test('a template picked from the gallery starts as its tile showed it, with one 
   await again(opened);
   assert.deepEqual(checked(root), ['Fill in yourself']);
   await click(labelled(root, 'Change the template'));
-  await click(labelled(root, 'Use room-like'));
+  await click(labelled(root, 'Use Room like'));
   const picked = lastConfig(dispatched);
   assert.equal(typeof picked['area'], 'string');
   assert.notEqual(picked['area'], '');
@@ -761,18 +781,18 @@ const PLAIN = {
   card: { type: 'custom:mnml-heading-card', title: '[[title]]', icon: 'mdi:star' },
 };
 
-function sceneHass(): Record<string, unknown> {
+function sceneHass(): HomeAssistant {
   const store = fakeStore();
   store.kept = own({ lighty: LIGHTY, plain: PLAIN });
-  return {
-    ...store.hass,
+  return fakeHass({
+    connection: store.hass.connection,
     areas: { living: { area_id: 'living', name: 'Living' } },
     devices: {},
     entities: { 'scene.living_relax': { entity_id: 'scene.living_relax', area_id: 'living' } },
     states: {
       'scene.living_relax': { entity_id: 'scene.living_relax', state: 'x', attributes: {} },
     },
-  };
+  });
 }
 
 test('an object discovery finds only in part is not found, and the slot it fills is named as needed', async () => {
@@ -810,24 +830,29 @@ test('another template picked starts with its own folds, not the ones opened on 
   await click(labelled(root, 'Change what it found'));
   assert.equal(panelHeads(root)['Basics'], 'true');
   await click(labelled(root, 'Change the template'));
-  await click(labelled(root, 'Use basic-two'));
+  await click(labelled(root, 'Use Basic two'));
   assert.equal(panelHeads(root)['Basics'], 'false');
 });
 
-function tiedHass(): Record<string, unknown> {
+function tiedHass(): HomeAssistant {
   const hass = roomHass();
-  const entities = hass['entities'] as Record<string, unknown>;
-  const states = hass['states'] as Record<string, unknown>;
-  entities['sensor.living_temperature_b'] = {
-    entity_id: 'sensor.living_temperature_b',
-    area_id: 'living',
+  return {
+    ...hass,
+    entities: {
+      ...hass.entities,
+      'sensor.living_temperature_b': {
+        entity_id: 'sensor.living_temperature_b',
+        area_id: 'living',
+      },
+    },
+    states: {
+      ...hass.states,
+      'sensor.living_temperature_b': fakeState('sensor.living_temperature_b', {
+        state: '22',
+        attributes: { device_class: 'temperature', friendly_name: 'Living Temperature B' },
+      }),
+    },
   };
-  states['sensor.living_temperature_b'] = {
-    entity_id: 'sensor.living_temperature_b',
-    state: '22',
-    attributes: { device_class: 'temperature', friendly_name: 'Living Temperature B' },
-  };
-  return hass;
 }
 
 test('when several fit a slot equally, they are offered, and picking one sets it', async () => {
@@ -967,16 +992,31 @@ const ROBOTIC = {
   card: { type: 'custom:mnml-heading-card', title: 'Robot', icon: 'mdi:robot-vacuum' },
 };
 
-const entity = (id: string, device: string, key?: string): [string, unknown] => [
+const entity = (id: string, device: string, key?: string): [string, EntityEntry] => [
   id,
-  { entity_id: id, device_id: device, ...(key === undefined ? {} : { translation_key: key }) },
+  { entity_id: id, device_id: device, translation_key: key },
 ];
 
-function robotHass(withMini = true): Record<string, unknown> {
+const ON_ROBOT = {
+  title: 'Robot card',
+  description: 'A robot on its own.',
+  slots: {
+    key: { kind: 'text', required: true, discover: 'area.id', group: 'Basics' },
+    vacuum: { ...ROBOTIC.slots.vacuum, required: true },
+  },
+  card: ROBOTIC.card,
+};
+
+const ROBOTS = { robotic: ROBOTIC, 'on-robot': ON_ROBOT };
+
+function robotHass(
+  withMini = true,
+  templates: Record<string, unknown> = { robotic: ROBOTIC },
+): HomeAssistant {
   const store = fakeStore();
-  store.kept = own({ robotic: ROBOTIC });
-  return {
-    ...store.hass,
+  store.kept = own(templates);
+  return fakeHass({
+    connection: store.hass.connection,
     areas: { living: { area_id: 'living', name: 'Living' } },
     devices: {
       robo: { id: 'robo', area_id: 'living', name: 'Robo', name_by_user: 'Roborock S8' },
@@ -998,7 +1038,7 @@ function robotHass(withMini = true): Record<string, unknown> {
         : []),
     ]),
     states: {},
-  };
+  });
 }
 
 const ROBOT_CARD = { type: 'custom:mnml-template-card', template: 'robotic', area: 'living' };
@@ -1083,4 +1123,109 @@ test("the pickers of a device's slot list its entities, then its relatives', the
   await click(labelled(root, 'Use Roborock S8 in Living'));
   assert.deepEqual(got.at(-1), robo);
   assert.equal(got.length, 3);
+});
+
+const ROBOT_ON = { type: 'custom:mnml-template-card', template: 'on-robot', device: 'robo' };
+
+test('a template that stands for one device is offered on a device, with a picker of the devices it fits; one that does not, not', async () => {
+  const { root } = await openWith(ROBOT_ON, robotHass(true, ROBOTS));
+  assert.deepEqual(checked(root), ['Find on a device']);
+  assert.match(text(root), /The template finds what it needs on the device you pick/);
+  const picker = formWith(root, 'device');
+  assert.deepEqual(picker?.schema, [
+    { name: 'device', required: true, selector: { device: { entity: [{ domain: 'vacuum' }] } } },
+  ]);
+  assert.equal(picker?.data['device'], 'robo');
+  const other = await openWith(ROBOT_CARD, robotHass(true, ROBOTS));
+  assert.equal(labelled(other.root, 'Find on a device'), undefined);
+});
+
+test('on a device, the editor says what it found there, each field names the device, and another device that fits is offered', async () => {
+  const { root, dispatched } = await openWith(ROBOT_ON, robotHass(true, ROBOTS));
+  assert.match(text(root), /Found on Roborock S8 in Living: Key, Vacuum/);
+  await click(labelled(root, 'Devices'));
+  assert.deepEqual(notes(root), ['Found: Roborock S8 in Living']);
+  assert.ok(labelled(root, 'Use what the device found'));
+  assert.equal(labelled(root, 'Use Roborock S8 in Living'), undefined, 'the one in use');
+  await click(labelled(root, 'Use Mini in Living'));
+  assert.deepEqual(lastConfig(dispatched), { ...ROBOT_ON, device: 'mini' });
+});
+
+test("switching between an area and a device moves the card, keeping only the person's own values", async () => {
+  const card = { ...ROBOT_CARD, template: 'on-robot' };
+  const opened = await openWith(card, robotHass(true, ROBOTS));
+  const { root, dispatched } = opened;
+  await click(labelled(root, 'Find on a device'));
+  assert.deepEqual(lastConfig(dispatched), ROBOT_ON, 'the device its vacuum came from');
+  await again(opened);
+  await click(labelled(root, 'Find in an area'));
+  assert.deepEqual(lastConfig(dispatched), card, "the device's own area");
+  opened.editor.setConfig({ ...ROBOT_ON, slots: { key: 'robot' } });
+  await updated(document);
+  await click(labelled(root, 'Find in an area'));
+  assert.deepEqual(lastConfig(dispatched), { ...card, slots: { key: 'robot' } });
+});
+
+test('a device picked in the form, or with a template in the gallery, places the card on it', async () => {
+  const opened = await openWith(ROBOT_ON, robotHass(true, ROBOTS));
+  await fire(formWith(opened.root, 'device'), { device: 'mini' });
+  assert.deepEqual(lastConfig(opened.dispatched), { ...ROBOT_ON, device: 'mini' });
+  const fresh = await openWith(
+    { type: 'custom:mnml-template-card', template: '' },
+    robotHass(true, ROBOTS),
+  );
+  const gallery = everything(fresh.root).find((node) => node instanceof MnmlTemplateGallery);
+  assert.ok(gallery);
+  gallery.dispatchEvent(
+    new CustomEvent('template-picked', { detail: { template: 'on-robot', device: 'robo' } }),
+  );
+  await updated(document);
+  assert.deepEqual(lastConfig(fresh.dispatched), ROBOT_ON);
+});
+
+test('a card on a device that no device fits waits for one, and never writes an empty one', async () => {
+  const opened = await openWith(
+    { type: 'custom:mnml-template-card', template: 'on-robot', slots: {} },
+    { ...robotHass(true, ROBOTS), devices: {}, entities: {} },
+  );
+  const before = opened.dispatched.length;
+  await click(labelled(opened.root, 'Find on a device'));
+  assert.equal(opened.dispatched.length, before);
+  assert.deepEqual(checked(opened.root), ['Find on a device']);
+  assert.equal(formWith(opened.root, 'device')?.data['device'], '');
+});
+
+test('a device key that is not text is refused, so Home Assistant opens YAML', () => {
+  const { editor } = made();
+  assert.throws(() => {
+    editor.setConfig({ type: 'custom:mnml-template-card', template: 'x', device: 1 });
+  }, /device is not a device/);
+});
+
+test("a card filled from the template's example finds in an area without the example's values", async () => {
+  const example = {
+    key: 'study',
+    name: 'Study',
+    temperature: 'sensor.study_temperature',
+    heating: { entity: 'climate.study' },
+  };
+  const hass = roomHass();
+  const store = fakeStore();
+  store.kept = own({ 'room-like': { ...ROOM_LIKE, example } });
+  const { root, dispatched } = await openWith(
+    {
+      type: 'custom:mnml-template-card',
+      template: 'room-like',
+      slots: { ...example, name: 'Den' },
+    },
+    { ...hass, connection: store.hass.connection },
+  );
+  await click(labelled(root, 'Find in an area'));
+  await fire(formWith(root, 'area'), { area: 'living' });
+  assert.deepEqual(lastConfig(dispatched), {
+    type: 'custom:mnml-template-card',
+    template: 'room-like',
+    area: 'living',
+    slots: { name: 'Den' },
+  });
 });

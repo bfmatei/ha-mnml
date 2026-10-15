@@ -8,31 +8,36 @@ import { isMapping } from '../contract/templates.ts';
 import type { Value } from '../contract/templates.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
 import { icon, quietly } from '../ha/templates.ts';
+import type { EditorWords } from '../words/panel/editors-en.ts';
+import { editorWordsFor } from '../words/panel/editors.ts';
 
 import { copyPart, pasted } from './clipboard.ts';
-import { formData, fromForm, isSimple, labelFor, schemaOf } from './form.ts';
+import { IN_PLACE, REDRAW } from './drawing.ts';
+import type { Drawing } from './drawing.ts';
+import { labelOf, place, switchVariant, variantOf } from './form.ts';
+import type { ChoiceForm, Field, PlainForm, Form } from './form.ts';
+import { formData, fromForm, isSimple, labelFor, schemaOf } from './ha-form-data.ts';
 import { haForm } from './ha-form.ts';
 import { iconFor } from './icons.ts';
 import { sectionPanel } from './panel.ts';
+import type { PopupChoice } from './popup-names.ts';
 import { rowMenu } from './row-menu.ts';
-import { labelOf, place, switchVariant, variantOf } from './shape.ts';
-import type { ChoiceShape, Field, PlainShape, Shape } from './shape.ts';
 import { nameOf, summarize } from './summary.ts';
 
-export interface Slot {
+export interface Lens {
   get(): Record<string, Value>;
-  set(next: Record<string, Value>, redraw: boolean): void;
+  set(next: Record<string, Value>, drawing: Drawing): void;
 }
 
 export interface Context {
   readonly hass: HomeAssistant | undefined;
-  readonly hashes: readonly string[];
+  readonly popups: readonly PopupChoice[];
   readonly open: Map<string, boolean>;
   redraw(): void;
 }
 
-const articled = (label: string): string =>
-  `${/^[aeiou]/i.test(label) ? 'an' : 'a'} ${label.toLowerCase()}`;
+export const wordsOf = (context: Pick<Context, 'hass'>): EditorWords =>
+  editorWordsFor(context.hass?.locale.language);
 
 export function adder(
   label: string,
@@ -57,41 +62,41 @@ interface FormChoices {
 }
 
 export function formOf(
-  shape: PlainShape,
+  form: PlainForm,
   keys: readonly string[],
-  slot: Slot,
+  lens: Lens,
   context: Context,
   choices: FormChoices = {},
 ): TemplateResult {
-  const { help } = shape;
+  const { help } = form;
   const { helper = help === undefined ? undefined : (name) => help[name], read = fromForm } =
     choices;
   return haForm({
     hass: context.hass,
-    data: formData(shape, keys, slot.get()),
-    schema: schemaOf(shape, keys, context.hashes),
-    computeLabel: (item) => labelFor(shape, item.name),
+    data: formData(form, keys, lens.get()),
+    schema: schemaOf(form, keys, context.popups),
+    computeLabel: (item) => labelFor(form, item.name, wordsOf(context)),
     computeHelper: helper === undefined ? undefined : (item) => helper(item.name),
     changed: (data) => {
-      slot.set(read(shape, keys, data, slot.get()), false);
+      lens.set(read(form, keys, data, lens.get()), IN_PLACE);
     },
   });
 }
 
-function childSlot(shape: PlainShape, slot: Slot, key: string): Slot {
+function childLens(form: PlainForm, lens: Lens, key: string): Lens {
   return {
     get: (): Record<string, Value> => {
-      const inner = slot.get()[key];
+      const inner = lens.get()[key];
       return isMapping(inner) ? inner : {};
     },
-    set: (next, redraw): void => {
-      slot.set(place(shape, slot.get(), key, next), redraw);
+    set: (next, drawing): void => {
+      lens.set(place(form, lens.get(), key, next), drawing);
     },
   };
 }
 
-const listOf = (slot: Slot, key: string): Value[] => {
-  const inner = slot.get()[key];
+const listOf = (lens: Lens, key: string): Value[] => {
+  const inner = lens.get()[key];
   return Array.isArray(inner) ? inner : [];
 };
 
@@ -119,7 +124,7 @@ function reindex(
   }
 }
 
-function newPart(of: Shape, when: string | undefined): Record<string, Value> {
+function newPart(of: Form, when: string | undefined): Record<string, Value> {
   if (of.kind === 'tagged') {
     return { type: when ?? '' };
   }
@@ -130,21 +135,22 @@ function newPart(of: Shape, when: string | undefined): Record<string, Value> {
 }
 
 function partsForm(
-  shape: PlainShape,
+  form: PlainForm,
   key: string,
-  of: Shape,
-  slot: Slot,
+  of: Form,
+  lens: Lens,
   context: Context,
   path: string,
 ): TemplateResult {
   const base = `${path}.${key}`;
-  const items = listOf(slot, key);
+  const items = listOf(lens, key);
   const write = (next: Value[]): void => {
-    slot.set(place(shape, slot.get(), key, next), true);
+    lens.set(place(form, lens.get(), key, next), REDRAW);
   };
   const named = (id: string): string => nameOf(context.hass, id);
+  const words = wordsOf(context);
   const move = (index: number, to: number): void => {
-    const next = [...listOf(slot, key)];
+    const next = [...listOf(lens, key)];
     const [taken] = next.splice(index, 1);
     if (taken === undefined || to < 0 || to > next.length) {
       return;
@@ -156,20 +162,20 @@ function partsForm(
   const row = (item: Value, index: number): TemplateResult => {
     const at = `${base}[${index}]`;
     const label = labelOf(of, item, index, named);
-    const itemSlot: Slot = {
+    const itemLens: Lens = {
       get: (): Record<string, Value> => {
-        const inner = listOf(slot, key)[index];
+        const inner = listOf(lens, key)[index];
         return isMapping(inner) ? inner : {};
       },
-      set: (next, redraw): void => {
-        slot.set(
+      set: (next, drawing): void => {
+        lens.set(
           place(
-            shape,
-            slot.get(),
+            form,
+            lens.get(),
             key,
-            listOf(slot, key).map((old, position) => (position === index ? next : old)),
+            listOf(lens, key).map((old, position) => (position === index ? next : old)),
           ),
-          redraw,
+          drawing,
         );
       },
     };
@@ -188,9 +194,9 @@ function partsForm(
         >
           ${label}
         </button>
-        ${rowMenu(label, [
+        ${rowMenu(words.moreFor(label), [
           {
-            label: 'Move up',
+            label: words.moveUp,
             icon: 'mdi:arrow-up',
             disabled: index === 0 ? true : undefined,
             run: (): void => {
@@ -198,7 +204,7 @@ function partsForm(
             },
           },
           {
-            label: 'Move down',
+            label: words.moveDown,
             icon: 'mdi:arrow-down',
             disabled: index === items.length - 1 ? true : undefined,
             run: (): void => {
@@ -206,38 +212,38 @@ function partsForm(
             },
           },
           {
-            label: 'Copy',
+            label: words.copy,
             icon: 'mdi:content-copy',
             run: (): void => {
-              copyPart(of.id, listOf(slot, key)[index] ?? item);
+              copyPart(of.id, listOf(lens, key)[index] ?? item);
               context.redraw();
             },
           },
           {
-            label: 'Delete',
+            label: words.delete,
             icon: 'mdi:delete-outline',
             run: (): void => {
               reindex(context.open, base, (old) =>
                 old === index ? undefined : old > index ? old - 1 : old,
               );
-              write(listOf(slot, key).filter((_, position) => position !== index));
+              write(listOf(lens, key).filter((_, position) => position !== index));
             },
           },
         ])}
       </div>
       ${
         context.open.get(at) === true
-          ? html`<div class="part-body">${objectForm(of, itemSlot, context, at, false)}</div>`
+          ? html`<div class="part-body">${objectForm(of, itemLens, context, at, false)}</div>`
           : nothing
       }
     </div>`;
   };
   const added = (when: string | undefined): void => {
-    const next = [...listOf(slot, key), newPart(of, when)];
+    const next = [...listOf(lens, key), newPart(of, when)];
     context.open.set(`${base}[${next.length - 1}]`, true);
     write(next);
   };
-  const add = `Add ${articled(of.label)}`;
+  const add = words.add(of.label);
   const chosen = (event: Event): void => {
     const box = event.currentTarget;
     const value = box instanceof HTMLSelectElement ? box.value : '';
@@ -259,62 +265,71 @@ function partsForm(
               <option value="">${add}</option>
               ${of.variants.map(
                 (variant) =>
-                  html`<option value=${variant.when ?? ''}>${variant.shape.label}</option>`,
+                  html`<option value=${variant.when ?? ''}>${variant.form.label}</option>`,
               )}
             </select>`
       }
       ${
         copied === undefined
           ? nothing
-          : adder(`Paste ${articled(of.label)}`, 'mdi:content-paste', () => {
-              write([...listOf(slot, key), copied]);
+          : adder(words.paste(of.label), 'mdi:content-paste', () => {
+              write([...listOf(lens, key), copied]);
             })
       }
     </div>
   </div>`;
 }
 
-function wordsForm(shape: PlainShape, key: string, spec: Field, slot: Slot): TemplateResult {
-  const inner = slot.get()[key];
-  const changed = (next: Record<string, string>, redraw: boolean): void => {
-    slot.set(place(shape, slot.get(), key, next), redraw);
+function wordsForm(
+  form: PlainForm,
+  key: string,
+  spec: Field,
+  lens: Lens,
+  context: Context,
+): TemplateResult {
+  const inner = lens.get()[key];
+  const changed = (next: Record<string, string>, drawing: Drawing): void => {
+    lens.set(place(form, lens.get(), key, next), drawing);
   };
   return html`<mnml-words
     .words=${isMapping(inner) ? inner : {}}
     .options=${spec.options}
+    .labels=${wordsOf(context).words}
     .changed=${changed}
   ></mnml-words>`;
 }
 
 function complexForm(
-  shape: PlainShape,
+  form: PlainForm,
   key: string,
   spec: Field,
-  slot: Slot,
+  lens: Lens,
   context: Context,
   path: string,
   titled: boolean,
 ): TemplateResult[] {
-  const heading = titled ? [html`<div class="heading">${labelFor(shape, key)}</div>`] : [];
+  const heading = titled
+    ? [html`<div class="heading">${labelFor(form, key, wordsOf(context))}</div>`]
+    : [];
   if (spec.kind === 'words') {
-    return [...heading, wordsForm(shape, key, spec, slot)];
+    return [...heading, wordsForm(form, key, spec, lens, context)];
   }
   if (spec.of === undefined) {
     return [];
   }
   if (spec.kind === 'parts') {
-    return [...heading, partsForm(shape, key, spec.of, slot, context, path)];
+    return [...heading, partsForm(form, key, spec.of, lens, context, path)];
   }
   return [
     ...heading,
-    objectForm(spec.of, childSlot(shape, slot, key), context, `${path}.${key}`, false),
+    objectForm(spec.of, childLens(form, lens, key), context, `${path}.${key}`, false),
   ];
 }
 
 export function keysForm(
-  shape: PlainShape,
+  form: PlainForm,
   keys: readonly string[],
-  slot: Slot,
+  lens: Lens,
   context: Context,
   path: string,
   titled = true,
@@ -323,12 +338,12 @@ export function keysForm(
   let simple: string[] = [];
   const flush = (): void => {
     if (simple.length > 0) {
-      drawn.push(formOf(shape, simple, slot, context));
+      drawn.push(formOf(form, simple, lens, context));
       simple = [];
     }
   };
   for (const key of keys) {
-    const spec = shape.fields[key];
+    const spec = form.fields[key];
     if (spec === undefined) {
       continue;
     }
@@ -336,54 +351,54 @@ export function keysForm(
       simple.push(key);
     } else {
       flush();
-      drawn.push(...complexForm(shape, key, spec, slot, context, path, titled));
+      drawn.push(...complexForm(form, key, spec, lens, context, path, titled));
     }
   }
   flush();
   return drawn;
 }
 
-function kindsForm(shape: ChoiceShape, slot: Slot): TemplateResult {
-  const current = variantOf(shape, slot.get());
+function kindsForm(form: ChoiceForm, lens: Lens): TemplateResult {
+  const current = variantOf(form, lens.get());
   return html`<div class="kinds">
-    ${shape.variants.map(
+    ${form.variants.map(
       (variant) =>
         html`<button
           type="button"
           class="control"
-          aria-label=${variant.shape.label}
-          title=${variant.shape.label}
-          aria-pressed=${String(variant.shape === current)}
+          aria-label=${variant.form.label}
+          title=${variant.form.label}
+          aria-pressed=${String(variant.form === current)}
           @click=${quietly(() => {
-            slot.set(switchVariant(shape, slot.get(), variant.when), true);
+            lens.set(switchVariant(form, lens.get(), variant.when), REDRAW);
           })}
         >
-          ${variant.shape.label}
+          ${variant.form.label}
         </button>`,
     )}
   </div>`;
 }
 
-function drawnKeys(shape: Shape, chosen: PlainShape, keys: readonly string[]): string[] {
-  if (shape.kind !== 'marked') {
+function drawnKeys(form: Form, chosen: PlainForm, keys: readonly string[]): string[] {
+  if (form.kind !== 'marked') {
     return [...keys];
   }
-  const marker = shape.variants.find((variant) => variant.shape === chosen)?.when;
+  const marker = form.variants.find((variant) => variant.form === chosen)?.when;
   return keys.filter((key) => key !== marker || chosen.fields[key]?.kind !== 'flag');
 }
 
 export function objectForm(
-  shape: Shape,
-  slot: Slot,
+  form: Form,
+  lens: Lens,
   context: Context,
   path: string,
   sectioned: boolean,
 ): TemplateResult {
-  const kinds = shape.kind === 'plain' ? nothing : kindsForm(shape, slot);
-  const chosen = variantOf(shape, slot.get());
+  const kinds = form.kind === 'plain' ? nothing : kindsForm(form, lens);
+  const chosen = variantOf(form, lens.get());
   if (!sectioned) {
-    const keys = drawnKeys(shape, chosen, Object.keys(chosen.fields));
-    return html`<div class="object">${kinds}${keysForm(chosen, keys, slot, context, path)}</div>`;
+    const keys = drawnKeys(form, chosen, Object.keys(chosen.fields));
+    return html`<div class="object">${kinds}${keysForm(chosen, keys, lens, context, path)}</div>`;
   }
   const keyOf = (title: string): string => `${path}#${title}`;
   return html`<div class="object">
@@ -391,12 +406,12 @@ export function objectForm(
       chosen.sections,
       (section) => keyOf(section.title),
       (section, index) => {
-        const keys = drawnKeys(shape, chosen, section.keys);
+        const keys = drawnKeys(form, chosen, section.keys);
         return sectionPanel(context, keyOf(section.title), index === 0, {
-          icon: iconFor(section.title),
+          icon: section.icon ?? iconFor(section.title),
           title: section.title,
-          summary: summarize(chosen, keys, slot.get(), context.hass),
-          body: () => keysForm(chosen, keys, slot, context, path),
+          summary: summarize(chosen, keys, lens.get(), context.hass, wordsOf(context)),
+          body: () => keysForm(chosen, keys, lens, context, path),
         });
       },
     )}

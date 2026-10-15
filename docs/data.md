@@ -4,20 +4,20 @@ Four cards read data that a sensor holds in its attributes, rather than an entit
 
 ## The messages card
 
-`entity` is a sensor whose state is the number of messages and whose `messages` attribute lists them, newest first:
+With `notifications` or `repairs`, the card reads Home Assistant's own persistent notifications or repairs, and needs no data; the Home Assistant messages pop-up ([`system-messages-popup`](catalog.md#system-messages-popup)) draws both. With `popup`, it is one row instead: their number, or None, opening that pop-up, as the Home Assistant pop-up draws it. Otherwise `entity` is a sensor whose state is the number of messages and whose `messages` attribute lists them, newest first:
 
-| Field      | Type   | Meaning                                                                     |
-| ---------- | ------ | --------------------------------------------------------------------------- |
-| `id`       | string | Unique; the clear script removes the message by it                          |
-| `title`    | string | The row's name                                                              |
-| `message`  | string | The text, shown under the row when it is opened; may be empty               |
-| `severity` | string | `error` red, `warning` orange, `notice` and `info` blue, anything else grey |
-| `source`   | string | Optional; named through the card's `sources`                                |
-| `time`     | string | ISO 8601                                                                    |
+| Field      | Type   | Meaning                                                                                    |
+| ---------- | ------ | ------------------------------------------------------------------------------------------ |
+| `id`       | string | Unique; the clear script removes the message by it                                         |
+| `title`    | string | The row's name                                                                             |
+| `message`  | string | The text, shown under the row when it is opened; may be empty                              |
+| `severity` | string | `critical` and `error` red, `warning` orange, `notice` and `info` blue, anything else grey |
+| `source`   | string | Optional; named through the card's `sources`                                               |
+| `time`     | string | ISO 8601                                                                                   |
 
 `clear` is a script that removes the message whose `id` it is given as a variable, or every message without one.
 
-`recipes/messages.yaml` is a package that does both: copy it into `packages/` (with `homeassistant: packages: !include_dir_named packages` in `configuration.yaml`), and fire `mnml_message` with `title`, `message`, `severity` and `source` from any automation to add a message.
+`recipes/messages.yaml` is a package that does both: copy it into `packages/` (with `homeassistant: packages: !include_dir_named packages` in `configuration.yaml`), and fire `mnml_message` with `title`, `message`, `severity` and `source` from any automation to add a message. It keeps the newest 20, and its sensor's `alerts` attribute counts those of severity `warning` or `error`, a number.
 
 ## The clients card
 

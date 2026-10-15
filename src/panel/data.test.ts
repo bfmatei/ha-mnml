@@ -79,6 +79,25 @@ test('the library lists shipped, customised, own and conflicting templates, with
   assert.equal(describe(room), 'customised, 1 change • on 9 cards, 2 dashboards');
 });
 
+test("a library row is named by the template's title and icon, its changes laid over, sorted by title", () => {
+  const yard = { card: {} };
+  const shipped: Templates = { zone: { title: 'A zone', icon: 'mdi:map', card: {} }, yard };
+  const retitle = { op: 'set', path: [], key: 'title', value: 'The yard', base: '' } as const;
+  const kept: Kept = {
+    own: { 'my-hall': { title: 'Hall', card: {} } },
+    changes: { yard: [{ ...retitle, base: baseOf(yard, retitle) }] },
+  };
+  const rows = rowsOf(shipped, {}, kept, new Map(), {});
+  assert.deepEqual(
+    rows.map((row) => [row.name, row.title, row.icon]),
+    [
+      ['zone', 'A zone', 'mdi:map'],
+      ['my-hall', 'Hall', 'mdi:puzzle-outline'],
+      ['yard', 'The yard', 'mdi:puzzle-outline'],
+    ],
+  );
+});
+
 test('a customised template opens with its changes laid over, and its conflicts named', () => {
   const kept: Kept = {
     own: {},

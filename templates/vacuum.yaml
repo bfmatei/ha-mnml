@@ -1,5 +1,7 @@
 vacuum-actions:
   description: A vacuum's Dock, Locate, Start and Stop buttons, each shown when it applies.
+  title: Vacuum actions
+  icon: mdi:robot-vacuum
   slots:
     entity: { kind: entity }
   card:
@@ -8,7 +10,7 @@ vacuum-actions:
       type: service
       entity: '[[entity]]'
       service: vacuum.return_to_base
-      name: Dock
+      name: '[[words.dock]]'
       icon: mdi:home-import-outline
       show: { not: [docked] }
     - id: locate
@@ -16,7 +18,7 @@ vacuum-actions:
       type: service
       entity: '[[entity]]'
       service: vacuum.locate
-      name: Locate
+      name: '[[words.locate]]'
       icon: mdi:map-marker-question
       show: { is: [docked] }
     - id: start
@@ -24,7 +26,7 @@ vacuum-actions:
       type: service
       entity: '[[entity]]'
       service: vacuum.start
-      name: Start
+      name: '[[words.start]]'
       icon: mdi:play
       primary: true
       show: { not: [cleaning] }
@@ -33,54 +35,82 @@ vacuum-actions:
       type: service
       entity: '[[entity]]'
       service: vacuum.stop
-      name: Stop
+      name: '[[words.stop]]'
       icon: mdi:stop
       primary: true
       show: { is: [cleaning] }
   example:
     entity: vacuum.robot
 
-vacuum-card:
-  description: A vacuum as an item, its error, status, room, battery and dock, opening its pop-up.
+vacuum-state:
+  description: "A vacuum's state line: its error while it has one, its status, the room while it cleans, its battery, the dock's error while it has one, and the mop drying time while it dries."
+  title: Vacuum state
+  icon: mdi:robot-vacuum
   slots:
-    key: { kind: text, required: true }
     vacuum: { shape: vacuum, required: true }
+  card:
+    - id: vacuum-error
+      if: vacuum.error
+      entity: '[[vacuum.error]]'
+      icon: true
+      when: { not: [none] }
+    - id: vacuum-status
+      if: vacuum.status
+      entity: '[[vacuum.status]]'
+    - id: vacuum-current_room
+      if: vacuum.current_room
+      entity: '[[vacuum.current_room]]'
+      when: { entity: '[[vacuum.entity]]', is: [cleaning] }
+    - id: vacuum-battery
+      if: vacuum.battery
+      entity: '[[vacuum.battery]]'
+    - id: vacuum-dock
+      if: vacuum.dock.error
+      entity: '[[vacuum.dock.error]]'
+      icon: true
+      when: { not: [ok] }
+    - id: vacuum-dock-2
+      if: vacuum.dock.mop_drying_time_left
+      entity: '[[vacuum.dock.mop_drying_time_left]]'
+      minutes: true
+      when: { entity: '[[vacuum.dock.mop_drying]]', is: ['on'] }
+  example:
+    vacuum:
+      {
+        entity: vacuum.robot,
+        error: sensor.robot_error,
+        status: sensor.robot_status,
+        current_room: sensor.robot_room,
+        battery: sensor.robot_battery,
+      }
+
+vacuum-card:
+  description: A vacuum as an item, its error, status, room, battery and dock, opening its pop-up; it brings the pop-up.
+  title: Vacuum
+  icon: mdi:robot-vacuum
+  slots:
+    key: { kind: text, required: true, discover: area.id }
+    name: { kind: text, required: true, discover: area.name }
+    vacuum: { shape: vacuum_popup, required: true }
   card:
     type: custom:mnml-entity-card
     entity: '[[vacuum.entity]]'
     state:
-      - id: vacuum-error
-        if: vacuum.error
-        entity: '[[vacuum.error]]'
-        icon: true
-        when: { not: [none] }
-      - id: vacuum-status
-        if: vacuum.status
-        entity: '[[vacuum.status]]'
-      - id: vacuum-current_room
-        if: vacuum.current_room
-        entity: '[[vacuum.current_room]]'
-        when: { entity: '[[vacuum.entity]]', is: [cleaning] }
-      - id: vacuum-battery
-        if: vacuum.battery
-        entity: '[[vacuum.battery]]'
-      - id: vacuum-dock
-        if: vacuum.dock.error
-        entity: '[[vacuum.dock.error]]'
-        icon: true
-        when: { not: [ok] }
-      - id: vacuum-dock-2
-        if: vacuum.dock.mop_drying_time_left
-        entity: '[[vacuum.dock.mop_drying_time_left]]'
-        minutes: true
-        when: { entity: '[[vacuum.dock.mop_drying]]', is: ['on'] }
+      - id: vacuum-state
+        template: vacuum-state
+        slots: { vacuum: '[[vacuum]]' }
     popup: '#[[key]]-vacuum'
     controls:
       - id: vacuum-actions
         template: vacuum-actions
         slots: { entity: '[[vacuum.entity]]' }
+  popups:
+    - id: vacuum-popup
+      template: vacuum-popup
+      slots: { key: '[[key]]', name: '[[name]]', vacuum: '[[vacuum]]' }
   example:
     key: living
+    name: Living
     vacuum:
       {
         entity: vacuum.robot,
@@ -91,7 +121,9 @@ vacuum-card:
       }
 
 vacuum-popup:
-  description: A room's vacuum pop-up, its routines, map, details, settings, dock, maintenance and totals.
+  description: "A vacuum's pop-up, which its card brings: its state line and controls in its header, its routines, map, details, settings, dock, maintenance and totals."
+  title: Vacuum pop-up
+  icon: mdi:robot-vacuum
   slots:
     key: { kind: text, required: true }
     name: { kind: text, required: true }
@@ -101,10 +133,10 @@ vacuum-popup:
     cards:
       - id: header
         type: custom:mnml-header-card
-        name: Vacuum
-        icon: mdi:robot-vacuum
         entity: '[[vacuum.entity]]'
-        state: [{ id: name, text: '[[name]]' }]
+        state:
+          - { id: name, text: '[[name]]' }
+          - { id: vacuum-state, template: vacuum-state, slots: { vacuum: '[[vacuum]]' } }
         controls:
           - id: vacuum-actions
             template: vacuum-actions
@@ -113,7 +145,7 @@ vacuum-popup:
       - id: vacuum-routines
         if: vacuum.routines
         type: custom:mnml-heading-card
-        title: Routines
+        title: '[[words.routines]]'
         icon: mdi:play-box-multiple
       - id: vacuum-routines-2
         if: vacuum.routines
@@ -130,7 +162,7 @@ vacuum-popup:
       - id: heading
         if: vacuum.map
         type: custom:mnml-heading-card
-        title: Map
+        title: '[[words.map]]'
         icon: mdi:map
       - id: picture-entity
         if: vacuum.map
@@ -150,7 +182,7 @@ vacuum-popup:
             vacuum.water_box_attached,
           ]
         type: custom:mnml-list-card
-        title: Details
+        title: '[[words.details]]'
         icon: mdi:information-outline
         rows:
           - id: vacuum-progress
@@ -180,7 +212,7 @@ vacuum-popup:
       - id: vacuum-settings
         if: vacuum.settings
         type: custom:mnml-heading-card
-        title: Settings
+        title: '[[words.settings]]'
         icon: mdi:tune
       - id: each-vacuum-settings
         each: vacuum.settings
@@ -190,7 +222,7 @@ vacuum-popup:
       - id: vacuum-dock
         if: [vacuum.dock.dust_emptying, vacuum.dock.mop_drying, vacuum.dock.mop_washing]
         type: custom:mnml-heading-card
-        title: Dock
+        title: '[[words.dock]]'
         icon: mdi:home-import-outline
       - id: vacuum-dock-2
         if: vacuum.dock.dust_emptying
@@ -208,7 +240,7 @@ vacuum-popup:
         if: [vacuum.consumables, vacuum.warnings, vacuum.dock.consumables, vacuum.dock.warnings]
         type: custom:mnml-list-card
         fold: true
-        title: Maintenance
+        title: '[[words.maintenance]]'
         icon: mdi:wrench
         rows:
           - id: each-vacuum-consumables
@@ -241,7 +273,7 @@ vacuum-popup:
         if: vacuum.totals
         type: custom:mnml-list-card
         fold: true
-        title: Totals
+        title: '[[words.totals]]'
         icon: mdi:counter
         rows:
           - id: vacuum-totals-count

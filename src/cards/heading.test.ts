@@ -2,7 +2,11 @@ import assert from 'node:assert/strict';
 
 import { test, vi } from 'vitest';
 
-import { define, mounted, text } from '../test/render.ts';
+import type { HomeAssistant } from '../ha/hass.ts';
+import { fakeConnection, fakeHass } from '../test/hass.ts';
+import type { ServiceCall } from '../test/hass.ts';
+import { configure, created, define, mounted, paint as painted, text } from '../test/render.ts';
+import { until } from '../test/until.ts';
 
 import { MnmlHeadingCard } from './heading.ts';
 
@@ -15,41 +19,20 @@ const CONFIG = {
   state: [{ entity: 'weather.infrastructure_open_meteo', attribute: 'temperature', icon: true }],
 };
 
-function hassWith(state: string, temperature: unknown): unknown {
-  return {
+function hassWith(state: string, temperature: unknown): HomeAssistant {
+  return fakeHass({
     states:
       state === ''
         ? {}
-        : {
-            'weather.infrastructure_open_meteo': {
-              entity_id: 'weather.infrastructure_open_meteo',
-              state,
-              attributes: { temperature },
-            },
-          },
-    entities: {},
-    devices: {},
-    locale: { language: 'en' },
-    formatEntityState: (stateObj: { state: string }): string => stateObj.state,
-    formatEntityAttributeValue: (
-      stateObj: { attributes: Record<string, unknown> },
-      attribute: string,
-    ): string => `${String(stateObj.attributes[attribute])} °C`,
-  };
+        : { 'weather.infrastructure_open_meteo': { state, attributes: { temperature } } },
+    formatEntityAttributeValue: (stateObj, attribute) =>
+      `${String(stateObj.attributes[attribute])} °C`,
+  });
 }
 
-function card(): MnmlHeadingCard {
-  const made = document.createElement('mnml-heading-card');
-  assert.ok(made instanceof MnmlHeadingCard);
-  return made;
-}
+const card = (): MnmlHeadingCard => created('mnml-heading-card', MnmlHeadingCard);
 
-async function paint(hass: unknown): Promise<ShadowRoot> {
-  const made = card();
-  made.setConfig(CONFIG as never);
-  made.hass = hass as never;
-  return mounted(made);
-}
+const paint = (hass: HomeAssistant): Promise<ShadowRoot> => painted(card(), CONFIG, hass);
 
 test('the Rooms heading renders the outdoor temperature', async () => {
   const out = await paint(hassWith('cloudy', 14.3));
@@ -62,11 +45,11 @@ test('the Rooms heading renders the outdoor temperature', async () => {
 
 test('the heading repaints when the temperature changes', async () => {
   const made = card();
-  made.setConfig(CONFIG as never);
-  made.hass = hassWith('cloudy', 14.3) as never;
+  configure(made, CONFIG);
+  made.hass = hassWith('cloudy', 14.3);
   const shadow = await mounted(made);
   assert.match(text(shadow), /14\.3/);
-  made.hass = hassWith('sunny', 21.8) as never;
+  made.hass = hassWith('sunny', 21.8);
   await made.updateComplete;
   assert.match(text(shadow), /21\.8/);
 });
@@ -95,42 +78,66 @@ test('an unavailable weather entity keeps its place as an orange dash', async ()
 test('a control of a type the card does not know is an error card that names it', () => {
   const made = card();
   assert.throws(() => {
-    made.setConfig({ ...CONFIG, controls: [{ type: 'toggel', entity: 'light.a' }] } as never);
+    configure(made, { ...CONFIG, controls: [{ type: 'toggel', entity: 'light.a' }] });
   }, /controls\[0\]\.type must be one of toggle, /);
 });
 
 test('a key of another variant is unknown: a toggle with a slider, a text with an attribute', () => {
   const made = card();
   assert.throws(() => {
-    made.setConfig({
+    configure(made, {
       ...CONFIG,
       controls: [{ type: 'toggle', entity: 'light.a', slider: 'brightness' }],
-    } as never);
+    });
   }, /unknown key: controls\[0\]\.slider/);
   assert.throws(() => {
-    made.setConfig({ ...CONFIG, state: [{ text: 'None', attribute: 'temperature' }] } as never);
+    configure(made, { ...CONFIG, state: [{ text: 'None', attribute: 'temperature' }] });
   }, /unknown key: state\[0\]\.attribute/);
 });
+
+function withRule(rule: Record<string, unknown>): unknown {
+  return {
+    ...CONFIG,
+    controls: [{ type: 'status', name: 'Doors', icon: 'mdi:door', rules: [rule] }],
+  };
+}
 
 test('a status control whose rule lists no entities is an error card that names it', () => {
   const made = card();
   assert.throws(() => {
-    made.setConfig({
+    configure(made, withRule({ color: 'red', is: ['on'] }));
+  }, /controls\[0\]\.rules\[0\]\.entities is required/);
+  assert.throws(() => {
+    configure(made, withRule({ entities: 'binary_sensor.door', color: 'red', is: ['on'] }));
+  }, /controls\[0\]\.rules\[0\]\.entities must be a list/);
+});
+
+test('a heading without its icon, or a control without a key its kind needs, is an error card that names it', () => {
+  const made = card();
+  const { icon: _icon, ...untitled } = CONFIG;
+  assert.throws(() => {
+    configure(made, untitled);
+  }, /^Error: icon is required$/);
+  assert.throws(() => {
+    configure(made, {
       ...CONFIG,
       controls: [
-        { type: 'status', name: 'Doors', icon: 'mdi:door', rules: [{ color: 'red', is: ['on'] }] },
+        { type: 'slider', entity: 'light.a', slider: 'brightness' },
+        { type: 'nav', entity: 'light.a' },
+        { type: 'indicator', entity: 'light.a' },
       ],
-    } as never);
-  }, /controls\[0\]\.rules\[0\]\.entities must be a list/);
+    });
+  }, /controls\[0\]\.name is required; controls\[0\]\.icon is required; controls\[1\]\.popup is required; controls\[2\]\.color is required/);
 });
 
 test('a slider on a heading opens over the heading, which holds it at the height of its controls', async () => {
   const { MnmlSlider } = await import('./parts/slider.ts');
   define('mnml-slider', MnmlSlider);
   const made = card();
-  made.setConfig({
+  configure(made, {
     type: 'custom:mnml-heading-card',
     title: 'Lights',
+    icon: 'mdi:lightbulb-group',
     controls: [
       {
         type: 'slider',
@@ -140,18 +147,11 @@ test('a slider on a heading opens over the heading, which holds it at the height
         icon: 'mdi:brightness-6',
       },
     ],
-  } as never);
-  made.hass = {
-    states: {
-      'light.a': { entity_id: 'light.a', state: 'on', attributes: { brightness: 128 } },
-    },
-    entities: {},
-    devices: {},
-    locale: { language: 'en' },
-    formatEntityState: (stateObj: { state: string }): string => stateObj.state,
-    formatEntityAttributeValue: (_stateObj: unknown, _name: string, value: unknown): string =>
-      String(value),
-  } as never;
+  });
+  made.hass = fakeHass({
+    states: { 'light.a': { state: 'on', attributes: { brightness: 128 } } },
+    formatEntityAttributeValue: (_stateObj, _name, value) => String(value),
+  });
   const root = await mounted(made);
   const button = root.querySelector('.heading button.control');
   assert.ok(button instanceof HTMLElement);
@@ -174,9 +174,10 @@ test('a card taken off the page keeps no wake-up for a key, and takes it again w
   vi.useFakeTimers({ now: Date.parse('2026-10-01T00:00:00Z') });
   try {
     const made = card();
-    made.setConfig({
+    configure(made, {
       type: 'custom:mnml-heading-card',
       title: 'Keys',
+      icon: 'mdi:key-chain',
       controls: [
         {
           type: 'status',
@@ -186,16 +187,8 @@ test('a card taken off the page keeps no wake-up for a key, and takes it again w
           rules: [{ entities: ['sensor.key'], within_days: 14, color: 'red' }],
         },
       ],
-    } as never);
-    made.hass = {
-      states: {
-        'sensor.key': { entity_id: 'sensor.key', state: '2026-10-15T03:00:00Z', attributes: {} },
-      },
-      entities: {},
-      devices: {},
-      locale: { language: 'en' },
-      formatEntityState: (stateObj: { state: string }): string => stateObj.state,
-    } as never;
+    });
+    made.hass = fakeHass({ states: { 'sensor.key': { state: '2026-10-15T03:00:00Z' } } });
     const root = await mounted(made);
     assert.equal(root.querySelector('.control'), null, 'not drawn while the key is further off');
     const refresh = vi.spyOn(made, 'refresh');
@@ -212,4 +205,58 @@ test('a card taken off the page keeps no wake-up for a key, and takes it again w
   } finally {
     vi.useRealTimers();
   }
+});
+
+test("a select control on a timer offers Home Assistant's presets for it, and starts the timer for the one picked", async () => {
+  if (typeof HTMLElement.prototype.showPopover !== 'function') {
+    Object.assign(HTMLElement.prototype, {
+      showPopover: () => undefined,
+      hidePopover: () => undefined,
+    });
+  }
+  const sent: unknown[] = [];
+  const calls: ServiceCall[] = [];
+  const made = card();
+  made.setConfig({
+    type: 'custom:mnml-heading-card',
+    title: 'Kitchen',
+    icon: 'mdi:stove',
+    controls: [{ type: 'select', entity: 'timer.tea' }],
+  });
+  made.hass = fakeHass({
+    states: { 'timer.tea': { state: 'idle' } },
+    connection: fakeConnection({
+      sendMessagePromise: (message) => {
+        sent.push(message);
+        return Promise.resolve({
+          entity_id: 'timer.tea',
+          options: { timer: { presets: [300, 60, 300, 0, 90.5] } },
+        });
+      },
+    }),
+    calls,
+  });
+  const root = await mounted(made);
+  assert.equal(root.querySelector('button.control'), null, 'nothing until the presets are known');
+  await until(() => root.querySelector('button.control') !== null, 'the presets');
+  assert.deepEqual(sent, [{ type: 'config/entity_registry/get', entity_id: 'timer.tea' }]);
+  const trigger = root.querySelector('button.control');
+  assert.ok(trigger instanceof HTMLElement);
+  trigger.click();
+  const offered = [...root.querySelectorAll('.menu button')];
+  assert.deepEqual(
+    offered.map((button) => text(button)),
+    ['5:00', '1:00', '1:30'],
+  );
+  assert.ok(offered[0] instanceof HTMLElement);
+  offered[0].click();
+  assert.deepEqual(calls, [
+    {
+      domain: 'timer',
+      service: 'start',
+      data: { duration: 300 },
+      target: { entity_id: 'timer.tea' },
+    },
+  ]);
+  made.remove();
 });

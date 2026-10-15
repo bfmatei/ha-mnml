@@ -4,7 +4,7 @@ import { test } from 'vitest';
 
 import { HOME, HOUSE } from '../builder/fixture.ts';
 import { planFrom } from '../builder/plan.ts';
-import type { Recipe } from '../contract/builder.ts';
+import type { DashboardTemplate } from '../contract/plan.ts';
 import type { Template } from '../contract/templates.ts';
 import { readTemplates } from '../templates/shipped.ts';
 
@@ -16,7 +16,7 @@ const MINE: Template = {
   card: { type: 'custom:mnml-heading-card', title: 'Mine', icon: 'mdi:star' },
 };
 
-const RECIPE: Recipe = {
+const TEMPLATE: DashboardTemplate = {
   title: 'Our flat',
   icon: 'mdi:home-city',
   open: {},
@@ -25,20 +25,28 @@ const RECIPE: Recipe = {
 };
 
 test('a plan is summed up by what it has', () => {
-  const plan = planFrom(RECIPE, HOME, SHIPPED);
+  const plan = planFrom(TEMPLATE, HOME, SHIPPED);
   assert.equal(summary(plan), '2 rooms, 2 people');
+  assert.equal(
+    summary({ ...plan, devices: [{ device: 'roborock_s8', template: 'vacuum-card' }] }),
+    '2 rooms, 1 device, 2 people',
+  );
   assert.equal(summary({ ...plan, rooms: [], people: [] }), 'nothing but its pop-ups yet');
 });
 
 test('the preview of a dashboard template says what it makes here, and what it cannot find', () => {
-  const plan = planFrom(RECIPE, HOME, SHIPPED);
+  const plan = planFrom(TEMPLATE, HOME, SHIPPED);
   assert.equal(
-    previewOf(RECIPE, plan),
+    previewOf(TEMPLATE, plan, SHIPPED),
     'Here it makes 2 rooms, 2 people. Home Assistant and AdGuard Home need their entities: Choose its entities picks them in the builder.',
   );
-  const empty = planFrom({ ...RECIPE, sections: { rooms: { template: 'person' } } }, HOME, SHIPPED);
+  const empty = planFrom(
+    { ...TEMPLATE, sections: { rooms: { template: 'person' } } },
+    HOME,
+    SHIPPED,
+  );
   assert.match(
-    previewOf({ ...RECIPE, sections: { rooms: { template: 'person' } } }, empty),
+    previewOf({ ...TEMPLATE, sections: { rooms: { template: 'person' } } }, empty, SHIPPED),
     /no room/,
   );
 });
@@ -47,15 +55,15 @@ test('a rooms template that draws only in areas that are not rooms is said to dr
   const entities = Object.fromEntries(
     Object.entries(HOUSE.entities).filter(([id]) => id !== 'light.living_lamp'),
   );
-  const plan = planFrom(RECIPE, { ...HOUSE, entities }, SHIPPED);
+  const plan = planFrom(TEMPLATE, { ...HOUSE, entities }, SHIPPED);
   assert.deepEqual(plan.rooms, []);
   assert.match(
-    previewOf(RECIPE, plan),
+    previewOf(TEMPLATE, plan, SHIPPED),
     /Its rooms template draws in none of this home's rooms, so there is no room\./,
   );
 });
 
-test('a template brought in beside one of the same name is renamed, and the recipe follows', () => {
+test('a template brought in beside one of the same name is renamed, and the dashboard template follows', () => {
   const plan = planImport(
     { mine: MINE },
     SHIPPED,
@@ -102,23 +110,23 @@ test('templates brought in beside the home ones are saved with the names inside 
   const room: Template = {
     card: { type: 'custom:mnml-tile-card', chips: [{ id: 'c', template: 'room-chip', slots: {} }] },
   };
-  const recipe: Recipe = {
-    ...RECIPE,
+  const dashboardTemplate: DashboardTemplate = {
+    ...TEMPLATE,
     sections: { rooms: { template: 'my-room' } },
     templates: { 'my-room': room, 'room-chip': chip },
   };
   const incoming = planImport(
-    recipe.templates,
+    dashboardTemplate.templates,
     SHIPPED,
     { own: { 'room-chip': { card: { type: 'indicator', name: 'Ours' } } }, changes: {} },
     { ...SHIPPED, 'room-chip': { card: { type: 'indicator', name: 'Ours' } } },
   );
   const { offered, choices } = bringing(incoming);
-  const brought = broughtIn(recipe, offered, choices, new Set(['room-chip']));
+  const brought = broughtIn(dashboardTemplate, offered, choices, new Set(['room-chip']));
   const saved = Object.fromEntries(brought.save.map((each) => [each.name, each.template]));
   assert.deepEqual(Object.keys(saved).toSorted(), ['my-room', 'room-chip-2']);
   assert.ok(JSON.stringify(saved['my-room']).includes('"template":"room-chip-2"'));
-  assert.equal(brought.recipe.sections.rooms?.template, 'my-room');
+  assert.equal(brought.dashboardTemplate.sections.rooms?.template, 'my-room');
 });
 
 test("the preview follows the choices: a template skipped is this home's in what it makes", () => {
@@ -128,24 +136,33 @@ test("the preview follows the choices: a template skipped is this home's in what
     slots: { key: { kind: 'text', required: true, discover: 'area.id' } },
     card: { type: 'custom:mnml-heading-card', title: 'Ours', icon: 'mdi:star' },
   };
-  const recipe: Recipe = {
-    ...RECIPE,
+  const dashboardTemplate: DashboardTemplate = {
+    ...TEMPLATE,
     sections: { rooms: { template: 'my-room' } },
     templates: { 'my-room': structuredClone(room) },
   };
   const resolved = { ...SHIPPED, 'my-room': ours };
   const incoming = planImport(
-    recipe.templates,
+    dashboardTemplate.templates,
     SHIPPED,
     { own: { 'my-room': ours }, changes: {} },
     resolved,
   );
   const { offered, choices } = bringing(incoming);
   const taken = new Set(['my-room']);
-  assert.equal(previewPlan(recipe, offered, choices, taken, HOME, resolved).rooms.length, 2);
   assert.equal(
-    previewPlan(recipe, offered, { ...choices, 'my-room': 'skip' }, taken, HOME, resolved).rooms
-      .length,
+    previewPlan(dashboardTemplate, offered, choices, taken, HOME, resolved).rooms.length,
+    2,
+  );
+  assert.equal(
+    previewPlan(
+      dashboardTemplate,
+      offered,
+      { ...choices, 'my-room': 'skip' },
+      taken,
+      HOME,
+      resolved,
+    ).rooms.length,
     0,
   );
 });

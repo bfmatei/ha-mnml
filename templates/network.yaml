@@ -1,5 +1,7 @@
 unifi-network:
   description: A UniFi network's tile, its latency, and its devices and firmware chips; it brings the network's pop-up and one per Wi-Fi network.
+  title: UniFi network
+  icon: mdi:router-network
   slots:
     latency:
       {
@@ -44,7 +46,7 @@ unifi-network:
       }
   card:
     type: custom:mnml-tile-card
-    name: Network
+    name: '[[words.network]]'
     icon: mdi:router-network
     popup: '#network'
     state: [{ id: latency-0, if: latency, entity: '[[latency.0]]', icon: true }]
@@ -52,7 +54,7 @@ unifi-network:
       - id: devices
         if: devices
         type: status
-        name: Devices
+        name: '[[words.devices]]'
         icon: mdi:lan
         silent: true
         rules:
@@ -69,7 +71,7 @@ unifi-network:
       - id: firmware
         if: firmware
         type: status
-        name: Firmware
+        name: '[[words.firmware]]'
         icon: mdi:memory
         silent: true
         rules:
@@ -109,6 +111,8 @@ unifi-network:
 
 wifi-item:
   description: A Wi-Fi network as an item, its switch when it may be switched from the dashboard, opening its pop-up.
+  title: Wi-Fi network
+  icon: mdi:wifi
   slots:
     wifi: { shape: wifi, required: true }
   card:
@@ -126,6 +130,8 @@ wifi-item:
 
 network-popup:
   description: The network's pop-up, its internet, devices, router, Wi-Fi networks, clients and firmware.
+  title: Network pop-up
+  icon: mdi:router-network
   slots:
     latency: { kind: entities }
     wan: { kind: entity }
@@ -140,12 +146,11 @@ network-popup:
     cards:
       - id: header
         type: custom:mnml-header-card
-        name: Network
+        name: '[[words.network]]'
         icon: mdi:router-network
-        state: [{ id: latency-0, if: latency, entity: '[[latency.0]]', icon: true }]
       - id: internet
         type: custom:mnml-list-card
-        title: Internet
+        title: '[[words.internet]]'
         icon: mdi:web
         rows:
           - id: each-latency
@@ -158,7 +163,7 @@ network-popup:
             slots: { entity: '[[wan]]' }
       - id: devices
         type: custom:mnml-list-card
-        title: Devices
+        title: '[[words.devices]]'
         icon: mdi:lan
         rows:
           - id: each-devices
@@ -178,7 +183,7 @@ network-popup:
       - id: router
         if: router
         type: custom:mnml-list-card
-        title: Router
+        title: '[[words.router]]'
         icon: mdi:router
         rows:
           - id: router-cpu
@@ -191,7 +196,7 @@ network-popup:
       - id: wifi
         if: wifi
         type: custom:mnml-heading-card
-        title: Wi-Fi
+        title: '[[words.wifi]]'
         icon: mdi:wifi
       - id: each-wifi
         each: wifi
@@ -207,7 +212,7 @@ network-popup:
         fold: true
       - id: firmware
         type: custom:mnml-list-card
-        title: Firmware
+        title: '[[words.firmware]]'
         icon: mdi:memory
         rows:
           - id: each-firmware
@@ -219,6 +224,8 @@ network-popup:
 
 wifi-popup:
   description: A Wi-Fi network's pop-up, its switch and the QR code to join it while it is on.
+  title: Wi-Fi pop-up
+  icon: mdi:wifi
   slots:
     wifi: { shape: wifi, required: true }
   card:
@@ -228,7 +235,7 @@ wifi-popup:
         type: custom:mnml-header-card
         entity: '[[wifi.enabled]]'
         label: device
-        state: [{ id: network, text: Network }, { id: part-2, when: { is: ['off'] } }]
+        state: [{ id: network, text: '[[words.network]]' }, { id: part-2, when: { is: ['off'] } }]
         controls?:
           - id: wifi-switchable
             if: wifi.switchable
@@ -238,7 +245,7 @@ wifi-popup:
       - id: heading
         if: wifi.qr
         type: custom:mnml-heading-card
-        title: Scan to join
+        title: '[[words.scan_to_join]]'
         icon: mdi:qrcode-scan
         visibility: { template: while-not-off, slots: { entity: '[[wifi.enabled]]' } }
       - id: picture-entity

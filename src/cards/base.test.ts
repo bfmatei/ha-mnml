@@ -4,23 +4,27 @@ import { html } from 'lit';
 import type { TemplateResult } from 'lit';
 import { test } from 'vitest';
 
+import { entity, need, plain, text as words } from '../contract/structure.ts';
+import type { Structure } from '../contract/structure.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
+import { fakeHass, fakeState } from '../test/hass.ts';
 import { define, mounted, text } from '../test/render.ts';
 
 import { MnmlCard } from './base.ts';
-import type { KeySchema } from './keys.ts';
 
 interface ProbeConfig {
-  type: string;
+  type: 'probe';
   entity: string;
   service?: string;
 }
 
+const PROBE = plain<ProbeConfig>('probe', { entity: need(entity()), service: words() });
+
 class ProbeCard extends MnmlCard<ProbeConfig> {
   draws = 0;
 
-  protected schema(): KeySchema {
-    return { keys: new Set(['type', 'entity', 'service']) };
+  protected structure(): Structure {
+    return PROBE;
   }
 
   protected draw(hass: HomeAssistant): TemplateResult | undefined {
@@ -31,27 +35,14 @@ class ProbeCard extends MnmlCard<ProbeConfig> {
 
 define('mnml-probe-card', ProbeCard);
 
-const ENTITIES = {};
-const DEVICES = {};
-const LOCALE = { language: 'en' };
-const FORMATTERS = {
-  config: { state: 'RUNNING' },
-  localize: (): string => '',
-  formatEntityState: (): string => '',
-  formatEntityAttributeValue: (): string => '',
-};
+const BASE = fakeHass();
 
-function hassOf(states: Record<string, unknown>): HomeAssistant {
-  return {
-    states,
-    entities: ENTITIES,
-    devices: DEVICES,
-    locale: LOCALE,
-  } as unknown as HomeAssistant;
+function hassOf(states: HomeAssistant['states']): HomeAssistant {
+  return { ...BASE, states };
 }
 
 function hassWith(state: string): HomeAssistant {
-  return hassOf({ 'light.a': { entity_id: 'light.a', state, attributes: {} } });
+  return hassOf({ 'light.a': fakeState('light.a', { state }) });
 }
 
 function probe(): ProbeCard {
@@ -118,14 +109,20 @@ test('setConfig drains teardowns, so a reconfigured card cannot freeze', async (
 test('a card draws again only when an entity its config names changes, not a service it calls', async () => {
   const card = probe();
   card.setConfig({ type: 'probe', entity: 'light.a', service: 'light.turn_on' });
-  const light = { entity_id: 'light.a', state: 'on', attributes: {} };
+  const light = fakeState('light.a', { state: 'on' });
   card.hass = hassOf({ 'light.a': light });
   await mounted(card);
   const first = card.draws;
-  card.hass = hassOf({ 'light.a': light, 'sensor.other': { state: '1' } });
+  card.hass = hassOf({
+    'light.a': light,
+    'sensor.other': fakeState('sensor.other', { state: '1' }),
+  });
   await card.updateComplete;
   assert.equal(card.draws, first, 'another entity changed');
-  card.hass = hassOf({ 'light.a': light, 'light.turn_on': { state: 'x' } });
+  card.hass = hassOf({
+    'light.a': light,
+    'light.turn_on': fakeState('light.turn_on', { state: 'x' }),
+  });
   await card.updateComplete;
   assert.equal(card.draws, first, 'a service name is not an entity to watch');
   card.hass = hassOf({ 'light.a': { ...light, state: 'off' } });
@@ -178,15 +175,13 @@ test('a change that came during a hold is drawn when the card comes back to the 
 });
 
 test('a new language or formatter draws the card again, though no state it watches changed', async () => {
-  const states = { 'light.a': { entity_id: 'light.a', state: 'on', attributes: {} } };
-  const same = { states, entities: ENTITIES, devices: DEVICES, locale: LOCALE, ...FORMATTERS };
-  const hass = (changes: Record<string, unknown>): HomeAssistant =>
-    ({ ...same, ...changes }) as unknown as HomeAssistant;
+  const same = hassWith('on');
+  const hass = (changes: Partial<HomeAssistant>): HomeAssistant => ({ ...same, ...changes });
   const card = probe();
   card.setConfig({ type: 'probe', entity: 'light.a' });
   card.hass = hass({});
   await mounted(card);
-  const redraws = async (changes: Record<string, unknown>): Promise<boolean> => {
+  const redraws = async (changes: Partial<HomeAssistant>): Promise<boolean> => {
     const before = card.draws;
     card.hass = hass(changes);
     await card.updateComplete;
@@ -197,6 +192,11 @@ test('a new language or formatter draws the card again, though no state it watch
   assert.equal(await redraws({}), false, 'the same hass draws nothing');
   assert.equal(await redraws({ localize: (): string => '' }), true, 'localize');
   assert.equal(await redraws({ formatEntityState: (): string => '' }), true, 'state formatter');
+  assert.equal(
+    await redraws({ formatEntityAttributeName: (): string => '' }),
+    true,
+    'attribute name formatter',
+  );
   assert.equal(
     await redraws({ formatEntityAttributeValue: (): string => '' }),
     true,

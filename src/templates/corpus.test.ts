@@ -6,10 +6,10 @@ import { test } from 'vitest';
 
 import { isMapping } from '../contract/templates.ts';
 import type { Value } from '../contract/templates.ts';
+import type { Registries } from '../ha/registries.ts';
 
 import { CORPUS_DIR, discoveries, homes } from './corpus.ts';
 import { discover, fromDevice } from './discover.ts';
-import type { Registries } from './discover.ts';
 import { expand } from './expand.ts';
 import { SHIPPED } from './shipped.ts';
 
@@ -523,53 +523,6 @@ test("a vacuum with no dock of its own does not take another vacuum's dock in it
     entity: 'vacuum.solo',
     error: 'sensor.solo_vacuum_error',
   });
-});
-
-const LOCKS: Registries = {
-  areas: {
-    entry: { area_id: 'entry', name: 'Entry' },
-    garage: { area_id: 'garage', name: 'Garage' },
-  },
-  devices: {
-    front: { id: 'front', area_id: 'entry', name: 'Front door' },
-    back: { id: 'back', area_id: 'entry', name: 'Back door' },
-    shed: { id: 'shed', area_id: null, name: 'Shed' },
-  },
-  entities: {
-    'lock.front': { entity_id: 'lock.front', device_id: 'front' },
-    'lock.back': { entity_id: 'lock.back', device_id: 'back' },
-    'lock.shed': { entity_id: 'lock.shed', device_id: 'shed' },
-    'lock.garage': { entity_id: 'lock.garage', area_id: 'garage', platform: 'template' },
-  },
-  states: {},
-};
-
-test('the glances strip has one item per lock, anywhere in the home, opening the room of its own area', () => {
-  const glances = SHIPPED['glances'];
-  assert.ok(glances);
-  const locks = [
-    { entity: 'lock.back', room: 'entry' },
-    { entity: 'lock.front', room: 'entry' },
-    { entity: 'lock.shed' },
-    { entity: 'lock.garage', room: 'garage' },
-  ];
-  assert.deepEqual(discover(glances, undefined, LOCKS)['locks'], locks);
-  assert.deepEqual(
-    discover(glances, 'garage', LOCKS)['locks'],
-    locks,
-    'placed in an area, each lock keeps its own',
-  );
-  const card = expand(SHIPPED, { template: 'glances' }, discover(glances, undefined, LOCKS)).card;
-  const items = isMapping(card) && Array.isArray(card['items']) ? card['items'] : [];
-  assert.deepEqual(
-    items.filter(isMapping).map((item) => [item['entities'], item['popup']]),
-    [
-      [['lock.back'], '#entry'],
-      [['lock.front'], '#entry'],
-      [['lock.garage'], '#garage'],
-      [['lock.shed'], undefined],
-    ],
-  );
 });
 
 test('the guests labelled mnml_guests are the only ones the glances strip and the Proxmox tile count', () => {

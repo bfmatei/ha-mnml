@@ -3,28 +3,22 @@ import type { TemplateResult } from 'lit';
 
 import type { SliderCard } from '../contract/cards.ts';
 import type { MdiIcon } from '../contract/entities.ts';
-import { SLIDER_KINDS } from '../contract/structure.ts';
+import { CARD_STRUCTURES } from '../contract/structure.ts';
+import type { Structure } from '../contract/structure.ts';
 import { hasValue, isUnavailable, stateOf } from '../ha/hass.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
 import { entityName } from '../ha/names.ts';
 
-import { MnmlCard, requireOneOf, requireString } from './base.ts';
-import type { KeySchema } from './keys.ts';
+import { MnmlCard } from './base.ts';
 import { sliderSpec } from './parts/slider-spec.ts';
-import { SLIDER_CARD } from './schemas.ts';
 
 const FALLBACK_ICON: MdiIcon = 'mdi:tune-variant';
 
 export class MnmlSliderCard extends MnmlCard<SliderCard> {
   protected override readonly columns = 6;
 
-  protected schema(): KeySchema {
-    return SLIDER_CARD;
-  }
-
-  protected override validate(config: SliderCard): void {
-    requireString('entity', config.entity);
-    requireOneOf('slider', config.slider, SLIDER_KINDS);
+  protected structure(): Structure {
+    return CARD_STRUCTURES['custom:mnml-slider-card'];
   }
 
   protected draw(hass: HomeAssistant, config: SliderCard): TemplateResult | undefined {

@@ -2,15 +2,16 @@ import { html, nothing } from 'lit';
 import type { TemplateResult } from 'lit';
 import { live } from 'lit/directives/live.js';
 
-import { isMapping } from '../contract/templates.ts';
+import { idOf, isMapping, plainKey } from '../contract/templates.ts';
 import type { Template, Value, WrittenTemplate } from '../contract/templates.ts';
 import { COLORS } from '../editors/lists.ts';
 import { field } from '../ha/field.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
+import { panelWordsFor } from '../words/panel/words.ts';
 
-import { partOf } from './outline.ts';
-import type { Group, Part } from './outline.ts';
-import { inserted, valueAt, withValue } from './tree.ts';
+import { ENGLISH, outlinePart } from './outline.ts';
+import type { Group, Part, Wording } from './outline.ts';
+import { inserted, listAt, valueAt, withValue } from './tree.ts';
 import type { Path } from './tree.ts';
 
 type LookKey = 'name' | 'title' | 'icon' | 'color';
@@ -42,9 +43,6 @@ const LOOKS: readonly LookKey[] = ['name', 'title', 'icon', 'color'];
 
 const words = (label: string): string => label.replaceAll(/\[\[([^\]]+)\]\]/g, '$1');
 
-const idOf = (item: Value): string | undefined =>
-  isMapping(item) && typeof item['id'] === 'string' ? item['id'] : undefined;
-
 function looksOf(part: Part, shipped: Template | undefined): SimpleLook[] {
   const slots = part.value['slots'];
   const homes: { holder: Record<string, Value>; base: Path }[] = [
@@ -71,11 +69,6 @@ function looksOf(part: Part, shipped: Template | undefined): SimpleLook[] {
       ];
     }),
   );
-}
-
-function listAt(template: WrittenTemplate | undefined, path: Path): Value[] {
-  const found = template === undefined ? undefined : valueAt(template, path);
-  return Array.isArray(found) ? found : [];
 }
 
 function merged(present: readonly string[], shipped: readonly string[]): string[] {
@@ -107,21 +100,27 @@ function rowOf(
     depth,
     switchable,
     on: true,
-    condition: part.badges.length === 0 ? undefined : part.badges.join(' and '),
+    condition: part.badges.length === 0 ? undefined : part.badges.join('; '),
     looks: looksOf(part, shipped),
   };
 }
 
 type Kept = ReadonlyMap<string, KeptPart>;
 
+interface Walk {
+  shipped: Template | undefined;
+  kept: Kept;
+  wording: Wording;
+}
+
 const keyOf = (path: Path): string => path.join('/');
 
-function groupsOf(part: Part, shipped: Template | undefined, kept: Kept): Group[] {
+function groupsOf(part: Part, { shipped, kept, wording }: Walk): Group[] {
   const groups = [...part.groups];
   const has = (path: Path): boolean => groups.some((group) => keyOf(group.path) === keyOf(path));
   const original = shipped === undefined ? undefined : valueAt(shipped, part.path);
   if (isMapping(original)) {
-    for (const group of partOf(original, part.path, part.shape, 0).groups) {
+    for (const group of outlinePart(original, part.path, part.form, 0, wording).groups) {
       if (group.list && !has(group.path)) {
         groups.push({ ...group, parts: [] });
       }
@@ -134,7 +133,7 @@ function groupsOf(part: Part, shipped: Template | undefined, kept: Kept): Group[
     if (key !== undefined && keyOf(list.slice(0, -1)) === keyOf(part.path) && !has(list)) {
       groups.push({
         key,
-        label: key.endsWith('?') ? key.slice(0, -1) : key,
+        label: plainKey(key),
         path: list,
         of: undefined,
         cards: true,
@@ -148,18 +147,18 @@ function groupsOf(part: Part, shipped: Template | undefined, kept: Kept): Group[
 
 function walk(
   part: Part,
-  shipped: Template | undefined,
-  kept: Kept,
+  given: Walk,
   group: string,
   depth: number,
   switchable: boolean,
   out: SimpleRow[],
 ): void {
+  const { shipped, kept, wording } = given;
   out.push(rowOf(part, group, depth, switchable, shipped));
-  for (const inner of groupsOf(part, shipped, kept)) {
+  for (const inner of groupsOf(part, given)) {
     if (!inner.list) {
       for (const each of inner.parts) {
-        walk(each, shipped, kept, inner.label, depth + 1, false, out);
+        walk(each, given, inner.label, depth + 1, false, out);
       }
       continue;
     }
@@ -182,14 +181,14 @@ function walk(
     for (const segment of order) {
       const here = present.get(segment);
       if (here !== undefined) {
-        walk(here, shipped, kept, inner.label, depth + 1, true, out);
+        walk(here, given, inner.label, depth + 1, true, out);
         continue;
       }
       const item =
         kept.get(keyOf([...inner.path, segment]))?.value ??
         original.find((each) => `#${idOf(each) ?? ''}` === segment);
       if (isMapping(item)) {
-        const gone = partOf(item, [...inner.path, segment], inner.of, 0);
+        const gone = outlinePart(item, [...inner.path, segment], inner.of, 0, wording);
         out.push({ ...rowOf(gone, inner.label, depth + 1, true, shipped), on: false, looks: [] });
       }
     }
@@ -200,14 +199,14 @@ export function simpleOf(
   template: WrittenTemplate,
   shipped: Template | undefined,
   kept: Kept = new Map(),
+  wording: Wording = ENGLISH,
 ): SimpleRow[] {
   const card = template.card;
   const rows: SimpleRow[] = [];
   walk(
-    partOf(isMapping(card) ? card : {}, ['card'], undefined, 0),
-    shipped,
-    kept,
-    'Card',
+    outlinePart(isMapping(card) ? card : {}, ['card'], undefined, 0, wording),
+    { shipped, kept, wording },
+    wording.said.card,
     0,
     false,
     rows,
@@ -275,7 +274,8 @@ export function drawLook(
   hass: HomeAssistant | undefined,
 ): TemplateResult {
   const where = look.path.join('/');
-  const label = `${of}: ${look.key === 'color' ? 'colour' : look.key === 'icon' ? 'icon' : look.key}`;
+  const said = panelWordsFor(hass?.locale.language).stage;
+  const label = said.lookOf(of, said.looks[look.key]);
   if (look.key === 'color') {
     const options = [
       ...new Set([...COLORS, look.value, ...(look.original === undefined ? [] : [look.original])]),

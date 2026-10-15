@@ -5,15 +5,17 @@ import { styleMap } from 'lit/directives/style-map.js';
 
 import type { CarPlanCard } from '../contract/cards.ts';
 import type { Corners } from '../contract/entities.ts';
+import { CARD_STRUCTURES } from '../contract/structure.ts';
+import type { Structure } from '../contract/structure.ts';
 import { DASH } from '../ha/format.ts';
 import { hasValue, isUnavailable, numericState, stateOf, stringAttribute } from '../ha/hass.ts';
 import type { HassEntity, HomeAssistant } from '../ha/hass.ts';
 import { normalise, tyreBand } from '../ha/rules.ts';
+import type { CarPart } from '../words/en.ts';
+import { wordsFor } from '../words/words.ts';
 
-import { MnmlCard, requireList, requireNumber, requireString } from './base.ts';
-import type { KeySchema } from './keys.ts';
+import { MnmlCard } from './base.ts';
 import { SECTION_STYLE, section } from './parts/section.ts';
-import { CAR_PLAN_CARD } from './schemas.ts';
 import { BASE_STYLE, HEADING_STYLE } from './styles.ts';
 
 const CAR_STYLE = css`
@@ -116,8 +118,6 @@ const CAR_STYLE = css`
   }
 `;
 
-const CORNER_NAMES: Corners<string> = ['Front left', 'Front right', 'Rear left', 'Rear right'];
-
 const TRACE = { x: 13, y: 65, w: 966, h: 490 };
 const MARGIN = 8;
 const WIDTH = 480;
@@ -137,6 +137,8 @@ const BODY =
   ' 971 209 977 254 C 979 270 979 274 979 324 C 978 375 978 377 976 390 C 966 441 946 475 914' +
   ' 492 C 904 497 894 500 873 505 L 856 508 L 770 509 L 685 509 L 684 512 C 681 520 673 535 668' +
   ' 540 C 663 547 656 552 650 554 C 645 555 622 555 620 554 Z';
+
+const AROUND_BODY = `M ${TRACE.x} ${TRACE.y} h ${TRACE.w} v ${TRACE.h} h ${-TRACE.w} Z ${BODY}`;
 
 const WINDSCREEN =
   'M 708 472 C 713 470 718 463 726 447 C 754 391 762 324 750 249 C 747 234 742 214 738 200 C' +
@@ -319,53 +321,39 @@ function pressure(
 export class MnmlCarPlanCard extends MnmlCard<CarPlanCard> {
   static override styles = [BASE_STYLE, HEADING_STYLE, SECTION_STYLE, CAR_STYLE];
 
-  protected schema(): KeySchema {
-    return CAR_PLAN_CARD;
-  }
-
-  protected override validate(config: CarPlanCard): void {
-    requireList('doors', config.doors, 4);
-    requireList('windows', config.windows, 4);
-    requireList('tyres', config.tyres, 4);
-    requireList('tyre_targets', config.tyre_targets, 4);
-    requireString('hood', config.hood);
-    requireString('tailgate', config.tailgate);
-    requireNumber('tyre_low_share', config.tyre_low_share);
-    requireNumber('tyre_warn_share', config.tyre_warn_share);
+  protected structure(): Structure {
+    return CARD_STRUCTURES['custom:mnml-car-plan-card'];
   }
 
   protected draw(hass: HomeAssistant, config: CarPlanCard): TemplateResult {
+    const words = wordsFor(hass.locale.language).car;
     const problems: string[] = [];
     const titles: string[] = [];
-    const mark = (name: string, stateObj: HassEntity | undefined): Mark => {
+    const mark = (part: CarPart, stateObj: HassEntity | undefined): Mark => {
       const state = openness(config, stateObj);
       if (state !== undefined) {
-        problems.push(`${name} ${state === 'half' ? 'half open' : 'open'}`);
+        problems.push(state === 'half' ? part.halfOpen : part.open);
       }
-      const title = `${name}: ${describe(hass, stateObj)}`;
+      const title = `${part.name}: ${describe(hass, stateObj)}`;
       titles.push(title);
       return { state, title };
     };
-    const hood = rect(HOOD, 'part', mark('Hood', stateOf(hass, config.hood)));
-    const tailgate = rect(TAILGATE, 'part', mark('Tailgate', stateOf(hass, config.tailgate)));
-    const doors = DOOR_PANELS.map((panel, index) =>
-      poly(
-        panel,
-        'part',
-        mark(`${CORNER_NAMES[index] ?? ''} door`, stateOf(hass, config.doors[index])),
-      ),
+    const hood = rect(HOOD, 'part', mark(words.hood, stateOf(hass, config.hood)));
+    const tailgate = rect(TAILGATE, 'part', mark(words.tailgate, stateOf(hass, config.tailgate)));
+    const doors = words.doors.map((part, index) =>
+      poly(DOOR_PANELS[index] ?? '', 'part', mark(part, stateOf(hass, config.doors[index]))),
     );
-    const windows = WINDOW_PANES.map((pane, index) =>
+    const windows = words.windows.map((part, index) =>
       path(
-        pane,
+        WINDOW_PANES[index] ?? '',
         'glass part',
-        mark(`${CORNER_NAMES[index] ?? ''} window`, stateOf(hass, config.windows[index])),
+        mark(part, stateOf(hass, config.windows[index])),
       ),
     );
     const sunroof =
       config.sunroof === undefined
         ? nothing
-        : rect(SUNROOF, 'sunroof part', mark('Sunroof', stateOf(hass, config.sunroof)));
+        : rect(SUNROOF, 'sunroof part', mark(words.sunroof, stateOf(hass, config.sunroof)));
     const tyres = TYRES.map((shape, index) => {
       const current = stateOf(hass, config.tyres[index]);
       const target = stateOf(hass, config.tyre_targets[index]);
@@ -385,10 +373,10 @@ export class MnmlCarPlanCard extends MnmlCard<CarPlanCard> {
     const lowTyres = tyres.filter((tyre) => tyre.band === 'low').length;
     const warnTyres = tyres.filter((tyre) => tyre.band === 'warn').length;
     if (lowTyres > 0) {
-      problems.push(lowTyres === 1 ? 'One tyre low' : `${lowTyres} tyres low`);
+      problems.push(words.tyresLow(lowTyres));
     }
     if (warnTyres > 0) {
-      problems.push(warnTyres === 1 ? 'One tyre dropping' : `${warnTyres} tyres dropping`);
+      problems.push(words.tyresDropping(warnTyres));
     }
     const card = html`<div class="card plan">
       <div class="drawing">
@@ -397,7 +385,12 @@ export class MnmlCarPlanCard extends MnmlCard<CarPlanCard> {
         </div>
         <svg viewBox=${VIEW_BOX} role="img" aria-label=${titles.join('. ')}>
           <g transform=${PLAN}>
-            ${tyres.map((tyre) => rect(tyre.shape, classOf('tyre', tyre.band)))}
+            <clipPath id="around-body">
+              <path d=${AROUND_BODY} clip-rule="evenodd"></path>
+            </clipPath>
+            <g clip-path="url(#around-body)">
+              ${tyres.map((tyre) => rect(tyre.shape, classOf('tyre', tyre.band)))}
+            </g>
             <clipPath id="body"><path d=${BODY}></path></clipPath>
             ${path(BODY, 'body')}
             <g clip-path="url(#body)">
@@ -416,7 +409,7 @@ export class MnmlCarPlanCard extends MnmlCard<CarPlanCard> {
         </div>
       </div>
       <div class=${classMap({ caption: true, alert: problems.length > 0 })}>
-        ${problems.length > 0 ? problems.join(' • ') : 'All closed'}
+        ${problems.length > 0 ? problems.join(' • ') : words.allClosed}
       </div>
     </div>`;
     return section(card, config.title, config.icon);

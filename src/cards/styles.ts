@@ -134,6 +134,7 @@ export const BASE_STYLE = css`
   .heading.fold {
     -webkit-user-select: none;
     user-select: none;
+    -webkit-touch-callout: none;
   }
   ha-icon,
   ha-state-icon,
@@ -183,8 +184,8 @@ export const HEADING_STYLE = css`
     align-items: center;
     gap: 3px;
     flex: none;
-    margin-left: auto;
-    padding-left: 8px;
+    margin-inline-start: auto;
+    padding-inline-start: 8px;
     font-weight: 500;
     letter-spacing: 0;
     text-transform: none;
@@ -195,7 +196,7 @@ export const HEADING_STYLE = css`
     align-items: center;
     gap: 4px;
     flex: none;
-    margin-left: auto;
+    margin-inline-start: auto;
   }
   .heading .state > span {
     display: inline-flex;
@@ -333,6 +334,11 @@ export const CONTROL_STYLE = css`
   .control.colored {
     color: var(--m-color);
   }
+  .control.armed {
+    padding: 0 10px;
+    color: var(--primary-text-color);
+    font-weight: 600;
+  }
   .control.inert {
     cursor: default;
   }
@@ -358,7 +364,8 @@ export const SELECT_STYLE = css`
     box-sizing: border-box;
     height: 36px;
     max-width: 100%;
-    padding: 0 34px 0 14px;
+    padding-block: 0;
+    padding-inline: 14px 34px;
     border: 1px solid var(--divider-color);
     border-radius: 18px;
     background-color: var(--card-background-color);
@@ -375,6 +382,11 @@ export const SELECT_STYLE = css`
     font-size: 14px;
     cursor: pointer;
     transition: border-color 120ms ease-out;
+  }
+  select:dir(rtl) {
+    background-position:
+      14px 50%,
+      19px 50%;
   }
   select:hover {
     border-color: var(--secondary-text-color);

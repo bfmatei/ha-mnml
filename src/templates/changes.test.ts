@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import { test } from 'vitest';
 
@@ -6,6 +8,20 @@ import type { Template } from '../contract/templates.ts';
 
 import { applyChanges, baseOf, changesOf, isChange, nodeHash } from './changes.ts';
 import type { Change } from './changes.ts';
+
+interface Example {
+  why: string;
+  change: unknown;
+}
+
+interface Examples {
+  valid: Example[];
+  invalid: Example[];
+}
+
+const EXAMPLES: Examples = JSON.parse(
+  readFileSync(resolve(import.meta.dirname, '../../tests/changes.json'), 'utf8'),
+);
 
 const ROOM: Template = {
   description: 'A room.',
@@ -137,34 +153,19 @@ test('a move or an insert is judged by the order of the parts, not by what is in
   assert.deepEqual(applyChanges(grown, [change]).conflicts, [{ index: 0, reason: 'changed' }]);
 });
 
-test('a change of the wrong shape for its op is not a change', () => {
-  const path = ['card', 'chips?'];
-  for (const wrong of [
-    { op: 'set', path: ['card'], value: 'x', base: 'b' },
-    { op: 'set', path: ['card'], key: 'name', base: 'b' },
-    { op: 'insert', path, after: null, value: 'chip', base: 'b' },
-    { op: 'insert', path, after: null, value: { type: 'indicator' }, base: 'b' },
-    { op: 'insert', path, value: { id: 'door' }, base: 'b' },
-    { op: 'move', path, after: null, base: 'b' },
-    { op: 'move', path, id: 'ac', after: 3, base: 'b' },
-    { op: 'remove', path: [], base: 'b' },
-    { op: 'set', path: ['__proto__'], key: 'polluted', value: true, base: 'b' },
-    { op: 'set', path: ['card'], key: 'constructor', value: true, base: 'b' },
-    { op: 'remove', path: ['card', ''], base: 'b' },
-    { op: 'remove', path: ['card'], base: 'b' },
-    { op: 'move', path, id: 'ac', after: 'ac', base: 'b' },
-  ]) {
-    assert.equal(isChange(wrong), false, JSON.stringify(wrong));
-  }
-  for (const right of [
-    { op: 'set', path: ['card'], key: 'name', value: null, base: 'b' },
-    { op: 'remove', path: ['card', 'name'], base: 'b' },
-    { op: 'insert', path, after: 'lock', value: { id: 'door' }, base: 'b' },
-    { op: 'move', path, id: 'ac', after: null, base: 'b' },
-  ]) {
-    assert.equal(isChange(right), true, JSON.stringify(right));
-  }
-});
+test.each(EXAMPLES.valid.map((example) => [example.why, example.change] as const))(
+  'a change is kept: %s',
+  (_why, change) => {
+    assert.equal(isChange(change), true);
+  },
+);
+
+test.each(EXAMPLES.invalid.map((example) => [example.why, example.change] as const))(
+  'a change is refused: %s',
+  (_why, change) => {
+    assert.equal(isChange(change), false);
+  },
+);
 
 test('a path through __proto__ reaches nothing, and the prototype stays as it was', () => {
   applyChanges(ROOM, [

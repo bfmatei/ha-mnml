@@ -1,5 +1,7 @@
 speaker-popup:
-  description: A speaker's pop-up, its sound, and its TV, subwoofer and surround settings when it has them.
+  description: "A speaker's pop-up: what it plays in its header, its sound, and its TV, subwoofer and surround settings when it has them."
+  title: Speaker pop-up
+  icon: mdi:speaker
   slots:
     key: { kind: text, required: true }
     name: { kind: text, required: true }
@@ -10,17 +12,21 @@ speaker-popup:
       - id: header
         type: custom:mnml-header-card
         entity: '[[speaker.entity]]'
-        state: [{ id: name, text: '[[name]]' }]
+        state:
+          - { id: name, text: '[[name]]' }
+          - { id: part, when: { not: [playing, paused, buffering, 'on'] } }
+          - { id: title, attribute: media_title }
+          - { id: artist, attribute: media_artist }
         back: true
       - id: heading
         type: custom:mnml-heading-card
-        title: Sound
+        title: '[[words.sound]]'
         icon: mdi:tune-vertical
       - id: slider
         type: custom:mnml-slider-card
         entity: '[[speaker.entity]]'
         slider: volume
-        name: Volume
+        name: '[[words.volume]]'
         icon: mdi:volume-high
       - id: number-slider
         if: speaker.bass
@@ -41,7 +47,7 @@ speaker-popup:
       - id: speaker-tv
         if: speaker.tv
         type: custom:mnml-heading-card
-        title: TV
+        title: '[[words.tv]]'
         icon: mdi:television
         state?:
           - id: speaker-tv-input_format
@@ -62,7 +68,7 @@ speaker-popup:
       - id: speaker-subwoofer
         if: speaker.subwoofer
         type: custom:mnml-heading-card
-        title: Subwoofer
+        title: '[[words.subwoofer]]'
         icon: mdi:speaker
       - id: speaker-subwoofer-2
         if: speaker.subwoofer
@@ -76,7 +82,7 @@ speaker-popup:
       - id: speaker-surround
         if: speaker.surround
         type: custom:mnml-heading-card
-        title: Surround
+        title: '[[words.surround]]'
         icon: mdi:surround-sound
       - id: speaker-surround-2
         if: speaker.surround

@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict, final
 
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.storage import Store
@@ -14,14 +14,35 @@ STORAGE_KEY = f"{DOMAIN}.templates"
 STORAGE_VERSION = 1
 HISTORY = 10
 
-type Entry = dict[str, Any]
+
+class Saved(TypedDict):
+    kind: Literal["own", "changes"]
+    template: NotRequired[dict[str, Any]]
+    changes: NotRequired[list[dict[str, Any]]]
 
 
-def without_history(entry: Entry) -> Entry:
-    return {key: value for key, value in entry.items() if key != "history"}
+class Kept(Saved):
+    updated: str
+    by: str | None
+    history: NotRequired[list[Kept]]
 
 
-def history_of(entry: Entry | None) -> list[Entry]:
+@final
+class Deleted(TypedDict):
+    history: list[Kept]
+
+
+class Stored(TypedDict):
+    templates: dict[str, Kept | Deleted]
+
+
+def without_history(entry: Kept) -> Kept:
+    kept = entry.copy()
+    kept.pop("history", None)
+    return kept
+
+
+def history_of(entry: Kept | Deleted | None) -> list[Kept]:
     if entry is None:
         return []
     kept = entry.get("history", [])
@@ -30,27 +51,28 @@ def history_of(entry: Entry | None) -> list[Entry]:
 
 class TemplateStore:
     def __init__(self, hass: HomeAssistant) -> None:
-        self._store: Store[dict[str, Any]] = Store(hass, STORAGE_VERSION, STORAGE_KEY)
-        self._templates: dict[str, Entry] = {}
+        self._store: Store[Stored] = Store(hass, STORAGE_VERSION, STORAGE_KEY)
+        self._templates: dict[str, Kept | Deleted] = {}
         self._listeners: list[Callable[[], None]] = []
 
     async def async_load(self) -> None:
         data = await self._store.async_load()
-        templates = (data or {}).get("templates", {})
+        templates = {} if data is None else data.get("templates", {})
         self._templates = dict(templates) if isinstance(templates, dict) else {}
 
     @property
-    def templates(self) -> dict[str, Entry]:
+    def templates(self) -> dict[str, Kept]:
         return {
             name: without_history(entry)
             for name, entry in self._templates.items()
             if "kind" in entry
         }
 
-    def history(self, name: str) -> list[Entry]:
-        return list(self._templates.get(name, {}).get("history", []))
+    def history(self, name: str) -> list[Kept]:
+        entry = self._templates.get(name)
+        return [] if entry is None else list(entry.get("history", []))
 
-    async def async_save(self, name: str, entry: Entry, user_id: str | None) -> None:
+    async def async_save(self, name: str, entry: Saved, user_id: str | None) -> None:
         self._templates[name] = {
             **entry,
             "updated": dt_util.utcnow().isoformat(),

@@ -2,59 +2,29 @@ import assert from 'node:assert/strict';
 
 import { test, vi } from 'vitest';
 
-import { fakeStore } from '../test/fake-hass.ts';
-import { define, mounted, text } from '../test/render.ts';
+import { fakeStore } from '../test/hass.ts';
+import { created, define, mounted, text } from '../test/render.ts';
+import { until } from '../test/until.ts';
 
 import { MnmlTemplateGallery } from './gallery.ts';
 import { MnmlTemplateCardEditor } from './template-card.ts';
 
-vi.mock('../templates/families.ts', async () => {
-  const { familyNames, readFamily } = await import('../templates/shipped.ts');
-  const owner = Object.fromEntries(
-    familyNames()
-      .filter((family) => family !== 'common')
-      .flatMap((family) => Object.keys(readFamily(family)).map((name) => [name, family])),
-  );
-  return {
-    COMMON_FAMILY: 'common',
-    COMMON: readFamily('common'),
-    OWNER: owner,
-    SHAPES: {},
-    loadFamily: (family: string): Promise<never> =>
-      Promise.reject(new Error(`mnml-cards-${family}.json: 404 Not Found`)),
-  };
-});
+vi.mock('../templates/families.ts', () => import('../test/families.ts'));
 
 define('ha-form', class extends HTMLElement {});
 define('mnml-template-gallery', MnmlTemplateGallery);
 define('mnml-template-card-editor', MnmlTemplateCardEditor);
 
-const settle = async (rounds = 6): Promise<void> => {
-  await new Promise((resolve) => {
-    setTimeout(resolve, 0);
-  });
-  if (rounds > 1) {
-    await settle(rounds - 1);
-  }
-};
-
 test('when the families cannot be fetched, the gallery keeps the common templates and says what failed', async () => {
   const quiet = vi.spyOn(console, 'error').mockImplementation(() => undefined);
   try {
-    const editor = document.createElement('mnml-template-card-editor');
-    assert.ok(editor instanceof MnmlTemplateCardEditor);
+    const editor = created('mnml-template-card-editor', MnmlTemplateCardEditor);
     editor.setConfig({ type: 'custom:mnml-template-card', template: '' });
-    editor.hass = {
-      ...fakeStore().hass,
-      states: {},
-      areas: { hall: { area_id: 'hall', name: 'Hall' } },
-      devices: {},
-      entities: {},
-    } as never;
+    editor.hass = { ...fakeStore().hass, areas: { hall: { area_id: 'hall', name: 'Hall' } } };
     const root = await mounted(editor);
-    await settle();
+    await until(() => /could not be loaded/.test(text(root)), 'the failure');
     const gallery = root.querySelector('mnml-template-gallery')?.shadowRoot;
-    assert.ok(gallery?.querySelector('[aria-label="Use section-heading"]'));
+    assert.ok(gallery?.querySelector('[aria-label="Use Section heading"]'));
     assert.match(text(root), /the shipped templates could not be loaded/);
   } finally {
     quiet.mockRestore();

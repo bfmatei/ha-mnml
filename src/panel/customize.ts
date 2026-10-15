@@ -4,6 +4,8 @@ import { isMapping } from '../contract/templates.ts';
 import type { Value } from '../contract/templates.ts';
 import { field } from '../ha/field.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
+import type { PanelWords } from '../words/panel/en.ts';
+import { panelWordsFor } from '../words/panel/words.ts';
 
 let opened = 0;
 
@@ -22,14 +24,14 @@ const isEditable = (value: unknown): value is Editable =>
 const isEditor = (value: unknown): value is CardEditor =>
   value instanceof HTMLElement && typeof field(value, 'setConfig') === 'function';
 
-async function templateEditor(): Promise<CardEditor> {
+async function templateEditor(said: PanelWords['customize']): Promise<CardEditor> {
   const card = customElements.get('mnml-template-card');
   if (!isEditable(card)) {
-    throw new Error('The MNML cards are not loaded on this page, so their editor cannot open.');
+    throw new Error(said.unloaded);
   }
   const editor = await card.getConfigElement();
   if (!isEditor(editor)) {
-    throw new Error("The template card's editor did not load.");
+    throw new Error(said.failed);
   }
   return editor;
 }
@@ -41,16 +43,11 @@ export async function customize(
   config: Record<string, Value>,
   check: (config: Record<string, Value>) => string | undefined,
 ): Promise<Record<string, Value> | undefined> {
-  const editor = await templateEditor();
+  const words = panelWordsFor(hass?.locale.language);
+  const editor = await templateEditor(words.customize);
   editor.hass = hass;
   editor.setConfig(config);
   let latest = config;
-  editor.addEventListener('config-changed', (event) => {
-    const next = field(field(event, 'detail'), 'config');
-    if (isMapping(next)) {
-      latest = next;
-    }
-  });
   const dialog = document.createElement('dialog');
   const named = `mnml-customize-${(opened += 1)}`;
   dialog.className = 'dialog customize';
@@ -65,7 +62,15 @@ export async function customize(
   const draw = (): void => {
     render(
       html`<h2 id=${named}>${title}</h2>
-        <div class="customize-body">${editor}</div>
+        <div class="customize-body">
+          <div class="customize-form">${editor}</div>
+          <mnml-live-card
+            class="customize-preview"
+            inert
+            .config=${latest}
+            .hass=${hass}
+          ></mnml-live-card>
+        </div>
         ${problem === undefined ? nothing : html`<p class="problem-line">${problem}</p>`}
         <div class="dialog-actions">
           <button
@@ -75,7 +80,7 @@ export async function customize(
               close(undefined);
             }}
           >
-            Cancel
+            ${words.dialog.cancel}
           </button>
           <button
             type="button"
@@ -89,12 +94,19 @@ export async function customize(
               }
             }}
           >
-            Done
+            ${words.customize.done}
           </button>
         </div>`,
       dialog,
     );
   };
+  editor.addEventListener('config-changed', (event) => {
+    const next = field(field(event, 'detail'), 'config');
+    if (isMapping(next)) {
+      latest = next;
+      draw();
+    }
+  });
   dialog.addEventListener('cancel', (event) => {
     event.preventDefault();
     close(undefined);

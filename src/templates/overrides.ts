@@ -1,7 +1,5 @@
+import { sameValue } from '../contract/templates.ts';
 import type { Value } from '../contract/templates.ts';
-
-const same = (a: Value | undefined, b: Value | undefined): boolean =>
-  JSON.stringify(a) === JSON.stringify(b);
 
 export function overridesOf(
   found: Readonly<Record<string, Value>>,
@@ -9,7 +7,7 @@ export function overridesOf(
 ): Record<string, Value> {
   const out: Record<string, Value> = {};
   for (const [name, value] of Object.entries(values)) {
-    if (!same(found[name], value)) {
+    if (!sameValue(found[name], value)) {
       out[name] = value;
     }
   }

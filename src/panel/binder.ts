@@ -3,12 +3,13 @@ import type { TemplateResult } from 'lit';
 import { property, state } from 'lit/decorators.js';
 
 import type { Kind, SlotSpec } from '../contract/templates.ts';
-import type { Field } from '../editors/shape.ts';
+import type { Field } from '../editors/form.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
 import { icon } from '../ha/templates.ts';
+import { panelWordsFor } from '../words/panel/words.ts';
 
 import { pick } from './form.ts';
-import { slotKinds } from './inspector.ts';
+import { slotChoices, slotKinds } from './inspector.ts';
 import { PANEL_STYLE } from './style.ts';
 
 type FieldKind = Field['kind'];
@@ -74,8 +75,9 @@ export class MnmlBinder extends LitElement {
     if (field === undefined) {
       return nothing;
     }
+    const said = panelWordsFor(this.hass?.locale.language);
     return html`${pick({
-        label: 'Setting',
+        label: said.binder.setting,
         options: this.fields.map(({ value, label }) => ({ value, label })),
         value: field.value,
         changed: (value) => {
@@ -83,10 +85,10 @@ export class MnmlBinder extends LitElement {
         },
       })}
       ${pick({
-        label: 'Link it to',
-        options: slots,
+        label: said.binder.linkTo,
+        options: slotChoices(this.slots, slots, said.slots.basics),
         value: slot,
-        ...(slots.length === 0 ? { help: 'No slot of a kind that fits this setting' } : {}),
+        ...(slots.length === 0 ? { help: said.binder.noFit } : {}),
         changed: (value) => {
           this.chosenSlot = value;
         },
@@ -94,8 +96,8 @@ export class MnmlBinder extends LitElement {
       <button
         type="button"
         class="action"
-        aria-label="Link the setting to the slot"
-        title="Link the setting to the slot"
+        aria-label=${said.binder.linkIt}
+        title=${said.binder.linkIt}
         ?disabled=${slot === ''}
         @click=${() => {
           if (slot !== '') {
@@ -103,7 +105,7 @@ export class MnmlBinder extends LitElement {
           }
         }}
       >
-        ${icon('mdi:link-variant')}<span>Link</span>
+        ${icon('mdi:link-variant')}<span>${said.binder.link}</span>
       </button>`;
   }
 }

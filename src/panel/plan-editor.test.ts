@@ -4,10 +4,14 @@ import { test } from 'vitest';
 
 import { HOME, HOUSE } from '../builder/fixture.ts';
 import { defaultPlan } from '../builder/plan.ts';
-import type { Plan } from '../contract/builder.ts';
+import { MnmlCardNote } from '../cards/parts/card-element.ts';
+import type { Plan } from '../contract/plan.ts';
 import type { Template } from '../contract/templates.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
+import type { Registries } from '../ha/registries.ts';
+import { homes } from '../templates/corpus.ts';
 import { readTemplates } from '../templates/shipped.ts';
+import { fakeHass } from '../test/hass.ts';
 import { define, mounted, text } from '../test/render.ts';
 
 import { MnmlLiveCard } from './live-card.ts';
@@ -15,14 +19,21 @@ import { MnmlPlanEditor } from './plan-editor.ts';
 
 define('mnml-plan-editor', MnmlPlanEditor);
 define('mnml-live-card', MnmlLiveCard);
+define('mnml-card-note', MnmlCardNote);
 
 const TEMPLATES = readTemplates();
-const HASS = { ...HOME, locale: { language: 'en' } } as never as HomeAssistant;
+const HASS = fakeHass(HOME);
 
 async function editor(
   options: { fresh?: boolean; taken?: string[]; plan?: Plan; hass?: HomeAssistant } = {},
-): Promise<{ element: MnmlPlanEditor; root: ShadowRoot; saved: [Plan, string][] }> {
+): Promise<{
+  element: MnmlPlanEditor;
+  root: ShadowRoot;
+  saved: [Plan, string][];
+  sorting: { count: number };
+}> {
   const saved: [Plan, string][] = [];
+  const sorting = { count: 0 };
   const element = new MnmlPlanEditor();
   element.hass = options.hass ?? HASS;
   element.templates = TEMPLATES;
@@ -36,8 +47,11 @@ async function editor(
       return Promise.resolve();
     },
     leave: () => undefined,
+    sortAreas: () => {
+      sorting.count += 1;
+    },
   };
-  return { element, root: await mounted(element), saved };
+  return { element, root: await mounted(element), saved, sorting };
 }
 
 function control<T extends Element>(root: ShadowRoot, selector: string): T {
@@ -96,8 +110,11 @@ test('an area with no light offers no room, and one ticked comes last', async ()
 });
 
 test('an area of phones or of system devices is unticked, says why, and can still be ticked', async () => {
-  const hass = { ...HOUSE, locale: { language: 'en' } } as never as HomeAssistant;
-  const { element, root, saved } = await editor({ plan: defaultPlan(HOUSE, TEMPLATES), hass });
+  const hass = fakeHass(HOUSE);
+  const { element, root, saved, sorting } = await editor({
+    plan: defaultPlan(HOUSE, TEMPLATES),
+    hass,
+  });
   const row = (name: string): { box: HTMLInputElement; words: string } => {
     const box = labelled(root, `Show ${name}`);
     assert.ok(box instanceof HTMLInputElement);
@@ -115,11 +132,13 @@ test('an area of phones or of system devices is unticked, says why, and can stil
     row('Attic').words,
     /Nothing in this area: its devices are in no area or elsewhere\./,
   );
-  const placing = control<HTMLAnchorElement>(root, 'a[href="/config/devices/dashboard"]');
+  const sort = labelled(root, 'Sort them into areas');
   assert.match(
-    text(placing.closest('p')),
-    /^2 devices have no area, so no room shows them\. Give them an area in Home Assistant$/,
+    text(sort.closest('div')?.previousElementSibling),
+    /^2 devices are in no area, so no room shows them\.$/,
   );
+  sort.click();
+  assert.equal(sorting.count, 1);
   row('Jane').box.dispatchEvent(new Event('change'));
   await save(element, root);
   assert.deepEqual(saved[0]?.[0].rooms, [{ area: 'living' }, { area: 'jane' }]);
@@ -312,7 +331,7 @@ test("a section offers the templates that take its rows' slots, and a new one dr
       name: { kind: 'text', required: true, discover: 'area.name' },
       lights: room.slots?.['lights'] ?? { kind: 'object' },
     },
-    card: room.card,
+    card: { type: 'custom:mnml-tile-card', entity: '[[lights.group]]', name: '[[name]]' },
   } satisfies Template;
   const plan: Plan = {
     ...defaultPlan(HOME, TEMPLATES),
@@ -329,6 +348,12 @@ test("a section offers the templates that take its rows' slots, and a new one dr
   assert.equal(options('People template').includes('room'), false);
   assert.ok(options('Garage template').includes('car'));
   assert.equal(options('Garage template').includes('section-heading'), false);
+  const shown = [
+    ...(root.querySelector<HTMLSelectElement>('select[aria-label="People template"]')?.options ??
+      []),
+  ].map((option) => text(option));
+  assert.ok(shown.includes('Person'), shown.join(', '));
+  assert.equal(shown.includes('person'), false);
   const rooms = root.querySelector<HTMLSelectElement>('select[aria-label="Rooms template"]');
   assert.ok(rooms);
   rooms.value = 'tiny';
@@ -351,15 +376,16 @@ test('the sections move up and down, and the page and the plan follow', async ()
   const headings = [...root.querySelectorAll('.plan-section h2')].map((heading) => text(heading));
   assert.deepEqual(headings, [
     'Dashboard',
-    'People',
     'Rooms',
+    'People',
+    'Devices',
     'Garage',
     'System',
     'Glances',
     'Pop-ups',
   ]);
   await save(element, root);
-  assert.deepEqual(saved[0]?.[0].order, ['people', 'rooms', 'garage', 'system']);
+  assert.deepEqual(saved[0]?.[0].order, ['rooms', 'people', 'devices', 'garage', 'system']);
   press(root, 'Move the People section down');
   await save(element, root);
   assert.equal('order' in (saved[1]?.[0] ?? {}), false);
@@ -410,7 +436,7 @@ test('people, cars and system cards move within their sections', async () => {
 test('a system card outside the five is listed, and kept when another changes', async () => {
   const plan: Plan = { ...defaultPlan(HOME, TEMPLATES), system: [{ template: 'room' }] };
   const { element, root, saved } = await editor({ plan });
-  assert.ok(root.querySelector('input[aria-label="Show room"]'));
+  assert.ok(root.querySelector('input[aria-label="Show Room"]'));
   const title = root.querySelector<HTMLInputElement>('input[aria-label="System title"]');
   assert.ok(title);
   title.value = 'Servers';
@@ -446,6 +472,7 @@ test("a save Home Assistant refuses says Home Assistant's reason", async () => {
   element.host = {
     save: () => Promise.reject({ code: 'invalid_format', message: 'expected a dictionary' }),
     leave: () => undefined,
+    sortAreas: () => undefined,
   };
   await save(element, root);
   assert.equal(text(control(root, '.problem-line')), 'expected a dictionary');
@@ -479,5 +506,317 @@ test('a spelled room is listed by its name and kept, and unticked it goes', asyn
   await element.updateComplete;
   await save(element, root);
   assert.deepEqual(saved[1]?.[0].rooms, [{ area: 'living' }]);
+  element.remove();
+});
+
+test("a row's tile is drawn but takes no press, focus or key", async () => {
+  const { element, root } = await editor();
+  const tiles = [...root.querySelectorAll('mnml-live-card')];
+  assert.ok(tiles.length > 0);
+  assert.ok(tiles.every((tile) => tile.hasAttribute('inert')));
+  element.remove();
+});
+
+test('the back arrow asks before it drops changes not built, and leaves at once with none', async () => {
+  const asked: string[] = [];
+  const answers = [false, true];
+  const confirm = window.confirm;
+  window.confirm = (message?: string): boolean => {
+    asked.push(message ?? '');
+    return answers.shift() ?? true;
+  };
+  let left = 0;
+  const { element, root } = await editor({ fresh: false });
+  element.host = {
+    save: () => Promise.resolve(),
+    leave: () => (left += 1),
+    sortAreas: () => undefined,
+  };
+  labelled(root, 'Back to the dashboards').click();
+  assert.deepEqual([asked.length, left], [0, 1]);
+  assert.equal(element.dirty(), false);
+  const title = control<HTMLInputElement>(root, 'input.fact-input');
+  title.value = 'Flat';
+  title.dispatchEvent(new Event('input'));
+  await element.updateComplete;
+  assert.equal(element.dirty(), true);
+  assert.match(text(root), /Not built yet: 1 change\./);
+  labelled(root, 'Back to the dashboards').click();
+  assert.deepEqual([asked.length, left], [1, 1]);
+  labelled(root, 'Back to the dashboards').click();
+  assert.deepEqual([asked.length, left], [2, 2]);
+  assert.match(asked[0] ?? '', /Leave without building/);
+  window.confirm = confirm;
+  element.remove();
+});
+
+test('the Rooms template lists only the tiles that find something in an area of the home', async () => {
+  const { element, root } = await editor();
+  const rooms = root.querySelector<HTMLSelectElement>('select[aria-label="Rooms template"]');
+  assert.ok(rooms);
+  const offered = new Set([...rooms.options].map((option) => option.value));
+  assert.ok(offered.has('room'));
+  for (const other of ['adguard', 'person', 'car', 'home-assistant']) {
+    assert.equal(offered.has(other), false, other);
+  }
+  element.remove();
+});
+
+test("each section's look is labelled, and its icon is Home Assistant's icon picker once the page has it", async () => {
+  const { element, root, saved } = await editor();
+  const look = root.querySelector('.plan-look');
+  assert.match(text(look), /Title.*Icon.*Template/);
+  assert.ok(root.querySelector('input[aria-label="Rooms icon"]'));
+  customElements.define(
+    'ha-icon-picker',
+    class extends HTMLElement {
+      value = '';
+    },
+  );
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await element.updateComplete;
+  assert.equal(root.querySelector('input[aria-label="Rooms icon"]'), null);
+  const picker = root.querySelector<HTMLElement & { value: string }>(
+    'ha-icon-picker[aria-label="Rooms icon"]',
+  );
+  assert.ok(picker);
+  picker.dispatchEvent(new CustomEvent('value-changed', { detail: { value: 'mdi:sofa' } }));
+  await save(element, root);
+  assert.deepEqual(saved[0]?.[0].sections, { rooms: { icon: 'mdi:sofa' } });
+  element.remove();
+});
+
+test('pop-ups close after the seconds given, and never once the field is emptied or zero', async () => {
+  const { element, root, saved } = await editor();
+  const seconds = control<HTMLInputElement>(root, 'input[type="number"]');
+  assert.equal(seconds.placeholder, 'Never');
+  const typed = async (value: string): Promise<number | undefined> => {
+    seconds.value = value;
+    seconds.dispatchEvent(new Event('change'));
+    await save(element, root);
+    return saved.at(-1)?.[0].idle_close;
+  };
+  assert.equal(await typed('120'), 120);
+  assert.equal(await typed('0'), undefined);
+  assert.equal(await typed(''), undefined);
+  element.remove();
+});
+
+function devicesHome(): Registries {
+  const home = homes()['devices'];
+  assert.ok(home);
+  return home;
+}
+
+function unplaced(home: Registries, device: string): Registries {
+  const placed = home.devices[device];
+  assert.ok(placed);
+  return {
+    ...home,
+    devices: { ...home.devices, [device]: { ...placed, area_id: null } },
+    entities: Object.fromEntries(
+      Object.entries(home.entities).map(([id, entry]) => [
+        id,
+        entry.device_id === device ? { ...entry, area_id: null } : entry,
+      ]),
+    ),
+  };
+}
+
+const hassOf = (home: Registries): HomeAssistant => fakeHass(home);
+
+function devicesSection(root: ShadowRoot): Element {
+  const found = [...root.querySelectorAll('.plan-section')].find(
+    (section) => text(section.querySelector('h2')) === 'Devices',
+  );
+  assert.ok(found);
+  return found;
+}
+
+const rowOf = (root: ShadowRoot, name: string): Element | null =>
+  labelled(root, `Show ${name}`).closest('.plan-row');
+
+test('the Devices section lists the devices a card stands for by area, marks those their room shows, and ticks one onto the plan', async () => {
+  const home = devicesHome();
+  const { element, root, saved } = await editor({
+    plan: defaultPlan(home, TEMPLATES),
+    hass: hassOf(home),
+  });
+  const section = devicesSection(root);
+  assert.deepEqual(
+    [...section.querySelectorAll('h3')].map((heading) => text(heading)),
+    ['Bedroom', 'Living', 'Office'],
+  );
+  const boxes = [...section.querySelectorAll<HTMLInputElement>('.plan-row input')];
+  assert.deepEqual(
+    boxes.map((box) => box.getAttribute('aria-label')),
+    [
+      'Show Bedroom AC',
+      'Show Bedroom heating',
+      'Show Living room',
+      'Show Living room TV',
+      'Show Roborock S8',
+      'Show Prusa MK4',
+    ],
+  );
+  assert.ok(boxes.every((box) => !box.checked && !box.disabled));
+  assert.match(text(rowOf(root, 'Roborock S8')), /Vacuum.*Its room, Living, shows it\./);
+  assert.match(text(rowOf(root, 'Bedroom AC')), /Its room, Bedroom, shows it\./);
+  labelled(root, 'Show Roborock S8').dispatchEvent(new Event('change'));
+  await element.updateComplete;
+  const tile = rowOf(root, 'Roborock S8')?.querySelector<HTMLElement & { config?: unknown }>(
+    'mnml-live-card',
+  );
+  assert.deepEqual(tile?.config, {
+    type: 'custom:mnml-template-card',
+    template: 'vacuum-card',
+    device: 'roborock_s8',
+  });
+  await save(element, root);
+  assert.deepEqual(saved[0]?.[0].devices, [{ device: 'roborock_s8', template: 'vacuum-card' }]);
+  element.remove();
+});
+
+test('a device in no area is listed last and unmarked, its card is switched among those that fit, and unticked it leaves the plan', async () => {
+  const home = unplaced(devicesHome(), 'roborock_s8');
+  const plan: Plan = { ...defaultPlan(home, TEMPLATES), rooms: [{ area: 'living' }] };
+  const { element, root, saved } = await editor({ plan, hass: hassOf(home), fresh: false });
+  const section = devicesSection(root);
+  assert.deepEqual(
+    [...section.querySelectorAll('h3')].map((heading) => text(heading)),
+    ['Bedroom', 'Living', 'Office', 'Not in an area'],
+  );
+  assert.doesNotMatch(text(rowOf(root, 'Roborock S8')), /shows it/);
+  assert.doesNotMatch(text(rowOf(root, 'Bedroom AC')), /shows it/);
+  assert.match(text(rowOf(root, 'Living room TV')), /Its room, Living, shows it\./);
+  labelled(root, 'Show Prusa MK4').dispatchEvent(new Event('change'));
+  await element.updateComplete;
+  const picker = control<HTMLSelectElement>(root, 'select[aria-label="Card for Prusa MK4"]');
+  assert.deepEqual(
+    [...picker.options].map((option) => option.value),
+    ['3d-printer-card', 'camera-card'],
+  );
+  picker.value = 'camera-card';
+  picker.dispatchEvent(new Event('change'));
+  await element.updateComplete;
+  assert.match(text(root), /Not built yet: 1 change\./);
+  await save(element, root);
+  assert.deepEqual(saved[0]?.[0].devices, [{ device: 'prusa_mk4', template: 'camera-card' }]);
+  assert.equal(root.querySelector('select[aria-label="Card for Roborock S8"]'), null);
+  labelled(root, 'Show Prusa MK4').dispatchEvent(new Event('change'));
+  await save(element, root);
+  assert.equal('devices' in (saved[1]?.[0] ?? {}), false);
+  element.remove();
+});
+
+test('the Devices section says so when no device in the home has a card of its own', async () => {
+  const { element, root } = await editor();
+  assert.match(text(devicesSection(root)), /No device in this home has a card of its own\./);
+  element.remove();
+});
+
+const PARTED: Registries = {
+  ...HOME,
+  entities: {
+    ...HOME.entities,
+    'sensor.kitchen_temperature': {
+      entity_id: 'sensor.kitchen_temperature',
+      area_id: 'kitchen',
+      platform: 'zha',
+    },
+  },
+  states: {
+    ...HOME.states,
+    'sensor.kitchen_temperature': {
+      attributes: { device_class: 'temperature', friendly_name: 'Kitchen temperature' },
+    },
+  },
+};
+
+test("a room's parts are hidden and shown again by their chips, and a part is swapped for another entity", async () => {
+  const office = { slots: { key: 'office', name: 'Office' }, spelled: true } as const;
+  const plan: Plan = { ...defaultPlan(PARTED, TEMPLATES), rooms: [{ area: 'living' }, office] };
+  const { element, root, saved } = await editor({ plan, hass: fakeHass(PARTED), fresh: false });
+  assert.equal(root.querySelector('[aria-label="Parts of Office"]'), null);
+  const open = labelled(root, 'Parts of Living');
+  assert.equal(open.getAttribute('aria-expanded'), 'false');
+  open.click();
+  await element.updateComplete;
+  assert.equal(open.getAttribute('aria-expanded'), 'true');
+  const chips = (): HTMLButtonElement[] => [
+    ...control(
+      root,
+      '[role="group"][aria-label="Parts of Living"]',
+    ).querySelectorAll<HTMLButtonElement>('button.chip'),
+  ];
+  assert.deepEqual(
+    chips().map((chip) => [text(chip), chip.getAttribute('aria-pressed')]),
+    [
+      ['Temperature', 'true'],
+      ['Lights', 'true'],
+    ],
+  );
+  chips()[0]?.click();
+  await element.updateComplete;
+  assert.equal(chips()[0]?.getAttribute('aria-pressed'), 'false');
+  assert.equal(root.querySelector('select[aria-label="Swap Temperature"]'), null);
+  await save(element, root);
+  assert.deepEqual(saved[0]?.[0].rooms, [{ area: 'living', slots: { temperature: null } }, office]);
+  chips()[0]?.click();
+  await element.updateComplete;
+  const swap = control<HTMLSelectElement>(root, 'select[aria-label="Swap Temperature"]');
+  assert.deepEqual(
+    [...swap.options].map((option) => text(option)),
+    ['sensor.living_temperature', 'Kitchen temperature (sensor.kitchen_temperature)'],
+  );
+  swap.value = 'sensor.kitchen_temperature';
+  swap.dispatchEvent(new Event('change'));
+  await save(element, root);
+  assert.deepEqual(saved[1]?.[0].rooms[0], {
+    area: 'living',
+    slots: { temperature: 'sensor.kitchen_temperature' },
+  });
+  const back = control<HTMLSelectElement>(root, 'select[aria-label="Swap Temperature"]');
+  back.value = 'sensor.living_temperature';
+  back.dispatchEvent(new Event('change'));
+  await save(element, root);
+  assert.deepEqual(saved[2]?.[0].rooms[0], { area: 'living' });
+  element.remove();
+});
+
+test('a shown device row gives the same card to another device it fits, which joins the plan', async () => {
+  const home = devicesHome();
+  const { element, root, saved } = await editor({
+    plan: defaultPlan(home, TEMPLATES),
+    hass: hassOf(home),
+    fresh: false,
+  });
+  labelled(root, 'Show Bedroom AC').dispatchEvent(new Event('change'));
+  labelled(root, 'Show Living room').dispatchEvent(new Event('change'));
+  await element.updateComplete;
+  assert.equal(
+    root.querySelector('select[aria-label="The same card as Bedroom AC, for another device"]'),
+    null,
+  );
+  const same = control<HTMLSelectElement>(
+    root,
+    'select[aria-label="The same card as Living room, for another device"]',
+  );
+  assert.deepEqual(
+    [...same.options].map((option) => text(option)),
+    ['Same for another device', 'Living room TV'],
+  );
+  same.value = 'apple_tv';
+  same.dispatchEvent(new Event('change'));
+  await save(element, root);
+  assert.deepEqual(saved[0]?.[0].devices, [
+    { device: 'daikin_ac', template: 'ac-item' },
+    { device: 'sonos_arc', template: 'media-card' },
+    { device: 'apple_tv', template: 'media-card' },
+  ]);
+  assert.equal(
+    root.querySelector('select[aria-label="The same card as Living room, for another device"]'),
+    null,
+  );
   element.remove();
 });

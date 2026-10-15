@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 
 import { test } from 'vitest';
 
 import type { SlotSpec } from '../contract/templates.ts';
 
+import { CATALOG_FILE, catalogText } from './catalog.ts';
 import { SHIPPED, readShapes } from './shipped.ts';
 
 function named(spec: SlotSpec, path: string): string[] {
@@ -17,8 +17,8 @@ function named(spec: SlotSpec, path: string): string[] {
   ];
 }
 
-test('docs/templates.md names every shipped template, its slots and their fields', () => {
-  const doc = readFileSync(resolve(import.meta.dirname, '../../docs/templates.md'), 'utf8');
+test('docs/catalog.md names every shipped template, its slots and their fields', () => {
+  const doc = readFileSync(CATALOG_FILE, 'utf8');
   const missing: string[] = [];
   for (const [name, template] of Object.entries(SHIPPED)) {
     const start = doc.indexOf(`### \`${name}\``);
@@ -39,8 +39,8 @@ test('docs/templates.md names every shipped template, its slots and their fields
   assert.deepEqual(missing, []);
 });
 
-test('docs/templates.md marks a slot required exactly when its template requires it', () => {
-  const doc = readFileSync(resolve(import.meta.dirname, '../../docs/templates.md'), 'utf8');
+test('docs/catalog.md marks a slot required exactly when its template requires it', () => {
+  const doc = readFileSync(CATALOG_FILE, 'utf8');
   const wrong: string[] = [];
   for (const [name, template] of Object.entries(SHIPPED)) {
     const start = doc.indexOf(`### \`${name}\``);
@@ -57,15 +57,19 @@ test('docs/templates.md marks a slot required exactly when its template requires
   assert.deepEqual(wrong, []);
 });
 
-test('docs/templates.md names every shipped shape under Shapes', () => {
-  const doc = readFileSync(resolve(import.meta.dirname, '../../docs/templates.md'), 'utf8');
+test('docs/catalog.md names every shipped shape under Shapes', () => {
+  const doc = readFileSync(CATALOG_FILE, 'utf8');
   const start = doc.indexOf('\n## Shapes\n');
   const named = new Set(
-    [...doc.slice(start, doc.indexOf('\n## ', start + 1)).matchAll(/^\| `([a-z0-9_]+)` /gm)].map(
+    [...doc.slice(start, doc.indexOf('\n## ', start + 1)).matchAll(/^- `([a-z0-9_]+)`: /gm)].map(
       (match) => match[1],
     ),
   );
   const missing = Object.keys(readShapes()).filter((name) => !named.has(name));
   assert.ok(start !== -1);
   assert.deepEqual(missing, []);
+});
+
+test('docs/catalog.md is the one pnpm run fix:docs writes from templates/*.yaml', () => {
+  assert.equal(readFileSync(CATALOG_FILE, 'utf8'), catalogText(), 'stale: run pnpm run fix:docs');
 });

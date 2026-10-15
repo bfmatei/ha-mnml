@@ -1,6 +1,7 @@
 import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
+import { isEntityId } from '../src/contract/entities.ts';
 import type { MdiIcon } from '../src/contract/entities.ts';
 import type { Value } from '../src/contract/templates.ts';
 import { toYaml } from '../src/contract/yaml.ts';
@@ -24,7 +25,6 @@ export const SUPPLIED: ReadonlyMap<string, string> = new Map([
   ['light.kitchen_lights', 'Lights'],
 ]);
 
-const ID = /^[a-z_]+\.[a-z0-9_]+$/;
 const NUMBER = /^-?\d+(?:\.\d+)?$/;
 const IMAGES: Record<string, string> = {
   map: 'http://localhost:8123/local/map.png',
@@ -230,7 +230,7 @@ interface Override {
 
 function collect(value: unknown, key: string, parent: string, out: Map<string, Found>): void {
   if (typeof value === 'string') {
-    if (ID.test(value) && !out.has(value)) {
+    if (isEntityId(value) && !out.has(value)) {
       out.set(value, { id: value, key, parent });
     }
   } else if (Array.isArray(value)) {
@@ -339,10 +339,12 @@ function attributesOf(entry: Found, home: Home): Record<string, string> | undefi
     return {
       messages: [
         '{{ [',
+        "{'id': 'smart', 'title': 'Disk wearing out', 'message': 'The SSD has used 92% of its rated writes.', 'severity': 'warning', 'source': 'pve', 'time': (now() - timedelta(hours=2)).isoformat()},",
         "{'id': 'backup', 'title': 'Backup finished', 'message': 'Every guest was backed up.', 'severity': 'info', 'source': 'pbs', 'time': (now() - timedelta(hours=5)).isoformat()},",
         "{'id': 'update', 'title': 'Updates available', 'message': 'Three packages can be upgraded.', 'severity': 'notice', 'source': 'pve', 'time': (now() - timedelta(hours=9)).isoformat()}",
         '] }}',
       ].join(' '),
+      alerts: '{{ 1 }}',
     };
   }
   return undefined;
@@ -383,6 +385,15 @@ function compact(value: Record<string, Value>): Record<string, Value> {
 
 const flag = (on: boolean): string => `{{ ${on ? 'true' : 'false'} }}`;
 
+const PRESETS: [string, number][] = [
+  ['_comfort', 21],
+  ['_eco', 18],
+  ['_away', 16],
+];
+const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+const ALL_DAY = { from: '00:00:00', to: '24:00:00' };
+const MORNING = { from: '06:00:00', to: '08:00:00' };
+
 export function packageOf(home: Home): Record<string, Value> {
   const areas = prefixes(home);
   const lights = lightRooms(home);
@@ -392,6 +403,8 @@ export function packageOf(home: Home): Record<string, Value> {
   const scenes: Value[] = [];
   const scripts: Record<string, Value> = {};
   const booleans: Record<string, Value> = {};
+  const schedules: Record<string, Value> = {};
+  const timers: Record<string, Value> = {};
   const climates: Value[] = [];
   const hygrostats: Value[] = [];
   const alarms: Value[] = [];
@@ -419,7 +432,7 @@ export function packageOf(home: Home): Record<string, Value> {
         const messages = entry.id === home.system.proxmox?.notifications?.messages;
         add('sensor', {
           ...base(entry, name, reading.state),
-          state: messages ? '2' : reading.state,
+          state: messages ? '3' : reading.state,
           unit_of_measurement: reading.unit ?? null,
           device_class: reading.device_class ?? null,
           state_class: reading.state_class ?? null,
@@ -474,16 +487,40 @@ export function packageOf(home: Home): Record<string, Value> {
           select_option: [],
         });
         break;
-      case 'number':
-        add('number', {
-          ...base(entry, name, '50'),
-          state: '{{ 50 }}',
-          min: 0,
-          max: 100,
-          step: 1,
-          set_value: [],
-        });
+      case 'number': {
+        const preset =
+          entry.key === 'presetTemperatures'
+            ? PRESETS.find(([end]) => entry.id.endsWith(end))?.[1]
+            : undefined;
+        add(
+          'number',
+          preset === undefined
+            ? {
+                ...base(entry, name, '50'),
+                state: '{{ 50 }}',
+                min: 0,
+                max: 100,
+                step: 1,
+                set_value: [],
+              }
+            : {
+                ...base(entry, name, String(preset)),
+                state: `{{ ${preset} }}`,
+                min: 5,
+                max: 30,
+                step: 0.5,
+                unit_of_measurement: '°C',
+                set_value: [],
+              },
+        );
         break;
+      }
+      case 'schedule': {
+        const room = home.rooms.find((each) => each.heating?.schedule === entry.id);
+        const hours = room !== undefined && HEATING_ON.has(room.key) ? ALL_DAY : MORNING;
+        schedules[object] = { name, ...Object.fromEntries(DAYS.map((day) => [day, [hours]])) };
+        break;
+      }
       case 'button':
         add('button', { ...base(entry, name, 'unknown'), press: [] });
         break;
@@ -509,6 +546,9 @@ export function packageOf(home: Home): Record<string, Value> {
         break;
       case 'input_boolean':
         booleans[object] = { name };
+        break;
+      case 'timer':
+        timers[object] = { name, duration: '00:05:00' };
         break;
 
       case 'cover': {
@@ -618,6 +658,8 @@ export function packageOf(home: Home): Record<string, Value> {
     scene: scenes,
     script: scripts,
     input_boolean: booleans,
+    schedule: schedules,
+    timer: timers,
     climate: climates,
     humidifier: hygrostats,
     alarm_control_panel: alarms,
@@ -743,7 +785,7 @@ export function created(pack: Value): Set<string> {
       }
     }
   }
-  for (const domain of ['script', 'input_boolean'] as const) {
+  for (const domain of ['script', 'input_boolean', 'schedule', 'timer'] as const) {
     for (const object of keysOf(pack[domain])) {
       made.add(`${domain}.${object}`);
     }

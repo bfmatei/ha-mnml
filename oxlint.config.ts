@@ -62,6 +62,7 @@ export default defineConfig({
     'typescript/prefer-reduce-type-parameter': 'error',
     'typescript/prefer-regexp-exec': 'error',
     'typescript/restrict-plus-operands': 'error',
+    'typescript/switch-exhaustiveness-check': 'error',
     'typescript/unified-signatures': 'error',
     'unicorn/catch-error-name': 'error',
     'unicorn/consistent-function-scoping': 'error',

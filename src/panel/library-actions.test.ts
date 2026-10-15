@@ -2,9 +2,11 @@ import assert from 'node:assert/strict';
 
 import { test } from 'vitest';
 
-import type { Plan } from '../contract/builder.ts';
+import type { Plan } from '../contract/plan.ts';
 import type { Template } from '../contract/templates.ts';
-import { text } from '../test/render.ts';
+import { press, text } from '../test/render.ts';
+import { until } from '../test/until.ts';
+import { PANEL_EN } from '../words/panel/en.ts';
 
 import type { Built } from './building.ts';
 import type { Dashboard, Entry, PanelState, Row } from './data.ts';
@@ -13,19 +15,13 @@ import {
   exportTemplates,
   importDashboards,
   importFile,
+  duplicateTemplate,
   newTemplate,
   removeTemplate,
   renameTemplate,
   restoreVersion,
 } from './library-actions.ts';
 import type { LibraryHost } from './library-actions.ts';
-
-HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement): void {
-  this.open = true;
-};
-HTMLDialogElement.prototype.close = function close(this: HTMLDialogElement): void {
-  this.open = false;
-};
 
 type Message = { type: string } & Record<string, unknown>;
 
@@ -63,6 +59,8 @@ const WALL: Dashboard = {
 };
 const ROW: Row = {
   name: 'garden',
+  title: 'Garden',
+  icon: 'mdi:puzzle-outline',
   description: '',
   family: undefined,
   status: 'own',
@@ -128,6 +126,7 @@ function fake(
         return Promise.resolve(answers[message.type] ?? null);
       },
       dialogs: dialogsOn(root),
+      words: PANEL_EN,
       state: () => state,
       refresh: () => {
         refreshes += 1;
@@ -147,16 +146,10 @@ function fake(
 }
 
 async function shown(root: HTMLElement): Promise<HTMLDialogElement> {
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await until(() => root.querySelector('dialog') !== null, 'a dialog');
   const dialog = [...root.querySelectorAll('dialog')].at(-1);
   assert.ok(dialog instanceof HTMLDialogElement, 'a dialog');
   return dialog;
-}
-
-function press(dialog: HTMLDialogElement, label: string): void {
-  const button = [...dialog.querySelectorAll('button')].find((each) => text(each) === label);
-  assert.ok(button, label);
-  button.click();
 }
 
 async function named(root: HTMLElement, name: string): Promise<void> {
@@ -194,7 +187,7 @@ test('a rename that cannot save a dashboard part-way keeps the old name beside t
     at.sent.some((message) => message.type === 'mnml/templates/delete'),
     false,
   );
-  assert.match(text(told), /garden is now patio/);
+  assert.match(text(told), /Garden is now patio in YAML/);
   assert.match(text(told), /change garden to patio in them by hand: Wall/);
   assert.match(
     text(told),
@@ -256,7 +249,7 @@ for (const [choice, names] of [
     assert.match(text(fates), /replaces the template of the same name/);
     assert.match(text(fates), /comes in as a template of the home/);
     const select = fates.querySelector<HTMLSelectElement>(
-      'select[aria-label="What to do with garden"]',
+      'select[aria-label="What to do with Garden"]',
     );
     assert.ok(select);
     select.value = choice;
@@ -339,7 +332,7 @@ test('History restores the version chosen at once, and asks for one first', asyn
   });
   const done = restoreVersion(at.host, 'garden');
   const ask = await shown(at.root);
-  assert.match(text(ask), /The history of garden/);
+  assert.match(text(ask), /The history of Garden/);
   assert.match(text(ask), /0 changes to the shipped one/);
   press(ask, 'Restore');
   assert.match(text(ask), /Choose a version first\./);
@@ -372,7 +365,7 @@ test('Delete says where the template is used, and Reset to shipped what goes', a
   const at = fake(stateOf());
   const done = removeTemplate(at.host, ROW);
   const asked = await shown(at.root);
-  assert.match(text(asked), /Delete garden\?/);
+  assert.match(text(asked), /Delete Garden\?/);
   assert.match(text(asked), /It is on 1 card, on Overview\. Its history keeps it\./);
   press(asked, 'Delete');
   await done;
@@ -390,19 +383,37 @@ test('Delete says where the template is used, and Reset to shipped what goes', a
   at.root.remove();
 });
 
-test('a new template is a heading with a title slot, under a name no template has', async () => {
+test('a new template is a heading with a title slot, named by the title typed, under a name no template has', async () => {
   const at = fake(stateOf());
   const made = newTemplate(at.host);
-  await named(at.root, 'garden');
-  const asked = await shown(at.root);
-  assert.match(text(asked), /garden is taken\./);
-  await named(at.root, 'porch');
+  const dialog = await shown(at.root);
+  const title = dialog.querySelector<HTMLInputElement>('input[aria-label="Title"]');
+  assert.ok(title);
+  title.value = 'Garden';
+  title.dispatchEvent(new Event('input'));
+  press(dialog, 'OK');
   const draft = await made;
-  assert.equal(draft?.name, 'porch');
+  assert.equal(draft?.name, 'garden-2');
   assert.equal(draft?.blank, true);
+  assert.equal(draft?.template.title, 'Garden');
+  assert.deepEqual(Object.keys(draft?.template ?? {}).slice(0, 2), ['description', 'title']);
   assert.deepEqual(draft?.template.slots, {
     title: { kind: 'text', required: true, label: 'Title' },
   });
+  at.root.remove();
+});
+
+test('a duplicate starts from the title of the template, and keeps it after the description', async () => {
+  const at = fake(stateOf());
+  const made = duplicateTemplate(at.host, 'garden', { description: 'Mine.', ...HEADING });
+  const dialog = await shown(at.root);
+  assert.match(text(dialog), /A copy of Garden/);
+  const title = dialog.querySelector<HTMLInputElement>('input[aria-label="Title"]');
+  assert.equal(title?.value, 'Garden copy');
+  press(dialog, 'OK');
+  const draft = await made;
+  assert.equal(draft?.name, 'garden-copy');
+  assert.deepEqual(draft?.template, { description: 'Mine.', title: 'Garden copy', ...HEADING });
   at.root.remove();
 });
 

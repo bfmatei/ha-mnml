@@ -4,17 +4,18 @@ import { test } from 'vitest';
 
 import { HOME } from '../builder/fixture.ts';
 import { defaultPlan } from '../builder/plan.ts';
-import type { Plan } from '../contract/builder.ts';
+import type { Plan } from '../contract/plan.ts';
 import type { Value } from '../contract/templates.ts';
-import type { HomeAssistant } from '../ha/hass.ts';
 import { readTemplates } from '../templates/shipped.ts';
-import { define, mounted, text } from '../test/render.ts';
+import { fakeHass } from '../test/hass.ts';
+import { define, mounted, press, text } from '../test/render.ts';
+import { until } from '../test/until.ts';
 
 import { MnmlLiveCard } from './live-card.ts';
 import { MnmlPlanEditor } from './plan-editor.ts';
 
 const TEMPLATES = readTemplates();
-const HASS = { ...HOME, locale: { language: 'en' } } as never as HomeAssistant;
+const HASS = fakeHass(HOME);
 const opened: FakeEditor[] = [];
 
 class FakeEditor extends HTMLElement {
@@ -40,14 +41,6 @@ define('mnml-fake-editor', FakeEditor);
 define('mnml-template-card', FakeTemplateCard);
 define('mnml-plan-editor', MnmlPlanEditor);
 define('mnml-live-card', MnmlLiveCard);
-HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement): void {
-  this.open = true;
-};
-HTMLDialogElement.prototype.close = function close(this: HTMLDialogElement): void {
-  this.open = false;
-};
-
-const later = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
 async function editor(): Promise<{
   element: MnmlPlanEditor;
@@ -67,16 +60,9 @@ async function editor(): Promise<{
       return Promise.resolve();
     },
     leave: () => undefined,
+    sortAreas: () => undefined,
   };
   return { element, root: await mounted(element), saved };
-}
-
-function press(root: ParentNode, label: string): void {
-  const found = [...root.querySelectorAll('button')].find(
-    (each) => each.getAttribute('aria-label') === label || text(each) === label,
-  );
-  assert.ok(found, label);
-  found.click();
 }
 
 async function customized(
@@ -85,22 +71,23 @@ async function customized(
   open: string,
   config: Record<string, Value>,
 ): Promise<HTMLDialogElement> {
+  const before = opened.length;
   press(root, open);
-  await later();
+  await until(() => opened.length > before, "the template card's editor");
   const fake = opened.at(-1);
   assert.ok(fake);
   fake.change(config);
   const dialog = root.querySelector('dialog.customize');
   assert.ok(dialog instanceof HTMLDialogElement);
   press(dialog, 'Done');
-  await later();
   await element.updateComplete;
   return dialog;
 }
 
 async function saved(element: MnmlPlanEditor, root: ShadowRoot, plans: Plan[]): Promise<Plan> {
+  const before = plans.length;
   press(root, 'Create');
-  await later();
+  await until(() => plans.length > before, 'the plan saved');
   const plan = plans.at(-1);
   assert.ok(plan);
   element.remove();
@@ -135,7 +122,7 @@ test('a customized card that does not draw, or is another template, is refused i
     template: 'lights',
   });
   assert.equal(other.isConnected, true);
-  assert.match(text(other), /drawn by the room template/);
+  assert.match(text(other), /drawn by the Room template/);
   element.remove();
 });
 
@@ -148,7 +135,8 @@ test('a car is added through its editor once it has a key and draws', async () =
     slots: Object.fromEntries(Object.entries(example).filter(([name]) => name !== 'key')),
   });
   assert.equal(keyless.isConnected, true);
-  assert.match(text(keyless), /the slot key is required|A car needs a key/);
+  assert.match(text(keyless), /Short name is needed/);
+  assert.doesNotMatch(text(keyless), /the slot key/);
   keyless.querySelector<HTMLButtonElement>('button')?.click();
   await element.updateComplete;
   await customized(element, root, 'Add a car', {
@@ -160,4 +148,31 @@ test('a car is added through its editor once it has a key and draws', async () =
   assert.equal(plan.cars.length, 1);
   assert.equal(plan.cars[0]?.key, 'sedan');
   assert.equal(plan.cars[0]?.slots['key'], undefined);
+});
+
+test('Customize shows the card as it is edited, drawn but inert', async () => {
+  const { element, root } = await editor();
+  press(root, 'Customize Kitchen');
+  await until(() => root.querySelector('dialog.customize') !== null, 'the dialog');
+  const dialog = root.querySelector('dialog.customize');
+  assert.ok(dialog instanceof HTMLDialogElement);
+  const preview = dialog.querySelector('mnml-live-card');
+  assert.ok(preview instanceof MnmlLiveCard);
+  assert.ok(preview.hasAttribute('inert'));
+  assert.equal(preview.hass, HASS);
+  assert.deepEqual(preview.config, {
+    type: 'custom:mnml-template-card',
+    template: 'room',
+    area: 'kitchen',
+  });
+  const edited = {
+    type: 'custom:mnml-template-card',
+    template: 'room',
+    area: 'kitchen',
+    slots: { name: 'Cook' },
+  };
+  opened.at(-1)?.change(edited);
+  assert.deepEqual(dialog.querySelector<MnmlLiveCard>('mnml-live-card')?.config, edited);
+  press(dialog, 'Cancel');
+  element.remove();
 });

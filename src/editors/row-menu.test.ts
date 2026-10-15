@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'vitest';
 
 import { define, mounted } from '../test/render.ts';
+import { EDITORS_EN } from '../words/panel/editors-en.ts';
 
 import { MnmlRowMenu } from './row-menu.ts';
 import type { MenuItem } from './row-menu.ts';
@@ -12,7 +13,7 @@ define('mnml-row-menu', MnmlRowMenu);
 async function menuOf(label: string, items: readonly MenuItem[]): Promise<MnmlRowMenu> {
   const made = document.createElement('mnml-row-menu');
   assert.ok(made instanceof MnmlRowMenu);
-  made.label = label;
+  made.label = EDITORS_EN.moreFor(label);
   made.items = items;
   await mounted(made);
   return made;
@@ -72,7 +73,7 @@ test('a row menu closes on Escape', async () => {
 
 test('a new label renames the button', async () => {
   const menu = await menuOf('Toggle 1', []);
-  menu.label = 'Toggle: light.a';
+  menu.label = EDITORS_EN.moreFor('Toggle: light.a');
   await menu.updateComplete;
   assert.ok(labelled(menu, 'More for Toggle: light.a'));
   assert.equal(labelled(menu, 'More for Toggle: light.a')?.title, 'More for Toggle: light.a');
@@ -166,4 +167,33 @@ test('an open menu takes the focus, the arrow keys walk its items, and Escape gi
   await menu.updateComplete;
   assert.equal(labelled(menu, 'Delete'), undefined);
   assert.equal(focused(), 'More for Living Sonos');
+});
+
+async function placed(direction: 'ltr' | 'rtl'): Promise<string | undefined> {
+  const page = document.createElement('div');
+  page.dir = direction;
+  document.body.append(page);
+  const made = document.createElement('mnml-row-menu');
+  assert.ok(made instanceof MnmlRowMenu);
+  made.label = EDITORS_EN.moreFor('Living Sonos');
+  made.items = [{ label: 'Delete', icon: 'mdi:delete-outline', run: () => undefined }];
+  page.append(made);
+  await mounted(made);
+  drawnLikeAnOpenPopover(made);
+  const button = labelled(made, 'More for Living Sonos');
+  const list = made.shadowRoot?.querySelector('.row-menu-list');
+  assert.ok(button && list instanceof HTMLElement);
+  button.getBoundingClientRect = () => new DOMRect(300, 20, 40, 40);
+  list.getBoundingClientRect = () => new DOMRect(0, 0, 200, 120);
+  button.click();
+  await made.updateComplete;
+  await made.updateComplete;
+  const left = list.style.left;
+  page.remove();
+  return left;
+}
+
+test('an open menu lines up with the end of its button, which is its left edge right to left', async () => {
+  assert.equal(await placed('ltr'), '140px');
+  assert.equal(await placed('rtl'), '300px');
 });

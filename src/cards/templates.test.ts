@@ -5,11 +5,23 @@ import { test } from 'vitest';
 import type { Rule, SlotSpec, Template, Value } from '../contract/templates.ts';
 import { expand } from '../templates/expand.ts';
 import { SHIPPED } from '../templates/shipped.ts';
+import { fakeHass } from '../test/hass.ts';
+import { configure } from '../test/render.ts';
 
+import { MnmlCard } from './base.ts';
+import { MnmlPopupsCard } from './popups.ts';
 import './register.ts';
+import { MnmlTemplateCard } from './template.ts';
 
-interface Configurable {
-  setConfig(config: unknown): void;
+function cardOf(
+  tag: string,
+): MnmlCard<{ type: string }> | MnmlPopupsCard | MnmlTemplateCard | undefined {
+  const element = document.createElement(tag);
+  return element instanceof MnmlCard ||
+    element instanceof MnmlPopupsCard ||
+    element instanceof MnmlTemplateCard
+    ? element
+    : undefined;
 }
 
 function cards(value: unknown, found: Record<string, unknown>[] = []): Record<string, unknown>[] {
@@ -34,30 +46,20 @@ test('every shipped template, from its example, draws cards their own check acce
     const { card, popups } = expand(SHIPPED, { template: name, slots: template.example ?? {} });
     for (const config of cards([card, popups])) {
       const tag = String(config['type']).slice('custom:'.length);
-      const Card = customElements.get(tag) as unknown as (new () => Configurable) | undefined;
-      assert.ok(Card, `${name}: ${tag} is a card`);
+      const element = cardOf(tag);
+      assert.ok(element, `${name}: ${tag} is a card`);
       assert.doesNotThrow(() => {
-        new Card().setConfig(config);
+        configure(element, config);
       }, `${name}: ${tag}`);
     }
   }
 });
 
-const HASS = {
-  states: {},
-  entities: {},
-  devices: {},
-  areas: {},
-  locale: { language: 'en' },
-  formatEntityState: (): string => '',
-  formatEntityAttributeValue: (): string => '',
-  callApi: (): Promise<unknown> => Promise.resolve([]),
-  callService: (): Promise<unknown> => Promise.resolve(),
-};
-
-interface Rendered extends Configurable {
-  hass: unknown;
-}
+const HASS = fakeHass({
+  formatEntityState: () => '',
+  formatEntityAttributeValue: () => '',
+  callApi: () => Promise.resolve([]),
+});
 
 test('every shipped template, with only its required slots, draws cards that render', () => {
   for (const [name, template] of Object.entries(SHIPPED)) {
@@ -68,11 +70,10 @@ test('every shipped template, with only its required slots, draws cards that ren
     const { card, popups } = expand(SHIPPED, { template: name, slots });
     for (const config of cards([card, popups])) {
       const tag = String(config['type']).slice('custom:'.length);
-      const Card = customElements.get(tag) as unknown as (new () => Rendered) | undefined;
-      assert.ok(Card, `${name}: ${tag} is a card`);
-      const element = new Card();
+      const element = cardOf(tag);
+      assert.ok(element, `${name}: ${tag} is a card`);
       assert.doesNotThrow(() => {
-        element.setConfig(config);
+        configure(element, config);
         element.hass = HASS;
       }, `${name}: ${tag}`);
     }
@@ -240,13 +241,13 @@ test('every shipped template, with each optional slot left out, draws cards that
       }
       for (const config of cards([card, popups])) {
         const tag = String(config['type']).slice('custom:'.length);
-        const Card = customElements.get(tag) as unknown as (new () => Configurable) | undefined;
-        if (Card === undefined) {
+        const element = cardOf(tag);
+        if (element === undefined) {
           broken.push(`${name} without ${slot}: ${tag} is no card`);
           continue;
         }
         try {
-          new Card().setConfig(config);
+          configure(element, config);
         } catch (error) {
           broken.push(
             `${name} without ${slot}: ${tag}: ${error instanceof Error ? error.message : String(error)}`,

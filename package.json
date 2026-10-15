@@ -17,12 +17,13 @@
     "check:ruff": "uv run ruff check",
     "check:ruff-format": "uv run ruff format --check",
     "check:mypy": "uv run mypy",
-    "check:hassfest": "docker run --rm --platform linux/amd64 -v \"$PWD\":/github/workspace:ro ghcr.io/home-assistant/hassfest",
+    "check:hassfest": "node tools/hassfest.ts",
     "corpus:demo": "node tools/corpus.ts",
     "demo": "node tools/up.ts",
-    "fix": "pnpm run fix:ids && pnpm run fix:format && pnpm run fix:lint && pnpm run fix:md && pnpm run fix:ruff && pnpm run fix:ruff-format",
+    "fix": "pnpm run fix:ids && pnpm run fix:docs && pnpm run fix:format && pnpm run fix:lint && pnpm run fix:md && pnpm run fix:ruff && pnpm run fix:ruff-format",
     "fix:ids": "node src/templates/ids-main.ts",
-    "fix:interface": "node src/contract/interface-main.ts",
+    "fix:docs": "node src/templates/catalog-main.ts",
+    "fix:interface": "node src/interface/main.ts",
     "fix:format": "oxfmt",
     "fix:lint": "oxlint --fix",
     "fix:md": "markdownlint-cli2 --fix",
@@ -60,7 +61,7 @@
     "yaml": "^2.9.1"
   },
   "engines": {
-    "node": ">=22.18"
+    "node": ">=26"
   },
   "packageManager": "pnpm@12.11.2"
 }

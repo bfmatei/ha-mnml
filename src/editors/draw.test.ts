@@ -5,13 +5,15 @@ import { beforeEach, test } from 'vitest';
 
 import type { Value } from '../contract/templates.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
-import { define, text } from '../test/render.ts';
+import { fakeHass } from '../test/hass.ts';
+import { define, everything, text, updated } from '../test/render.ts';
 
 import { DESCRIPTIONS } from './cards.ts';
 import { objectForm } from './draw.ts';
 import type { Context } from './draw.ts';
+import type { Drawing } from './drawing.ts';
+import type { Form } from './form.ts';
 import { MnmlRowMenu } from './row-menu.ts';
-import type { Shape } from './shape.ts';
 import { MnmlWords } from './words.ts';
 
 define('mnml-row-menu', MnmlRowMenu);
@@ -20,26 +22,6 @@ define('mnml-words', MnmlWords);
 beforeEach(() => {
   localStorage.clear();
 });
-
-function everything(root: ParentNode): Element[] {
-  const out: Element[] = [];
-  for (const element of root.querySelectorAll('*')) {
-    out.push(element);
-    if (element.shadowRoot !== null) {
-      out.push(...everything(element.shadowRoot));
-    }
-  }
-  return out;
-}
-
-const settle = async (): Promise<void> => {
-  await new Promise((resolve) => {
-    setTimeout(resolve, 0);
-  });
-  await new Promise((resolve) => {
-    setTimeout(resolve, 0);
-  });
-};
 
 const labelled = (root: ParentNode, label: string): HTMLElement | undefined =>
   everything(root).find(
@@ -50,7 +32,7 @@ const labelled = (root: ParentNode, label: string): HTMLElement | undefined =>
 async function click(node: HTMLElement | undefined): Promise<void> {
   assert.ok(node, 'there is something to click');
   node.click();
-  await settle();
+  await updated(document);
 }
 
 const forms = (root: ParentNode): HTMLElement[] =>
@@ -67,14 +49,14 @@ const words = (root: ParentNode): HTMLInputElement[] =>
 async function fire(form: HTMLElement | undefined, value: Record<string, Value>): Promise<void> {
   assert.ok(form, 'there is a form');
   form.dispatchEvent(new CustomEvent('value-changed', { detail: { value } }));
-  await settle();
+  await updated(document);
 }
 
 async function type(box: HTMLInputElement | undefined, typed: string): Promise<void> {
   assert.ok(box, 'there is a box');
   box.value = typed;
   box.dispatchEvent(new Event('input'));
-  await settle();
+  await updated(document);
 }
 
 interface Harness {
@@ -87,14 +69,14 @@ interface Harness {
 async function harness(kind: string, start: Record<string, Value>): Promise<Harness> {
   const found = DESCRIPTIONS[kind];
   assert.ok(found);
-  const shape: Shape = found;
+  const form: Form = found;
   let value = start;
   const writes: { value: Record<string, Value>; redraw: boolean }[] = [];
   const root = document.createElement('div');
   document.body.append(root);
   const context: Context & { hass: HomeAssistant | undefined } = {
     hass: undefined,
-    hashes: ['#living'],
+    popups: [{ value: '#living', label: 'Living' }],
     open: new Map<string, boolean>(),
     redraw: (): void => {
       draw();
@@ -102,17 +84,17 @@ async function harness(kind: string, start: Record<string, Value>): Promise<Harn
   };
   const slot = {
     get: (): Record<string, Value> => value,
-    set: (next: Record<string, Value>, redraw: boolean): void => {
+    set: (next: Record<string, Value>, { redraw }: Drawing): void => {
       value = next;
       writes.push({ value: next, redraw });
       draw();
     },
   };
   function draw(): void {
-    render(objectForm(shape, slot, context, '', true), root);
+    render(objectForm(form, slot, context, '', true), root);
   }
   draw();
-  await settle();
+  await updated(document);
   return { root, writes, context, value: () => value };
 }
 
@@ -174,7 +156,7 @@ test('a control is added by kind, opened, and starts with its type alone', async
   assert.ok(add instanceof HTMLSelectElement);
   add.value = 'toggle';
   add.dispatchEvent(new Event('change'));
-  await settle();
+  await updated(document);
   assert.deepEqual(value()['controls'], [{ type: 'toggle' }]);
   assert.ok(labelled(root, 'More for Toggle 1'));
   assert.equal(add.value, '', 'the picker is ready for the next one');
@@ -394,15 +376,9 @@ test('a row is named by its entity as Home Assistant names it', async () => {
     type: 'custom:mnml-list-card',
     rows: [{ entity: 'sensor.a' }],
   });
-  context.hass = {
-    states: {
-      'sensor.a': {
-        entity_id: 'sensor.a',
-        state: '1',
-        attributes: { friendly_name: 'Hall power' },
-      },
-    },
-  } as unknown as HomeAssistant;
+  context.hass = fakeHass({
+    states: { 'sensor.a': { state: '1', attributes: { friendly_name: 'Hall power' } } },
+  });
   context.redraw();
   await click(labelled(root, 'Rows'));
   assert.ok(labelled(root, 'Hall power'));
@@ -418,7 +394,7 @@ test("the report card's colours are picked from the list, word by word", async (
   assert.ok(picker instanceof HTMLSelectElement);
   picker.value = 'blue';
   picker.dispatchEvent(new Event('change'));
-  await settle();
+  await updated(document);
   assert.deepEqual(value()['colors'], { warnings: 'blue' });
 });
 

@@ -2,6 +2,7 @@ import { LitElement, css, html } from 'lit';
 import type { PropertyValues, TemplateResult } from 'lit';
 import { property, query } from 'lit/decorators.js';
 
+import { cardOf } from '../cards/parts/card-element.ts';
 import type { ChildCard } from '../ha/card-helpers.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
 
@@ -37,17 +38,15 @@ export class MnmlLiveCard extends LitElement {
     this.drawing += 1;
     const mine = this.drawing;
     const config = this.config;
-    const load = window.loadCardHelpers;
-    if (config === undefined || load === undefined) {
+    if (config === undefined) {
       this.card = undefined;
       this.box?.replaceChildren();
       return;
     }
-    const helpers = await load();
+    const card = await cardOf(config);
     if (mine !== this.drawing) {
       return;
     }
-    const card = helpers.createCardElement(config);
     card.preview = true;
     if (this.hass !== undefined) {
       card.hass = this.hass;

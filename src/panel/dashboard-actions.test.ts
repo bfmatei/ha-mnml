@@ -3,9 +3,12 @@ import assert from 'node:assert/strict';
 import { test } from 'vitest';
 
 import { HOME } from '../builder/fixture.ts';
-import type { Plan } from '../contract/builder.ts';
+import type { Plan } from '../contract/plan.ts';
+import type { Registries } from '../ha/registries.ts';
 import { readTemplates } from '../templates/shipped.ts';
-import { text } from '../test/render.ts';
+import { press, text } from '../test/render.ts';
+import { until } from '../test/until.ts';
+import { PANEL_EN } from '../words/panel/en.ts';
 
 import { boardsOf, builtOf } from './building.ts';
 import {
@@ -19,13 +22,6 @@ import {
 import type { DashboardHost } from './dashboard-actions.ts';
 import type { Entry, PanelState } from './data.ts';
 import { dialogsOn } from './dialog.ts';
-
-HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement): void {
-  this.open = true;
-};
-HTMLDialogElement.prototype.close = function close(this: HTMLDialogElement): void {
-  this.open = false;
-};
 
 type Message = { type: string } & Record<string, unknown>;
 
@@ -56,7 +52,11 @@ interface World {
 }
 
 function world(
-  given: { built?: Record<string, unknown>; boards?: (typeof BOARD)[] } = {},
+  given: {
+    built?: Record<string, unknown>;
+    boards?: (typeof BOARD)[];
+    registries?: Registries;
+  } = {},
   refuse: readonly string[] = [],
   boardsFailure?: string,
 ): World {
@@ -78,7 +78,7 @@ function world(
     shippedFailure: undefined,
     resolved: SHIPPED,
     taken: new Set(Object.keys(SHIPPED)),
-    registries: HOME,
+    registries: given.registries ?? HOME,
     dashboards: [],
     built: builtOf({ dashboards: structuredClone(made.built) }),
     boards: boardsOf(made.boards),
@@ -115,6 +115,7 @@ function world(
           : Promise.resolve(answer(message));
       },
       dialogs: dialogsOn(root),
+      words: PANEL_EN,
       state: () => state,
       refresh: () => {
         refreshes += 1;
@@ -139,16 +140,10 @@ function world(
 }
 
 async function shown(root: HTMLElement): Promise<HTMLDialogElement> {
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await until(() => root.querySelector('dialog') !== null, 'a dialog');
   const dialog = [...root.querySelectorAll('dialog')].at(-1);
   assert.ok(dialog instanceof HTMLDialogElement, 'a dialog');
   return dialog;
-}
-
-function press(dialog: HTMLDialogElement, label: string): void {
-  const button = [...dialog.querySelectorAll('button')].find((each) => text(each) === label);
-  assert.ok(button, label);
-  button.click();
 }
 
 const types = (at: World): string[] => at.sent.map((message) => message.type);
@@ -233,6 +228,37 @@ test('a rebuild keeps the cards it replaces, goes back to the dashboards and off
   at.root.remove();
 });
 
+test("a rebuild's question lists what changed since the build, by section and name, or says nothing did", async () => {
+  const at = world({ built: { 'dashboard-flat': { plan: PLAN } }, boards: [BOARD] });
+  const next: Plan = {
+    ...NEXT,
+    rooms: [{ area: 'living' }],
+    system: [{ template: 'adguard' }],
+    sections: { rooms: { title: 'Spaces' } },
+  };
+  const done = buildDashboard(at.host, 'dashboard-flat', next, 'dashboard-flat');
+  const asked = await shown(at.root);
+  assert.deepEqual(
+    [...asked.querySelectorAll('li')].map((item) => text(item)),
+    [
+      'The title changed',
+      "A section's title, icon or template changed",
+      'Spaces: Living added',
+      'System: AdGuard Home added',
+    ],
+  );
+  press(asked, 'Cancel');
+  await done;
+  const again = buildDashboard(at.host, 'dashboard-flat', PLAN, 'dashboard-flat');
+  const same = await shown(at.root);
+  assert.equal(same.querySelector('li'), null);
+  assert.match(text(same), /Nothing chosen here changed since it was last built/);
+  press(same, 'Cancel');
+  await again;
+  assert.deepEqual(at.sent, []);
+  at.root.remove();
+});
+
 test('a rebuild cancelled sends nothing', async () => {
   const at = world({ built: { 'dashboard-flat': { plan: PLAN } }, boards: [BOARD] });
   const done = buildDashboard(at.host, 'dashboard-flat', NEXT, 'dashboard-flat');
@@ -306,6 +332,40 @@ test('Quick start says what it makes and where, makes it, and offers to open it'
   press(ready, 'Open it');
   await done;
   assert.deepEqual(at.visited, ['/dashboard-home']);
+  at.root.remove();
+});
+
+const SCATTERED: Registries = {
+  ...HOME,
+  devices: Object.fromEntries(
+    Object.entries(HOME.devices).map(([id, { area_id: _area, ...device }]) => [id, device]),
+  ),
+  entities: Object.fromEntries(
+    Object.entries(HOME.entities).map(([id, { area_id: _area, ...entity }]) => [id, entity]),
+  ),
+};
+
+test('Quick start on a home mostly in no area offers to sort it first, and goes to the assistant', async () => {
+  const at = world({ registries: SCATTERED });
+  const done = quickStart(at.host);
+  const asked = await shown(at.root);
+  assert.match(text(asked), /Most of the home is in no area/);
+  press(asked, 'Sort it first');
+  await done;
+  assert.deepEqual(at.went, ['/areas']);
+  assert.deepEqual(types(at), []);
+  at.root.remove();
+});
+
+test('Build anyway goes on to what Quick start makes', async () => {
+  const at = world({ registries: SCATTERED });
+  const done = quickStart(at.host);
+  press(await shown(at.root), 'Build anyway');
+  await until(() => /MNML makes Home at/.test(text(at.root)), 'what Quick start makes');
+  press([...at.root.querySelectorAll('dialog')].at(-1), 'Cancel');
+  await done;
+  assert.deepEqual(at.went, []);
+  assert.deepEqual(types(at), []);
   at.root.remove();
 });
 

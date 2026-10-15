@@ -1,9 +1,15 @@
 import { html, nothing } from 'lit';
+import type { TemplateResult } from 'lit';
 
+import {
+  readDashboardTemplate,
+  dashboardTemplateOf,
+  dashboardTemplateText,
+} from '../builder/dashboard-template.ts';
 import { dashboardOf } from '../builder/dashboard.ts';
-import { defaultPlan, planFrom } from '../builder/plan.ts';
-import { readRecipe, recipeOf, recipeText } from '../builder/recipe.ts';
-import type { Plan } from '../contract/builder.ts';
+import { defaultPlan, planFrom, unplaced } from '../builder/plan.ts';
+import { lookOf } from '../contract/plan.ts';
+import type { Plan } from '../contract/plan.ts';
 
 import {
   addressFor,
@@ -17,6 +23,8 @@ import { readableOf } from './data.ts';
 import type { Choice as Option } from './dialog.ts';
 import { drawFates, shippedWhole } from './library-actions.ts';
 import type { LibraryHost } from './library-actions.ts';
+import { changesIn, rowNames } from './plan-edits.ts';
+import type { PlanChange } from './plan-edits.ts';
 import { bringing, broughtIn, previewOf, previewPlan, summary } from './share.ts';
 import { entryFor, planImport, resolvable } from './transfer.ts';
 
@@ -24,6 +32,8 @@ export interface DashboardHost extends LibraryHost {
   go: (path: string) => void;
   visit: (path: string) => void;
 }
+
+type Said = DashboardHost['words']['boardActions'];
 
 export function boardOf(boards: readonly Board[], built: Built): Board | undefined {
   return boards.find((board) => board.url_path === built.url_path);
@@ -35,24 +45,43 @@ async function offerOpen(
   address: string,
   done: string,
 ): Promise<void> {
-  const open = await host.dialogs.ask(
-    done,
-    html`<p>${plan.title} is at /${address}, in the sidebar.</p>`,
-    [{ label: 'Open it', value: true, primary: true }],
-  );
+  const said = host.words.boardActions;
+  const open = await host.dialogs.ask(done, html`<p>${said.at(plan.title, address)}</p>`, [
+    { label: said.openIt, value: true, primary: true },
+  ]);
   if (open === true) {
     host.visit(`/${address}`);
   }
 }
 
+const MOSTLY_UNPLACED = 0.5;
+
 export async function quickStart(host: DashboardHost): Promise<void> {
   const { registries, resolved, addresses } = host.state();
+  if (unplaced(registries).share > MOSTLY_UNPLACED) {
+    const areas = host.words.areas;
+    const next = await host.dialogs.ask(
+      areas.mostUnplaced,
+      html`<p>${areas.mostUnplacedText}</p>`,
+      [
+        { label: areas.buildAnyway, value: 'build' },
+        { label: areas.sortFirst, value: 'sort', primary: true },
+      ],
+    );
+    if (next === 'sort') {
+      host.go('/areas');
+    }
+    if (next !== 'build') {
+      return;
+    }
+  }
   const plan = defaultPlan(registries, resolved);
   const address = addressFor(plan.title, addresses);
+  const said = host.words.boardActions;
   const sure = await host.dialogs.confirm(
-    'Quick start',
-    `MNML makes ${plan.title} at /${address}: ${summary(plan)}. Edit changes any of it later.`,
-    'Make it',
+    said.quickStart,
+    said.quickMakes(plan.title, address, summary(plan, host.words)),
+    said.makeIt,
   );
   if (!sure) {
     return;
@@ -62,7 +91,39 @@ export async function quickStart(host: DashboardHost): Promise<void> {
   } finally {
     await host.refresh();
   }
-  await offerOpen(host, plan, address, `${plan.title} is ready`);
+  await offerOpen(host, plan, address, said.ready(plan.title));
+}
+
+function changeLine(change: PlanChange, plan: Plan, said: Said): string {
+  if (change.field !== undefined) {
+    return said.fields[change.field];
+  }
+  const section = lookOf(plan, change.section).title;
+  switch (change.how) {
+    case 'moved':
+      return said.moved(section);
+    case 'added':
+      return said.added(section, change.name);
+    case 'removed':
+      return said.removed(section, change.name);
+    case 'changed':
+      return said.edited(section, change.name);
+  }
+}
+
+function rebuildBody(host: DashboardHost, built: Plan, plan: Plan): TemplateResult {
+  const { registries, resolved } = host.state();
+  const said = host.words.boardActions;
+  const changes = changesIn(built, plan, rowNames(registries, resolved, host.words.plan.aRoom));
+  return html`<p>${said.rebuildText}</p>
+    ${
+      changes.length === 0
+        ? html`<p class="muted">${said.unchanged}</p>`
+        : html`<p>${said.changed}</p>
+            <ul class="changes">
+              ${changes.map((change) => html`<li>${changeLine(change, plan, said)}</li>`)}
+            </ul>`
+    }`;
 }
 
 export async function buildDashboard(
@@ -74,18 +135,15 @@ export async function buildDashboard(
   const state = host.state();
   const built = state.built?.find((each) => each.url_path === at);
   const config = dashboardOf(plan, state.registries, state.resolved);
+  const said = host.words.boardActions;
   if (built !== undefined && state.boardsFailure !== undefined) {
-    throw new Error(
-      `MNML cannot read Home Assistant's dashboards, so it cannot tell whether ${built.plan.title} is still there: ${state.boardsFailure}`,
-    );
+    throw new Error(said.unlisted(built.plan.title, state.boardsFailure));
   }
   if (
     built !== undefined &&
-    !(await host.dialogs.confirm(
-      `Rebuild ${built.plan.title}?`,
-      'MNML replaces its cards, with any change made to them by hand. Undo brings back the version this replaces.',
-      'Rebuild',
-    ))
+    (await host.dialogs.ask(said.rebuild(built.plan.title), rebuildBody(host, built.plan, plan), [
+      { label: said.rebuildIt, value: true, primary: true },
+    ])) !== true
   ) {
     return;
   }
@@ -106,7 +164,7 @@ export async function buildDashboard(
     host,
     plan,
     built?.url_path ?? address,
-    built === undefined ? `${plan.title} is ready` : `${plan.title} is rebuilt`,
+    built === undefined ? said.ready(plan.title) : said.rebuilt(plan.title),
   );
 }
 
@@ -116,10 +174,11 @@ export async function undoRebuild(host: DashboardHost, built: Built): Promise<vo
   if (board === undefined || previous === undefined) {
     return;
   }
+  const said = host.words.boardActions;
   const sure = await host.dialogs.confirm(
-    `Undo the last rebuild of ${built.plan.title}?`,
-    `Its cards, title and icon go back to how they were before it: ${previous.plan.title}, with ${summary(previous.plan)}.`,
-    'Undo',
+    said.undo(built.plan.title),
+    said.undoText(previous.plan.title, summary(previous.plan, host.words)),
+    said.undoIt,
   );
   if (!sure) {
     return;
@@ -133,24 +192,21 @@ export async function undoRebuild(host: DashboardHost, built: Built): Promise<vo
 
 export async function shareBuilt(host: DashboardHost, built: Built): Promise<void> {
   const { resolved, shipped } = host.state();
-  const text = recipeText(recipeOf(built.plan, resolved, shipped));
+  const text = dashboardTemplateText(dashboardTemplateOf(built.plan, resolved, shipped));
+  const said = host.words.boardActions;
   const copy: Option<'copy'>[] =
-    window.isSecureContext && 'clipboard' in navigator ? [{ label: 'Copy', value: 'copy' }] : [];
+    window.isSecureContext && 'clipboard' in navigator ? [{ label: said.copy, value: 'copy' }] : [];
   const choices: Option<'copy' | 'download'>[] = [
     ...copy,
-    { label: 'Download', value: 'download', primary: true },
+    { label: said.download, value: 'download', primary: true },
   ];
   const choice = await host.dialogs.ask(
-    `Share ${built.plan.title}`,
-    html`<p class="muted">
-        Its layout, its sections' looks and every template of yours it uses. Its layout names no
-        area, person or entity of this home; the templates go whole, and a template's example may
-        name this home's entities.
-      </p>
+    said.share(built.plan.title),
+    html`<p class="muted">${said.shareText}</p>
       <textarea
         class="yaml-text"
         readonly
-        aria-label="The dashboard template"
+        aria-label=${said.shareLabel}
         .value=${text}
       ></textarea>`,
     choices,
@@ -165,17 +221,14 @@ export async function shareBuilt(host: DashboardHost, built: Built): Promise<voi
 export async function fromTemplate(host: DashboardHost): Promise<Plan | undefined> {
   shippedWhole(host.state());
   const shipped = host.state().shipped;
+  const said = host.words.boardActions;
   const given = await host.dialogs.yaml(
-    'A dashboard from a template',
-    {
-      file: 'A dashboard template file',
-      text: 'A dashboard template in YAML',
-      placeholder: 'Paste a dashboard template, or choose a file',
-    },
+    said.fromTemplate,
+    { file: said.file, text: said.text, placeholder: said.placeholder },
     (text) => {
-      const recipe = readRecipe(text, shipped);
-      resolvable(recipe.templates);
-      return recipe;
+      const dashboardTemplate = readDashboardTemplate(text, shipped);
+      resolvable(dashboardTemplate.templates);
+      return dashboardTemplate;
     },
   );
   if (given === undefined) {
@@ -198,18 +251,17 @@ export async function fromTemplate(host: DashboardHost): Promise<Plan | undefine
               host.state().registries,
               host.state().resolved,
             ),
+            { ...host.state().resolved, ...given.templates },
+            host.words,
           )}
         </p>
         ${
           incoming.length === 0
             ? nothing
-            : html`<p class="muted">
-                  It brings these templates. Replacing one changes it on every dashboard of this
-                  home; keeping both brings this one in beside it, under a new name.
-                </p>
-                ${drawFates(offered, choices, [], alone, redraw)}`
+            : html`<p class="muted">${said.brings}</p>
+                ${drawFates(host.words, offered, choices, [], alone, redraw)}`
         }`,
-    [{ label: 'Open in the builder', value: true, primary: true }],
+    [{ label: said.openBuilder, value: true, primary: true }],
   );
   if (open !== true) {
     return undefined;
@@ -217,7 +269,7 @@ export async function fromTemplate(host: DashboardHost): Promise<Plan | undefine
   const brought = broughtIn(given, offered, choices, host.state().taken);
   await Promise.all(brought.save.map((each) => host.save(each.name, entryFor(each, shipped))));
   const now = host.state();
-  return planFrom(brought.recipe, now.registries, {
+  return planFrom(brought.dashboardTemplate, now.registries, {
     ...now.resolved,
     ...Object.fromEntries(
       brought.save.map((each) => [each.name, readableOf(each.name, each.template)]),
@@ -227,18 +279,16 @@ export async function fromTemplate(host: DashboardHost): Promise<Plan | undefine
 
 export async function forgetBuilt(host: DashboardHost, built: Built): Promise<void> {
   const board = boardOf(host.state().boards, built);
+  const said = host.words.boardActions;
   const remove: Option<'delete'>[] =
-    board === undefined ? [] : [{ label: 'Delete it too', value: 'delete' }];
+    board === undefined ? [] : [{ label: said.deleteToo, value: 'delete' }];
   const choices: Option<'forget' | 'delete'>[] = [
     ...remove,
-    { label: 'Forget', value: 'forget', primary: true },
+    { label: said.forgetIt, value: 'forget', primary: true },
   ];
   const choice = await host.dialogs.ask(
-    `Forget ${built.plan.title}?`,
-    html`<p>
-      MNML stops building it. The dashboard stays in Home Assistant as it is, unless it is deleted
-      too.
-    </p>`,
+    said.forget(built.plan.title),
+    html`<p>${said.forgetText}</p>`,
     choices,
   );
   if (choice === undefined) {

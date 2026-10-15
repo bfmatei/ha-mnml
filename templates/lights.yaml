@@ -1,5 +1,7 @@
 light-controls:
   description: A light's brightness, white temperature and, for a colour light, hue sliders, then its power toggle.
+  title: Light controls
+  icon: mdi:tune-variant
   slots:
     entity: { kind: entity, required: true }
     color: { kind: flag }
@@ -9,7 +11,7 @@ light-controls:
       type: slider
       entity: '[[entity]]'
       slider: brightness
-      name: Brightness
+      name: '[[words.brightness]]'
       icon: mdi:brightness-6
       color: amber
       show: { not: ['off'] }
@@ -18,7 +20,7 @@ light-controls:
       type: slider
       entity: '[[entity]]'
       slider: color_temp
-      name: White temperature
+      name: '[[words.white_temperature]]'
       icon: mdi:white-balance-sunny
       show: { not: ['off'] }
     - id: color
@@ -26,7 +28,7 @@ light-controls:
       type: slider
       entity: '[[entity]]'
       slider: hue
-      name: Color
+      name: '[[words.color]]'
       icon: mdi:palette
       show: { not: ['off'] }
     - id: power
@@ -35,8 +37,32 @@ light-controls:
   example:
     entity: light.kitchen
 
+light-state:
+  description: "A light's state line: Off while it is off, its brightness, and the active scene while it is on."
+  title: Light state
+  icon: mdi:lightbulb-outline
+  slots:
+    entity: { kind: entity, required: true }
+    active_scene: { kind: entity }
+  card:
+    - id: part
+      entity: '[[entity]]'
+      when: { is: ['off'] }
+    - id: brightness
+      entity: '[[entity]]'
+      attribute: brightness
+    - id: active_scene
+      if: active_scene
+      entity: '[[active_scene]]'
+      when: { entity: '[[entity]]', is: ['on'] }
+  example:
+    entity: light.kitchen
+    active_scene: select.kitchen_scene
+
 light-item:
   description: A light as an item, with its brightness, the active scene while it is on, its scenes and its sliders.
+  title: Light item
+  icon: mdi:lightbulb
   slots:
     entity: { kind: entity, required: true }
     strip_word: { kind: text }
@@ -49,14 +75,9 @@ light-item:
     strip_word: '[[strip_word]]'
     color: amber
     state:
-      - id: part
-        when: { is: ['off'] }
-      - id: brightness
-        attribute: brightness
-      - id: active_scene
-        if: active_scene
-        entity: '[[active_scene]]'
-        when: { entity: '[[entity]]', is: ['on'] }
+      - id: light-state
+        template: light-state
+        slots: { entity: '[[entity]]', active_scene: '[[active_scene]]' }
     popup: '[[popup]]'
     controls:
       - id: scenes
@@ -64,7 +85,7 @@ light-item:
         type: scenes
         scenes: '[[scenes]]'
         active_scene: '[[active_scene]]'
-        name: Scenes
+        name: '[[words.scenes]]'
         icon: mdi:palette-swatch
       - id: light-controls
         template: light-controls
@@ -75,8 +96,17 @@ light-item:
 
 light-card:
   description: A light, or a light group with its members folded under it.
+  title: Light
+  icon: mdi:lightbulb-group
   slots:
-    entity: { kind: entity, required: true, label: Light, group: Basics }
+    entity:
+      {
+        kind: entity,
+        required: true,
+        discover: [{ domain: light, platform: group }, { domain: light }],
+        label: Light,
+        group: Basics,
+      }
     members: { kind: entities, group: Basics }
     strip_word: { kind: text, group: More }
     popup: { kind: text, label: Pop-up, group: More }
@@ -110,7 +140,9 @@ light-card:
     members: [light.kitchen_ceiling, light.kitchen_counter]
 
 lights-popup:
-  description: A room's lights pop-up, its sliders over the whole group, its scenes and every light.
+  description: A room's lights pop-up, its scenes and power in the header, its sliders over the whole group and every light.
+  title: Lights pop-up
+  icon: mdi:lightbulb-group
   slots:
     key: { kind: text, required: true }
     name: { kind: text, required: true }
@@ -124,26 +156,32 @@ lights-popup:
     cards:
       - id: header
         type: custom:mnml-header-card
-        name: Lights
-        icon: mdi:lightbulb-group
         entity: '[[group]]'
         color: amber
-        state: [{ id: name, text: '[[name]]' }]
+        state:
+          - { id: name, text: '[[name]]' }
         controls:
+          - id: scenes
+            if: scenes
+            type: scenes
+            scenes: '[[scenes]]'
+            active_scene: '[[active_scene]]'
+            name: '[[words.scenes]]'
+            icon: mdi:palette-swatch
           - id: power
             template: power
             slots: { entity: '[[group]]' }
         back: true
       - id: heading
         type: custom:mnml-heading-card
-        title: All lights
+        title: '[[words.all_lights]]'
         icon: mdi:lightbulb-group
         visibility: { template: while-not-off, slots: { entity: '[[group]]' } }
       - id: brightness
         type: custom:mnml-slider-card
         entity: '[[group]]'
         slider: brightness
-        name: Brightness
+        name: '[[words.brightness]]'
         icon: mdi:brightness-6
         color: amber
         visibility: { template: while-not-off, slots: { entity: '[[group]]' } }
@@ -151,7 +189,7 @@ lights-popup:
         type: custom:mnml-slider-card
         entity: '[[group]]'
         slider: color_temp
-        name: White temperature
+        name: '[[words.white_temperature]]'
         icon: mdi:white-balance-sunny
         visibility: { template: while-not-off, slots: { entity: '[[group]]' } }
       - id: color
@@ -159,20 +197,13 @@ lights-popup:
         type: custom:mnml-slider-card
         entity: '[[group]]'
         slider: hue
-        name: Color
+        name: '[[words.color]]'
         icon: mdi:palette
         visibility: { template: while-not-off, slots: { entity: '[[group]]' } }
-      - id: scenes
-        if: scenes
-        type: custom:mnml-select-card
-        scenes: '[[scenes]]'
-        active_scene: '[[active_scene]]'
-        name: Scenes
-        icon: mdi:palette-swatch
       - id: members
         if: members
         type: custom:mnml-heading-card
-        title: Lights
+        title: '[[words.lights]]'
         icon: mdi:lightbulb-group
       - id: each-members
         each: members

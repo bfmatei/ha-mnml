@@ -1,4 +1,5 @@
-import { isMapping } from '../contract/templates.ts';
+import { isLooseEntityId } from '../contract/entities.ts';
+import { isMapping, pathLabel } from '../contract/templates.ts';
 import type {
   Rule,
   SlotSpec,
@@ -8,8 +9,9 @@ import type {
   WrittenSlot,
   WrittenTemplate,
 } from '../contract/templates.ts';
-import { variantOf } from '../editors/shape.ts';
+import { variantOf } from '../editors/form.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
+import { PANEL_EN } from '../words/panel/en.ts';
 
 import type { Part } from './outline.ts';
 import { withValue } from './tree.ts';
@@ -47,10 +49,6 @@ function specAt(
   return found;
 }
 
-export function slotLabel(template: Template, path: string): string {
-  return specAt(template.slots, path)?.label ?? sentence(path);
-}
-
 export function findsItself(template: Template, path: string): boolean {
   return specAt(template.slots, path)?.discover !== undefined;
 }
@@ -64,7 +62,7 @@ function valueOfSlot(values: Readonly<Record<string, Value>>, path: string): Val
 }
 
 const entityText = (value: Value | undefined): string | undefined =>
-  typeof value === 'string' && value.includes('.') ? value : undefined;
+  isLooseEntityId(value) ? value : undefined;
 
 export function resolvedEntity(
   values: Readonly<Record<string, Value>>,
@@ -88,11 +86,11 @@ function entityKeys(part: Part, templates: Templates): Key[] {
       .filter(([, spec]) => spec.kind === 'entity')
       .map(([key, spec]) => ({ key, label: spec.label }));
   }
-  if (part.shape === undefined) {
+  if (part.form === undefined) {
     return [];
   }
   try {
-    return Object.entries(variantOf(part.shape, part.value).fields)
+    return Object.entries(variantOf(part.form, part.value).fields)
       .filter(([, spec]) => spec.kind === 'entity')
       .map(([key, spec]) => ({ key, label: spec.label }));
   } catch {
@@ -100,7 +98,12 @@ function entityKeys(part: Part, templates: Templates): Key[] {
   }
 }
 
-export function dataFields(part: Part, template: Template, templates: Templates): DataField[] {
+export function dataFields(
+  part: Part,
+  template: Template,
+  templates: Templates,
+  what: string = PANEL_EN.stage.what,
+): DataField[] {
   const holderValue = part.kind === 'fragment' ? part.value['slots'] : part.value;
   const holder: Path = part.kind === 'fragment' ? [...part.path, 'slots'] : part.path;
   const values = isMapping(holderValue) ? holderValue : {};
@@ -115,8 +118,8 @@ export function dataFields(part: Part, template: Template, templates: Templates)
       slot,
       label:
         slot === undefined
-          ? (label ?? sentence(key === 'entity' ? 'what it shows' : key))
-          : slotLabel(template, slot),
+          ? (label ?? (key === 'entity' ? what : sentence(key)))
+          : pathLabel(template.slots, slot),
     };
   });
 }

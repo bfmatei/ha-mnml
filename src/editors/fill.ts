@@ -1,14 +1,15 @@
 import type { MdiIcon } from '../contract/entities.ts';
-import { isMapping } from '../contract/templates.ts';
+import { BASICS, isMapping, slotGroup } from '../contract/templates.ts';
 import type { Rule, SlotSpec, Value } from '../contract/templates.ts';
-import { humanise } from '../ha/format.ts';
-import type { AreaEntry, EntityEntry } from '../templates/discover.ts';
+import type { AreaEntry, EntityEntry } from '../ha/registries.ts';
 import { filled } from '../templates/expand.ts';
 import type { DeviceFit } from '../templates/explain.ts';
+import { EDITORS_EN } from '../words/panel/editors-en.ts';
+import type { EditorWords } from '../words/panel/editors-en.ts';
 
 import { iconFor } from './icons.ts';
 
-export type Source = 'area' | 'yourself' | 'home';
+export type Source = 'area' | 'device' | 'yourself' | 'home';
 
 interface Group {
   readonly name: string;
@@ -16,26 +17,20 @@ interface Group {
   readonly slots: readonly string[];
 }
 
-const SIMPLE = new Set(['text', 'texts', 'number', 'icon', 'flag', 'entity', 'entities']);
-
-export function slotLabel(name: string, spec: SlotSpec): string {
-  return spec.label ?? humanise(name);
-}
-
-export function singular(label: string): string {
-  if (label.endsWith('ies')) {
-    return `${label.slice(0, -3)}y`;
-  }
-  return label.endsWith('s') && !label.endsWith('ss') ? label.slice(0, -1) : label;
-}
-
-export function groupsOf(slots: Readonly<Record<string, SlotSpec>>): Group[] {
+export function groupsOf(
+  slots: Readonly<Record<string, SlotSpec>>,
+  basics: string = EDITORS_EN.template.basics,
+): Group[] {
   const named = new Map<string, string[]>();
   for (const [name, spec] of Object.entries(slots)) {
-    const group = spec.group ?? (SIMPLE.has(spec.kind) ? 'Basics' : slotLabel(name, spec));
+    const group = slotGroup(name, spec);
     named.set(group, [...(named.get(group) ?? []), name]);
   }
-  return [...named].map(([name, members]) => ({ name, icon: iconFor(name), slots: members }));
+  return [...named].map(([name, members]) => ({
+    name: name === BASICS ? basics : name,
+    icon: iconFor(name),
+    slots: members,
+  }));
 }
 
 const wide = (rule: Rule | undefined): boolean =>
@@ -48,6 +43,9 @@ export function homeWide(slots: Readonly<Record<string, SlotSpec>>): boolean {
 }
 
 export function sourceOf(config: Readonly<Record<string, Value>>): Source {
+  if (typeof config['device'] === 'string') {
+    return 'device';
+  }
   if (typeof config['area'] === 'string') {
     return 'area';
   }
@@ -87,8 +85,8 @@ export function valuesOf(
   );
 }
 
-export const deviceWords = (device: DeviceFit): string =>
-  device.area === undefined ? device.name : `${device.name} in ${device.area}`;
+export const deviceWords = (device: DeviceFit, words: EditorWords = EDITORS_EN): string =>
+  device.area === undefined ? device.name : words.notes.deviceIn(device.name, device.area);
 
 export function noteOf(
   source: Source,
@@ -97,24 +95,29 @@ export function noteOf(
   slots: Readonly<Record<string, Value>>,
   place: string,
   device?: DeviceFit,
+  words: EditorWords = EDITORS_EN,
 ): string | undefined {
   if (source === 'yourself') {
     return undefined;
   }
-  const own = source === 'area' && Object.hasOwn(slots, name);
+  const { notes } = words;
+  const own = source !== 'home' && Object.hasOwn(slots, name);
   if (device !== undefined && (own ? filled(slots[name]) : Object.hasOwn(found, name))) {
-    return `${own ? 'Set by you' : 'Found'}: ${deviceWords(device)}`;
+    return notes.device(own, deviceWords(device, words));
   }
   if (source === 'home') {
-    return Object.hasOwn(found, name) ? 'Found in the home' : 'Nothing found in the home';
+    return notes.inHome(Object.hasOwn(found, name));
   }
   if (place === '') {
     return undefined;
   }
   if (own) {
-    return filled(slots[name]) ? 'Set by you' : 'Not set';
+    return filled(slots[name]) ? notes.setByYou : notes.notSet;
   }
-  return Object.hasOwn(found, name) ? `Found in ${place}` : `Nothing found in ${place}`;
+  if (source === 'device') {
+    return notes.on(Object.hasOwn(found, name), place);
+  }
+  return notes.in(Object.hasOwn(found, name), place);
 }
 
 function idsIn(value: Value | undefined): string[] {

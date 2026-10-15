@@ -1,5 +1,7 @@
 media-server:
   description: A media server's tile, what is being watched, and its requests, downloads, health and update chips; it brings its pop-up. The parts are Plex, Jellyfin, Seerr, Radarr and Sonarr.
+  title: Media server
+  icon: mdi:filmstrip-box-multiple
   slots:
     streams:
       kind: entity
@@ -44,7 +46,7 @@ media-server:
     none: { kind: texts, default: ['0', unknown, unavailable] }
   card:
     type: custom:mnml-tile-card
-    name: Media
+    name: '[[words.media]]'
     icon: mdi:play-box-multiple-outline
     popup: '#media'
     state:
@@ -54,7 +56,7 @@ media-server:
       - id: requests
         if: requests
         type: status
-        name: Requests
+        name: '[[words.requests]]'
         icon: mdi:account-clock-outline
         silent: true
         rules:
@@ -70,7 +72,7 @@ media-server:
       - id: movies-shows
         if: [movies, shows]
         type: status
-        name: Downloads
+        name: '[[words.downloads]]'
         icon: mdi:download
         silent: true
         rules:
@@ -87,7 +89,7 @@ media-server:
       - id: movies-health
         if: movies.health
         type: status
-        name: Health
+        name: '[[words.health]]'
         icon: mdi:heart-pulse
         silent: true
         rules:
@@ -103,7 +105,7 @@ media-server:
       - id: update
         if: update
         type: status
-        name: Update
+        name: '[[words.update]]'
         icon: mdi:package-up
         silent: true
         rules:
@@ -135,6 +137,8 @@ media-server:
 
 media-popup:
   description: The media server's pop-up, what is being watched, its requests, downloads, upcoming releases, library and update.
+  title: Media server pop-up
+  icon: mdi:filmstrip-box-multiple
   slots:
     streams: { kind: entity, required: true }
     more_streams: { kind: entities }
@@ -148,20 +152,11 @@ media-popup:
     cards:
       - id: header
         type: custom:mnml-header-card
-        name: Media
+        name: '[[words.media]]'
         icon: mdi:play-box-multiple-outline
-        state:
-          - { id: streams, entity: '[[streams]]', icon: true }
-          - {
-              id: each-more_streams,
-              each: more_streams,
-              as: server,
-              entity: '[[server]]',
-              icon: true,
-            }
       - id: watching
         type: custom:mnml-list-card
-        title: Watching
+        title: '[[words.watching]]'
         icon: mdi:play-circle-outline
         rows:
           - { id: streams, entity: '[[streams]]', label: device }
@@ -175,7 +170,7 @@ media-popup:
       - id: requests
         if: requests
         type: custom:mnml-list-card
-        title: Requests
+        title: '[[words.requests]]'
         icon: mdi:account-clock-outline
         rows:
           - id: requests-pending
@@ -191,7 +186,7 @@ media-popup:
       - id: movies-shows
         if: [movies, shows]
         type: custom:mnml-list-card
-        title: Downloads
+        title: '[[words.downloads]]'
         icon: mdi:download
         rows:
           - id: movies
@@ -219,7 +214,7 @@ media-popup:
       - id: shows-calendar-movies-calendar
         if: [shows.calendar, movies.calendar]
         type: custom:mnml-agenda-card
-        title: Upcoming
+        title: '[[words.upcoming]]'
         icon: mdi:calendar-clock
         sources:
           - id: shows-calendar
@@ -233,7 +228,7 @@ media-popup:
       - id: movies-shows-2
         if: [movies, shows]
         type: custom:mnml-list-card
-        title: Library
+        title: '[[words.library]]'
         icon: mdi:filmstrip-box-multiple
         rows:
           - id: movies
@@ -253,7 +248,7 @@ media-popup:
       - id: update
         if: update
         type: custom:mnml-list-card
-        title: Update
+        title: '[[words.update]]'
         icon: mdi:package-up
         rows:
           - id: pending-row

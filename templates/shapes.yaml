@@ -47,6 +47,13 @@ heating:
   fields:
     entity: { kind: entity, required: true }
     preset: { kind: flag }
+    preset_temperatures:
+      {
+        kind: entities,
+        label: Preset temperatures,
+        help: 'The numbers that hold the temperature of each preset, such as comfort, eco and away.',
+      }
+    schedule: { kind: entity, help: 'The schedule that switches the heating.' }
     thermostats: { shape: thermostat, kind: objects }
 
 thermostat:
@@ -101,6 +108,77 @@ vacuum:
         mop_washing: { kind: entity }
         consumables: { shape: consumable, kind: objects }
         warnings: { kind: entities }
+  discover:
+    device: { domain: vacuum }
+    fields:
+      entity: { domain: vacuum }
+      status:
+        - { domain: sensor, translation_key: status }
+        - { domain: sensor, name: status }
+      error:
+        - { domain: sensor, translation_key: vacuum_error }
+        - { domain: sensor, name: error, exclude: { name: dock } }
+      battery: { domain: sensor, device_class: battery }
+      current_room:
+        - { domain: sensor, translation_key: current_room }
+        - { domain: sensor, name: current room }
+      progress:
+        - { domain: sensor, translation_key: clean_percent }
+        - { domain: sensor, name: cleaning progress }
+      area:
+        - { domain: sensor, translation_key: cleaning_area }
+        - { domain: sensor, name: cleaning area, exclude: { name: total } }
+      time:
+        - { domain: sensor, translation_key: cleaning_time }
+        - { domain: sensor, name: cleaning time, exclude: { name: total } }
+      last_clean:
+        - { domain: sensor, translation_key: last_clean_end }
+        - { domain: sensor, name: last clean end }
+      mop_attached:
+        - { domain: binary_sensor, translation_key: mop_attached }
+        - { domain: binary_sensor, name: mop attached }
+      water_box_attached:
+        - { domain: binary_sensor, translation_key: water_box_attached }
+        - { domain: binary_sensor, name: water box attached }
+      totals:
+        fields:
+          count:
+            - { domain: sensor, translation_key: total_cleaning_count }
+            - { domain: sensor, name: total cleaning count }
+          area:
+            - { domain: sensor, translation_key: total_cleaning_area }
+            - { domain: sensor, name: total cleaning area }
+          time:
+            - { domain: sensor, translation_key: total_cleaning_time }
+            - { domain: sensor, name: total cleaning time }
+      map: { domain: image }
+      routines: { domain: button, entity_category: none }
+      settings:
+        { domain: select, entity_category: config, exclude: { translation_key: selected_map } }
+      warnings: { domain: binary_sensor, device_class: problem }
+      dock:
+        device:
+          - { domain: sensor, translation_key: dock_error }
+          - { model: dock }
+          - { domain: sensor, name: dock error }
+        scope: area
+        fields:
+          error:
+            - { domain: sensor, translation_key: dock_error }
+            - { domain: sensor, name: error }
+          dust_emptying:
+            - { domain: switch, translation_key: dust_emptying }
+            - { domain: switch, name: dust emptying }
+          mop_drying:
+            - { domain: switch, translation_key: mop_drying }
+            - { domain: switch, name: mop drying }
+          mop_drying_time_left:
+            - { domain: sensor, translation_key: mop_drying_remaining_time }
+            - { domain: sensor, name: mop drying }
+          mop_washing:
+            - { domain: switch, translation_key: mop_washing }
+            - { domain: switch, name: mop washing }
+          warnings: { domain: binary_sensor, device_class: problem }
 
 vacuum_popup:
   shape: vacuum
@@ -129,6 +207,61 @@ printer3d:
     camera: { kind: entity }
     actions: { shape: printer3d_actions, required: true }
     outlet: { shape: outlet }
+  discover:
+    device: { platform: prusalink }
+    fields:
+      entity:
+        - { domain: sensor, translation_key: printer_state }
+        - { domain: sensor, device_class: enum }
+      progress:
+        - { domain: sensor, translation_key: progress }
+        - { domain: sensor, name: progress }
+      filename:
+        - { domain: sensor, translation_key: filename }
+        - { domain: sensor, name: filename }
+      material:
+        - { domain: sensor, translation_key: material }
+        - { domain: sensor, name: material }
+      speed:
+        - { domain: sensor, translation_key: print_speed }
+        - { domain: sensor, name: print speed }
+      start:
+        - { domain: sensor, translation_key: print_start }
+        - { domain: sensor, name: print start }
+      finish:
+        - { domain: sensor, translation_key: print_finish }
+        - { domain: sensor, name: print finish }
+      nozzle:
+        fields:
+          temperature:
+            - { domain: sensor, translation_key: nozzle_temperature }
+            - { domain: sensor, name: nozzle temperature, exclude: { name: target } }
+          target:
+            - { domain: sensor, translation_key: nozzle_target_temperature }
+            - { domain: sensor, name: nozzle target temperature }
+      bed:
+        fields:
+          temperature:
+            - { domain: sensor, translation_key: heatbed_temperature }
+            - { domain: sensor, name: heatbed temperature, exclude: { name: target } }
+          target:
+            - { domain: sensor, translation_key: heatbed_target_temperature }
+            - { domain: sensor, name: heatbed target temperature }
+      camera: { domain: camera }
+      actions:
+        fields:
+          pause:
+            - { domain: button, translation_key: pause_job }
+            - { domain: button, name: pause }
+          resume:
+            - { domain: button, translation_key: resume_job }
+            - { domain: button, name: resume }
+          continue:
+            - { domain: button, translation_key: continue_job }
+            - { domain: button, name: continue }
+          cancel:
+            - { domain: button, translation_key: cancel_job }
+            - { domain: button, name: cancel }
 
 printer3d_popup:
   shape: printer3d
@@ -318,7 +451,12 @@ server_backups:
 notifications:
   kind: object
   fields:
-    messages: { kind: entity, required: true }
+    messages:
+      {
+        kind: entity,
+        required: true,
+        help: "The messages' sensor, its alerts attribute counting the warnings and errors, which colour it and show its chip.",
+      }
     clear: { kind: entity }
     sources:
       kind: objects
@@ -345,6 +483,21 @@ room_firmware:
   fields:
     name: { kind: text, required: true }
     firmware: { kind: entities }
+
+battery_group:
+  kind: object
+  fields:
+    name: { kind: text }
+    entity:
+      { kind: entity, help: 'Names the group after it while it has no name, such as a person.' }
+    icon: { kind: icon, default: mdi:battery-low }
+    batteries: { kind: entities, required: true }
+
+room_leaks:
+  kind: object
+  fields:
+    room: { kind: text, required: true, label: Room key }
+    sensors: { kind: entities, required: true }
 
 wifi:
   kind: object

@@ -2,23 +2,41 @@ import { css, html, nothing } from 'lit';
 import type { TemplateResult } from 'lit';
 import { classMap } from 'lit/directives/class-map.js';
 
-import { isMapping } from '../contract/templates.ts';
+import { isMapping, plainKey } from '../contract/templates.ts';
 import type { Value } from '../contract/templates.ts';
-import { DESCRIPTIONS } from '../editors/cards.ts';
+import { DESCRIPTIONS, descriptionsFor } from '../editors/cards.ts';
+import { labelOf, variantOf } from '../editors/form.ts';
+import type { Field, PlainForm, Form } from '../editors/form.ts';
 import { rowMenu } from '../editors/row-menu.ts';
-import { labelOf, variantOf } from '../editors/shape.ts';
-import type { Field, PlainShape, Shape } from '../editors/shape.ts';
 import { icon } from '../ha/templates.ts';
 import type { Change } from '../templates/changes.ts';
+import { editorWordsFor } from '../words/panel/editors.ts';
+import { PANEL_EN } from '../words/panel/en.ts';
+import type { PanelWords } from '../words/panel/en.ts';
+import { panelWordsFor } from '../words/panel/words.ts';
 
 import type { Path } from './tree.ts';
+
+export interface Wording {
+  forms: Readonly<Record<string, Form>>;
+  said: PanelWords['outline'];
+}
+
+export const ENGLISH: Wording = { forms: DESCRIPTIONS, said: PANEL_EN.outline };
+
+export function wordingFor(language: string | undefined): Wording {
+  return {
+    forms: descriptionsFor(editorWordsFor(language)),
+    said: panelWordsFor(language).outline,
+  };
+}
 
 type PartKind = 'card' | 'part' | 'fragment';
 
 export interface Part {
   path: Path;
   value: Record<string, Value>;
-  shape: Shape | undefined;
+  form: Form | undefined;
   kind: PartKind;
   label: string;
   badges: string[];
@@ -29,7 +47,7 @@ export interface Group {
   key: string;
   label: string;
   path: Path;
-  of: Shape | undefined;
+  of: Form | undefined;
   cards: boolean;
   list: boolean;
   parts: Part[];
@@ -49,30 +67,27 @@ export interface OutlineActions {
   duplicate: (part: Part) => void;
   remove: (part: Part) => void;
   move: (group: Group, from: number, to: number) => void;
+  titleOf: (template: string) => string;
+  wording: Wording;
 }
 
-const plainKey = (key: string): string => (key.endsWith('?') ? key.slice(0, -1) : key);
-
-function variantFor(
-  shape: Shape | undefined,
-  value: Record<string, Value>,
-): PlainShape | undefined {
-  if (shape === undefined) {
+function variantFor(form: Form | undefined, value: Record<string, Value>): PlainForm | undefined {
+  if (form === undefined) {
     return undefined;
   }
   try {
-    return variantOf(shape, value);
+    return variantOf(form, value);
   } catch {
     return undefined;
   }
 }
 
 function fieldOf(
-  shape: Shape | undefined,
+  form: Form | undefined,
   value: Record<string, Value>,
   key: string,
 ): Field | undefined {
-  return variantFor(shape, value)?.fields[plainKey(key)];
+  return variantFor(form, value)?.fields[plainKey(key)];
 }
 
 function slotsIn(rule: Value): string[] {
@@ -81,76 +96,84 @@ function slotsIn(rule: Value): string[] {
   );
 }
 
-function shown(rule: Value, set: boolean): string {
-  const slots = slotsIn(rule);
-  if (set) {
-    return `when ${slots.join(' or ')} is set`;
-  }
-  return `when ${slots.join(' and ')} ${slots.length === 1 ? 'is' : 'are'} not set`;
-}
-
-export function badgesOf(value: Record<string, Value>): string[] {
+export function badgesOf(
+  value: Record<string, Value>,
+  said: PanelWords['outline'] = PANEL_EN.outline,
+): string[] {
   const shownIf = value['if'];
   const shownUnless = value['unless'];
   const each = value['each'];
   return [
-    ...(shownIf === undefined ? [] : [shown(shownIf, true)]),
-    ...(shownUnless === undefined ? [] : [shown(shownUnless, false)]),
-    ...(each === undefined ? [] : [`one for each of ${slotsIn(each).join(' and ')}`]),
+    ...(shownIf === undefined ? [] : [said.shownIf(slotsIn(shownIf))]),
+    ...(shownUnless === undefined ? [] : [said.shownUnless(slotsIn(shownUnless))]),
+    ...(each === undefined ? [] : [said.each(slotsIn(each))]),
   ];
 }
 
-export function partOf(
+const groupLabel = (key: string, said: PanelWords['outline']): string => {
+  const plain = plainKey(key);
+  return plain === 'cards' || plain === 'popups' ? said.groups[plain] : plain;
+};
+
+export function outlinePart(
   value: Record<string, Value>,
   path: Path,
-  given: Shape | undefined,
+  given: Form | undefined,
   index: number,
+  wording: Wording = ENGLISH,
 ): Part {
+  const { forms, said } = wording;
   const type = value['type'];
-  const known = typeof type === 'string' ? DESCRIPTIONS[type] : undefined;
+  const known = typeof type === 'string' ? forms[type] : undefined;
   const template = value['template'];
   const fragment = typeof template === 'string';
-  const shape = fragment ? undefined : (known ?? given);
+  const form = fragment ? undefined : (known ?? given);
   const kind: PartKind = fragment ? 'fragment' : known !== undefined ? 'card' : 'part';
   const fallback =
     typeof type === 'string'
       ? type.replace(/^custom:/, '')
       : typeof value['hash'] === 'string'
         ? value['hash']
-        : `Part ${index + 1}`;
+        : said.part(index + 1);
   const label = fragment
     ? template
-    : shape === undefined || variantFor(shape, value) === undefined
+    : form === undefined || variantFor(form, value) === undefined
       ? fallback
       : kind === 'card'
-        ? shape.label
-        : labelOf(shape, value, index);
+        ? form.label
+        : labelOf(form, value, index);
   const groups: Group[] = [];
   for (const [key, inner] of Object.entries(value)) {
-    const field = fieldOf(shape, value, key);
+    const field = fieldOf(form, value, key);
     const list = Array.isArray(inner) && inner.some(isMapping);
     if (field?.kind === 'parts' || (list && (key === 'cards' || plainKey(key) === 'popups'))) {
-      groups.push(groupOf(Array.isArray(inner) ? inner : [], [...path, key], key, field));
+      groups.push(groupOf(Array.isArray(inner) ? inner : [], [...path, key], key, field, wording));
     } else if (field?.kind === 'part' && isMapping(inner)) {
       groups.push({
         key,
-        label: field.label ?? plainKey(key),
+        label: field.label ?? groupLabel(key, said),
         path: [...path, key],
         of: field.of,
         cards: false,
         list: false,
-        parts: [partOf(inner, [...path, key], field.of, 0)],
+        parts: [outlinePart(inner, [...path, key], field.of, 0, wording)],
       });
     }
   }
-  return { path, value, shape, kind, label, badges: badgesOf(value), groups };
+  return { path, value, form, kind, label, badges: badgesOf(value, said), groups };
 }
 
-export function groupOf(items: readonly Value[], path: Path, key: string, field?: Field): Group {
+export function groupOf(
+  items: readonly Value[],
+  path: Path,
+  key: string,
+  field?: Field,
+  wording: Wording = ENGLISH,
+): Group {
   const of = field?.kind === 'parts' ? field.of : undefined;
   return {
     key,
-    label: field?.label ?? plainKey(key),
+    label: field?.label ?? groupLabel(key, wording.said),
     path,
     of,
     cards: of === undefined,
@@ -160,28 +183,28 @@ export function groupOf(items: readonly Value[], path: Path, key: string, field?
         return [];
       }
       const id = typeof item['id'] === 'string' ? item['id'] : String(index);
-      return [partOf(item, [...path, `#${id}`], of, index)];
+      return [outlinePart(item, [...path, `#${id}`], of, index, wording)];
     }),
   };
 }
 
-export function startersOf(group: Group): Starter[] {
+export function startersOf(group: Group, wording: Wording = ENGLISH): Starter[] {
   const of = group.of;
   if (of === undefined) {
-    const cards: Starter[] = Object.entries(DESCRIPTIONS)
-      .filter(([, shape]) => shape.kind === 'plain' || shape.kind === 'tagged')
-      .map(([type, shape]) => ({ label: shape.label, value: { type } }));
-    return [...cards, { label: 'Fragment', value: { template: '', slots: {} } }];
+    const cards: Starter[] = Object.entries(wording.forms)
+      .filter(([, form]) => form.kind === 'plain' || form.kind === 'tagged')
+      .map(([type, form]) => ({ label: form.label, value: { type } }));
+    return [...cards, { label: wording.said.fragment, value: { template: '', slots: {} } }];
   }
   if (of.kind === 'tagged') {
     return of.variants.map((variant) => ({
-      label: variant.shape.label,
+      label: variant.form.label,
       value: { type: variant.when ?? '' },
     }));
   }
   if (of.kind === 'marked') {
     return of.variants.map((variant) => ({
-      label: variant.shape.label,
+      label: variant.form.label,
       value: variant.when === undefined ? {} : { [variant.when]: true },
     }));
   }
@@ -228,6 +251,10 @@ function drawPart(
   actions: OutlineActions,
 ): TemplateResult {
   const here = key(part.path);
+  const said = actions.wording.said;
+  const used = part.value['template'];
+  const label =
+    part.kind === 'fragment' && typeof used === 'string' ? actions.titleOf(used) : part.label;
   return html`<div class="outline-part">
     <div
       class=${classMap({ 'outline-row': true, selected: here === actions.selected })}
@@ -250,27 +277,27 @@ function drawPart(
       <button
         type="button"
         class="outline-name"
-        aria-label=${part.label}
-        title=${part.label}
+        aria-label=${label}
+        title=${label}
         @click=${() => {
           actions.select(part.path);
         }}
       >
-        ${icon(KIND_ICONS[part.kind])}<span class="outline-label">${part.label}</span>
+        ${icon(KIND_ICONS[part.kind])}<span class="outline-label">${label}</span>
         ${part.badges.map((badge) => html`<span class="badge">${badge}</span>`)}
-        ${actions.changed.has(here) ? html`<span class="badge changed">changed</span>` : nothing}
-        ${actions.conflicted.has(here) ? html`<span class="badge conflict">conflict</span>` : nothing}
+        ${actions.changed.has(here) ? html`<span class="badge changed">${said.changed}</span>` : nothing}
+        ${actions.conflicted.has(here) ? html`<span class="badge conflict">${said.conflict}</span>` : nothing}
       </button>
-      ${rowMenu(part.label, [
+      ${rowMenu(said.more(label), [
         {
-          label: 'Duplicate',
+          label: said.duplicate,
           icon: 'mdi:content-copy',
           run: () => {
             actions.duplicate(part);
           },
         },
         {
-          label: 'Move up',
+          label: said.moveUp,
           icon: 'mdi:arrow-up',
           disabled: index === 0 ? true : undefined,
           run: () => {
@@ -278,7 +305,7 @@ function drawPart(
           },
         },
         {
-          label: 'Move down',
+          label: said.moveDown,
           icon: 'mdi:arrow-down',
           disabled: index === group.parts.length - 1 ? true : undefined,
           run: () => {
@@ -286,7 +313,7 @@ function drawPart(
           },
         },
         {
-          label: 'Delete',
+          label: said.delete,
           icon: 'mdi:delete-outline',
           run: () => {
             actions.remove(part);
@@ -305,10 +332,10 @@ function drawGroup(group: Group, actions: OutlineActions): TemplateResult {
     ${
       group.list
         ? html`<div class="outline-add">
-            <span class="add-label">Add to ${group.label.toLowerCase()}</span>
+            <span class="add-label">${actions.wording.said.addTo(group.label.toLowerCase())}</span>
             ${rowMenu(
-              `Add to ${group.label}`,
-              startersOf(group).map((starter) => ({
+              actions.wording.said.addTo(group.label),
+              startersOf(group, actions.wording).map((starter) => ({
                 label: starter.label,
                 icon: 'mdi:plus',
                 run: () => {
@@ -392,10 +419,10 @@ export const OUTLINE_STYLE = css`
     display: flex;
     flex-direction: column;
     gap: 2px;
-    margin-left: 12px;
+    margin-inline-start: 12px;
   }
   .outline > .outline-part > .outline-group {
-    margin-left: 0;
+    margin-inline-start: 0;
   }
   .outline-heading {
     color: var(--secondary-text-color);
@@ -437,7 +464,7 @@ export const OUTLINE_STYLE = css`
     display: flex;
     align-items: center;
     gap: 4px;
-    padding-left: 4px;
+    padding-inline-start: 4px;
   }
   .add-label {
     color: var(--secondary-text-color);

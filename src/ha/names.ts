@@ -67,6 +67,31 @@ export function nameOf(hass: HomeAssistant, entityId: string, naming: Naming): s
   return stripped(name, naming).trim();
 }
 
+interface Named extends Naming {
+  entity: string;
+}
+
+function areaName(hass: HomeAssistant, entityId: string): string | undefined {
+  const areaId = hass.entities[entityId]?.area_id ?? deviceOf(hass, entityId)?.area_id;
+  return areaId === undefined || areaId === null ? undefined : hass.areas[areaId]?.name;
+}
+
+function withArea(hass: HomeAssistant, entityId: string, name: string): string {
+  const area = areaName(hass, entityId);
+  return area === undefined || name.toLowerCase().startsWith(area.toLowerCase())
+    ? name
+    : `${area} ${name}`;
+}
+
+export function distinctNames(hass: HomeAssistant, rows: readonly Named[]): string[] {
+  const named = rows.map((row) => ({ row, name: nameOf(hass, row.entity, row) }));
+  return named.map(({ row, name }) =>
+    row.name !== undefined || named.filter((other) => other.name === name).length < 2
+      ? name
+      : withArea(hass, row.entity, name),
+  );
+}
+
 export function cardName(
   hass: HomeAssistant,
   entityId: string | undefined,

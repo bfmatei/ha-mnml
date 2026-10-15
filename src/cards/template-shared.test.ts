@@ -2,18 +2,20 @@ import assert from 'node:assert/strict';
 
 import { test } from 'vitest';
 
-import type { TemplateCard } from '../contract/cards.ts';
 import type { ChildCard } from '../ha/card-helpers.ts';
-import type { HomeAssistant } from '../ha/hass.ts';
+import type { HassConnection } from '../ha/hass.ts';
 import { baseOf } from '../templates/changes.ts';
 import { readFamily } from '../templates/shipped.ts';
-import { fakeStore } from '../test/fake-hass.ts';
-import { define } from '../test/render.ts';
+import { fakeHass, fakeStore } from '../test/hass.ts';
+import { configure, created, define, updated } from '../test/render.ts';
+import { until } from '../test/until.ts';
 
+import { MnmlCardNote } from './parts/card-element.ts';
 import { announced } from './parts/popup-registry.ts';
 import { MnmlTemplateCard } from './template.ts';
 
 define('mnml-template-card', MnmlTemplateCard);
+define('mnml-card-note', MnmlCardNote);
 
 const built: Record<string, unknown>[] = [];
 window.loadCardHelpers = () =>
@@ -24,19 +26,7 @@ window.loadCardHelpers = () =>
     },
   });
 
-const settle = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
-const REGISTRIES = { states: {}, areas: {}, devices: {}, entities: {} };
-
-function make(): MnmlTemplateCard {
-  const made = document.createElement('mnml-template-card');
-  assert.ok(made instanceof MnmlTemplateCard);
-  return made;
-}
-
-const hassOf = (hass: object): HomeAssistant => hass as HomeAssistant;
-const configure = (card: MnmlTemplateCard, config: unknown): void => {
-  card.setConfig(config as TemplateCard);
-};
+const make = (): MnmlTemplateCard => created('mnml-template-card', MnmlTemplateCard);
 const heading = (title: string): Record<string, unknown> => ({
   card: { type: 'custom:mnml-heading-card', title, icon: 'mdi:share-variant' },
 });
@@ -50,18 +40,15 @@ test('before the store answers, a card draws nothing and announces no pop-up; th
   const answer = Promise.withResolvers<void>();
   const store = fakeStore();
   const { connection } = store.hass;
-  const late = {
+  const late: HassConnection = {
     ...connection,
-    subscribeMessage: (
-      ...args: Parameters<typeof connection.subscribeMessage>
-    ): ReturnType<typeof connection.subscribeMessage> =>
-      answer.promise.then(() => connection.subscribeMessage(...args)),
+    subscribeMessage: (...args) => answer.promise.then(() => connection.subscribeMessage(...args)),
   };
   const card = make();
-  card.hass = hassOf({ connection: late, ...REGISTRIES });
+  card.hass = fakeHass({ connection: late });
   configure(card, { type: 'custom:mnml-template-card', template: 'shared', slots: {} });
   document.body.append(card);
-  await settle();
+  await updated(document);
   assert.equal(built.length, 0);
   assert.deepEqual(
     announced().map((popup) => popup.hash),
@@ -74,8 +61,7 @@ test('before the store answers, a card draws nothing and announces no pop-up; th
     }),
   };
   answer.resolve();
-  await settle();
-  await settle();
+  await until(() => built.length > 0, 'the card');
   assert.equal(built[0]?.['title'], 'Shared');
   assert.deepEqual(
     announced().map((popup) => popup.hash),
@@ -102,13 +88,12 @@ test("the store's own template wins over the shipped one, and the store's change
     { template: 'switch-card', slots: { entity: 'switch.kitchen_outlet' } },
   ].map((config) => {
     const card = make();
-    card.hass = hassOf({ ...store.hass, ...REGISTRIES });
+    card.hass = store.hass;
     configure(card, { type: 'custom:mnml-template-card', ...config });
     document.body.append(card);
     return card;
   });
-  await settle();
-  await settle();
+  await updated(document);
   assert.equal(
     built[0]?.['icon'],
     'mdi:share-variant',
@@ -127,39 +112,36 @@ test('a home without the store draws the shipped templates', async () => {
   built.length = 0;
   const store = fakeStore();
   const card = make();
-  card.hass = hassOf({ ...store.hass, ...REGISTRIES });
+  card.hass = store.hass;
   configure(card, {
     type: 'custom:mnml-template-card',
     template: 'section-heading',
     slots: { title: 'Rooms', icon: 'mdi:floor-plan' },
   });
   document.body.append(card);
-  await settle();
-  await settle();
+  await updated(document);
   assert.equal(built[0]?.['type'], 'custom:mnml-heading-card');
   assert.equal(built[0]?.['title'], 'Rooms');
   card.remove();
 });
 
-test('a store that cannot be read is an error card saying so', async () => {
-  built.length = 0;
+test('a store that cannot be read is an error note saying so', async () => {
   const store = fakeStore();
   store.refuse = { code: 'unauthorized', message: 'Unauthorized' };
   const card = make();
-  card.hass = hassOf({ ...store.hass, ...REGISTRIES });
+  card.hass = store.hass;
   configure(card, {
     type: 'custom:mnml-template-card',
     template: 'section-heading',
     slots: { title: 'Rooms', icon: 'mdi:floor-plan' },
   });
   document.body.append(card);
-  await settle();
-  await settle();
-  assert.equal(built[0]?.['type'], 'error');
-  assert.match(
-    String(built[0]?.['error']),
-    /mnml: the templates MNML keeps could not be read: Unauthorized/,
-  );
+  await updated(document);
+  await card.updateComplete;
+  const note = card.shadowRoot?.firstElementChild;
+  assert.ok(note instanceof MnmlCardNote, note?.localName ?? 'nothing is drawn');
+  assert.equal(note.failed, true);
+  assert.match(note.message, /mnml: the templates MNML keeps could not be read: Unauthorized/);
   card.remove();
 });
 
@@ -168,18 +150,16 @@ test('a save of the store redraws a card whose template changed, live', async ()
   const store = fakeStore();
   store.kept = { shared: own(heading('Before')) };
   const card = make();
-  card.hass = hassOf({ ...store.hass, ...REGISTRIES });
+  card.hass = store.hass;
   configure(card, { type: 'custom:mnml-template-card', template: 'shared', slots: {} });
   document.body.append(card);
-  await settle();
-  await settle();
+  await updated(document);
   assert.deepEqual(
     built.map((config) => config['title']),
     ['Before'],
   );
   store.keep({ shared: own(heading('After')) });
-  await settle();
-  await settle();
+  await updated(document);
   assert.deepEqual(
     built.map((config) => config['title']),
     ['Before', 'After'],
@@ -192,14 +172,12 @@ test('a save that changes another template leaves the card as it is', async () =
   const store = fakeStore();
   store.kept = { shared: own(heading('Same')), other: own(heading('One')) };
   const card = make();
-  card.hass = hassOf({ ...store.hass, ...REGISTRIES });
+  card.hass = store.hass;
   configure(card, { type: 'custom:mnml-template-card', template: 'shared', slots: {} });
   document.body.append(card);
-  await settle();
-  await settle();
+  await updated(document);
   store.keep({ shared: own(heading('Same')), other: own(heading('Two')) });
-  await settle();
-  await settle();
+  await updated(document);
   assert.deepEqual(
     built.map((config) => config['title']),
     ['Same'],
@@ -210,8 +188,8 @@ test('a save that changes another template leaves the card as it is', async () =
 test('once the store has answered, a mistake in an explicit instance is thrown, as in the card editor', async () => {
   const store = fakeStore();
   const first = make();
-  first.hass = hassOf({ ...store.hass, ...REGISTRIES });
-  await settle();
+  first.hass = store.hass;
+  await updated(document);
   const card = make();
   assert.throws(() => {
     configure(card, {
@@ -227,13 +205,12 @@ test('a card given hass but never attached does not follow saves', async () => {
   const store = fakeStore();
   store.kept = { shared: own(heading('A')) };
   const card = make();
-  card.hass = hassOf({ ...store.hass, ...REGISTRIES });
-  await settle();
+  card.hass = store.hass;
+  await updated(document);
   configure(card, { type: 'custom:mnml-template-card', template: 'shared', slots: {} });
-  await settle();
+  await updated(document);
   store.keep({ shared: own(heading('B')) });
-  await settle();
-  await settle();
+  await updated(document);
   assert.deepEqual(
     built.map((config) => config['title']),
     ['A'],
@@ -245,17 +222,15 @@ test('a card detached during a save shows the saved template when it is attached
   const store = fakeStore();
   store.kept = { shared: own(heading('Before')) };
   const card = make();
-  card.hass = hassOf({ ...store.hass, ...REGISTRIES });
+  card.hass = store.hass;
   configure(card, { type: 'custom:mnml-template-card', template: 'shared', slots: {} });
   document.body.append(card);
-  await settle();
-  await settle();
+  await updated(document);
   card.remove();
   store.keep({ shared: own(heading('After')) });
-  await settle();
-  await settle();
+  await updated(document);
   document.body.append(card);
-  await settle();
+  await updated(document);
   assert.deepEqual(
     built.map((config) => config['title']),
     ['Before', 'After'],

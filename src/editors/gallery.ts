@@ -4,21 +4,61 @@ import { property, state } from 'lit/decorators.js';
 import { live } from 'lit/directives/live.js';
 import { repeat } from 'lit/directives/repeat.js';
 
+import { unplaced } from '../builder/plan.ts';
+import { cardOf } from '../cards/parts/card-element.ts';
+import { placeOf, previewOf } from '../cards/stubs.ts';
 import { BASE_STYLE, CONTROL_STYLE } from '../cards/styles.ts';
+import { templateIcon, templateTitle } from '../contract/templates.ts';
 import type { Template, Templates } from '../contract/templates.ts';
 import type { ChildCard } from '../ha/card-helpers.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
+import { registriesOf } from '../ha/snapshot.ts';
 import { quietly } from '../ha/templates.ts';
+import { byDeviceName, deviceName } from '../templates/entity-index.ts';
 import { OWNER } from '../templates/families.ts';
+import { familyTitle } from '../templates/family-titles.ts';
 import { rolesOf } from '../templates/roles.ts';
+import { cardsFor, drawsCard, templateIndex } from '../templates/stands.ts';
+import type { Standing, TemplateIndex } from '../templates/stands.ts';
+import type { EditorWords } from '../words/panel/editors-en.ts';
+import { editorWordsFor } from '../words/panel/editors.ts';
 
-import { drawsCard, previewConfig } from './slots.ts';
 import { EDITOR_STYLE } from './style.ts';
 
 interface Preview {
+  readonly name: string;
   readonly template: Template;
   readonly card: ChildCard;
 }
+
+interface Fitted {
+  readonly device: string;
+  readonly name: string;
+  readonly area: string | undefined;
+  readonly kind: Standing | undefined;
+  readonly cards: readonly string[];
+}
+
+interface Fitting {
+  readonly index: TemplateIndex;
+  readonly registries: readonly object[];
+  readonly devices: readonly Fitted[];
+}
+
+interface Stranding {
+  readonly templates: Templates;
+  readonly registries: readonly object[];
+  readonly stranded: boolean;
+}
+
+const CARD = 'custom:mnml-template-card';
+const AREAS_PAGE = '/mnml/areas';
+
+const previewKey = (target: HTMLElement): string | undefined => {
+  const name = target.dataset['template'];
+  const device = target.dataset['device'];
+  return name === undefined || device === undefined ? name : `${name}@${device}`;
+};
 
 const GALLERY_STYLE = css`
   .fold {
@@ -43,11 +83,17 @@ const GALLERY_STYLE = css`
     flex-direction: column;
     align-items: stretch;
     justify-content: flex-start;
-    text-align: left;
+    text-align: start;
     padding: 8px;
     border-radius: 12px;
     box-shadow: inset 0 0 0 1px var(--divider-color);
     white-space: normal;
+  }
+  .tile-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    --mdc-icon-size: 20px;
   }
   .tile-name {
     font-weight: 500;
@@ -56,10 +102,49 @@ const GALLERY_STYLE = css`
   .tile-description {
     font-size: 12px;
   }
+  .tile-code {
+    font-family: var(--ha-font-family-code, monospace);
+    font-size: 11px;
+    color: var(--secondary-text-color);
+  }
   .tile-preview {
     height: 120px;
     overflow: hidden;
     border-radius: 8px;
+  }
+  .views {
+    display: flex;
+    gap: 8px;
+  }
+  .views .fold {
+    margin: 0;
+  }
+  .device {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .device-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    --mdc-icon-size: 20px;
+  }
+  .device-name {
+    font-weight: 500;
+    color: var(--primary-text-color);
+  }
+  .device-kind {
+    font-size: 12px;
+    color: var(--secondary-text-color);
+  }
+  .stranded {
+    margin: 0;
+    font-size: 12px;
+    color: var(--secondary-text-color);
+  }
+  .stranded a {
+    color: var(--primary-color);
   }
 `;
 
@@ -71,8 +156,12 @@ export class MnmlTemplateGallery extends LitElement {
   @property({ attribute: false }) own: Templates = {};
   @state() private filter = '';
   @state() private everything = false;
+  @state() private byDevice = false;
   private observer: IntersectionObserver | undefined;
   private readonly previews = new Map<string, Preview>();
+  private indexed: { readonly templates: Templates; readonly index: TemplateIndex } | undefined;
+  private fitting: Fitting | undefined;
+  private stranding: Stranding | undefined;
 
   override connectedCallback(): void {
     super.connectedCallback();
@@ -87,9 +176,9 @@ export class MnmlTemplateGallery extends LitElement {
 
   protected override willUpdate(changed: PropertyValues<this>): void {
     if (changed.has('templates')) {
-      for (const [name, preview] of this.previews) {
-        if (this.templates[name] !== preview.template) {
-          this.previews.delete(name);
+      for (const [key, preview] of this.previews) {
+        if (this.templates[preview.name] !== preview.template) {
+          this.previews.delete(key);
         }
       }
     }
@@ -106,15 +195,29 @@ export class MnmlTemplateGallery extends LitElement {
       const box = event.currentTarget;
       this.filter = box instanceof HTMLInputElement ? box.value : '';
     };
+    const words = this.words();
     return html`<div class="gallery">
       <input
         class="filter"
-        placeholder="Filter"
-        aria-label="Filter the templates"
+        placeholder=${words.filter}
+        aria-label=${words.filterTemplates}
         .value=${live(this.filter)}
         @input=${filtered}
       />
-      <div class="gallery">${this.tiles()}</div>
+      <div class="views">
+        <button
+          type="button"
+          class="control fold"
+          aria-label=${words.forDevice}
+          aria-pressed=${this.byDevice}
+          @click=${quietly(() => {
+            this.byDevice = !this.byDevice;
+          })}
+        >
+          ${words.forDevice}
+        </button>
+      </div>
+      <div class="gallery">${this.byDevice ? this.devices() : this.tiles()}</div>
     </div>`;
   }
 
@@ -124,8 +227,8 @@ export class MnmlTemplateGallery extends LitElement {
     }
     const waiting = [...this.renderRoot.querySelectorAll<HTMLElement>('.tile-preview')].filter(
       (target) => {
-        const name = target.dataset['template'];
-        return name !== undefined && !this.previews.has(name);
+        const key = previewKey(target);
+        return key !== undefined && !this.previews.has(key);
       },
     );
     if (waiting.length === 0) {
@@ -146,15 +249,26 @@ export class MnmlTemplateGallery extends LitElement {
     }
   };
 
+  private words(): EditorWords['gallery'] {
+    return editorWordsFor(this.hass?.locale.language).gallery;
+  }
+
   private tiles(): TemplateResult {
+    const said = this.words();
     const templates = this.templates;
     const own = new Set(Object.keys(this.own));
     const roles = rolesOf(templates);
     const words = this.filter.trim().toLowerCase();
+    const titles = new Map(
+      Object.keys(templates).map((name) => [name, templateTitle(templates[name], name)]),
+    );
     const names = Object.keys(templates)
-      .toSorted()
+      .toSorted(
+        (a, b) => (titles.get(a) ?? a).localeCompare(titles.get(b) ?? b) || a.localeCompare(b),
+      )
       .filter((name) => {
-        const text = `${name} ${templates[name]?.description ?? ''}`.toLowerCase();
+        const text =
+          `${titles.get(name) ?? ''} ${name} ${templates[name]?.description ?? ''}`.toLowerCase();
         return words === '' || text.includes(words);
       });
     const tiles = names.filter((name) => roles[name] === 'tile');
@@ -162,11 +276,13 @@ export class MnmlTemplateGallery extends LitElement {
     const grouped = (from: readonly string[]): TemplateResult => {
       const groups = new Map<string, string[]>();
       for (const name of from) {
-        const group = own.has(name) ? 'Yours' : `Shipped: ${OWNER[name] ?? 'common'}`;
+        const group = own.has(name)
+          ? said.yours
+          : said.shipped(familyTitle(OWNER[name] ?? 'common'));
         groups.set(group, [...(groups.get(group) ?? []), name]);
       }
       const order = [...groups.keys()].toSorted((a, b) =>
-        a === 'Yours' ? -1 : b === 'Yours' ? 1 : a.localeCompare(b),
+        a === said.yours ? -1 : b === said.yours ? 1 : a.localeCompare(b),
       );
       return html`${repeat(
         order,
@@ -183,7 +299,12 @@ export class MnmlTemplateGallery extends LitElement {
       )}`;
     };
     const open = this.everything || words !== '';
-    return html`${grouped(tiles)}
+    return html`${
+      this.stranded()
+        ? html`<p class="stranded">${said.stranded} <a href=${AREAS_PAGE}>${said.sortThem}</a></p>`
+        : nothing
+    }
+    ${grouped(tiles)}
     ${
       rest.length === 0
         ? nothing
@@ -195,7 +316,7 @@ export class MnmlTemplateGallery extends LitElement {
                 this.everything = !this.everything;
               })}
             >
-              Pop-ups and parts (${rest.length})
+              ${said.rest(rest.length)}
             </button>
             ${open ? grouped(rest) : nothing}`
     }`;
@@ -206,7 +327,8 @@ export class MnmlTemplateGallery extends LitElement {
     if (template === undefined) {
       return nothing;
     }
-    const use = `Use ${name}`;
+    const title = templateTitle(template, name);
+    const use = this.words().use(title);
     return html`<button
       type="button"
       class="control tile"
@@ -216,8 +338,12 @@ export class MnmlTemplateGallery extends LitElement {
         this.dispatchEvent(new CustomEvent('template-picked', { detail: { template: name } }));
       })}
     >
-      <div class="tile-name">${name}</div>
+      <div class="tile-head">
+        <ha-icon .icon=${templateIcon(template)}></ha-icon>
+        <span class="tile-name">${title}</span>
+      </div>
       <div class="tile-description">${template.description ?? ''}</div>
+      <code class="tile-code">${name}</code>
       ${
         drawsCard(template)
           ? html`<div class="tile-preview" inert data-template=${name}>
@@ -228,22 +354,166 @@ export class MnmlTemplateGallery extends LitElement {
     </button>`;
   }
 
+  private index(): TemplateIndex {
+    const known = this.indexed;
+    if (known !== undefined && known.templates === this.templates) {
+      return known.index;
+    }
+    const index = templateIndex(this.templates);
+    this.indexed = { templates: this.templates, index };
+    return index;
+  }
+
+  private stranded(): boolean {
+    const hass = this.hass;
+    const registries = [hass?.areas, hass?.devices, hass?.entities].map(
+      (registry) => registry ?? {},
+    );
+    const known = this.stranding;
+    if (
+      known !== undefined &&
+      known.templates === this.templates &&
+      known.registries.every((registry, at) => registry === registries[at])
+    ) {
+      return known.stranded;
+    }
+    const home = registriesOf(hass);
+    const away = unplaced(home);
+    const roles = rolesOf(this.templates);
+    const stranded =
+      away.devices + away.entities > 0 &&
+      Object.entries(this.templates).some(
+        ([name, template]) =>
+          roles[name] === 'tile' && drawsCard(template) && placeOf(template, home) === undefined,
+      );
+    this.stranding = { templates: this.templates, registries, stranded };
+    return stranded;
+  }
+
+  private fitted(): readonly Fitted[] {
+    const hass = this.hass;
+    const index = this.index();
+    const registries = [hass?.areas, hass?.devices, hass?.entities].map(
+      (registry) => registry ?? {},
+    );
+    const known = this.fitting;
+    if (
+      known !== undefined &&
+      known.index === index &&
+      known.registries.every((registry, at) => registry === registries[at])
+    ) {
+      return known.devices;
+    }
+    const home = registriesOf(hass);
+    const devices = Object.keys(home.devices)
+      .toSorted(byDeviceName(home))
+      .flatMap((device): Fitted[] => {
+        const cards = cardsFor(index, device, home).map(({ template }) => template);
+        const area = home.devices[device]?.area_id ?? undefined;
+        const named = area === undefined ? undefined : (home.areas[area]?.name ?? area);
+        const kind = index[cards[0] ?? ''];
+        return cards.length === 0
+          ? []
+          : [{ device, name: deviceName(device, home), area: named, kind, cards }];
+      });
+    this.fitting = { index, registries, devices };
+    return devices;
+  }
+
+  private devices(): TemplateResult {
+    const said = this.words();
+    const noArea = said.noArea;
+    const index = this.index();
+    const words = this.filter.trim().toLowerCase();
+    const titleOf = (template: string): string => index[template]?.title ?? template;
+    const shown = this.fitted().flatMap((fitted): Fitted[] => {
+      const cards =
+        words === '' || fitted.name.toLowerCase().includes(words)
+          ? fitted.cards
+          : fitted.cards.filter((template) => titleOf(template).toLowerCase().includes(words));
+      return cards.length === 0 ? [] : [{ ...fitted, cards }];
+    });
+    if (shown.length === 0) {
+      return html`<div class="empty">${words === '' ? said.noDevice : said.noMatch}</div>`;
+    }
+    const areas = [...new Set(shown.map((fitted) => fitted.area ?? noArea))].toSorted((a, b) =>
+      a === noArea ? 1 : b === noArea ? -1 : a.localeCompare(b),
+    );
+    return html`${repeat(
+      areas,
+      (area) => area,
+      (area) =>
+        html`<div class="heading">${area}</div>
+          ${repeat(
+            shown.filter((fitted) => (fitted.area ?? noArea) === area),
+            (fitted) => fitted.device,
+            (fitted) => this.device(fitted, index),
+          )}`,
+    )}`;
+  }
+
+  private device(fitted: Fitted, index: TemplateIndex): TemplateResult {
+    const kind = fitted.kind;
+    return html`<section class="device" role="group" aria-label=${fitted.name}>
+      <div class="device-head">
+        ${kind === undefined ? nothing : html`<ha-icon .icon=${kind.icon}></ha-icon>`}
+        <span class="device-name">${fitted.name}</span>
+        ${kind === undefined ? nothing : html`<span class="device-kind">${kind.title}</span>`}
+      </div>
+      <div class="tiles">
+        ${repeat(
+          fitted.cards,
+          (template) => template,
+          (template) => this.deviceTile(template, fitted, index),
+        )}
+      </div>
+    </section>`;
+  }
+
+  private deviceTile(template: string, fitted: Fitted, index: TemplateIndex): TemplateResult {
+    const standing = index[template];
+    const title = standing?.title ?? template;
+    const use = this.words().useFor(title, fitted.name);
+    return html`<button
+      type="button"
+      class="control tile"
+      aria-label=${use}
+      title=${use}
+      @click=${quietly(() => {
+        this.dispatchEvent(
+          new CustomEvent('template-picked', { detail: { template, device: fitted.device } }),
+        );
+      })}
+    >
+      <div class="tile-head">
+        ${standing === undefined ? nothing : html`<ha-icon .icon=${standing.icon}></ha-icon>`}
+        <span class="tile-name">${title}</span>
+      </div>
+      <div class="tile-description">${this.templates[template]?.description ?? ''}</div>
+      <div class="tile-preview" inert data-template=${template} data-device=${fitted.device}>
+        ${this.previews.get(`${template}@${fitted.device}`)?.card ?? nothing}
+      </div>
+    </button>`;
+  }
+
   private async preview(target: Element): Promise<void> {
+    const key = target instanceof HTMLElement ? previewKey(target) : undefined;
     const name = target instanceof HTMLElement ? target.dataset['template'] : undefined;
+    const device = target instanceof HTMLElement ? target.dataset['device'] : undefined;
     const template = name === undefined ? undefined : this.templates[name];
-    if (name === undefined || template === undefined) {
+    if (key === undefined || name === undefined || template === undefined) {
       return;
     }
-    const helpers = await window.loadCardHelpers?.();
-    if (helpers === undefined) {
-      return;
-    }
-    const card = helpers.createCardElement(previewConfig(name, template, this.hass));
+    const card = await cardOf(
+      device === undefined
+        ? previewOf(name, template, this.hass)
+        : { type: CARD, template: name, device },
+    );
     card.preview = true;
     if (this.hass !== undefined) {
       card.hass = this.hass;
     }
-    this.previews.set(name, { template, card });
+    this.previews.set(key, { name, template, card });
     this.requestUpdate();
   }
 }

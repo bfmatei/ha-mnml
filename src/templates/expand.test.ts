@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 
 import { test } from 'vitest';
 
+import { isMapping } from '../contract/templates.ts';
 import type { Templates } from '../contract/templates.ts';
+import { RO } from '../words/ro.ts';
 
 import { TemplateError, expand, toValue } from './expand.ts';
 
@@ -25,7 +27,7 @@ const T: Templates = {
       key: { kind: 'text', required: true },
       name: { kind: 'text' },
       count: { kind: 'number' },
-      words: { kind: 'texts' },
+      states: { kind: 'texts' },
       windows: { kind: 'entities' },
       lights: { kind: 'object', fields: { group: { kind: 'entity' } } },
       ac: { kind: 'entity' },
@@ -121,11 +123,64 @@ test('a key ending in ? is dropped when it comes out empty', () => {
   assert.equal('chips' in card, false);
 });
 
+test('a key ending in ! keeps its places: an unfilled item stays as null, so the items after it keep theirs', () => {
+  const t: Templates = {
+    row: {
+      slots: {
+        power: { kind: 'entity' },
+        today: { kind: 'entity' },
+        total: { kind: 'entity' },
+      },
+      card: {
+        'values!': ['[[power]]', '[[today]]', '[[total]]'],
+        entities: ['[[power]]', '[[today]]', '[[total]]'],
+      },
+    },
+  };
+  assert.deepEqual(
+    expand(t, { template: 'row', slots: { power: 'sensor.p', total: 'sensor.t' } }).card,
+    { values: ['sensor.p', null, 'sensor.t'], entities: ['sensor.p', 'sensor.t'] },
+  );
+});
+
+test('a key ending in ! takes a list written out', () => {
+  const t: Templates = {
+    row: { slots: { all: { kind: 'entities' } }, card: { 'values!': '[[all]]' } },
+  };
+  assert.throws(
+    () => expand(t, { template: 'row', slots: { all: ['sensor.a'] } }),
+    /a key ending in ! takes a list written out/,
+  );
+});
+
 test('pop-ups are rendered with the slots and returned beside the card', () => {
   const { popups } = expand(T, { template: 'tile', slots: { key: 'hall', name: 'Hall' } });
   assert.deepEqual(popups, [
     { hash: '#hall', cards: [{ type: 'custom:mnml-header-card', name: 'Hall' }] },
   ]);
+});
+
+test("a template's own pop-ups come before those its pop-ups' cards bring", () => {
+  const t: Templates = {
+    item: {
+      slots: { key: { kind: 'text' } },
+      card: { type: 'tile', popup: '#[[key]]-item' },
+      popups: [{ hash: '#[[key]]-item', cards: [] }],
+    },
+    room: {
+      slots: { key: { kind: 'text' } },
+      card: { type: 'tile', popup: '#[[key]]' },
+      popups: [
+        { hash: '#[[key]]', cards: [{ template: 'item', slots: { key: '[[key]]' } }] },
+        { hash: '#[[key]]-lights', cards: [] },
+      ],
+    },
+  };
+  const { popups } = expand(t, { template: 'room', slots: { key: 'hall' } });
+  assert.deepEqual(
+    popups.map((popup) => (isMapping(popup) ? popup['hash'] : undefined)),
+    ['#hall', '#hall-lights', '#hall-item'],
+  );
 });
 
 test('in a list, an item that renders to a list is spliced', () => {
@@ -194,11 +249,11 @@ test('mistakes are errors that name the template and the place', () => {
     /tile: count is not a number/,
   );
   assert.throws(
-    () => expand(T, { template: 'tile', slots: { key: 'hall', words: [1] } }),
-    /tile: words is not of kind texts/,
+    () => expand(T, { template: 'tile', slots: { key: 'hall', states: [1] } }),
+    /tile: states is not of kind texts/,
   );
   assert.doesNotThrow(() =>
-    expand(T, { template: 'tile', slots: { key: 'hall', words: ['on', 'open'] } }),
+    expand(T, { template: 'tile', slots: { key: 'hall', states: ['on', 'open'] } }),
   );
   const t: Templates = {
     loop: { card: { template: 'loop' } },
@@ -212,6 +267,102 @@ test('mistakes are errors that name the template and the place', () => {
     /typo at card\.popup: no slot named kye/,
   );
   assert.throws(() => expand(t, { template: 'typo', slots: { key: 'a' } }), TemplateError);
+});
+
+const WORDED: Templates = {
+  lit: {
+    slots: { name: { kind: 'text' } },
+    card: {
+      type: 'custom:mnml-list-card',
+      title: '[[words.lights]]',
+      headers: ['[[words.item]]', '[[words.now]]'],
+      'chips?': [{ if: 'name', name: '[[name]] • [[words.firmware]]' }],
+    },
+    popups: [{ hash: '#lit', cards: [{ title: '[[words.all_lights]]' }] }],
+  },
+};
+
+test('a template names a word, and the expansion writes it in the words it is given, English when it is given none', () => {
+  assert.deepEqual(expand(WORDED, { template: 'lit', slots: { name: 'Kitchen' } }), {
+    card: {
+      type: 'custom:mnml-list-card',
+      title: 'Lights',
+      headers: ['Item', 'Now'],
+      chips: [{ name: 'Kitchen • Firmware' }],
+    },
+    popups: [{ hash: '#lit', cards: [{ title: 'All lights' }] }],
+  });
+  const { card, popups } = expand(
+    WORDED,
+    { template: 'lit', slots: { name: 'Bucătărie' } },
+    {},
+    new Set(),
+    undefined,
+    RO.templates,
+  );
+  assert.deepEqual(card, {
+    type: 'custom:mnml-list-card',
+    title: 'Lumini',
+    headers: ['Element', 'Acum'],
+    chips: [{ name: 'Bucătărie • Firmware' }],
+  });
+  assert.deepEqual(popups, [{ hash: '#lit', cards: [{ title: 'Toate luminile' }] }]);
+});
+
+test('an unknown word is an error naming the template, the place and the word, even where nothing is drawn', () => {
+  const t: Templates = {
+    typo: {
+      slots: { name: { kind: 'text' } },
+      card: { type: 'x', 'chips?': [{ if: 'name', name: '[[words.lightz]]' }] },
+    },
+    whole: { card: { type: 'x', title: '[[words]]' } },
+    deep: { card: { type: 'x', title: '[[words.lights.name]]' } },
+    over: { card: { type: 'x', title: '[[words.*]]' } },
+    gate: { card: { type: 'x', if: 'words', title: 'x' } },
+  };
+  assert.throws(
+    () => expand(t, { template: 'typo' }),
+    (error: unknown) => {
+      assert.ok(error instanceof TemplateError);
+      assert.equal(error.message, 'typo at card.chips[0].name: no word named lightz');
+      assert.equal(error.said, error.message);
+      return true;
+    },
+  );
+  for (const name of ['whole', 'deep', 'over', 'gate']) {
+    assert.throws(
+      () => expand(t, { template: name }),
+      new RegExp(
+        ` ${name} at card(\\.title)?: words takes the name of one word, as \\[\\[words\\.lights\\]\\]$`,
+      ),
+    );
+  }
+});
+
+test('words is reserved: no slot, and no element of each:, is called words', () => {
+  const t: Templates = {
+    slot: { slots: { words: { kind: 'texts' } }, card: { type: 'x' } },
+    alias: {
+      slots: { lights: { kind: 'entities' } },
+      card: { type: 'x', rows: [{ each: 'lights', as: 'words', entity: 'light.a' }] },
+    },
+    field: {
+      slots: { light: { kind: 'object', fields: { words: { kind: 'texts' } } } },
+      card: { type: 'x', is: ['[[light.words]]'] },
+    },
+  };
+  assert.throws(
+    () => expand(t, { template: 'slot' }),
+    / slot: the slot name words is reserved for the words of the card's language$/,
+  );
+  assert.throws(
+    () => expand(t, { template: 'alias' }),
+    / alias at card\.rows\[0\]: as: words is reserved for the words of the card's language$/,
+  );
+  assert.deepEqual(expand(t, { template: 'field', slots: { light: { words: ['on'] } } }).card, {
+    type: 'x',
+    is: ['on'],
+  });
 });
 
 const FIELDS: Templates = {
@@ -268,6 +419,78 @@ test('a path into an object names one of its fields', () => {
     () => expand(FIELDS, { template: 'thing', slots: { o: { e: 'light.a', x: 1 } } }),
     /thing: o has no field named x/,
   );
+});
+
+function saidOf(run: () => unknown): string {
+  try {
+    run();
+  } catch (error) {
+    assert.ok(error instanceof TemplateError);
+    return error.said;
+  }
+  return assert.fail('it did not throw');
+}
+
+test('a slot mistake also says, in the words of the slot labels, what a person filling it must do', () => {
+  const t: Templates = {
+    car: {
+      title: 'Car',
+      slots: {
+        key: { kind: 'text', required: true, label: 'Short name' },
+        fuel: { kind: 'number' },
+        lights: {
+          kind: 'object',
+          label: 'Its lights',
+          fields: { group: { kind: 'entity', required: true }, color: { kind: 'flag' } },
+        },
+        meters: { kind: 'objects', fields: { power: { kind: 'entity', required: true } } },
+      },
+      card: { name: '[[key]]' },
+    },
+    outer: { card: { item: { template: 'inner', slots: {} } } },
+    inner: {
+      title: 'Inner piece',
+      slots: { entity: { kind: 'entity', required: true } },
+      card: { e: '[[entity]]' },
+    },
+  };
+  assert.equal(
+    saidOf(() => expand(t, { template: 'car', slots: {} })),
+    'Short name is needed',
+  );
+  assert.throws(
+    () => expand(t, { template: 'car', slots: {} }),
+    /^Error: car: the slot key is required$/,
+  );
+  assert.equal(
+    saidOf(() => expand(t, { template: 'car', slots: { key: 'a', fuel: 'full' } })),
+    'Fuel takes a number',
+  );
+  assert.equal(
+    saidOf(() => expand(t, { template: 'car', slots: { key: 'a', lights: { color: true } } })),
+    'Its lights: Group is needed',
+  );
+  assert.equal(
+    saidOf(() => expand(t, { template: 'car', slots: { key: 'a', meters: [{}] } })),
+    'Meters: Power is needed',
+  );
+  assert.equal(
+    saidOf(() => expand(t, { template: 'outer' })),
+    'Inner piece: Entity is needed',
+  );
+  assert.equal(
+    saidOf(() => expand(t, { template: 'car', slots: { key: 'a', nmae: 'x' } })),
+    'car: no slot named nmae',
+  );
+});
+
+test('a title is a text and an icon an mdi: icon, or the template is an error naming it', () => {
+  const t = JSON.parse(
+    '{"titled": {"title": "", "card": {}}, "iconed": {"icon": "sofa", "card": {}}, "fine": {"title": "Fine", "icon": "mdi:sofa", "card": {"a": 1}}}',
+  ) as Templates;
+  assert.throws(() => expand(t, { template: 'titled' }), /^Error: titled: its title is a text/);
+  assert.throws(() => expand(t, { template: 'iconed' }), /^Error: iconed: its icon is mdi:/);
+  assert.deepEqual(expand(t, { template: 'fine' }).card, { a: 1 });
 });
 
 test("a nested template's slot mistake names the outer template, the place, and the inner template", () => {

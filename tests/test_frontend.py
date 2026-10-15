@@ -2,7 +2,7 @@ import hashlib
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
-from homeassistant.components.frontend import DATA_EXTRA_MODULE_URL
+from homeassistant.components.frontend import DATA_EXTRA_MODULE_URL, DATA_PANELS
 from homeassistant.config_entries import ConfigEntryState
 
 if TYPE_CHECKING:
@@ -43,6 +43,31 @@ async def test_the_loader_and_the_bundle_are_served(
     assert await bundle.text() == "export {};\n"
 
 
+async def test_a_file_is_served_as_its_compressed_sibling_when_the_browser_takes_it(
+    hass: HomeAssistant, www: Path, setup_mnml: SetupMnml, hass_client: ClientSessionGenerator
+) -> None:
+    (www / "mnml-cards.js.br").write_bytes(b"brotli")
+    (www / "mnml-cards.js.gz").write_bytes(b"gzip")
+    await setup_mnml()
+    client = await hass_client()
+    for accepted, encoding, body in (
+        ("gzip, deflate, br, zstd", "br", b"brotli"),
+        ("gzip, deflate", "gzip", b"gzip"),
+        ("identity", None, b"export {};\n"),
+    ):
+        response = await client.get(
+            "/mnml-files/mnml-cards.js",
+            headers={"Accept-Encoding": accepted},
+            auto_decompress=False,
+        )
+        assert response.status == 200, accepted
+        assert response.content_type == "text/javascript", accepted
+        assert response.headers.get("Content-Encoding") == encoding, accepted
+        assert await response.read() == body, accepted
+        if encoding is not None:
+            assert response.headers["Vary"] == "Accept-Encoding"
+
+
 async def test_unloading_takes_the_loader_off(
     hass: HomeAssistant, www: Path, setup_mnml: SetupMnml
 ) -> None:
@@ -75,10 +100,20 @@ async def test_an_install_without_the_built_frontend_fails_setup_and_says_what_i
     assert mnml_urls(hass) == []
 
 
-async def test_a_setup_that_fails_after_the_loader_is_added_leaves_no_loader(
+async def test_a_setup_that_fails_after_the_loader_is_added_leaves_no_loader_and_no_panel(
     hass: HomeAssistant, www: Path, setup_mnml: SetupMnml
 ) -> None:
     with patch("custom_components.mnml.other_theme_files", side_effect=RuntimeError("broken")):
+        entry = await setup_mnml()
+    assert entry.state is ConfigEntryState.SETUP_ERROR
+    assert mnml_urls(hass) == []
+    assert "mnml" not in hass.data[DATA_PANELS]
+
+
+async def test_a_setup_whose_panel_fails_leaves_no_loader(
+    hass: HomeAssistant, www: Path, setup_mnml: SetupMnml
+) -> None:
+    with patch("custom_components.mnml.async_register_panel", side_effect=RuntimeError("broken")):
         entry = await setup_mnml()
     assert entry.state is ConfigEntryState.SETUP_ERROR
     assert mnml_urls(hass) == []

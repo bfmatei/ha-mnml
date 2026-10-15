@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 
 import { test } from 'vitest';
 
-import { UNAVAILABLE, matches, tint, tyreBand } from './rules.ts';
+import { fakeHass } from '../test/hass.ts';
+
+import { UNAVAILABLE, active, holds, matches, shown, tint, tyreBand } from './rules.ts';
 
 const on = {
   entity_id: 'light.a',
@@ -31,6 +33,41 @@ test('tint() colours on its rule, and paints an unavailable entity orange regard
   assert.equal(tint('amber', { is: ['off'] }, on), undefined);
   assert.equal(tint(undefined, undefined, { ...on, state: 'unavailable' }), UNAVAILABLE);
   assert.equal(tint('amber', undefined, undefined), undefined);
+});
+
+test("a rule with an attribute reads that attribute's value instead of the state, a missing one as unknown", () => {
+  const notifications = {
+    ...on,
+    entity_id: 'sensor.notifications',
+    state: '3',
+    attributes: { alerts: 0, worst: 'warning', muted: false, messages: [{ id: 'a' }] },
+  };
+  assert.equal(holds({ attribute: 'alerts', not: ['0'] }, notifications), false);
+  assert.equal(holds({ not: ['0'] }, notifications), true, 'the state, without one');
+  assert.equal(holds({ attribute: 'worst', is: ['Warning'] }, notifications), true);
+  assert.equal(holds({ attribute: 'gone', is: ['unknown'] }, notifications), true);
+  assert.equal(holds({ attribute: 'muted', is: ['false'] }, notifications), true);
+  assert.equal(
+    holds({ attribute: 'messages', is: ['unknown'] }, notifications),
+    true,
+    'a list or a mapping is no state to match, so it reads as unknown',
+  );
+  assert.equal(holds({ attribute: 'alerts', is: ['unavailable'] }, undefined), true);
+  const alerting = { ...notifications, attributes: { alerts: 2 } };
+  assert.equal(active({ attribute: 'alerts', not: ['0'] }, alerting), true);
+  assert.equal(tint('amber', { attribute: 'alerts', not: ['0'] }, alerting), 'amber');
+  assert.equal(tint('amber', { attribute: 'alerts', not: ['0'] }, notifications), undefined);
+  assert.equal(
+    active({ attribute: 'gone', not: ['0'] }, alerting),
+    false,
+    'a missing attribute is no value, so it never colours',
+  );
+  const hass = fakeHass({ states: { 'sensor.notifications': alerting } });
+  assert.equal(shown(hass, { attribute: 'alerts', not: ['0'] }, 'sensor.notifications'), true);
+  assert.equal(
+    shown(hass, { entity: 'sensor.notifications', attribute: 'alerts', is: ['0'] }, 'light.a'),
+    false,
+  );
 });
 
 test('a tyre is low under its low share, dropping under its warn share', () => {

@@ -472,6 +472,12 @@ const ROOMS: readonly Room[] = [
     heating: {
       entity: 'climate.bedroom_heating',
       preset: true,
+      presetTemperatures: [
+        'number.bedroom_heating_comfort',
+        'number.bedroom_heating_eco',
+        'number.bedroom_heating_away',
+      ],
+      schedule: 'schedule.bedroom_heating',
       thermostats: [
         {
           valve: 'sensor.bedroom_thermostat_1_valve_position',
@@ -704,6 +710,12 @@ const ROOMS: readonly Room[] = [
     heating: {
       entity: 'climate.kitchen_heating',
       preset: true,
+      presetTemperatures: [
+        'number.kitchen_heating_comfort',
+        'number.kitchen_heating_eco',
+        'number.kitchen_heating_away',
+      ],
+      schedule: 'schedule.kitchen_heating',
       thermostats: [
         {
           valve: 'sensor.kitchen_thermostat_valve_position',
@@ -744,6 +756,8 @@ const ROOMS: readonly Room[] = [
         litter: 'sensor.kitchen_litter_box_waste_level',
       },
     ],
+    timers: ['timer.kitchen_eggs'],
+    schedules: ['schedule.kitchen_coffee'],
     batteries: [
       'sensor.kitchen_climate_battery',
       'sensor.kitchen_coffee_machine_button_battery',
@@ -812,6 +826,12 @@ const ROOMS: readonly Room[] = [
     heating: {
       entity: 'climate.living_heating',
       preset: true,
+      presetTemperatures: [
+        'number.living_heating_comfort',
+        'number.living_heating_eco',
+        'number.living_heating_away',
+      ],
+      schedule: 'schedule.living_heating',
       thermostats: [
         {
           valve: 'sensor.living_thermostat_1_valve_position',
@@ -1022,6 +1042,7 @@ const ROOMS: readonly Room[] = [
       entity: 'switch.office_perfume_diffuser',
       amount: 'number.office_perfume_diffuser_amount',
     },
+    schedules: ['schedule.office_perfume'],
     batteries: [
       'sensor.office_button_1_battery',
       'sensor.office_button_2_battery',

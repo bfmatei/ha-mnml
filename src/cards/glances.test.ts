@@ -4,7 +4,11 @@ import { test } from 'vitest';
 
 import { DEMO } from '../../demo/home.ts';
 import { drawn } from '../home/view.ts';
-import { define, mounted, text } from '../test/render.ts';
+import { fakeHass } from '../test/hass.ts';
+import type { FakeState, ServiceCall } from '../test/hass.ts';
+import { configure, created, define, mounted, text } from '../test/render.ts';
+import { until } from '../test/until.ts';
+import { notified, wire } from '../test/wire.ts';
 
 import { MnmlGlancesCard } from './glances.ts';
 import { tipOf } from './parts/tooltip.ts';
@@ -32,21 +36,21 @@ const CONFIG = {
   ],
 };
 
-interface Call {
-  service: string;
-}
-
 function reading(
   id: string,
   state: string,
   attributes: Record<string, unknown> = {},
-): [string, unknown] {
-  return [id, { entity_id: id, state, attributes }];
+): [string, FakeState] {
+  return [id, { state, attributes }];
 }
 
-function hassWith(failed: string, batteries: string[], calls: Call[] = []): unknown {
+function services(calls: readonly ServiceCall[]): string[] {
+  return calls.map(({ domain, service }) => `${domain}.${service}`);
+}
+
+function hassWith(failed: string, batteries: string[], calls?: ServiceCall[]) {
   const [a = '80', b = '80', c = '80'] = batteries;
-  return {
+  return fakeHass({
     states: Object.fromEntries([
       reading('weather.home', 'sunny', { temperature: 21 }),
       reading('input_boolean.away', 'off'),
@@ -55,24 +59,15 @@ function hassWith(failed: string, batteries: string[], calls: Call[] = []): unkn
       reading('sensor.b_battery', b),
       reading('sensor.c_battery', c),
     ]),
-    entities: {},
-    devices: {},
-    locale: { language: 'en' },
-    formatEntityState: (stateObj: { state: string }): string => stateObj.state,
-    formatEntityAttributeValue: (_stateObj: unknown, _name: string, value: unknown): string =>
-      String(value),
-    callService: (domain: string, service: string): Promise<unknown> => {
-      calls.push({ service: `${domain}.${service}` });
-      return Promise.resolve();
-    },
-  };
+    calls,
+  });
 }
 
-async function paint(failed: string, batteries: string[], calls: Call[] = []) {
+async function paint(failed: string, batteries: string[], calls?: ServiceCall[]) {
   const made = document.createElement('mnml-glances-card');
   assert.ok(made instanceof MnmlGlancesCard);
-  made.setConfig(CONFIG as never);
-  made.hass = hassWith(failed, batteries, calls) as never;
+  configure(made, CONFIG);
+  made.hass = hassWith(failed, batteries, calls);
   return mounted(made);
 }
 
@@ -119,6 +114,11 @@ test('a count lists what it counts in its tooltip, and only a critical one fades
   assert.ok(!calm.querySelector('.group.problems .glance')?.classList.contains('critical'));
 });
 
+test('a glance draws no name beside its icon, its name being its tooltip', async () => {
+  const root = await paint('2', ['14', '80', '3']);
+  assert.equal(root.querySelector('.glance .name'), null);
+});
+
 test('a sensor that is not 0 is a glance, and a battery below the limit is counted', async () => {
   const root = await paint('2', ['14', '80', '3']);
   const glances = [...root.querySelectorAll('.glance')];
@@ -136,7 +136,7 @@ test('a count turns orange while none is critical, and an unavailable battery is
 });
 
 test('only a toggle glance is a button, and it toggles its entity', async () => {
-  const calls: Call[] = [];
+  const calls: ServiceCall[] = [];
   const root = await paint('0', [], calls);
   const glances = [...root.querySelectorAll<HTMLElement>('.glance')];
   assert.deepEqual(
@@ -144,44 +144,72 @@ test('only a toggle glance is a button, and it toggles its entity', async () => 
     [null, 'button'],
   );
   glances[1]?.click();
-  assert.deepEqual(calls, [{ service: 'homeassistant.toggle' }]);
+  assert.deepEqual(services(calls), ['homeassistant.toggle']);
+});
+
+test('a timer glance with show is: active is drawn only while the timer runs, and prints the time it has left', async () => {
+  const made = document.createElement('mnml-glances-card');
+  assert.ok(made instanceof MnmlGlancesCard);
+  configure(made, {
+    type: 'custom:mnml-glances-card',
+    items: [{ entity: 'timer.tea', show: { is: ['active'] }, state: [{ remaining: true }] }],
+  });
+  const finishes = new Date(Date.now() + 65_500).toISOString();
+  const hass = (state: string) =>
+    fakeHass({
+      states: {
+        'timer.tea': { state, attributes: { remaining: '0:03:00', finishes_at: finishes } },
+      },
+    });
+  made.hass = hass('idle');
+  const root = await mounted(made);
+  assert.equal(root.querySelector('.glance'), null, 'nothing while it is idle');
+  made.hass = hass('active');
+  await made.updateComplete;
+  assert.equal(text(root.querySelector('.glance .state')), '1:06');
+  made.remove();
+});
+
+test("a toggle glance fires Home Assistant's light haptic as it toggles", async () => {
+  const felt: unknown[] = [];
+  const listener = (event: Event): void => {
+    felt.push(event instanceof CustomEvent ? event.detail : undefined);
+  };
+  window.addEventListener('haptic', listener);
+  const root = await paint('0', []);
+  root.querySelectorAll<HTMLElement>('.glance')[1]?.click();
+  window.removeEventListener('haptic', listener);
+  assert.deepEqual(felt, ['light']);
 });
 
 test('a card with nothing to show draws nothing, and one with no items is an error card', async () => {
   const made = document.createElement('mnml-glances-card');
   assert.ok(made instanceof MnmlGlancesCard);
   assert.throws(() => {
-    made.setConfig({ type: 'custom:mnml-glances-card' } as never);
+    configure(made, { type: 'custom:mnml-glances-card' });
   });
   assert.throws(() => {
-    made.setConfig({
+    configure(made, {
       type: 'custom:mnml-glances-card',
       items: [{ entities: ['sensor.a'] }],
-    } as never);
+    });
   });
 });
 
-function alarmHass(alarm: string, home: boolean, calls: Call[] = []): unknown {
-  return {
+function alarmHass(alarm: string, home: boolean, calls?: ServiceCall[]) {
+  return fakeHass({
     states: Object.fromEntries([
       reading('alarm_control_panel.home', alarm),
       reading('person.jane', home ? 'home' : 'not_home'),
     ]),
-    entities: {},
-    devices: {},
-    locale: { language: 'en' },
-    formatEntityState: (stateObj: { state: string }): string => stateObj.state,
-    callService: (domain: string, service: string): Promise<unknown> => {
-      calls.push({ service: `${domain}.${service}` });
-      return Promise.resolve();
-    },
-  };
+    calls,
+  });
 }
 
-async function alarm(state: string, home: boolean, calls: Call[] = []) {
+async function alarm(state: string, home: boolean, calls?: ServiceCall[]) {
   const made = document.createElement('mnml-glances-card');
   assert.ok(made instanceof MnmlGlancesCard);
-  made.setConfig({
+  configure(made, {
     type: 'custom:mnml-glances-card',
     items: [
       {
@@ -194,8 +222,8 @@ async function alarm(state: string, home: boolean, calls: Call[] = []) {
         people: ['person.jane'],
       },
     ],
-  } as never);
-  made.hass = alarmHass(state, home, calls) as never;
+  });
+  made.hass = alarmHass(state, home, calls);
   return (await mounted(made)).querySelector('.glance');
 }
 
@@ -215,13 +243,60 @@ test('a triggered alarm is red whoever is home, and a bare glance draws its icon
 });
 
 test('tapping the alarm arms it while it is disarmed and disarms it otherwise', async () => {
-  const calls: Call[] = [];
+  const calls: ServiceCall[] = [];
   (await alarm('disarmed', true, calls))?.dispatchEvent(new MouseEvent('click'));
   (await alarm('armed_away', true, calls))?.dispatchEvent(new MouseEvent('click'));
-  assert.deepEqual(calls, [
-    { service: 'alarm_control_panel.alarm_arm_away' },
-    { service: 'alarm_control_panel.alarm_disarm' },
+  assert.deepEqual(services(calls), [
+    'alarm_control_panel.alarm_arm_away',
+    'alarm_control_panel.alarm_disarm',
   ]);
+});
+
+test('a toggle glance whose confirm rule holds arms on the first tap, says what it will do, and toggles on the second', async () => {
+  const calls: ServiceCall[] = [];
+  const made = document.createElement('mnml-glances-card');
+  assert.ok(made instanceof MnmlGlancesCard);
+  configure(made, {
+    type: 'custom:mnml-glances-card',
+    items: [
+      {
+        entity: 'input_boolean.away',
+        name: 'Vacation',
+        icon: 'mdi:palm-tree',
+        toggle: true,
+        confirm: {},
+        quiet: true,
+      },
+    ],
+  });
+  made.hass = hassWith('0', [], calls);
+  const root = await mounted(made);
+  const glance = (): HTMLElement => {
+    const found = root.querySelector<HTMLElement>('.glance');
+    assert.ok(found);
+    return found;
+  };
+  glance().click();
+  await made.updateComplete;
+  assert.deepEqual(calls, [], 'the first tap does not toggle');
+  assert.equal(text(glance()), 'Turn on? Tap again');
+  assert.equal(glance().getAttribute('aria-label'), 'Turn on Vacation? Tap again');
+  assert.ok(glance().classList.contains('armed'));
+  glance().click();
+  await made.updateComplete;
+  assert.deepEqual(services(calls), ['homeassistant.toggle']);
+  assert.equal(text(glance()), '', 'and it is quiet again');
+});
+
+test('a glance that does not toggle takes no confirm', () => {
+  const made = document.createElement('mnml-glances-card');
+  assert.ok(made instanceof MnmlGlancesCard);
+  assert.throws(() => {
+    configure(made, {
+      type: 'custom:mnml-glances-card',
+      items: [{ entity: 'weather.home', popup: '#weather', confirm: {} }],
+    });
+  }, /^Error: items\[0\]\.confirm needs toggle: true$/);
 });
 
 test('a summed item adds its sensors together, drawn while the total is above 0 and red while the first is at the limit', async () => {
@@ -240,17 +315,13 @@ test('a summed item adds its sensors together, drawn while the total is above 0 
   const paint = async (failed: string, warned: string) => {
     const made = document.createElement('mnml-glances-card');
     assert.ok(made instanceof MnmlGlancesCard);
-    made.setConfig(config as never);
-    made.hass = {
+    configure(made, config);
+    made.hass = fakeHass({
       states: Object.fromEntries([
         reading('sensor.failed', failed),
         reading('sensor.warned', warned),
       ]),
-      entities: {},
-      devices: {},
-      locale: { language: 'en' },
-      formatEntityState: (stateObj: { state: string }): string => stateObj.state,
-    } as never;
+    });
     return mounted(made);
   };
   const quiet = await paint('0', '0');
@@ -266,7 +337,7 @@ test('a summed item adds its sensors together, drawn while the total is above 0 
 test('a glance that acts is a button named with what its tooltip says, its value included', async () => {
   const made = document.createElement('mnml-glances-card');
   assert.ok(made instanceof MnmlGlancesCard);
-  made.setConfig({
+  configure(made, {
     type: 'custom:mnml-glances-card',
     items: [
       { entity: 'weather.home', popup: '#weather' },
@@ -279,8 +350,8 @@ test('a glance that acts is a button named with what its tooltip says, its value
       },
       { entity: 'sensor.c_battery' },
     ],
-  } as never);
-  made.hass = hassWith('0', ['14', '3', '80']) as never;
+  });
+  made.hass = hassWith('0', ['14', '3', '80']);
   const root = await mounted(made);
   assert.deepEqual(
     [...root.querySelectorAll('.glance')].map((glance) => [
@@ -299,7 +370,7 @@ test('a glance that acts is a button named with what its tooltip says, its value
 test("a count's is and not match a state as a rule does, lower-cased and without hyphens, and skip an unavailable one", async () => {
   const made = document.createElement('mnml-glances-card');
   assert.ok(made instanceof MnmlGlancesCard);
-  made.setConfig({
+  configure(made, {
     type: 'custom:mnml-glances-card',
     items: [
       {
@@ -315,9 +386,8 @@ test("a count's is and not match a state as a rule does, lower-cased and without
         not: ['connected', 'upgrading'],
       },
     ],
-  } as never);
-  made.hass = {
-    ...(hassWith('0', []) as object),
+  });
+  made.hass = fakeHass({
     states: Object.fromEntries([
       reading('sensor.sedan_doors', 'UNLOCKED'),
       reading('sensor.suv_doors', 'SELECTIVE-LOCKED'),
@@ -326,12 +396,120 @@ test("a count's is and not match a state as a rule does, lower-cased and without
       reading('sensor.switch_state', 'heartbeat_missed'),
       reading('sensor.ap_state', 'unavailable'),
     ]),
-  } as never;
+  });
   const root = await mounted(made);
   assert.deepEqual(
     [...root.querySelectorAll('.glance')].map((glance) => text(glance.querySelector('.state'))),
     ['2', '1'],
   );
+});
+
+async function paintWith(config: unknown, states: [string, FakeState][]): Promise<ShadowRoot> {
+  const made = document.createElement('mnml-glances-card');
+  assert.ok(made instanceof MnmlGlancesCard);
+  configure(made, config);
+  made.hass = fakeHass({
+    states: Object.fromEntries(states),
+    formatEntityState: (stateObj, state = stateObj.state) => {
+      const unit = stateObj.attributes['unit_of_measurement'];
+      return typeof unit === 'string' ? `${state} ${unit}` : state;
+    },
+  });
+  return mounted(made);
+}
+
+test("a glance's rules and state line may read an attribute, so notifications are drawn, coloured and counted by their alerts", async () => {
+  const config = {
+    type: 'custom:mnml-glances-card',
+    items: [
+      {
+        entity: 'sensor.notifications',
+        name: 'Notifications',
+        color: 'amber',
+        when: { attribute: 'alerts', not: ['0'] },
+        show: { attribute: 'alerts', not: ['0'] },
+        state: [{ attribute: 'alerts' }],
+      },
+    ],
+  };
+  const quiet = await paintWith(config, [reading('sensor.notifications', '2', { alerts: 0 })]);
+  assert.equal(quiet.querySelector('.glance'), null, 'two notices, no alert');
+  const loud = await paintWith(config, [reading('sensor.notifications', '3', { alerts: 2 })]);
+  const glance = loud.querySelector('.group.problems .glance');
+  assert.ok(glance?.classList.contains('colored'));
+  assert.ok(glance?.getAttribute('style')?.includes('amber'));
+  assert.equal(text(glance?.querySelector('.state')), '2');
+});
+
+test("a count's show decides whether it is drawn, reading the first counted entity unless it names another", async () => {
+  const config = {
+    type: 'custom:mnml-glances-card',
+    items: [
+      {
+        entities: ['climate.bedroom'],
+        name: 'Heating while away',
+        icon: 'mdi:thermometer-alert',
+        not: ['off'],
+        show: { entity: 'input_boolean.away', is: ['on'] },
+      },
+      { entities: ['climate.bedroom'], name: 'Heating', not: ['off'], show: { is: ['heat'] } },
+    ],
+  };
+  const names = async (heating: string, away: string): Promise<(string | undefined)[]> => {
+    const root = await paintWith(config, [
+      reading('climate.bedroom', heating),
+      reading('input_boolean.away', away),
+    ]);
+    return [...root.querySelectorAll('.glance')].map((glance) => tipOf(glance)?.split('\n')[0]);
+  };
+  assert.deepEqual(await names('heat', 'off'), ['Heating']);
+  assert.deepEqual(await names('heat', 'on'), ['Heating while away', 'Heating']);
+  assert.deepEqual(await names('auto', 'on'), ['Heating while away']);
+  assert.deepEqual(await names('off', 'on'), []);
+});
+
+test("a total is a calm glance: the sum of its entities in the first one's unit, uncoloured, each listed in its tooltip", async () => {
+  const config = {
+    type: 'custom:mnml-glances-card',
+    items: [
+      {
+        entities: [
+          'sensor.plug_power',
+          'sensor.fridge_power',
+          'sensor.boiler_power',
+          'sensor.car_power',
+        ],
+        name: 'Energy',
+        icon: 'mdi:lightning-bolt',
+        total: true,
+        popup: '#energy',
+      },
+    ],
+  };
+  const watts = { unit_of_measurement: 'W' };
+  const root = await paintWith(config, [
+    reading('sensor.plug_power', '12.5', watts),
+    reading('sensor.fridge_power', '80', watts),
+    reading('sensor.boiler_power', 'unavailable', watts),
+    reading('sensor.car_power', '7', { unit_of_measurement: 'kW' }),
+  ]);
+  const glance = root.querySelector('.group.calm .glance');
+  assert.ok(glance);
+  assert.equal(root.querySelector('.group.problems'), null);
+  assert.ok(!glance.classList.contains('colored'));
+  assert.equal(text(glance.querySelector('.state')), '92.5 W');
+  assert.equal(tipOf(glance), 'Energy\nsensor.plug_power: 12.5 W\nsensor.fridge_power: 80 W');
+  assert.equal(glance.getAttribute('role'), 'button');
+  const none = await paintWith(config, [reading('sensor.plug_power', 'unavailable', watts)]);
+  assert.equal(none.querySelector('.glance'), null, 'not drawn while none reads a number');
+  const made = document.createElement('mnml-glances-card');
+  assert.ok(made instanceof MnmlGlancesCard);
+  assert.throws(() => {
+    configure(made, {
+      type: 'custom:mnml-glances-card',
+      items: [{ entities: ['sensor.plug_power'], name: 'Energy', total: true, below: 20 }],
+    });
+  }, /^Error: items\[0\]\.below does not go with total$/);
 });
 
 function glancesOf(value: unknown): Record<string, unknown> | undefined {
@@ -350,8 +528,6 @@ const NEEDS_YOU: ReadonlySet<unknown> = new Set([
   'Network devices down',
   'Tailscale offline',
   'Media health',
-  'Unlocked',
-  'Car security',
 ]);
 
 async function demoGlances(states: Record<string, string>): Promise<Element[]> {
@@ -360,27 +536,56 @@ async function demoGlances(states: Record<string, string>): Promise<Element[]> {
   assert.ok(Array.isArray(items));
   const made = document.createElement('mnml-glances-card');
   assert.ok(made instanceof MnmlGlancesCard);
-  made.setConfig({
+  configure(made, {
     type: 'custom:mnml-glances-card',
     items: items.filter(
       (item: unknown) =>
         typeof item === 'object' && item !== null && NEEDS_YOU.has(Reflect.get(item, 'name')),
     ),
-  } as never);
-  made.hass = {
-    ...(hassWith('0', []) as object),
+  });
+  made.hass = fakeHass({
     states: Object.fromEntries(Object.entries(states).map(([id, state]) => reading(id, state))),
-  } as never;
+  });
   const root = await mounted(made);
   return [...root.querySelectorAll('.group.problems .glance')];
 }
 
-test("the demo home's Glances show a stopped guest, a device down or offline, the media server's health, a lock and each car left open, each opening its pop-up", async () => {
+test("Home Assistant's messages are a glance that needs you, counted while there are any and opening their pop-up", async () => {
+  const line = wire();
+  const made = created('mnml-glances-card', MnmlGlancesCard);
+  configure(made, {
+    type: 'custom:mnml-glances-card',
+    items: [
+      {
+        messages: true,
+        name: 'Messages',
+        icon: 'mdi:home-assistant',
+        color: 'amber',
+        popup: '#system-messages',
+      },
+    ],
+  });
+  made.hass = { ...fakeHass(), connection: line.connection };
+  const root = await mounted(made);
+  line.push(notified(0));
+  await made.updateComplete;
+  assert.equal(made.style.display, 'none', 'none, so nothing is drawn');
+  line.push(notified(2));
+  await made.updateComplete;
+  const [well, ...rest] = root.querySelectorAll('.group.problems .glance');
+  assert.ok(well);
+  assert.equal(rest.length, 0);
+  assert.equal(text(well.querySelector('.state')), '2');
+  assert.equal(tipOf(well), 'Messages');
+  assert.equal(well.getAttribute('aria-label'), 'Messages: 2');
+  assert.equal(well.getAttribute('role'), 'button');
+  made.remove();
+  await until(() => line.unsubscribed === 1, 'the end of the subscription');
+});
+
+test("the demo home's Glances show a stopped guest, a device down or offline and the media server's health, each opening its pop-up", async () => {
   const { proxmox, network, tailscale, media } = DEMO.system;
-  const room = DEMO.rooms.find((one) => one.lock !== undefined);
-  const [sedan, suv] = DEMO.cars;
-  assert.ok(proxmox && network && tailscale && media?.movies?.health && room?.lock);
-  assert.ok(sedan && suv);
+  assert.ok(proxmox && network && tailscale && media?.movies?.health);
   const [router, exit] = tailscale.devices.filter((device) => device.essential === true);
   const personal = tailscale.devices.find((device) => device.essential !== true);
   const [guest] = proxmox.guests;
@@ -391,11 +596,6 @@ test("the demo home's Glances show a stopped guest, a device down or offline, th
     ...Object.fromEntries(network.devices.map((device) => [device, 'connected'])),
     ...Object.fromEntries(tailscale.devices.map((device) => [device.connected, 'on'])),
     [media.movies.health]: 'off',
-    [room.lock]: 'locked',
-    [sedan.lock]: 'SECURED',
-    [sedan.alarm]: 'doorsOnly',
-    [suv.lock]: 'LOCKED',
-    [suv.alarm]: 'doorsTiltCabin',
   };
   assert.deepEqual(await demoGlances({ ...calm, [personal.connected]: 'off' }), []);
   const wells = await demoGlances({
@@ -404,9 +604,6 @@ test("the demo home's Glances show a stopped guest, a device down or offline, th
     [switched]: 'heartbeat_missed',
     [exit.connected]: 'off',
     [media.movies.health]: 'on',
-    [room.lock]: 'unlocked',
-    [sedan.alarm]: 'unarmed',
-    [suv.lock]: 'SELECTIVE-LOCKED',
   });
   assert.deepEqual(
     wells.map((well) => [tipOf(well)?.split('\n')[0], text(well.querySelector('.state'))]),
@@ -415,9 +612,6 @@ test("the demo home's Glances show a stopped guest, a device down or offline, th
       ['Network devices down', '1'],
       ['Tailscale offline', '1'],
       ['Media health', '1'],
-      ['Unlocked', '1'],
-      ['Car security', '1'],
-      ['Car security', '1'],
     ],
   );
   assert.ok(wells.every((well) => well.getAttribute('role') === 'button'));

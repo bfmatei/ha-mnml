@@ -6,7 +6,8 @@ import { styleMap } from 'lit/directives/style-map.js';
 
 import type { AgendaCard, AgendaSource } from '../contract/cards.ts';
 import type { MdiIcon } from '../contract/entities.ts';
-import { AGENDA_KINDS } from '../contract/structure.ts';
+import { CARD_STRUCTURES } from '../contract/structure.ts';
+import type { Structure } from '../contract/structure.ts';
 import { SEPARATOR } from '../ha/format.ts';
 import { isUnavailable, stateOf } from '../ha/hass.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
@@ -15,11 +16,11 @@ import { nameOf } from '../ha/names.ts';
 import { UNAVAILABLE } from '../ha/rules.ts';
 import { scrollableAncestors } from '../ha/scroll.ts';
 import { colorStyle, icon, quietly } from '../ha/templates.ts';
+import type { Words } from '../words/en.ts';
+import { wordsFor } from '../words/words.ts';
 
-import { MnmlCard, requireList, requireOneOf, requireString } from './base.ts';
-import type { KeySchema } from './keys.ts';
+import { MnmlCard } from './base.ts';
 import { SECTION_STYLE, section } from './parts/section.ts';
-import { AGENDA_CARD } from './schemas.ts';
 import { BASE_STYLE, CONTROL_STYLE, HEADING_STYLE } from './styles.ts';
 
 const WINDOW_WEEKS = 13;
@@ -120,7 +121,10 @@ interface Row {
   kind: Kind;
   name: string;
   detail?: string;
+  episodes?: number;
 }
+
+type Saying = Words['agenda'];
 
 interface Chunk {
   rows: Row[];
@@ -229,7 +233,8 @@ function fold(releases: Release[]): Row[] {
         at: first.at,
         kind: first.kind,
         name: first.name,
-        detail: `${span(first, last)}${SEPARATOR}${group.length} episodes`,
+        detail: span(first, last),
+        episodes: group.length,
       });
     }
     group = [];
@@ -281,15 +286,15 @@ function dayLabel(language: string, date: Date): string {
   return `${new Intl.DateTimeFormat(language, { weekday: 'short' }).format(date)} ${date.getDate()}`;
 }
 
-function weekLabel(language: string, week: Date, thisWeek: Date): string {
+function weekLabel(language: string, words: Saying, week: Date, thisWeek: Date): string {
   const weeks = Math.round((week.getTime() - thisWeek.getTime()) / WEEK_MS);
   if (weeks === 0) {
-    return 'This week';
+    return words.thisWeek;
   }
   if (weeks === 1) {
-    return 'Next week';
+    return words.nextWeek;
   }
-  return `Week of ${shortDate(language, week)}`;
+  return words.weekOf(shortDate(language, week));
 }
 
 function note(text: string, warning?: true): TemplateResult {
@@ -302,12 +307,16 @@ function note(text: string, warning?: true): TemplateResult {
   </div>`;
 }
 
-function releaseRow(language: string, row: Row): TemplateResult {
+function releaseRow(language: string, words: Saying, row: Row): TemplateResult {
+  const detail =
+    row.episodes === undefined
+      ? row.detail
+      : `${row.detail ?? ''}${SEPARATOR}${words.episodes(row.episodes)}`;
   return html`<div class="release">
     ${icon(row.kind === 'episodes' ? EPISODE_ICON : MOVIE_ICON)}
     <div class="what">
       <div class="name">${row.name}</div>
-      ${row.detail === undefined ? nothing : html`<div class="detail">${row.detail}</div>`}
+      ${detail === undefined ? nothing : html`<div class="detail">${detail}</div>`}
     </div>
     <div class="day">${dayLabel(language, row.at)}</div>
   </div>`;
@@ -324,16 +333,8 @@ export class MnmlAgendaCard extends MnmlCard<AgendaCard> {
   private readonly loaded = new Map<number, Chunk>();
   private readonly loading = new Set<number>();
 
-  protected schema(): KeySchema {
-    return AGENDA_CARD;
-  }
-
-  protected override validate(config: AgendaCard): void {
-    requireList('sources', config.sources);
-    for (const source of config.sources) {
-      requireString('sources entity', source.entity);
-      requireOneOf('sources kind', source.kind, AGENDA_KINDS);
-    }
+  protected structure(): Structure {
+    return CARD_STRUCTURES['custom:mnml-agenda-card'];
   }
 
   private range(today: Date, window: number): [Date, Date] {
@@ -450,7 +451,12 @@ export class MnmlAgendaCard extends MnmlCard<AgendaCard> {
     });
   }
 
-  private more(enough: boolean, today: Date, last: Week | undefined): TemplateResult {
+  private more(
+    words: Saying,
+    enough: boolean,
+    today: Date,
+    last: Week | undefined,
+  ): TemplateResult {
     const next = (): void => {
       this.revealFrom = this.renderRoot.querySelectorAll('.week').length;
       if (enough && last !== undefined) {
@@ -465,18 +471,23 @@ export class MnmlAgendaCard extends MnmlCard<AgendaCard> {
       this.horizon = SEARCH_WINDOWS - 1;
     };
     return html`<div class="more">
-      <button type="button" class="control primary" aria-label="Next" @click=${quietly(next)}>
-        ${icon('mdi:chevron-down')}Next
+      <button
+        type="button"
+        class="control primary"
+        aria-label=${words.next}
+        @click=${quietly(next)}
+      >
+        ${icon('mdi:chevron-down')}${words.next}
       </button>
       ${
         this.shown > 1 || this.horizon > SEARCH_WINDOWS - 1
           ? html`<button
               type="button"
               class="control"
-              aria-label="Back to now"
+              aria-label=${words.now}
               @click=${quietly(back)}
             >
-              ${icon('mdi:chevron-up')}Back to now
+              ${icon('mdi:chevron-up')}${words.now}
             </button>`
           : nothing
       }
@@ -486,6 +497,7 @@ export class MnmlAgendaCard extends MnmlCard<AgendaCard> {
   protected draw(hass: HomeAssistant, config: AgendaCard): TemplateResult {
     const today = startOfDay(new Date());
     const language = hass.locale.language;
+    const words = wordsFor(language).agenda;
     this.sync(hass, config, today);
     const { weeks, failed, missing } = this.plan();
     if (missing !== undefined) {
@@ -497,27 +509,27 @@ export class MnmlAgendaCard extends MnmlCard<AgendaCard> {
     });
     const notes = [
       ...unavailable.map((source) =>
-        note(`${nameOf(hass, source.entity, { label: 'device' })} unavailable`, true),
+        note(words.unavailable(nameOf(hass, source.entity, { label: 'device' })), true),
       ),
-      ...[...failed].map((name) => note(`Couldn't read ${name}`, true)),
+      ...[...failed].map((name) => note(words.unread(name), true)),
     ];
     const visible = weeks.slice(0, this.shown);
     const thisWeek = mondayOf(today);
     const listed = visible.map(
       (week) =>
-        html`<div class="week">${weekLabel(language, week.start, thisWeek)}</div>
-          ${week.rows.map((row) => releaseRow(language, row))}`,
+        html`<div class="week">${weekLabel(language, words, week.start, thisWeek)}</div>
+          ${week.rows.map((row) => releaseRow(language, words, row))}`,
     );
     const enough = visible.length >= this.shown;
     const [, end] = this.range(today, this.horizon);
     const tail =
       missing !== undefined
-        ? note('Loading')
+        ? note(words.loading)
         : enough
           ? nothing
-          : note(`Nothing until ${longDate(language, addDays(end, -1))}`);
+          : note(words.nothingUntil(longDate(language, addDays(end, -1))));
     const card = html`<div class="card agenda">
-      ${notes}${listed}${tail}${this.more(enough, today, visible.at(-1))}
+      ${notes}${listed}${tail}${this.more(words, enough, today, visible.at(-1))}
     </div>`;
     return section(card, config.title, config.icon);
   }

@@ -1,4 +1,5 @@
-import type { Palette, Theme, Tint } from './model.ts';
+import type { Hex, Palette, Theme } from './model.ts';
+import { fieldOf, mix } from './theme.ts';
 
 interface Claim {
   what: string;
@@ -27,19 +28,9 @@ function ratio(fore: string, back: string): number {
   return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
 }
 
-function mix(front: Tint, back: string): string {
-  const top = Number.parseInt(front.color.slice(1), 16);
-  const bottom = Number.parseInt(back.slice(1), 16);
-  const part = (shift: number): string =>
-    Math.round(front.alpha * ((top >> shift) & 255) + (1 - front.alpha) * ((bottom >> shift) & 255))
-      .toString(16)
-      .padStart(2, '0');
-  return `#${part(16)}${part(8)}${part(0)}`;
-}
-
-function backdrops(palette: Palette): [string, string][] {
+function backdrops(palette: Palette): [string, Hex][] {
   const { base, glows } = palette.material;
-  const behind: [string, string][] = [
+  const behind: [string, Hex][] = [
     ['page', palette.page],
     [`the ${base.from} start of the base`, base.from],
     [`the ${base.to} end of the base`, base.to],
@@ -60,7 +51,7 @@ function materialClaims(mode: string, palette: Palette): Claim[] {
     green: palette.green,
     blue: palette.blue,
   };
-  const icons: Record<string, Palette['red']> = { ...accents, purple: palette.purple };
+  const icons: Record<string, Hex> = { ...accents, purple: palette.purple };
   const claims: Claim[] = [];
   for (const [where, behind] of backdrops(palette)) {
     const card = mix(material.card, behind);
@@ -93,6 +84,12 @@ function materialClaims(mode: string, palette: Palette): Claim[] {
         fore: palette.icon,
         back: lifted,
         least: 3,
+      },
+      {
+        what: `${mode}: a pill in a section of a pop-up over ${where}`,
+        fore: lifted,
+        back: well,
+        least: 1.15,
       },
       { what: `${mode}: a heading over ${where}`, fore: palette.dimmed, back: behind, least: 4.5 },
       {
@@ -161,7 +158,29 @@ function paletteClaims(mode: string, palette: Palette): Claim[] {
     blue: palette.blue,
   };
   const surfaces = { page: palette.page, card: palette.card };
+  const field = fieldOf(palette);
+  const fields = { resting: field.background, hovered: field.hover };
   return [
+    ...Object.entries(fields).flatMap(([state, hex]) => [
+      {
+        what: `${mode}: text in a ${state} form field`,
+        fore: palette.text,
+        back: hex,
+        least: 7,
+      },
+      {
+        what: `${mode}: a label in a ${state} form field`,
+        fore: palette.dimmed,
+        back: hex,
+        least: 4.5,
+      },
+    ]),
+    {
+      what: `${mode}: a switch's thumb on its track`,
+      fore: palette.icon,
+      back: field.background,
+      least: 3,
+    },
     ...Object.entries(accents).map(([name, hex]) => ({
       what: `${mode}: ${name} as a value on the card`,
       fore: hex,

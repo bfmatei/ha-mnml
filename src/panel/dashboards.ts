@@ -4,6 +4,8 @@ import { property } from 'lit/decorators.js';
 
 import type { MdiIcon } from '../contract/entities.ts';
 import { icon } from '../ha/templates.ts';
+import { PANEL_EN } from '../words/panel/en.ts';
+import type { PanelWords } from '../words/panel/en.ts';
 
 import type { Board, Built } from './building.ts';
 import { PANEL_STYLE } from './style.ts';
@@ -22,10 +24,6 @@ export interface DashboardActions {
 export interface DashboardRow {
   built: Built;
   board: Board | undefined;
-}
-
-function when(updated: string | undefined): string {
-  return updated === undefined ? '' : ` on ${new Date(updated).toLocaleString()}`;
 }
 
 function button(name: MdiIcon, label: string, run: () => void): TemplateResult {
@@ -87,27 +85,25 @@ export class MnmlDashboards extends LitElement {
 
   @property({ attribute: false }) rows: readonly DashboardRow[] = [];
   @property({ attribute: false }) actions: DashboardActions | undefined;
+  @property({ attribute: false }) words: PanelWords = PANEL_EN;
 
   private drawStart(actions: DashboardActions | undefined): TemplateResult {
+    const said = this.words.boards;
     return html`<div class="start">
       ${icon('mdi:view-dashboard-edit-outline')}
       <div class="start-words">
-        <h2>Build your dashboard</h2>
-        <p>
-          MNML makes a dashboard from your home: a tile for each room it finds something in, one for
-          each person, and the system cards it finds the entities of. Start at once, or choose what
-          goes in step by step. Either way, Edit changes it later.
-        </p>
+        <h2>${said.build}</h2>
+        <p>${said.about}</p>
       </div>
       <div class="start-actions">
         <button type="button" class="action primary" @click=${() => actions?.quickStart()}>
-          ${icon('mdi:flash-outline')}<span>Quick start</span>
+          ${icon('mdi:flash-outline')}<span>${said.quickStart}</span>
         </button>
         <button type="button" class="action" @click=${() => actions?.stepByStep()}>
-          ${icon('mdi:format-list-checks')}<span>Step by step</span>
+          ${icon('mdi:format-list-checks')}<span>${said.stepByStep}</span>
         </button>
         <button type="button" class="action" @click=${() => actions?.fromTemplate()}>
-          ${icon('mdi:file-import-outline')}<span>From a template</span>
+          ${icon('mdi:file-import-outline')}<span>${said.fromTemplate}</span>
         </button>
       </div>
     </div>`;
@@ -116,12 +112,13 @@ export class MnmlDashboards extends LitElement {
   private drawRow(row: DashboardRow, actions: DashboardActions | undefined): TemplateResult {
     const { built, board } = row;
     const title = board?.title ?? built.plan.title;
+    const said = this.words.boards;
     return html`<div class="library-row">
       <button
         type="button"
         class="library-open"
-        aria-label=${`Edit ${title}`}
-        title=${`Edit ${title}`}
+        aria-label=${said.edit(title)}
+        title=${said.edit(title)}
         @click=${() => actions?.edit(built)}
       >
         <span class="library-icon">${icon(built.plan.icon)}</span>
@@ -133,39 +130,42 @@ export class MnmlDashboards extends LitElement {
           <span class="library-description"
             >${
               board === undefined
-                ? 'No longer in Home Assistant: Edit makes it again.'
-                : `Built${when(built.updated)}.`
+                ? said.gone
+                : built.updated === undefined
+                  ? said.built
+                  : said.builtOn(new Date(built.updated).toLocaleString())
             }</span
           >
         </span>
       </button>
       <span class="row-actions">
-        ${board === undefined ? nothing : button('mdi:open-in-new', `Open ${title}`, () => actions?.open(built))}
+        ${board === undefined ? nothing : button('mdi:open-in-new', said.open(title), () => actions?.open(built))}
         ${
           built.previous === undefined || board === undefined
             ? nothing
-            : button('mdi:undo', `Undo the last rebuild of ${title}`, () => actions?.undo(built))
+            : button('mdi:undo', said.undo(title), () => actions?.undo(built))
         }
-        ${button('mdi:share-variant', `Share ${title}`, () => actions?.share(built))}
-        ${button('mdi:delete-outline', `Forget ${title}`, () => actions?.forget(built))}
+        ${button('mdi:share-variant', said.share(title), () => actions?.share(built))}
+        ${button('mdi:delete-outline', said.forget(title), () => actions?.forget(built))}
       </span>
     </div>`;
   }
 
   protected override render(): TemplateResult {
     const actions = this.actions;
+    const said = this.words.boards;
     return html`<div class="library">
       <div class="library-head">
-        <h1>Dashboards</h1>
+        <h1>${said.heading}</h1>
         ${
           this.rows.length === 0
             ? nothing
             : html`<div class="library-tools">
                 <button type="button" class="action" @click=${() => actions?.fromTemplate()}>
-                  ${icon('mdi:file-import-outline')}<span>From a template</span>
+                  ${icon('mdi:file-import-outline')}<span>${said.fromTemplate}</span>
                 </button>
                 <button type="button" class="action primary" @click=${() => actions?.stepByStep()}>
-                  ${icon('mdi:plus')}<span>Build another</span>
+                  ${icon('mdi:plus')}<span>${said.another}</span>
                 </button>
               </div>`
         }

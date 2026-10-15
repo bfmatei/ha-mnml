@@ -30,6 +30,16 @@ template:
             {%- else -%}
               {{- [] -}}
             {%- endif -%}
+          alerts: >-
+            {%- set kept = this.attributes.messages | default([]) -%}
+            {%- if trigger.id == 'add' -%}
+              {%- set listed = ([{'severity': trigger.event.data.severity | default('') | string}] + kept)[:20] -%}
+            {%- elif trigger.event.data.id | default('') -%}
+              {%- set listed = kept | rejectattr('id', 'eq', trigger.event.data.id) | list -%}
+            {%- else -%}
+              {%- set listed = [] -%}
+            {%- endif -%}
+            {{- listed | selectattr('severity', 'in', ['warning', 'error']) | list | count -}}
 
 script:
   clear_messages:

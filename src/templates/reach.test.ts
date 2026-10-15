@@ -34,7 +34,9 @@ function popup(template: string, slots: Mapping, hash: string): Mapping[] {
 }
 
 const row = (cards: Mapping[], entity: string): Mapping | undefined =>
-  cards.find((each) => each['entity'] === entity && each['type'] === undefined);
+  cards.find(
+    (each) => each['entity'] === entity && each['type'] === undefined && each['icon'] !== true,
+  );
 
 test("a room's battery thresholds reach the batteries of its pop-up and of its heating pop-up", () => {
   const slots = {

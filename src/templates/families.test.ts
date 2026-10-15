@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 
 import { test } from 'vitest';
 
-import { COMMON, OWNER, SHAPES, loadFamily } from './families.ts';
+import { COMMON, OWNER, SIZES, loadFamily } from './families.ts';
+import { familyTitle } from './family-titles.ts';
 import { SHIPPED } from './shipped.ts';
 
 test('common holds the shared fragments, and every other shipped template belongs to one family', () => {
@@ -17,6 +18,16 @@ test('common holds the shared fragments, and every other shipped template belong
   );
 });
 
+test('every family has a title in plain words, and the common one too', () => {
+  const families = [...new Set(['common', ...Object.values(OWNER)])];
+  assert.deepEqual(
+    families.filter((family) => familyTitle(family) === family),
+    [],
+  );
+  assert.equal(familyTitle('3d-printer'), '3D printer');
+  assert.equal(familyTitle('garden'), 'garden');
+});
+
 test('a family loads its own templates, as the shipped ones', async () => {
   const room = await loadFamily('room');
   assert.deepEqual(Object.keys(room).toSorted(), ['room', 'room-media-card', 'room-popup']);
@@ -24,15 +35,15 @@ test('a family loads its own templates, as the shipped ones', async () => {
 });
 
 test('the index carries the literal type and grid size of each family template, for sizing before it loads', () => {
-  assert.deepEqual(SHAPES['select-card'], { type: 'custom:mnml-select-card' });
-  assert.deepEqual(SHAPES['room'], {
+  assert.deepEqual(SIZES['select-card'], { type: 'custom:mnml-select-card' });
+  assert.deepEqual(SIZES['room'], {
     type: 'custom:mnml-tile-card',
     grid_options: { columns: 12 },
   });
   assert.equal(
-    SHAPES['room-popup'],
+    SIZES['room-popup'],
     undefined,
     'a template whose card is not a literal card has none',
   );
-  assert.equal(SHAPES['section-heading'], undefined, 'a common template needs none');
+  assert.equal(SIZES['section-heading'], undefined, 'a common template needs none');
 });

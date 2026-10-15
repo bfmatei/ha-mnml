@@ -1,0 +1,259 @@
+{
+  "valid": [
+    {
+      "why": "a set of a key to a value",
+      "change": { "op": "set", "path": ["card"], "key": "name", "value": "Hall", "base": "b" }
+    },
+    {
+      "why": "a set to null",
+      "change": { "op": "set", "path": ["card"], "key": "name", "value": null, "base": "b" }
+    },
+    {
+      "why": "a set of a mapping, at the template itself",
+      "change": { "op": "set", "path": [], "key": "card", "value": { "type": "x" }, "base": "b" }
+    },
+    {
+      "why": "a set inside a part",
+      "change": {
+        "op": "set",
+        "path": ["card", "chips?", "#lock"],
+        "key": "color",
+        "value": "amber",
+        "base": "0123456789abcdef"
+      }
+    },
+    {
+      "why": "a remove of a key",
+      "change": { "op": "remove", "path": ["card", "name"], "base": "b" }
+    },
+    {
+      "why": "a remove of a part",
+      "change": { "op": "remove", "path": ["card", "chips?", "#lock"], "base": "b" }
+    },
+    {
+      "why": "a remove of the pop-ups",
+      "change": { "op": "remove", "path": ["popups"], "base": "b" }
+    },
+    {
+      "why": "an insert after a part",
+      "change": {
+        "op": "insert",
+        "path": ["card", "chips?"],
+        "after": "lock",
+        "value": { "id": "door" },
+        "base": "b"
+      }
+    },
+    {
+      "why": "an insert first, of a part with keys of its own",
+      "change": {
+        "op": "insert",
+        "path": ["card", "chips?"],
+        "after": null,
+        "value": { "id": "my-door", "type": "indicator", "color": "orange" },
+        "base": "b"
+      }
+    },
+    {
+      "why": "a move first",
+      "change": { "op": "move", "path": ["card", "chips?"], "id": "ac", "after": null, "base": "b" }
+    },
+    {
+      "why": "a move after another part",
+      "change": {
+        "op": "move",
+        "path": ["card", "chips?"],
+        "id": "ac",
+        "after": "lock",
+        "base": "b"
+      }
+    },
+    {
+      "why": "an empty base, as a change worked out before its base",
+      "change": { "op": "remove", "path": ["card", "name"], "base": "" }
+    }
+  ],
+  "invalid": [
+    { "why": "no mapping", "change": null },
+    { "why": "a list", "change": [{ "op": "remove", "path": ["card", "name"], "base": "b" }] },
+    { "why": "no op", "change": { "path": ["card", "name"], "base": "b" } },
+    {
+      "why": "an unknown op",
+      "change": { "op": "rename", "path": ["card"], "id": "ac", "after": null, "base": "b" }
+    },
+    { "why": "no path", "change": { "op": "remove", "base": "b" } },
+    { "why": "a path that is no list", "change": { "op": "remove", "path": "card", "base": "b" } },
+    {
+      "why": "a path with a number in it",
+      "change": { "op": "remove", "path": ["card", 0], "base": "b" }
+    },
+    { "why": "no base", "change": { "op": "remove", "path": ["card", "name"] } },
+    {
+      "why": "a base that is no string",
+      "change": { "op": "remove", "path": ["card", "name"], "base": 1 }
+    },
+    {
+      "why": "a set without its key",
+      "change": { "op": "set", "path": ["card"], "value": "x", "base": "b" }
+    },
+    {
+      "why": "a set without its value",
+      "change": { "op": "set", "path": ["card"], "key": "name", "base": "b" }
+    },
+    {
+      "why": "a set with an id",
+      "change": {
+        "op": "set",
+        "path": ["card"],
+        "key": "name",
+        "value": "x",
+        "id": "ac",
+        "base": "b"
+      }
+    },
+    {
+      "why": "a set with a key of no change",
+      "change": {
+        "op": "set",
+        "path": ["card"],
+        "key": "name",
+        "value": "x",
+        "note": "mine",
+        "base": "b"
+      }
+    },
+    {
+      "why": "a set through __proto__",
+      "change": {
+        "op": "set",
+        "path": ["__proto__"],
+        "key": "polluted",
+        "value": true,
+        "base": "b"
+      }
+    },
+    {
+      "why": "a set of constructor",
+      "change": { "op": "set", "path": ["card"], "key": "constructor", "value": true, "base": "b" }
+    },
+    {
+      "why": "a set of an empty key",
+      "change": { "op": "set", "path": ["card"], "key": "", "value": true, "base": "b" }
+    },
+    { "why": "a remove of the template", "change": { "op": "remove", "path": [], "base": "b" } },
+    { "why": "a remove of the card", "change": { "op": "remove", "path": ["card"], "base": "b" } },
+    {
+      "why": "a remove with an empty segment",
+      "change": { "op": "remove", "path": ["card", ""], "base": "b" }
+    },
+    {
+      "why": "a remove with a value",
+      "change": { "op": "remove", "path": ["card", "name"], "value": "x", "base": "b" }
+    },
+    {
+      "why": "an insert of no mapping",
+      "change": {
+        "op": "insert",
+        "path": ["card", "chips?"],
+        "after": null,
+        "value": "chip",
+        "base": "b"
+      }
+    },
+    {
+      "why": "an insert of a part without an id",
+      "change": {
+        "op": "insert",
+        "path": ["card", "chips?"],
+        "after": null,
+        "value": { "type": "indicator" },
+        "base": "b"
+      }
+    },
+    {
+      "why": "an insert of a part with an empty id",
+      "change": {
+        "op": "insert",
+        "path": ["card", "chips?"],
+        "after": null,
+        "value": { "id": "" },
+        "base": "b"
+      }
+    },
+    {
+      "why": "an insert without after",
+      "change": {
+        "op": "insert",
+        "path": ["card", "chips?"],
+        "value": { "id": "door" },
+        "base": "b"
+      }
+    },
+    {
+      "why": "an insert after an empty id",
+      "change": {
+        "op": "insert",
+        "path": ["card", "chips?"],
+        "after": "",
+        "value": { "id": "door" },
+        "base": "b"
+      }
+    },
+    {
+      "why": "an insert after __proto__",
+      "change": {
+        "op": "insert",
+        "path": ["card", "chips?"],
+        "after": "__proto__",
+        "value": { "id": "door" },
+        "base": "b"
+      }
+    },
+    {
+      "why": "an insert with a key",
+      "change": {
+        "op": "insert",
+        "path": ["card", "chips?"],
+        "after": null,
+        "value": { "id": "door" },
+        "key": "chips",
+        "base": "b"
+      }
+    },
+    {
+      "why": "a move without its id",
+      "change": { "op": "move", "path": ["card", "chips?"], "after": null, "base": "b" }
+    },
+    {
+      "why": "a move without after",
+      "change": { "op": "move", "path": ["card", "chips?"], "id": "ac", "base": "b" }
+    },
+    {
+      "why": "a move after a number",
+      "change": { "op": "move", "path": ["card", "chips?"], "id": "ac", "after": 3, "base": "b" }
+    },
+    {
+      "why": "a move after an empty id",
+      "change": { "op": "move", "path": ["card", "chips?"], "id": "ac", "after": "", "base": "b" }
+    },
+    {
+      "why": "a move of an empty id",
+      "change": { "op": "move", "path": ["card", "chips?"], "id": "", "after": null, "base": "b" }
+    },
+    {
+      "why": "a move after itself",
+      "change": { "op": "move", "path": ["card", "chips?"], "id": "ac", "after": "ac", "base": "b" }
+    },
+    {
+      "why": "a move with a value",
+      "change": {
+        "op": "move",
+        "path": ["card", "chips?"],
+        "id": "ac",
+        "after": null,
+        "value": { "id": "ac" },
+        "base": "b"
+      }
+    }
+  ]
+}

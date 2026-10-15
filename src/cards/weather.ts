@@ -4,15 +4,16 @@ import { state } from 'lit/decorators.js';
 
 import type { WeatherCard } from '../contract/cards.ts';
 import type { MdiIcon } from '../contract/entities.ts';
+import { CARD_STRUCTURES } from '../contract/structure.ts';
+import type { Structure } from '../contract/structure.ts';
 import { formatAttribute } from '../ha/format.ts';
 import { stateOf } from '../ha/hass.ts';
 import type { HassEntity, HomeAssistant } from '../ha/hass.ts';
 import { icon } from '../ha/templates.ts';
+import { wordsFor } from '../words/words.ts';
 
-import { MnmlCard, requireString } from './base.ts';
-import type { KeySchema } from './keys.ts';
+import { MnmlCard } from './base.ts';
 import { SECTION_STYLE, section } from './parts/section.ts';
-import { WEATHER_CARD } from './schemas.ts';
 import { BASE_STYLE, HEADING_STYLE } from './styles.ts';
 
 const WEATHER_STYLE = css`
@@ -101,8 +102,6 @@ const WEATHER_STYLE = css`
   }
 `;
 
-const DEFAULT_TITLE = 'Weather';
-
 const DEFAULT_ICON: MdiIcon = 'mdi:weather-partly-cloudy';
 
 const FALLBACK_ICON: MdiIcon = 'mdi:weather-cloudy';
@@ -137,19 +136,18 @@ const CONDITIONS: Readonly<Record<string, MdiIcon>> = {
 
 interface Fact {
   attribute: string;
-  label: string;
   icon: MdiIcon;
 }
 
 const FACTS: readonly Fact[] = [
-  { attribute: 'apparent_temperature', label: 'Feels like', icon: 'mdi:thermometer' },
-  { attribute: 'humidity', label: 'Humidity', icon: 'mdi:water-percent' },
-  { attribute: 'wind_speed', label: 'Wind', icon: 'mdi:weather-windy' },
-  { attribute: 'pressure', label: 'Pressure', icon: 'mdi:gauge' },
-  { attribute: 'uv_index', label: 'UV index', icon: 'mdi:white-balance-sunny' },
-  { attribute: 'dew_point', label: 'Dew point', icon: 'mdi:water-thermometer-outline' },
-  { attribute: 'cloud_coverage', label: 'Clouds', icon: 'mdi:cloud-outline' },
-  { attribute: 'visibility', label: 'Visibility', icon: 'mdi:eye-outline' },
+  { attribute: 'apparent_temperature', icon: 'mdi:thermometer' },
+  { attribute: 'humidity', icon: 'mdi:water-percent' },
+  { attribute: 'wind_speed', icon: 'mdi:weather-windy' },
+  { attribute: 'pressure', icon: 'mdi:gauge' },
+  { attribute: 'uv_index', icon: 'mdi:white-balance-sunny' },
+  { attribute: 'dew_point', icon: 'mdi:water-thermometer-outline' },
+  { attribute: 'cloud_coverage', icon: 'mdi:cloud-outline' },
+  { attribute: 'visibility', icon: 'mdi:eye-outline' },
 ];
 
 interface Step {
@@ -188,7 +186,7 @@ function whenOf(language: string, step: Step, kind: Kind): string {
     );
   }
   if (step.at.toDateString() === new Date().toDateString()) {
-    return 'Today';
+    return wordsFor(language).weather.today;
   }
   return new Intl.DateTimeFormat(language, { weekday: 'long' }).format(step.at);
 }
@@ -208,12 +206,8 @@ export class MnmlWeatherCard extends MnmlCard<WeatherCard> {
   private subscribed = '';
   private unfollow: (() => void) | undefined;
 
-  protected schema(): KeySchema {
-    return WEATHER_CARD;
-  }
-
-  protected override validate(config: WeatherCard): void {
-    requireString('entity', config.entity);
+  protected structure(): Structure {
+    return CARD_STRUCTURES['custom:mnml-weather-card'];
   }
 
   override connectedCallback(): void {
@@ -284,7 +278,8 @@ export class MnmlWeatherCard extends MnmlCard<WeatherCard> {
         ? []
         : [
             html`<div class="fact">
-              ${icon(fact.icon)}<span class="label">${fact.label}</span
+              ${icon(fact.icon)}<span class="label"
+                >${hass.formatEntityAttributeName(stateObj, fact.attribute)}</span
               ><span class="value">${value}</span>
             </div>`,
           ];
@@ -323,7 +318,7 @@ export class MnmlWeatherCard extends MnmlCard<WeatherCard> {
               </div>`
         }
       </div>`,
-      config.title ?? DEFAULT_TITLE,
+      config.title ?? wordsFor(language).weather.title,
       DEFAULT_ICON,
     );
   }

@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 
 import { test } from 'vitest';
 
-import { define, mounted } from '../test/render.ts';
+import type { HomeAssistant } from '../ha/hass.ts';
+import { fakeHass } from '../test/hass.ts';
+import type { FakeState, ServiceCall } from '../test/hass.ts';
+import { configure, define, mounted } from '../test/render.ts';
 
 import { MnmlSelectCard } from './select.ts';
 
@@ -18,21 +21,21 @@ test('a mode attribute the select card does not know is an error card that lists
   const made = card();
   const select = { type: 'custom:mnml-select-card', entity: 'climate.a' };
   assert.throws(() => {
-    made.setConfig({ ...select, attribute: 'hvac_mode' } as never);
+    configure(made, { ...select, attribute: 'hvac_mode' });
   }, /attribute must be one of hvac_modes, preset_modes/);
   assert.doesNotThrow(() => {
-    made.setConfig({ ...select, attribute: 'preset_modes' } as never);
+    configure(made, { ...select, attribute: 'preset_modes' });
   });
 });
 
 test("a select over an entity takes none of the scenes form's keys", () => {
   const made = card();
   assert.throws(() => {
-    made.setConfig({
+    configure(made, {
       type: 'custom:mnml-select-card',
       entity: 'select.a',
       active_scene: 'select.b',
-    } as never);
+    });
   }, /unknown key: active_scene/);
 });
 
@@ -43,35 +46,6 @@ if (typeof HTMLElement.prototype.showPopover !== 'function') {
   });
 }
 
-interface Call {
-  domain: string;
-  service: string;
-  data: unknown;
-  target: unknown;
-}
-
-function recorder(states: Record<string, unknown>, calls: Call[]): unknown {
-  return {
-    states,
-    entities: {},
-    devices: {},
-    locale: { language: 'en' },
-    formatEntityState: (stateObj: { state: string }, state?: string): string =>
-      state ?? stateObj.state,
-    formatEntityAttributeValue: (_stateObj: unknown, _name: string, value: unknown): string =>
-      String(value),
-    callService: (
-      domain: string,
-      service: string,
-      data: unknown,
-      target: unknown,
-    ): Promise<unknown> => {
-      calls.push({ domain, service, data, target });
-      return Promise.resolve();
-    },
-  };
-}
-
 const OPTIONS = {
   'select.a': {
     entity_id: 'select.a',
@@ -80,10 +54,10 @@ const OPTIONS = {
   },
 };
 
-async function painted(config: unknown, hass: unknown): Promise<ShadowRoot> {
+async function painted(config: unknown, hass: HomeAssistant): Promise<ShadowRoot> {
   const made = card();
-  made.setConfig(config as never);
-  made.hass = hass as never;
+  configure(made, config);
+  made.hass = hass;
   return mounted(made);
 }
 
@@ -103,7 +77,7 @@ function choose(root: ShadowRoot, label: string): void {
 test('tapping the trigger of an open menu closes it, and tapping it again opens it', async () => {
   const root = await painted(
     { type: 'custom:mnml-select-card', entity: 'select.a' },
-    recorder(OPTIONS, []),
+    fakeHass({ states: OPTIONS }),
   );
   const arrow = root.querySelector('button.control');
   const row = root.querySelector('.card.select');
@@ -122,10 +96,10 @@ test('tapping the trigger of an open menu closes it, and tapping it again opens 
 });
 
 test('an option chosen from a select menu selects it on the entity', async () => {
-  const calls: Call[] = [];
+  const calls: ServiceCall[] = [];
   const root = await painted(
     { type: 'custom:mnml-select-card', entity: 'select.a' },
-    recorder(OPTIONS, calls),
+    fakeHass({ states: OPTIONS, calls }),
   );
   const arrow = root.querySelector('button.control');
   assert.ok(arrow);
@@ -143,8 +117,8 @@ test('an option chosen from a select menu selects it on the entity', async () =>
 });
 
 test('a mode chosen from a climate menu sets that mode, through the hass of the moment', async () => {
-  const drawn: Call[] = [];
-  const now: Call[] = [];
+  const drawn: ServiceCall[] = [];
+  const now: ServiceCall[] = [];
   const states = {
     'climate.a': {
       entity_id: 'climate.a',
@@ -153,17 +127,17 @@ test('a mode chosen from a climate menu sets that mode, through the hass of the 
     },
   };
   const made = card();
-  made.setConfig({
+  configure(made, {
     type: 'custom:mnml-select-card',
     entity: 'climate.a',
     attribute: 'hvac_modes',
-  } as never);
-  made.hass = recorder(states, drawn) as never;
+  });
+  made.hass = fakeHass({ states, calls: drawn });
   const root = await mounted(made);
   const arrow = root.querySelector('button.control');
   assert.ok(arrow);
   tap(arrow);
-  made.hass = recorder(states, now) as never;
+  made.hass = fakeHass({ states, calls: now });
   choose(root, 'cool');
   assert.deepEqual(drawn, [], 'not the hass the menu was drawn with');
   assert.deepEqual(now, [
@@ -177,12 +151,12 @@ test('a mode chosen from a climate menu sets that mode, through the hass of the 
   made.remove();
 });
 
-function scene(id: string, name: string): [string, unknown] {
-  return [id, { entity_id: id, state: 'unknown', attributes: { friendly_name: name } }];
+function scene(id: string, name: string): [string, FakeState] {
+  return [id, { attributes: { friendly_name: name } }];
 }
 
 test('a scene chosen from a scenes menu turns that scene on', async () => {
-  const calls: Call[] = [];
+  const calls: ServiceCall[] = [];
   const root = await painted(
     {
       type: 'custom:mnml-select-card',
@@ -190,10 +164,10 @@ test('a scene chosen from a scenes menu turns that scene on', async () => {
       name: 'Scenes',
       icon: 'mdi:palette',
     },
-    recorder(
-      Object.fromEntries([scene('scene.read', 'Read'), scene('scene.relax', 'Relax')]),
+    fakeHass({
+      states: Object.fromEntries([scene('scene.read', 'Read'), scene('scene.relax', 'Relax')]),
       calls,
-    ),
+    }),
   );
   const arrow = root.querySelector('button.control');
   assert.ok(arrow);

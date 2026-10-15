@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 
 import { test } from 'vitest';
 
+import { pathLabel } from '../contract/templates.ts';
 import type { Template } from '../contract/templates.ts';
+import { fakeHass } from '../test/hass.ts';
 
 import {
   automateField,
@@ -12,10 +14,9 @@ import {
   resolvedEntity,
   setPreview,
   slotIn,
-  slotLabel,
 } from './binding.ts';
 import { readableOf } from './data.ts';
-import { chainTo, partOf } from './outline.ts';
+import { chainTo, outlinePart } from './outline.ts';
 
 const TEMPLATE: Template = {
   slots: {
@@ -50,7 +51,7 @@ const TEMPLATES = {
 function part(key: string) {
   const card = TEMPLATE.card;
   assert.ok(typeof card === 'object' && card !== null && !Array.isArray(card));
-  const found = chainTo(partOf(card, ['card'], undefined, 0), key).at(-1);
+  const found = chainTo(outlinePart(card, ['card'], undefined, 0), key).at(-1);
   assert.ok(found, key);
   return found;
 }
@@ -63,8 +64,8 @@ test('a slot named whole in a value is the slot, and nothing else is', () => {
 });
 
 test('a slot is named by its label, or else by its name, and says whether it finds itself', () => {
-  assert.equal(slotLabel(TEMPLATE, 'temperature'), 'Temperature sensor');
-  assert.equal(slotLabel(TEMPLATE, 'lights.group'), 'Lights group');
+  assert.equal(pathLabel(TEMPLATE.slots, 'temperature'), 'Temperature sensor');
+  assert.equal(pathLabel(TEMPLATE.slots, 'lights.group'), 'Lights: Group');
   assert.equal(findsItself(TEMPLATE, 'temperature'), true);
   assert.equal(findsItself(TEMPLATE, 'lights.group'), false);
 });
@@ -118,9 +119,9 @@ test('always this one writes the entity in place of the slot', () => {
 test('finding it in every room makes a slot with a rule from the entity, and binds the field to it', () => {
   const [field] = dataFields(part('card/state/#door'), TEMPLATE, TEMPLATES);
   assert.ok(field);
-  const hass = {
+  const hass = fakeHass({
     states: { 'binary_sensor.door': { attributes: { device_class: 'door' } } },
-  } as never;
+  });
   const made = automateField(TEMPLATE, field, 'binary_sensor.door', hass);
   assert.deepEqual(made.slots?.['door'], {
     kind: 'entity',
@@ -133,7 +134,7 @@ test('finding it in every room makes a slot with a rule from the entity, and bin
     (() => {
       const card = made.card;
       assert.ok(typeof card === 'object' && card !== null && !Array.isArray(card));
-      const found = chainTo(partOf(card, ['card'], undefined, 0), 'card/state/#door').at(-1);
+      const found = chainTo(outlinePart(card, ['card'], undefined, 0), 'card/state/#door').at(-1);
       assert.ok(found);
       return found;
     })(),

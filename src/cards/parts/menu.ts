@@ -3,7 +3,8 @@ import type { TemplateResult } from 'lit';
 import { classMap } from 'lit/directives/class-map.js';
 
 import type { ModeAttribute } from '../../contract/cards.ts';
-import type { EntityId, MdiIcon, SceneId, SelectId } from '../../contract/entities.ts';
+import type { EntityId, MdiIcon, SceneId, SelectId, TimerId } from '../../contract/entities.ts';
+import { rightToLeft } from '../../ha/direction.ts';
 import { formatAttribute } from '../../ha/format.ts';
 import {
   callService,
@@ -16,6 +17,7 @@ import {
 import type { HassEntity, HomeAssistant } from '../../ha/hass.ts';
 import { entityName } from '../../ha/names.ts';
 import { attributeIcon, icon, stateIcon } from '../../ha/templates.ts';
+import { clock } from '../../ha/timer.ts';
 import type { Host } from '../base.ts';
 
 import { dismissable } from './overlay.ts';
@@ -53,7 +55,7 @@ export const MENU_STYLE = css`
     background: transparent;
     color: inherit;
     font: inherit;
-    text-align: left;
+    text-align: start;
     cursor: pointer;
     white-space: nowrap;
     transition: background-color 120ms ease-out;
@@ -141,7 +143,8 @@ export function modeChoice(
         return SWING_WITH_ICON.has(value)
           ? attributeIcon(hass, stateObj, single, value)
           : undefined;
-      default:
+      case 'fan_modes':
+      case 'swing_horizontal_modes':
         return undefined;
     }
   };
@@ -168,6 +171,20 @@ export function optionChoice(hass: HomeAssistant, entity: EntityId, stateObj: Ha
     currentIcon: () => undefined,
     select: (value, now) =>
       callService(now ?? hass, entity, 'select.select_option', { option: value }),
+  };
+}
+
+export function presetChoice(
+  hass: HomeAssistant,
+  entity: TimerId,
+  presets: readonly number[],
+): Choice {
+  return {
+    options: presets.map((seconds) => ({ value: String(seconds), label: clock(seconds) })),
+    current: undefined,
+    currentIcon: () => undefined,
+    select: (value, now) =>
+      callService(now ?? hass, entity, 'timer.start', { duration: Number(value) }),
   };
 }
 
@@ -298,7 +315,8 @@ export function openMenu(
   menu.style.maxHeight = `${rows * ROW + PADDING}px`;
   const width = menu.offsetWidth;
   const height = menu.offsetHeight;
-  menu.style.left = `${Math.max(EDGE, Math.min(rect.right - width, window.innerWidth - width - EDGE))}px`;
+  const hung = rightToLeft(anchor) ? rect.left : rect.right - width;
+  menu.style.left = `${Math.max(EDGE, Math.min(hung, window.innerWidth - width - EDGE))}px`;
   menu.style.top = `${downwards ? rect.bottom + GAP : rect.top - height - GAP}px`;
   if (selected !== undefined) {
     menu.scrollTop = selected.offsetTop - (menu.clientHeight - selected.offsetHeight) / 2;

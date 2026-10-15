@@ -59,7 +59,7 @@ export function readFamily(family: string, dir: string = DIR): Templates {
   return found;
 }
 
-export function shapeOf(template: Template): Value | undefined {
+export function sizeOf(template: Template): Value | undefined {
   const card = template.card;
   if (!isMapping(card) || typeof card['type'] !== 'string' || card['type'].includes('[[')) {
     return undefined;

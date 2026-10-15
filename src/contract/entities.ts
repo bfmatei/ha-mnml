@@ -23,9 +23,21 @@ type Domain =
   | 'cover'
   | 'fan'
   | 'humidifier'
-  | 'alarm_control_panel';
+  | 'alarm_control_panel'
+  | 'schedule'
+  | 'timer';
 
 export type EntityId<D extends Domain = Domain> = `${D}.${string}`;
+
+const DOTTED = /^[a-z_]+\.[a-z0-9_]+$/;
+
+export function isEntityId(value: unknown): value is string {
+  return typeof value === 'string' && DOTTED.test(value);
+}
+
+export function isLooseEntityId(value: unknown): value is string {
+  return typeof value === 'string' && value.includes('.');
+}
 
 export type LightId = EntityId<'light'>;
 export type SensorId = EntityId<'sensor'>;
@@ -52,10 +64,23 @@ export type CoverId = EntityId<'cover'>;
 export type FanId = EntityId<'fan'>;
 export type HumidifierId = EntityId<'humidifier'>;
 export type AlarmPanelId = EntityId<'alarm_control_panel'>;
+export type ScheduleId = EntityId<'schedule'>;
+export type TimerId = EntityId<'timer'>;
 
 export type MdiIcon = `mdi:${string}`;
+
+const ICON = /^mdi:[a-z0-9-]+$/;
+
+export function isIcon(value: unknown): value is MdiIcon {
+  return typeof value === 'string' && ICON.test(value);
+}
+
 export type PopupHash = `#${string}`;
 export type Subnet = `${number}.${number}.${number}.${number}/${number}`;
+
+export function isService(value: unknown): value is string {
+  return typeof value === 'string' && DOTTED.test(value);
+}
 
 export type ServiceName =
   | 'alarm_control_panel.alarm_arm_away'
@@ -87,9 +112,15 @@ export type ServiceName =
   | 'media_player.media_previous_track'
   | 'media_player.volume_set'
   | 'number.set_value'
+  | 'persistent_notification.dismiss'
+  | 'persistent_notification.dismiss_all'
   | 'scene.turn_on'
   | 'script.turn_on'
   | 'select.select_option'
+  | 'timer.cancel'
+  | 'timer.finish'
+  | 'timer.pause'
+  | 'timer.start'
   | 'vacuum.locate'
   | 'vacuum.return_to_base'
   | 'vacuum.start'

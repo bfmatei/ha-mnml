@@ -4,14 +4,14 @@ import { state } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
 
 import type { ButtonCard } from '../contract/cards.ts';
+import { CARD_STRUCTURES } from '../contract/structure.ts';
+import type { Structure } from '../contract/structure.ts';
 import { callService, run, stateOf } from '../ha/hass.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
 import { entityName } from '../ha/names.ts';
 import { onPress, stateIcon } from '../ha/templates.ts';
 
-import { MnmlCard, requireString } from './base.ts';
-import type { KeySchema } from './keys.ts';
-import { BUTTON_CARD } from './schemas.ts';
+import { MnmlCard } from './base.ts';
 import { BASE_STYLE, ROW_STYLE } from './styles.ts';
 
 const PRESS_FLASH = 600;
@@ -41,13 +41,8 @@ export class MnmlButtonCard extends MnmlCard<ButtonCard> {
   @state() private pressed = false;
   private timer: ReturnType<typeof setTimeout> | undefined;
 
-  protected schema(): KeySchema {
-    return BUTTON_CARD;
-  }
-
-  protected override validate(config: ButtonCard): void {
-    requireString('entity', config.entity);
-    requireString('service', config.service);
+  protected structure(): Structure {
+    return CARD_STRUCTURES['custom:mnml-button-card'];
   }
 
   protected draw(hass: HomeAssistant, config: ButtonCard): TemplateResult {

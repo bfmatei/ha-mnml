@@ -2,37 +2,33 @@ import { isMapping } from '../contract/templates.ts';
 import type { Value } from '../contract/templates.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
 import { filled } from '../templates/expand.ts';
+import type { EditorWords } from '../words/panel/editors-en.ts';
 
-import { singular } from './fill.ts';
-import { labelFor } from './form.ts';
-import type { PlainShape } from './shape.ts';
+import type { PlainForm } from './form.ts';
+import { labelFor } from './ha-form-data.ts';
 
 export function nameOf(hass: HomeAssistant | undefined, id: string): string {
   const friendly = hass?.states[id]?.attributes['friendly_name'];
   return typeof friendly === 'string' && friendly !== '' ? friendly : id;
 }
 
-const counted = (count: number, label: string): string => {
-  const word = label.toLowerCase();
-  return count === 1 ? `1 ${singular(word)}` : `${count} ${word}`;
-};
-
 function brief(
-  shape: PlainShape,
+  form: PlainForm,
   key: string,
   value: Value,
   hass: HomeAssistant | undefined,
+  words: EditorWords,
 ): string {
-  const spec = shape.fields[key];
+  const spec = form.fields[key];
   if (spec === undefined) {
     return '';
   }
-  const label = labelFor(shape, key);
+  const label = labelFor(form, key, words);
   if (spec.kind === 'entity' || spec.kind === 'popup') {
     return typeof value === 'string' ? (spec.kind === 'entity' ? nameOf(hass, value) : value) : '';
   }
   if (Array.isArray(value)) {
-    return counted(value.length, label);
+    return words.counted(value.length, label);
   }
   if (spec.kind === 'part' && isMapping(value)) {
     const main = value['entity'] ?? value['group'] ?? value['name'];
@@ -45,21 +41,22 @@ function brief(
 }
 
 export function summarize(
-  shape: PlainShape,
+  form: PlainForm,
   keys: readonly string[],
   value: Readonly<Record<string, Value>>,
   hass: HomeAssistant | undefined,
+  words: EditorWords,
 ): string {
   const parts = keys.flatMap((key) => {
     const inner = value[key];
     if (inner === undefined || !filled(inner)) {
       return [];
     }
-    const text = brief(shape, key, inner, hass);
+    const text = brief(form, key, inner, hass, words);
     return text === '' ? [] : [text];
   });
   if (parts.length === 0) {
-    return 'not set';
+    return words.notSet;
   }
   return parts.length > 3 ? `${parts.slice(0, 3).join(', ')}, ...` : parts.join(', ');
 }

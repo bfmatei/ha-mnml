@@ -1,8 +1,8 @@
-import type { CarChoice, PersonChoice, RoomChoice, SystemChoice } from '../contract/builder.ts';
+import type { CarChoice, PersonChoice, RoomChoice, SystemChoice } from '../contract/plan.ts';
 import { isMapping } from '../contract/templates.ts';
 import type { Templates, Value } from '../contract/templates.ts';
+import type { Registries } from '../ha/registries.ts';
 import { discover } from '../templates/discover.ts';
-import type { Registries } from '../templates/discover.ts';
 import { overridesOf } from '../templates/overrides.ts';
 
 import { personOf } from './person.ts';

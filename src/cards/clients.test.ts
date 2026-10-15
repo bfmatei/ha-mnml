@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 
 import { test } from 'vitest';
 
-import { define, mounted, text } from '../test/render.ts';
+import { fakeHass } from '../test/hass.ts';
+import { configure, define, mounted, text } from '../test/render.ts';
 
 import { MnmlClientsCard } from './clients.ts';
 
@@ -39,28 +40,16 @@ const NAMES = [
 
 type States = Record<string, { state: string; attributes: Record<string, unknown> }>;
 
-function hassOf(states: States): unknown {
-  return {
-    states: Object.fromEntries(
-      Object.entries(states).map(([id, entry]) => [id, { entity_id: id, ...entry }]),
-    ),
-    entities: {},
-    devices: {},
-    locale: { language: 'en' },
-    formatEntityState: (stateObj: { state: string }): string => stateObj.state,
-  };
-}
-
 function configured(config: unknown): MnmlClientsCard {
   const card = document.createElement('mnml-clients-card');
   assert.ok(card instanceof MnmlClientsCard);
-  card.setConfig(config as never);
+  configure(card, config);
   return card;
 }
 
 async function paint(states: States, config: unknown = CONFIG): Promise<ShadowRoot> {
   const card = configured(config);
-  card.hass = hassOf(states) as never;
+  card.hass = fakeHass({ states });
   return mounted(card);
 }
 
@@ -260,15 +249,17 @@ test('folded, every network shows its heading only, and Other, which needs you, 
 
 test('a tap on a folded network opens it, and the choice holds through the next update', async () => {
   const card = configured({ ...CONFIG, fold: true });
-  card.hass = hassOf(LIVE) as never;
+  card.hass = fakeHass({ states: LIVE });
   const out = await mounted(card);
   sections(out)[0]?.querySelector<HTMLElement>('.heading.fold')?.click();
   await card.updateComplete;
   assert.ok(!hidden(sections(out)[0]), 'open after the tap');
-  card.hass = hassOf({
-    ...LIVE,
-    'sensor.clients': { state: '9', attributes: { data: CLIENTS } },
-  }) as never;
+  card.hass = fakeHass({
+    states: {
+      ...LIVE,
+      'sensor.clients': { state: '9', attributes: { data: CLIENTS } },
+    },
+  });
   await card.updateComplete;
   assert.ok(!hidden(sections(out)[0]), 'still open');
   assert.ok(hidden(sections(out)[1]), 'the others stay folded');

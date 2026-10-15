@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 
 import { test } from 'vitest';
 
+import type { Plan } from '../contract/plan.ts';
 import type { Template, Templates } from '../contract/templates.ts';
 import { applyChanges } from '../templates/changes.ts';
 
@@ -13,6 +14,7 @@ import {
   notKept,
   planImport,
   renameEverywhere,
+  renamePlans,
   renamedConfig,
   renamedTemplate,
   settleImport,
@@ -336,4 +338,45 @@ test("a template of the home's own brought in as it is written, or with its shap
   const entry = entryFor(changed, SHIPPED);
   assert.ok(entry?.kind === 'changes');
   assert.deepEqual(applyChanges(ROOM, entry.changes).template.slots, resolved.slots);
+});
+
+test("a rename reaches the plan's device cards and keeps the Devices section's look", async () => {
+  const sent: Record<string, unknown>[] = [];
+  const plan: Plan = {
+    title: 'Home',
+    icon: 'mdi:home-variant',
+    rooms: [],
+    devices: [
+      { device: 'roborock_s8', template: 'vacuum-card' },
+      { device: 'office_printer', template: '3d-printer-card' },
+    ],
+    people: [],
+    cars: [],
+    system: [],
+    open: {},
+    sections: { devices: { title: 'Things', icon: 'mdi:robot-vacuum' } },
+  };
+  const failed = await renamePlans(
+    (message) => {
+      sent.push(message);
+      return Promise.resolve(null);
+    },
+    [{ url_path: 'dashboard-home', plan, previous: undefined, updated: undefined }],
+    'vacuum-card',
+    'robot-card',
+  );
+  assert.deepEqual(failed, []);
+  assert.deepEqual(sent, [
+    {
+      type: 'mnml/dashboards/save',
+      url_path: 'dashboard-home',
+      plan: {
+        ...plan,
+        devices: [
+          { device: 'roborock_s8', template: 'robot-card' },
+          { device: 'office_printer', template: '3d-printer-card' },
+        ],
+      },
+    },
+  ]);
 });

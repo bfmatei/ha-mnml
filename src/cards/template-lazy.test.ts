@@ -2,17 +2,18 @@ import assert from 'node:assert/strict';
 
 import { test } from 'vitest';
 
-import type { TemplateCard } from '../contract/cards.ts';
 import type { ChildCard } from '../ha/card-helpers.ts';
-import type { HomeAssistant } from '../ha/hass.ts';
 import { baseOf } from '../templates/changes.ts';
 import { readFamily } from '../templates/shipped.ts';
-import { fakeStore } from '../test/fake-hass.ts';
-import { define } from '../test/render.ts';
+import { fakeStore } from '../test/hass.ts';
+import { configure, created, define } from '../test/render.ts';
+import { until } from '../test/until.ts';
 
+import { MnmlCardNote } from './parts/card-element.ts';
 import { MnmlTemplateCard } from './template.ts';
 
 define('mnml-template-card', MnmlTemplateCard);
+define('mnml-card-note', MnmlCardNote);
 
 const built: Record<string, unknown>[] = [];
 window.loadCardHelpers = () =>
@@ -23,26 +24,9 @@ window.loadCardHelpers = () =>
     },
   });
 
-const tick = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
-const settle = async (): Promise<void> => {
-  await tick();
-  await tick();
-  await tick();
-  await tick();
-};
-const hassOf = (hass: object): HomeAssistant => hass as HomeAssistant;
-const STORE = fakeStore();
-const HASS = hassOf({ ...STORE.hass, states: {}, areas: {}, devices: {}, entities: {} });
+const HASS = fakeStore().hass;
 
-function make(): MnmlTemplateCard {
-  const made = document.createElement('mnml-template-card');
-  assert.ok(made instanceof MnmlTemplateCard);
-  return made;
-}
-
-const configure = (card: MnmlTemplateCard, config: unknown): void => {
-  card.setConfig(config as TemplateCard);
-};
+const make = (): MnmlTemplateCard => created('mnml-template-card', MnmlTemplateCard);
 
 test("before its family has loaded, a card takes the size of its template's card", () => {
   customElements.define(
@@ -72,7 +56,7 @@ test('a card whose template is in a family draws once that family has loaded', a
     slots: { entity: 'switch.kitchen_outlet' },
   });
   document.body.append(card);
-  await settle();
+  await until(() => built.length > 0, 'the card');
   assert.equal(built[0]?.['type'], 'custom:mnml-entity-card');
   const controls = built[0]?.['controls'];
   assert.ok(Array.isArray(controls));
@@ -80,17 +64,18 @@ test('a card whose template is in a family draws once that family has loaded', a
   card.remove();
 });
 
-test('before its family has loaded, a mistake is not thrown but drawn as an error card', async () => {
-  built.length = 0;
+test('before its family has loaded, a mistake is not thrown but drawn as an error note', async () => {
   const card = make();
   card.hass = HASS;
   assert.doesNotThrow(() => {
     configure(card, { type: 'custom:mnml-template-card', template: 'speaker-popup', slots: {} });
   });
   document.body.append(card);
-  await settle();
-  assert.equal(built[0]?.['type'], 'error');
-  assert.match(String(built[0]?.['error']), /speaker-popup: the slot key is required/);
+  await until(() => card.shadowRoot?.firstElementChild instanceof MnmlCardNote, 'the note');
+  const note = card.shadowRoot?.firstElementChild;
+  assert.ok(note instanceof MnmlCardNote, note?.localName ?? 'nothing is drawn');
+  assert.equal(note.failed, true);
+  assert.equal(note.message, 'Speaker pop-up: Key is needed');
   card.remove();
 });
 
@@ -110,9 +95,9 @@ test('a card without hass draws its template once its family has loaded', async 
     slots: { entity: 'light.kitchen' },
   });
   document.body.append(card);
-  await settle();
+  await until(() => built.length > 0, 'the card');
   assert.equal(built.length, 1);
-  assert.notEqual(built[0]?.['type'], 'error');
+  assert.equal(built[0]?.['type'], 'custom:mnml-entity-card');
   card.remove();
 });
 
@@ -126,14 +111,14 @@ test('changes kept for a template whose family has not loaded yet lay over it on
     'media-server': { kind: 'changes', changes: [{ ...rename, base: baseOf(shipped, rename) }] },
   };
   const card = make();
-  card.hass = hassOf({ ...store.hass, states: {}, areas: {}, devices: {}, entities: {} });
+  card.hass = store.hass;
   configure(card, {
     type: 'custom:mnml-template-card',
     template: 'media-server',
     slots: shipped.example ?? {},
   });
   document.body.append(card);
-  await settle();
+  await until(() => built.length > 0, 'the card');
   assert.equal(built[0]?.['name'], 'Films');
   card.remove();
 });

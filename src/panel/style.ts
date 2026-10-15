@@ -25,6 +25,11 @@ export const PANEL_STYLE = css`
     font-size: 12px;
     white-space: nowrap;
   }
+  .code-name {
+    font-family: var(--ha-font-family-code, monospace);
+    font-size: 12px;
+    color: var(--secondary-text-color);
+  }
   .badge.changed {
     color: var(--primary-color);
     border-color: var(--primary-color);
@@ -81,6 +86,9 @@ export const PANEL_STYLE = css`
   .icon-button:disabled {
     opacity: 0.35;
     cursor: default;
+  }
+  .icon-button.back ha-icon:dir(rtl) {
+    transform: scaleX(-1);
   }
   .chip {
     all: unset;
@@ -169,7 +177,8 @@ export const PANEL_STYLE = css`
     display: flex;
     align-items: center;
     gap: 14px;
-    padding: 12px 8px 12px 16px;
+    padding-block: 12px;
+    padding-inline: 16px 8px;
     cursor: pointer;
   }
   .library-icon {
@@ -280,6 +289,11 @@ export const PANEL_STYLE = css`
   .fact-input.wide {
     width: 100%;
   }
+  .name-line .fact-input {
+    height: 28px;
+    font-family: var(--ha-font-family-code, monospace);
+    font-size: 12px;
+  }
   .dialog {
     border: none;
     border-radius: 16px;
@@ -290,11 +304,27 @@ export const PANEL_STYLE = css`
     box-sizing: border-box;
   }
   .dialog.customize {
-    width: min(720px, calc(100vw - 32px));
+    width: min(1040px, calc(100vw - 32px));
   }
   .customize-body {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    align-items: start;
+    gap: 16px;
     max-height: calc(100vh - 220px);
     overflow: auto;
+  }
+  .customize-preview {
+    position: sticky;
+    top: 0;
+  }
+  @media (max-width: 720px) {
+    .customize-body {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .customize-preview {
+      position: static;
+    }
   }
   .dialog::backdrop {
     background: rgba(0, 0, 0, 0.4);

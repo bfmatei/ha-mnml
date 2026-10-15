@@ -1,6 +1,6 @@
 import type { PersonId } from '../contract/entities.ts';
 import type { Value } from '../contract/templates.ts';
-import type { Registries } from '../templates/discover.ts';
+import type { Registries } from '../ha/registries.ts';
 
 const SENSORS: readonly (readonly [string, string])[] = [
   ['battery', '_battery_level'],

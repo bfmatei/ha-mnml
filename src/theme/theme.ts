@@ -1,6 +1,31 @@
-import type { Material, Palette, Ramp, Theme, Tint } from './model.ts';
+import type { Hex, Material, Palette, Ramp, Theme, Tint } from './model.ts';
 
 type Variables = Record<string, string>;
+
+export function mix(front: Tint, back: Hex): Hex {
+  const top = Number.parseInt(front.color.slice(1), 16);
+  const bottom = Number.parseInt(back.slice(1), 16);
+  const part = (shift: number): string =>
+    Math.round(front.alpha * ((top >> shift) & 255) + (1 - front.alpha) * ((bottom >> shift) & 255))
+      .toString(16)
+      .padStart(2, '0');
+  return `#${part(16)}${part(8)}${part(0)}`;
+}
+
+interface Field {
+  background: Hex;
+  hover: Hex;
+  disabled: Hex;
+}
+
+export function fieldOf(palette: Palette): Field {
+  const background = mix(palette.material.pill, palette.card);
+  return {
+    background,
+    hover: mix({ color: palette.text, alpha: 0.06 }, background),
+    disabled: palette.divider,
+  };
+}
 
 interface Modes {
   light: Variables;
@@ -44,6 +69,49 @@ function shadow(material: Material): string {
 
 function well(material: Material): string {
   return `inset 0 1px 3px ${tint(material.well)}, 0 1px 0 ${tint(material.lip)}`;
+}
+
+interface Depth {
+  near: string;
+  far: string;
+  nearShare: number;
+  farShare: number;
+}
+
+const DEPTHS: Readonly<Record<'s' | 'm' | 'l', Depth>> = {
+  s: { near: '0 1px 2px 0', far: '0 1px 3px 0', nearShare: 0.27, farShare: 0.4 },
+  m: { near: '0 3px 6px -1px', far: '0 8px 16px -2px', nearShare: 0.33, farShare: 0.5 },
+  l: { near: '0 6px 12px -3px', far: '0 16px 32px -6px', nearShare: 0.4, farShare: 0.67 },
+};
+
+function share(alpha: number, part: number): number {
+  return Math.round(alpha * part * 100) / 100;
+}
+
+function boxShadows(material: Material): Variables {
+  const { color, alpha } = material.shadow;
+  return Object.fromEntries(
+    Object.entries(DEPTHS).map(([size, depth]) => [
+      `ha-box-shadow-${size}`,
+      alpha === 0
+        ? NO_SHADOW
+        : `${depth.near} ${tint({ color, alpha: share(alpha, depth.nearShare) })}, ${depth.far} ${tint({ color, alpha: share(alpha, depth.farShare) })}`,
+    ]),
+  );
+}
+
+function controls(palette: Palette): Variables {
+  const field = fieldOf(palette);
+  return {
+    'ha-color-form-background': field.background,
+    'ha-color-form-background-hover': field.hover,
+    'ha-color-form-background-disabled': field.disabled,
+    'ha-switch-background-color': field.background,
+    'ha-switch-border-color': palette.icon,
+    'ha-switch-thumb-background-color': palette.icon,
+    'ha-switch-thumb-border-color': palette.icon,
+    'ha-checkbox-border-color': palette.icon,
+  };
 }
 
 function popupShadow(material: Material): string {
@@ -103,7 +171,6 @@ function colours(palette: Palette): Variables {
     'deep-purple-color': palette.purple,
     'indigo-color': palette.purple,
     'ha-color-focus': palette.yellow,
-    'mdc-text-field-disabled-line-color': palette.disabled,
   };
 }
 
@@ -111,9 +178,12 @@ function variables(palette: Palette): Variables {
   const { material } = palette;
   return {
     ...colours(palette),
+    ...controls(palette),
     'ha-card-background': tint(material.card),
     'ha-card-backdrop-filter': filter(material),
+    ...boxShadows(material),
     'lovelace-background': background(material),
+    'ha-section-background-color': tint(material.pill),
     'mnml-pill-color': tint(material.pill),
     'mnml-card-background-color': tint(material.card),
     'mnml-card-backdrop-filter': filter(material),
@@ -157,9 +227,8 @@ function ramp(family: string, values: Ramp): Variables {
 export function buildTheme(theme: Theme): ThemeFile {
   return {
     [theme.name]: {
-      'primary-font-family': theme.font,
-      'ha-font-family-body': 'var(--primary-font-family)',
-      'ha-font-family-heading': 'var(--primary-font-family)',
+      'ha-font-family-body': theme.font,
+      'ha-font-family-heading': 'var(--ha-font-family-body)',
       'ha-card-border-radius': `${theme.cardRadius}px`,
       'ha-card-border-width': '0px',
       'ha-card-box-shadow': 'none',

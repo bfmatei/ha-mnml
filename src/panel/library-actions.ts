@@ -1,10 +1,11 @@
 import { html, nothing } from 'lit';
 import type { TemplateResult } from 'lit';
 
-import { isTemplate } from '../contract/templates.ts';
+import { isTemplate, templateTitle, templateWithLook } from '../contract/templates.ts';
 import type { Template, WrittenTemplate } from '../contract/templates.ts';
 import { field } from '../ha/field.ts';
 import { isChange } from '../templates/changes.ts';
+import type { PanelWords } from '../words/panel/en.ts';
 
 import type { Call } from './building.ts';
 import { storedAs } from './data.ts';
@@ -34,31 +35,25 @@ export interface LibraryHost {
   refresh: () => Promise<void>;
   save: (name: string, entry: Entry | undefined) => Promise<void>;
   download: (name: string, text: string) => void;
+  words: PanelWords;
 }
 
-const NEW_TEMPLATE: Template = {
+const newOne = (title: string): Template => ({
   description: '',
+  title,
   slots: { title: { kind: 'text', required: true, label: 'Title' } },
   card: { type: 'custom:mnml-heading-card', title: '[[title]]', icon: 'mdi:star-outline' },
   example: { title: 'New' },
-};
-const FATES: Record<Incoming['fate'], string> = {
-  changes: 'comes in as changes to the shipped template',
-  own: 'comes in as a template of the home',
-  replaces: 'replaces the template of the same name',
-  same: 'is the same as the one MNML keeps, so it is left out',
-};
-
-function versionText(version: unknown): string {
+});
+function versionText(version: unknown, said: PanelWords['templateActions']): string {
   const updated = field(version, 'updated');
   const changes = field(version, 'changes');
-  const when =
-    typeof updated === 'string' ? new Date(updated).toLocaleString() : 'an earlier version';
+  const when = typeof updated === 'string' ? new Date(updated).toLocaleString() : said.earlier;
   const what =
     field(version, 'kind') === 'own'
-      ? 'the whole template'
-      : `${Array.isArray(changes) ? changes.length : 0} changes to the shipped one`;
-  return `${when}: ${what}`;
+      ? said.whole
+      : said.changes(Array.isArray(changes) ? changes.length : 0);
+  return said.version(when, what);
 }
 
 function entryOfVersion(version: unknown): Entry | undefined {
@@ -94,12 +89,16 @@ export async function saveTemplate(
 }
 
 export async function newTemplate(host: LibraryHost): Promise<Draft | undefined> {
-  const name = await host.dialogs.name('A new template', '', host.state().taken);
-  return name === undefined
+  const named = await host.dialogs.titled(
+    host.words.templateActions.newOne,
+    '',
+    host.state().taken,
+  );
+  return named === undefined
     ? undefined
     : {
-        name,
-        template: structuredClone(NEW_TEMPLATE),
+        name: named.name,
+        template: newOne(named.title),
         shipped: undefined,
         conflicts: [],
         fresh: true,
@@ -112,24 +111,38 @@ export async function duplicateTemplate(
   of: string,
   template: WrittenTemplate | undefined,
 ): Promise<Draft | undefined> {
-  const name = await host.dialogs.name(`A copy of ${of}`, `${of}-copy`, host.state().taken);
-  return name === undefined || template === undefined
+  const title = templateTitle(template, of);
+  const said = host.words.templateActions;
+  const named = await host.dialogs.titled(
+    said.copyOf(title),
+    said.copyTitle(title),
+    host.state().taken,
+  );
+  return named === undefined || template === undefined
     ? undefined
-    : { name, template: structuredClone(template), shipped: undefined, conflicts: [], fresh: true };
+    : {
+        name: named.name,
+        template: templateWithLook(structuredClone(template), 'title', named.title),
+        shipped: undefined,
+        conflicts: [],
+        fresh: true,
+      };
 }
 
 export async function chooseVersion(host: LibraryHost, name: string): Promise<Entry | undefined> {
-  const title = `The history of ${name}`;
+  const said = host.words.templateActions;
+  const ok = host.words.dialog.ok;
+  const title = said.history(templateTitle(host.state().resolved[name], name));
   let versions: unknown[];
   try {
     const list = field(await host.call({ type: 'mnml/templates/history', name }), 'history');
     versions = Array.isArray(list) ? list : [];
   } catch (error) {
-    await host.dialogs.confirm(title, `It could not be read: ${messageOf(error)}`, 'OK');
+    await host.dialogs.confirm(title, said.unread(messageOf(error)), ok);
     return undefined;
   }
   if (versions.length === 0) {
-    await host.dialogs.confirm(title, 'There is no earlier version.', 'OK');
+    await host.dialogs.confirm(title, said.noHistory, ok);
     return undefined;
   }
   let chosen = -1;
@@ -145,12 +158,12 @@ export async function chooseVersion(host: LibraryHost, name: string): Promise<En
               @change=${() => {
                 chosen = index;
               }}
-            /><span>${versionText(version)}</span></label
+            /><span>${versionText(version, said)}</span></label
           >`,
       )}
     </div>`,
-    [{ label: 'Restore', value: true, primary: true }],
-    () => (chosen === -1 ? 'Choose a version first.' : undefined),
+    [{ label: said.restore, value: true, primary: true }],
+    () => (chosen === -1 ? said.chooseFirst : undefined),
   );
   return restore === true ? entryOfVersion(versions[chosen]) : undefined;
 }
@@ -174,35 +187,36 @@ export function exportTemplates(
 }
 
 export function drawFates(
+  words: PanelWords,
   plan: readonly Incoming[],
   choices: Record<string, Choice>,
   differ: readonly string[] = [],
   alone: ReadonlySet<string> = new Set(),
   changed: () => void = () => undefined,
 ): TemplateResult {
+  const said = words.templateActions;
   return html`<div class="import-plan">
     ${plan.map(
       (incoming) =>
         html`<div class="import-row">
-          <code>${incoming.name}</code><span class="muted">${FATES[incoming.fate]}</span>
+          <span>${templateTitle(incoming.template, incoming.name)}</span>
+          <code class="code-name">${incoming.name}</code>
+          <span class="muted">${said.fates[incoming.fate]}</span>
           ${
             incoming.from.length > 0
-              ? html`<span class="muted">from ${incoming.from.join(', ')}</span>`
+              ? html`<span class="muted">${said.from(incoming.from)}</span>`
               : nothing
           }
           ${
             differ.includes(incoming.name)
-              ? html`<span class="muted"
-                  >the dashboards hold different versions of it; this is the one from
-                  ${incoming.from[0] ?? 'the first'}</span
-                >`
+              ? html`<span class="muted">${said.differ(incoming.from[0])}</span>`
               : nothing
           }
           ${
             incoming.clash
               ? html`<select
                   class="word"
-                  aria-label=${`What to do with ${incoming.name}`}
+                  aria-label=${said.whatToDo(templateTitle(incoming.template, incoming.name))}
                   @change=${(event: Event) => {
                     const value = field(event.target, 'value');
                     choices[incoming.name] =
@@ -214,17 +228,17 @@ export function drawFates(
                     value="replace"
                     ?selected=${(choices[incoming.name] ?? 'replace') === 'replace'}
                   >
-                    Replace the one MNML keeps
+                    ${said.replace}
                   </option>
                   ${
                     alone.has(incoming.name)
                       ? nothing
                       : html`<option value="both" ?selected=${choices[incoming.name] === 'both'}>
-                          Keep both, this one under a new name
+                          ${said.both}
                         </option>`
                   }
                   <option value="skip" ?selected=${choices[incoming.name] === 'skip'}>
-                    Skip it
+                    ${said.skip}
                   </option>
                 </select>`
               : nothing
@@ -255,11 +269,12 @@ async function importFrom(
   const state = host.state();
   const plan = planImport(found, state.shipped, state.kept, state.resolved, from);
   const choices: Record<string, Choice> = {};
+  const said = host.words.templateActions;
   const go = await host.dialogs.ask(
-    'Import',
-    html`${drawFates(plan, choices, differ)}
-      <p class="muted">Nothing on the dashboards is written.</p>`,
-    [{ label: 'Import', value: true, primary: true }],
+    said.importIt,
+    html`${drawFates(host.words, plan, choices, differ)}
+      <p class="muted">${said.unwritten}</p>`,
+    [{ label: said.importIt, value: true, primary: true }],
   );
   if (go !== true) {
     return;
@@ -273,17 +288,14 @@ async function importFrom(
 
 export async function importFile(host: LibraryHost): Promise<void> {
   shippedWhole(host.state());
+  const said = host.words.templateActions;
   const found = await host.dialogs.yaml(
-    'Import templates',
-    {
-      file: 'A file of templates',
-      text: 'Templates in YAML',
-      placeholder: 'Paste templates, or choose a file',
-    },
+    said.importFile,
+    { file: said.file, text: said.text, placeholder: said.placeholder },
     (text) => {
-      const read = templatesIn(text, new Set(Object.keys(host.state().shipped)));
+      const read = templatesIn(text, new Set(Object.keys(host.state().shipped)), host.words);
       if (Object.keys(read).length === 0) {
-        throw new Error('The text holds no template.');
+        throw new Error(said.none);
       }
       return read;
     },
@@ -301,18 +313,12 @@ export async function importDashboards(host: LibraryHost): Promise<void> {
 }
 
 export async function removeTemplate(host: LibraryHost, row: Row): Promise<void> {
-  const use =
-    row.use.cards === 0
-      ? 'No dashboard uses it.'
-      : `It is on ${row.use.cards} ${row.use.cards === 1 ? 'card' : 'cards'}, on ${row.use.dashboards.join(', ')}.`;
+  const said = host.words.templateActions;
+  const use = row.use.cards === 0 ? said.unused : said.used(row.use.cards, row.use.dashboards);
   const sure =
     row.status === 'own'
-      ? await host.dialogs.confirm(`Delete ${row.name}?`, `${use} Its history keeps it.`, 'Delete')
-      : await host.dialogs.confirm(
-          `Reset ${row.name} to shipped?`,
-          `${use} Your changes go; its history keeps them.`,
-          'Reset',
-        );
+      ? await host.dialogs.confirm(said.delete(row.title), said.deleteText(use), said.deleteIt)
+      : await host.dialogs.confirm(said.reset(row.title), said.resetText(use), said.resetIt);
   if (sure) {
     await host.call({ type: 'mnml/templates/delete', name: row.name });
   }
@@ -323,7 +329,8 @@ export async function renameTemplate(host: LibraryHost, row: Row): Promise<void>
   if (template === undefined) {
     return;
   }
-  const name = await host.dialogs.name(`Rename ${row.name}`, row.name, host.state().taken);
+  const said = host.words.templateActions;
+  const name = await host.dialogs.name(said.rename(row.title), row.name, host.state().taken);
   if (name === undefined || name === row.name) {
     return;
   }
@@ -345,31 +352,19 @@ export async function renameTemplate(host: LibraryHost, row: Row): Promise<void>
   const { written, byHand } = everywhere;
   const failed = [
     ...everywhere.failed,
-    ...(now.boardsFailure === undefined
-      ? []
-      : [`Home Assistant's dashboards, which MNML could not read: ${now.boardsFailure}`]),
+    ...(now.boardsFailure === undefined ? [] : [said.unlisted(now.boardsFailure)]),
     ...(now.built === undefined
-      ? ['the dashboards MNML built, which it could not read']
-      : await renamePlans(host.call, now.built, row.name, name)),
+      ? [said.unbuilt]
+      : await renamePlans(host.call, now.built, row.name, name, host.words)),
   ];
   if (failed.length === 0) {
     await host.call({ type: 'mnml/templates/delete', name: row.name });
   }
   await host.refresh();
   const told = [
-    written.length === 0
-      ? 'No dashboard stored in the UI used it.'
-      : `Updated the cards on ${written.join(', ')}.`,
-    ...(byHand.length === 0
-      ? []
-      : [
-          `These dashboards are YAML files; change ${row.name} to ${name} in them by hand: ${byHand.join(', ')}.`,
-        ]),
-    ...(failed.length === 0
-      ? []
-      : [
-          `These could not be saved, so ${row.name} stays beside ${name} until they are changed by hand: ${failed.join('; ')}.`,
-        ]),
+    written.length === 0 ? said.noneInUi : said.updated(written),
+    ...(byHand.length === 0 ? [] : [said.byHand(row.name, name, byHand)]),
+    ...(failed.length === 0 ? [] : [said.unsaved(row.name, name, failed)]),
   ];
-  await host.dialogs.confirm(`${row.name} is now ${name}`, told.join(' '), 'OK');
+  await host.dialogs.confirm(said.renamed(row.title, name), told.join(' '), host.words.dialog.ok);
 }

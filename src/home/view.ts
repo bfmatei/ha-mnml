@@ -1,12 +1,13 @@
 import { dashboardOf } from '../builder/dashboard.ts';
+import type { Dashboard } from '../contract/dashboard.ts';
 import type { Value } from '../contract/templates.ts';
+import type { Registries } from '../ha/registries.ts';
 import { expandDashboard } from '../templates/dashboard.ts';
-import type { Registries } from '../templates/discover.ts';
 import { toValue } from '../templates/expand.ts';
 import { SHIPPED } from '../templates/shipped.ts';
 
 import { homePlan } from './plan.ts';
-import type { Dashboard, Home } from './types.ts';
+import type { Home } from './types.ts';
 
 const NOTHING: Registries = { areas: {}, devices: {}, entities: {}, states: {} };
 

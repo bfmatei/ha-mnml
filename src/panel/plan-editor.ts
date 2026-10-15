@@ -5,84 +5,90 @@ import { live } from 'lit/directives/live.js';
 
 import { carFrom, personFrom, roomFrom, systemFrom } from '../builder/customized.ts';
 import { carCard, personCard, roomCard, systemCard } from '../builder/dashboard.ts';
+import { offersIn, roomFound, shownBy } from '../builder/devices.ts';
+import type { Offer } from '../builder/devices.ts';
+import { partsOf, swapsFor } from '../builder/parts.ts';
 import { personOf } from '../builder/person.ts';
 import { areaKinds, peopleIn, roomShows, systemFills, unplaced } from '../builder/plan.ts';
-import type { AreaKind } from '../builder/plan.ts';
-import {
-  SECTION_LOOKS,
-  SYSTEM_NAMES,
-  SYSTEM_TEMPLATES,
-  isPlan,
-  lookOf,
-  orderOf,
-} from '../contract/builder.ts';
+import type { AreaKind, Unplaced } from '../builder/plan.ts';
+import type { PopupOpen, PopupOpening, TemplateCard } from '../contract/cards.ts';
+import { isIcon } from '../contract/entities.ts';
+import type { MdiIcon, PersonId } from '../contract/entities.ts';
+import { SECTION_LOOKS, SYSTEM_TEMPLATES, isPlan, lookOf, orderOf } from '../contract/plan.ts';
 import type {
+  DeviceChoice,
   Plan,
+  PlanSection,
   RoomChoice,
-  SectionKey,
   SectionLook,
   SystemChoice,
-} from '../contract/builder.ts';
-import type { PopupOpen, PopupOpening, TemplateCard } from '../contract/cards.ts';
-import type { MdiIcon, PersonId } from '../contract/entities.ts';
-import { isMapping } from '../contract/templates.ts';
+} from '../contract/plan.ts';
+import { isMapping, slotLabel, templateTitle } from '../contract/templates.ts';
 import type { Templates, Value } from '../contract/templates.ts';
 import { field } from '../ha/field.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
-import { registriesOf } from '../ha/registries.ts';
+import type { Registries } from '../ha/registries.ts';
+import { registriesOf } from '../ha/snapshot.ts';
 import { icon } from '../ha/templates.ts';
 import { discover } from '../templates/discover.ts';
-import type { Registries } from '../templates/discover.ts';
-import { expand, toValue } from '../templates/expand.ts';
+import { expand, filled, toValue } from '../templates/expand.ts';
+import { fillsHome } from '../templates/rank.ts';
 import { rolesOf } from '../templates/roles.ts';
 import type { Role } from '../templates/roles.ts';
+import { templateIndex } from '../templates/stands.ts';
+import type { TemplateIndex } from '../templates/stands.ts';
+import type { PanelWords } from '../words/panel/en.ts';
+import { panelWordsFor } from '../words/panel/words.ts';
 
 import { customize } from './customize.ts';
 import { messageOf } from './message.ts';
+import { DEVICES_STYLE, devicesList } from './plan-devices.ts';
 import {
-  isIcon,
   movedBy,
+  planChanges,
+  roomName,
   templatesOf,
-  trimmed,
+  tidied,
   withDeclared,
+  withDevice,
   withGlances,
-  withLook,
+  sectionsWithLook,
+  slotsWith,
   withOrder,
   withSystem,
+  withoutDevice,
 } from './plan-edits.ts';
 import { PANEL_STYLE } from './style.ts';
 
 export interface PlanHost {
   save: (plan: Plan, address: string) => Promise<void>;
   leave: () => void;
+  sortAreas: () => void;
 }
 
 type Device = keyof PopupOpen;
 
 interface Survey {
   kinds: Readonly<Record<string, AreaKind>>;
-  unplaced: number;
+  unplaced: Unplaced;
+}
+
+interface Parting {
+  readonly key: string;
+  readonly name: string;
+  readonly template: string;
+  readonly found: () => Readonly<Record<string, Value>>;
+  readonly slots: Readonly<Record<string, Value>> | undefined;
+  readonly area: string | undefined;
+  readonly write: (slots: Record<string, Value> | undefined) => void;
 }
 
 const ADDRESS = /^[a-z0-9]+(?:-[a-z0-9]+)+$/;
 const LONGEST = 64;
-const DEVICES: readonly { device: Device; label: string; otherwise: string }[] = [
-  { device: 'phone', label: 'On a phone', otherwise: 'a sheet' },
-  { device: 'tablet', label: 'On a tablet', otherwise: 'a dialog' },
-  { device: 'desktop', label: 'On a computer', otherwise: 'a dialog' },
-];
-const WHY: Readonly<Record<AreaKind, string | undefined>> = {
-  room: undefined,
-  phones: 'Only phones and trackers.',
-  system: 'Only system devices.',
-  empty: 'Nothing in this area: its devices are in no area or elsewhere.',
-};
-const DEVICES_PAGE = '/config/devices/dashboard';
-const OPENINGS: readonly { opening: PopupOpening; label: string }[] = [
-  { opening: 'sheet', label: 'A sheet from the bottom' },
-  { opening: 'dialog', label: 'A dialog in the middle' },
-  { opening: 'unfold', label: 'Unfolded from its tile' },
-];
+const DEVICES: readonly Device[] = ['phone', 'tablet', 'desktop'];
+const OPENINGS: readonly PopupOpening[] = ['sheet', 'dialog', 'unfold'];
+
+type Said = PanelWords['plan'];
 
 function asConfig(card: TemplateCard): Record<string, Value> {
   const value = toValue(card);
@@ -114,31 +120,28 @@ function withOpening(
 ): PopupOpen {
   const next: PopupOpen = {};
   for (const each of DEVICES) {
-    const value = each.device === device ? opening : open[each.device];
+    const value = each === device ? opening : open[each];
     if (value !== undefined) {
-      next[each.device] = value;
+      next[each] = value;
     }
   }
   return next;
 }
 
-function roomName(room: RoomChoice, registries: Registries): string {
-  if (room.spelled === true) {
-    const name = room.slots['name'];
-    return typeof name === 'string' ? name : 'A room';
-  }
-  return registries.areas[room.area]?.name ?? room.area;
-}
-
-function placing(count: number): TemplateResult | typeof nothing {
-  if (count === 0) {
+function placing(
+  { devices, entities }: Unplaced,
+  said: Said,
+  sort: () => void,
+): TemplateResult | typeof nothing {
+  if (devices + entities === 0) {
     return nothing;
   }
-  const [have, them] = count === 1 ? ['1 device has', 'it'] : [`${count} devices have`, 'them'];
-  return html`<p class="muted">
-    ${have} no area, so no room shows ${them}.
-    <a href=${DEVICES_PAGE}>Give ${them} an area in Home Assistant</a>
-  </p>`;
+  return html`<p class="muted">${said.unplaced(devices, entities)}</p>
+    <div>
+      <button type="button" class="action" @click=${sort}>
+        ${icon('mdi:sofa-outline')}<span>${said.sortThem}</span>
+      </button>
+    </div>`;
 }
 
 function text(event: Event): string {
@@ -146,7 +149,7 @@ function text(event: Event): string {
   return typeof value === 'string' ? value : '';
 }
 
-const PLAN_STYLE = css`
+export const PLAN_STYLE = css`
   .plan-title {
     display: flex;
     align-items: center;
@@ -210,14 +213,45 @@ const PLAN_STYLE = css`
   .plan-row.off .plan-words > span:first-child {
     color: var(--secondary-text-color);
   }
+  .plan-parts {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-inline-start: 32px;
+  }
+  .plan-part {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .plan-part select {
+    min-width: 0;
+    max-width: 100%;
+  }
   .plan-look {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
   }
-  .plan-look .fact-input {
+  .look-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
     flex: 1;
     min-width: 140px;
+  }
+  .look-field > span:first-child {
+    color: var(--secondary-text-color);
+    font-size: 12px;
+  }
+  .plan-picker {
+    display: block;
+    flex: 1;
+    min-width: 0;
   }
   .plan-field {
     display: flex;
@@ -236,10 +270,23 @@ const PLAN_STYLE = css`
     flex: 1;
     min-width: 200px;
   }
+  @media (max-width: 600px) {
+    .plan-row:has(> .plan-tile) {
+      flex-wrap: wrap;
+      row-gap: 4px;
+    }
+    .plan-tile {
+      flex-basis: calc(100% - 32px);
+      max-width: none;
+    }
+    .plan-tile + .row-actions {
+      margin-inline-start: 24px;
+    }
+  }
 `;
 
 export class MnmlPlanEditor extends LitElement {
-  static override styles = [PANEL_STYLE, PLAN_STYLE];
+  static override styles = [PANEL_STYLE, PLAN_STYLE, DEVICES_STYLE];
 
   @property({ attribute: false }) hass: HomeAssistant | undefined;
   @property({ attribute: false }) templates: Templates = {};
@@ -251,11 +298,15 @@ export class MnmlPlanEditor extends LitElement {
   @state() private draft: Plan | undefined;
   @state() private where = '';
   @state() private iconText = '';
-  @state() private lookIcons: Partial<Record<SectionKey, string>> = {};
+  @state() private lookIcons: Partial<Record<PlanSection, string>> = {};
   @state() private problem: string | undefined;
   @state() private saving = false;
+  @state() private partsOpen: string | undefined;
   private readonly found = new Map<string, boolean>();
+  private readonly roomsFound = new Map<string, Record<string, Value>>();
   private survey: Survey | undefined;
+  private indexed: { templates: Templates; index: TemplateIndex } | undefined;
+  private offered: { chosen: readonly DeviceChoice[] | undefined; offers: Offer[] } | undefined;
   private known: { templates: Templates | undefined; roles: Readonly<Record<string, Role>> } = {
     templates: undefined,
     roles: {},
@@ -268,7 +319,9 @@ export class MnmlPlanEditor extends LitElement {
     if (now.some((each, index) => each !== this.seen[index])) {
       this.seen = now;
       this.found.clear();
+      this.roomsFound.clear();
       this.survey = undefined;
+      this.offered = undefined;
     }
     if (this.plan !== undefined && (this.draft === undefined || this.address !== this.drafted)) {
       this.drafted = this.address;
@@ -279,6 +332,49 @@ export class MnmlPlanEditor extends LitElement {
     if (changed.has('address')) {
       this.where = this.address;
     }
+  }
+
+  override connectedCallback(): void {
+    super.connectedCallback();
+    window.addEventListener('beforeunload', this.guard);
+    if (customElements.get('ha-icon-picker') === undefined) {
+      void customElements.whenDefined('ha-icon-picker').then(() => {
+        this.requestUpdate();
+      });
+    }
+  }
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    window.removeEventListener('beforeunload', this.guard);
+  }
+
+  readonly guard = (event: BeforeUnloadEvent): void => {
+    if (this.dirty()) {
+      event.preventDefault();
+    }
+  };
+
+  dirty(): boolean {
+    return this.changes() > 0 || (this.fresh && this.where !== this.address);
+  }
+
+  leave(): void {
+    if (!this.dirty() || window.confirm(this.words().plan.leave)) {
+      this.host?.leave();
+    }
+  }
+
+  private sortAreas(): void {
+    if (!this.dirty() || window.confirm(this.words().plan.leave)) {
+      this.host?.sortAreas();
+    }
+  }
+
+  private changes(): number {
+    return this.plan === undefined || this.draft === undefined
+      ? 0
+      : planChanges(this.plan, this.draft);
   }
 
   private roles(): Readonly<Record<string, Role>> {
@@ -310,29 +406,35 @@ export class MnmlPlanEditor extends LitElement {
     }
   }
 
+  private words(): PanelWords {
+    return panelWordsFor(this.hass?.locale.language);
+  }
+
   private check(plan: Plan): string | undefined {
+    const said = this.words().plan;
     if (plan.title.trim() === '') {
-      return 'A dashboard needs a title.';
+      return said.needsTitle;
     }
     if (!isIcon(this.iconText)) {
-      return 'An icon is mdi: and its name, such as mdi:home-variant.';
+      return said.badIcon;
     }
     if (this.fresh && (!ADDRESS.test(this.where) || this.where.length > LONGEST)) {
-      return `An address is lower case letters and digits, with at least one - between them, such as dashboard-home, and at most ${LONGEST} long.`;
+      return said.badAddress(LONGEST);
     }
     if (this.fresh && this.taken.has(this.where)) {
-      return `/${this.where} is taken.`;
+      return said.takenAddress(this.where);
     }
-    return isPlan(plan) ? undefined : 'Something in this dashboard is not what MNML keeps.';
+    return isPlan(plan) ? undefined : said.notPlan;
   }
 
   private problemOf(template: string, config: Record<string, Value>): string | undefined {
+    const said = this.words().plan;
     if (config['template'] !== template) {
-      return `This card is drawn by the ${template} template: pick it again under Change.`;
+      return said.otherTemplate(this.titleOf(template));
     }
     const found = this.templates[template];
     if (found === undefined) {
-      return `${template} is not a template MNML knows.`;
+      return said.unknownTemplate(template);
     }
     const area = typeof config['area'] === 'string' ? config['area'] : undefined;
     const slots = isMapping(config['slots']) ? config['slots'] : undefined;
@@ -344,9 +446,7 @@ export class MnmlPlanEditor extends LitElement {
           ? discover(found, area, registriesOf(this.hass))
           : {},
       );
-      return expanded.missing === undefined
-        ? undefined
-        : `It waits for ${expanded.missing.join(', ')}.`;
+      return expanded.missing === undefined ? undefined : said.waits(expanded.missing);
     } catch (error) {
       return messageOf(error);
     }
@@ -382,13 +482,7 @@ export class MnmlPlanEditor extends LitElement {
     if (plan === undefined || host === undefined) {
       return;
     }
-    const sections = trimmed(plan.sections);
-    const { sections: _looks, ...rest } = plan;
-    const tidy: Plan = {
-      ...rest,
-      title: plan.title.trim(),
-      ...(sections === undefined ? {} : { sections }),
-    };
+    const tidy = tidied(plan);
     this.problem = this.check(tidy);
     if (this.problem !== undefined) {
       return;
@@ -406,16 +500,18 @@ export class MnmlPlanEditor extends LitElement {
   private drawTile(config: object): TemplateResult {
     return html`<mnml-live-card
       class="plan-tile"
+      inert
       .config=${config}
       .hass=${this.hass}
     ></mnml-live-card>`;
   }
 
   private drawDashboard(plan: Plan): TemplateResult {
+    const said = this.words().plan;
     return html`<section class="plan-section">
-      <h2>Dashboard</h2>
+      <h2>${said.dashboard}</h2>
       <label class="plan-field">
-        <span>Title</span>
+        <span>${said.title}</span>
         <span class="plan-icon">
           <input
             class="fact-input wide"
@@ -427,26 +523,26 @@ export class MnmlPlanEditor extends LitElement {
         </span>
       </label>
       <label class="plan-field">
-        <span>Icon</span>
+        <span>${said.icon}</span>
         <span class="plan-icon">
-          ${isIcon(this.iconText) ? icon(this.iconText) : nothing}
-          <input
-            class="fact-input wide"
-            .value=${live(this.iconText)}
-            @input=${(event: Event) => {
-              this.iconText = text(event).trim();
-              this.problem = undefined;
-              if (isIcon(this.iconText)) {
-                this.change({ icon: this.iconText });
-              }
-            }}
-          />
+          ${
+            customElements.get('ha-icon-picker') === undefined && isIcon(this.iconText)
+              ? icon(this.iconText)
+              : nothing
+          }
+          ${this.iconField(said.icon, this.iconText, 'mdi:home-variant', (typed) => {
+            this.iconText = typed.trim();
+            this.problem = undefined;
+            if (isIcon(this.iconText)) {
+              this.change({ icon: this.iconText });
+            }
+          })}
         </span>
       </label>
       ${
         this.fresh
           ? html`<label class="plan-field">
-              <span>Address</span>
+              <span>${said.address}</span>
               <span class="plan-icon">
                 <span class="muted">/</span>
                 <input
@@ -464,11 +560,24 @@ export class MnmlPlanEditor extends LitElement {
     </section>`;
   }
 
-  private drawLook(plan: Plan, key: SectionKey): TemplateResult {
-    const fallback = SECTION_LOOKS[key];
-    const given = plan.sections?.[key];
-    const name = fallback.title;
-    const registries = registriesOf(this.hass);
+  private fitsRooms(name: string, registries: Registries): boolean {
+    return this.remembered(`fits:${name}`, () => {
+      const template = this.templates[name];
+      if (template === undefined) {
+        return false;
+      }
+      const home = discover(template, undefined, registries);
+      return Object.keys(registries.areas).some((area) => {
+        const found = discover(template, area, registries);
+        const own = Object.fromEntries(
+          Object.entries(found).filter(([slot]) => !filled(home[slot])),
+        );
+        return fillsHome(template, own) > 0 && roomShows(registries, this.templates, area, name);
+      });
+    });
+  }
+
+  private tilesFor(key: PlanSection, registries: Registries): string[] {
     const writes =
       key === 'people'
         ? [
@@ -479,70 +588,121 @@ export class MnmlPlanEditor extends LitElement {
         : key === 'garage'
           ? ['key']
           : [];
-    const tiles = Object.entries(this.roles())
+    return Object.entries(this.roles())
       .filter(
         ([template, role]) =>
           role === 'tile' &&
-          writes.every((slot) => Object.hasOwn(this.templates[template]?.slots ?? {}, slot)),
+          writes.every((slot) => Object.hasOwn(this.templates[template]?.slots ?? {}, slot)) &&
+          (key !== 'rooms' || this.fitsRooms(template, registries)),
       )
       .map(([template]) => template)
-      .toSorted();
+      .toSorted((a, b) => this.titleOf(a).localeCompare(this.titleOf(b)));
+  }
+
+  private titleOf(name: string): string {
+    return templateTitle(this.templates[name], name);
+  }
+
+  private changeLook(key: PlanSection, next: Partial<Record<keyof SectionLook, string>>): void {
+    const draft = this.draft;
+    if (draft === undefined) {
+      return;
+    }
+    const sections = sectionsWithLook(draft, key, next);
+    const template = next.template;
+    const declared = new Set(
+      Object.keys(template === undefined ? {} : (this.templates[template]?.slots ?? {})),
+    );
+    this.draft =
+      template === undefined
+        ? { ...draft, sections }
+        : { ...withDeclared(draft, key, declared), sections };
+    this.problem = undefined;
+  }
+
+  private iconField(
+    label: string,
+    value: string,
+    placeholder: string,
+    typed: (value: string) => void,
+  ): TemplateResult {
+    if (customElements.get('ha-icon-picker') !== undefined) {
+      return html`<ha-icon-picker
+        class="plan-picker"
+        aria-label=${label}
+        .hass=${this.hass}
+        .value=${value}
+        .placeholder=${placeholder}
+        @value-changed=${(event: Event) => {
+          const picked = field(field(event, 'detail'), 'value');
+          typed(typeof picked === 'string' ? picked : '');
+        }}
+      ></ha-icon-picker>`;
+    }
+    return html`<input
+      class="fact-input wide"
+      aria-label=${label}
+      placeholder=${placeholder}
+      .value=${live(value)}
+      @input=${(event: Event) => {
+        typed(text(event));
+      }}
+    />`;
+  }
+
+  private drawLook(plan: Plan, key: PlanSection): TemplateResult {
+    const fallback = SECTION_LOOKS[key];
+    const given = plan.sections?.[key];
+    const said = this.words().plan;
+    const name = said.sections[key];
+    const tiles = this.tilesFor(key, registriesOf(this.hass));
     const current = lookOf(plan, key).template;
-    const change = (next: Partial<Record<keyof SectionLook, string>>): void => {
-      const draft = this.draft;
-      if (draft === undefined) {
-        return;
-      }
-      const sections = withLook(draft, key, next);
-      const template = next.template;
-      const declared = new Set(
-        Object.keys(template === undefined ? {} : (this.templates[template]?.slots ?? {})),
-      );
-      this.draft =
-        template === undefined
-          ? { ...draft, sections }
-          : { ...withDeclared(draft, key, declared), sections };
-      this.problem = undefined;
-    };
     return html`<div class="plan-look">
-      <input
-        class="fact-input"
-        aria-label=${`${name} title`}
-        placeholder=${fallback.title}
-        .value=${live(given?.title ?? '')}
-        @input=${(event: Event) => {
-          change({ title: text(event) });
-        }}
-      />
-      <input
-        class="fact-input"
-        aria-label=${`${name} icon`}
-        placeholder=${fallback.icon}
-        .value=${live(this.lookIcons[key] ?? given?.icon ?? '')}
-        @input=${(event: Event) => {
-          const typed = text(event);
-          this.lookIcons = { ...this.lookIcons, [key]: typed };
-          change({ icon: typed.trim() });
-        }}
-      />
+      <label class="look-field">
+        <span>${said.title}</span>
+        <input
+          class="fact-input"
+          aria-label=${said.lookTitle(name)}
+          placeholder=${fallback.title}
+          .value=${live(given?.title ?? '')}
+          @input=${(event: Event) => {
+            this.changeLook(key, { title: text(event) });
+          }}
+        />
+      </label>
+      <label class="look-field">
+        <span>${said.icon}</span>
+        ${this.iconField(
+          said.lookIcon(name),
+          this.lookIcons[key] ?? given?.icon ?? '',
+          fallback.icon,
+          (typed) => {
+            this.lookIcons = { ...this.lookIcons, [key]: typed };
+            this.changeLook(key, { icon: typed.trim() });
+          },
+        )}
+      </label>
       ${
         current === undefined
           ? nothing
-          : html`<select
-              class="area-picker"
-              aria-label=${`${name} template`}
-              .value=${live(current)}
-              @change=${(event: Event) => {
-                change({ template: text(event) });
-              }}
-            >
-              ${(tiles.includes(current) ? tiles : [current, ...tiles]).map(
-                (template) =>
-                  html`<option value=${template} ?selected=${template === current}>
-                    ${template}
-                  </option>`,
-              )}
-            </select>`
+          : html`<label class="look-field">
+              <span>${said.template}</span>
+              <select
+                class="area-picker"
+                aria-label=${said.lookTemplate(name)}
+                .value=${live(current)}
+                @change=${(event: Event) => {
+                  this.changeLook(key, { template: text(event) });
+                }}
+              >
+                ${(tiles.includes(current) ? tiles : [current, ...tiles]).map(
+                  (template) =>
+                    html`<option value=${template} ?selected=${template === current}>
+                      ${this.titleOf(template)}
+                    </option>`,
+                )}
+              </select>
+            </label>`
       }
     </div>`;
   }
@@ -556,54 +716,75 @@ export class MnmlPlanEditor extends LitElement {
       (area) => !chosen.some((room) => room.area === area.area_id),
     );
     const survey = this.surveyOf(registries);
+    const said = this.words().plan;
     return html`<section class="plan-section">
       ${this.drawHeading(plan, 'rooms')} ${this.drawLook(plan, 'rooms')}
-      <p class="muted">
-        Each area that holds something a room shows gets a room. Tick the ones to show, in order.
-      </p>
+      <p class="muted">${said.roomsAbout}</p>
       ${chosen.map((room, index) => {
-        const name = roomName(room, registries);
-        return html`<div class="plan-row">
-          <input
-            type="checkbox"
-            .checked=${live(true)}
-            aria-label=${`Show ${name}`}
-            @change=${() => {
-              this.change({ rooms: plan.rooms.filter((each) => each !== room) });
-            }}
-          />
-          ${this.drawTile(roomCard(room, look.rooms, this.templates))}
-          <span class="row-actions">
-            ${iconButton('mdi:tune-variant', `Customize ${name}`, () => {
-              this.edit(
-                `Customize ${name}`,
-                look.rooms,
-                roomCard(room, look.rooms, this.templates),
-                (config) => {
+        const name = roomName(room, registries, said.aRoom);
+        const parting: Parting | undefined =
+          room.spelled === true
+            ? undefined
+            : {
+                key: `room:${room.area}`,
+                name,
+                template: look.rooms,
+                found: () => this.roomFoundOf({ area: room.area }, look.rooms, registries),
+                slots: room.slots,
+                area: room.area,
+                write: (slots) => {
                   this.change({
-                    rooms: chosen.map((each) => (each === room ? roomFrom(room, config) : each)),
+                    rooms: chosen.map((each) =>
+                      each === room
+                        ? { area: room.area, ...(slots === undefined ? {} : { slots }) }
+                        : each,
+                    ),
                   });
                 },
-              );
-            })}
-            ${this.moves(name, index, chosen.length, (by) => {
-              this.change({ rooms: movedBy(chosen, index, by) });
-            })}
-          </span>
-        </div>`;
+              };
+        return html`<div class="plan-row">
+            <input
+              type="checkbox"
+              .checked=${live(true)}
+              aria-label=${said.show(name)}
+              @change=${() => {
+                this.change({ rooms: plan.rooms.filter((each) => each !== room) });
+              }}
+            />
+            ${this.drawTile(roomCard(room, look.rooms, this.templates))}
+            <span class="row-actions">
+              ${iconButton('mdi:tune-variant', said.customize(name), () => {
+                this.edit(
+                  said.customize(name),
+                  look.rooms,
+                  roomCard(room, look.rooms, this.templates),
+                  (config) => {
+                    this.change({
+                      rooms: chosen.map((each) => (each === room ? roomFrom(room, config) : each)),
+                    });
+                  },
+                );
+              })}
+              ${parting === undefined ? nothing : this.partsButton(parting)}
+              ${this.moves(name, index, chosen.length, (by) => {
+                this.change({ rooms: movedBy(chosen, index, by) });
+              })}
+            </span>
+          </div>
+          ${parting === undefined ? nothing : this.drawParts(parting, registries)}`;
       })}
       ${others.map((area) => {
         const shows = this.remembered(`room:${look.rooms}:${area.area_id}`, () =>
           roomShows(registries, this.templates, area.area_id, look.rooms),
         );
+        const kind = survey.kinds[area.area_id] ?? 'empty';
         const why =
-          WHY[survey.kinds[area.area_id] ?? 'empty'] ??
-          (shows ? undefined : 'Its template finds nothing to show here.');
+          (kind === 'room' ? undefined : said.why[kind]) ?? (shows ? undefined : said.findsNothing);
         return html`<div class="plan-row off">
           <input
             type="checkbox"
             .checked=${live(false)}
-            aria-label=${`Show ${area.name}`}
+            aria-label=${said.show(area.name)}
             ?disabled=${!shows}
             @change=${() => {
               this.change({ rooms: [...chosen, { area: area.area_id }] });
@@ -615,7 +796,166 @@ export class MnmlPlanEditor extends LitElement {
           </span>
         </div>`;
       })}
-      ${placing(survey.unplaced)}
+      ${placing(survey.unplaced, said, () => {
+        this.sortAreas();
+      })}
+    </section>`;
+  }
+
+  private index(): TemplateIndex {
+    if (this.indexed?.templates !== this.templates) {
+      this.indexed = { templates: this.templates, index: templateIndex(this.templates) };
+    }
+    return this.indexed.index;
+  }
+
+  private offersOf(plan: Plan, registries: Registries): Offer[] {
+    if (this.offered === undefined || this.offered.chosen !== plan.devices) {
+      this.offered = {
+        chosen: plan.devices,
+        offers: offersIn(registries, this.index(), plan.devices),
+      };
+    }
+    return this.offered.offers;
+  }
+
+  private roomFoundOf(
+    room: RoomChoice,
+    template: string,
+    registries: Registries,
+  ): Record<string, Value> {
+    const key = `${template}:${JSON.stringify(room)}`;
+    const known = this.roomsFound.get(key);
+    if (known !== undefined) {
+      return known;
+    }
+    const found = roomFound(room, template, registries, this.templates);
+    this.roomsFound.set(key, found);
+    return found;
+  }
+
+  private partsButton(row: Parting): TemplateResult | typeof nothing {
+    const template = this.templates[row.template];
+    if (template === undefined || partsOf(template).length === 0) {
+      return nothing;
+    }
+    const label = this.words().plan.parts(row.name);
+    const open = this.partsOpen === row.key;
+    return html`<button
+      type="button"
+      class="icon-button"
+      aria-label=${label}
+      title=${label}
+      aria-expanded=${open ? 'true' : 'false'}
+      @click=${() => {
+        this.partsOpen = open ? undefined : row.key;
+      }}
+    >
+      ${icon(open ? 'mdi:eye-settings' : 'mdi:eye-settings-outline')}
+    </button>`;
+  }
+
+  private drawParts(row: Parting, registries: Registries): TemplateResult | typeof nothing {
+    const template = this.templates[row.template];
+    if (this.partsOpen !== row.key || template === undefined) {
+      return nothing;
+    }
+    const said = this.words().plan;
+    const specs = template.slots ?? {};
+    const found = row.found();
+    const parts = partsOf(template).filter(
+      (slot) => filled(found[slot]) || row.slots?.[slot] !== undefined,
+    );
+    if (parts.length === 0) {
+      return html`<p class="muted plan-parts">${said.noParts}</p>`;
+    }
+    return html`<div class="plan-parts" role="group" aria-label=${said.parts(row.name)}>
+      ${parts.map((slot) => {
+        const own = row.slots?.[slot];
+        const value = own === undefined ? found[slot] : own;
+        const shown = filled(value);
+        const label = slotLabel(slot, specs[slot]);
+        return html`<span class="plan-part">
+          <button
+            type="button"
+            class=${shown ? 'chip active' : 'chip'}
+            aria-pressed=${shown ? 'true' : 'false'}
+            @click=${() => {
+              row.write(slotsWith(row.slots, slot, shown ? null : undefined));
+            }}
+          >
+            ${icon(shown ? 'mdi:eye-outline' : 'mdi:eye-off-outline')}<span>${label}</span>
+          </button>
+          ${
+            shown && specs[slot]?.kind === 'entity' && typeof value === 'string'
+              ? this.drawSwap(row, slot, label, value, found[slot], registries)
+              : nothing
+          }
+        </span>`;
+      })}
+    </div>`;
+  }
+
+  private drawSwap(
+    row: Parting,
+    slot: string,
+    label: string,
+    current: string,
+    discovered: Value | undefined,
+    registries: Registries,
+  ): TemplateResult {
+    const nameOf = (entity: string): string => {
+      const name = registries.states[entity]?.attributes['friendly_name'];
+      return typeof name === 'string' ? `${name} (${entity})` : entity;
+    };
+    return html`<select
+      class="area-picker"
+      aria-label=${this.words().plan.swap(label)}
+      .value=${live(current)}
+      @change=${(event: Event) => {
+        const picked = text(event);
+        row.write(slotsWith(row.slots, slot, picked === discovered ? undefined : picked));
+      }}
+    >
+      ${[current, ...swapsFor(registries, current, row.area)].map(
+        (entity) =>
+          html`<option value=${entity} ?selected=${entity === current}>${nameOf(entity)}</option>`,
+      )}
+    </select>`;
+  }
+
+  private drawDevices(plan: Plan, registries: Registries): TemplateResult {
+    const index = this.index();
+    const offers = this.offersOf(plan, registries);
+    const template = templatesOf(plan).rooms;
+    const rooms = plan.rooms
+      .filter((room) => room.spelled === true || Object.hasOwn(registries.areas, room.area))
+      .map((room) => ({
+        name: roomName(room, registries, this.words().plan.aRoom),
+        found: this.roomFoundOf(room, template, registries),
+      }));
+    const listed = offers.map((offer) => offer.device);
+    return html`<section class="plan-section">
+      ${this.drawHeading(plan, 'devices')} ${this.drawLook(plan, 'devices')}
+      ${devicesList({
+        offers,
+        chosen: plan.devices ?? [],
+        areaName: (area) => registries.areas[area]?.name ?? area,
+        titleOf: (name) => this.titleOf(name),
+        shownBy: (offer) => {
+          const [best] = offer.templates;
+          const anchor = best === undefined ? undefined : index[best]?.anchor;
+          return shownBy(offer.device, anchor, rooms, registries);
+        },
+        tile: (card) => this.drawTile(card),
+        said: this.words().plan,
+        pick: (choice) => {
+          this.reshaped((draft) => withDevice(draft, choice, listed));
+        },
+        drop: (device) => {
+          this.reshaped((draft) => withoutDevice(draft, device));
+        },
+      })}
     </section>`;
   }
 
@@ -628,19 +968,39 @@ export class MnmlPlanEditor extends LitElement {
     };
     const chosen = plan.people;
     const others = people.filter((entity) => !chosen.some((person) => person.entity === entity));
+    const said = this.words().plan;
     return html`<section class="plan-section">
       ${this.drawHeading(plan, 'people')} ${this.drawLook(plan, 'people')}
       ${
         people.length === 0 && chosen.length === 0
-          ? html`<p class="muted">Home Assistant has no people yet.</p>`
+          ? html`<p class="muted">${said.noPeople}</p>`
           : nothing
       }
-      ${chosen.map(
-        (choice, index) =>
-          html`<div class="plan-row">
+      ${chosen.map((choice, index) => {
+        const parting: Parting | undefined =
+          choice.spelled === true
+            ? undefined
+            : {
+                key: `person:${choice.entity}`,
+                name: nameOf(choice.entity),
+                template: look.people,
+                found: () => personOf(registries, choice.entity),
+                slots: choice.slots,
+                area: undefined,
+                write: (slots) => {
+                  this.change({
+                    people: chosen.map((each) =>
+                      each === choice
+                        ? { entity: choice.entity, ...(slots === undefined ? {} : { slots }) }
+                        : each,
+                    ),
+                  });
+                },
+              };
+        return html`<div class="plan-row">
             <input
               type="checkbox"
-              aria-label=${`Show ${nameOf(choice.entity)}`}
+              aria-label=${said.show(nameOf(choice.entity))}
               .checked=${live(true)}
               @change=${() => {
                 this.change({ people: chosen.filter((person) => person !== choice) });
@@ -648,9 +1008,9 @@ export class MnmlPlanEditor extends LitElement {
             />
             ${this.drawTile(personCard(choice, registries, look.people, this.templates))}
             <span class="row-actions">
-              ${iconButton('mdi:tune-variant', `Customize ${nameOf(choice.entity)}`, () => {
+              ${iconButton('mdi:tune-variant', said.customize(nameOf(choice.entity)), () => {
                 this.edit(
-                  `Customize ${nameOf(choice.entity)}`,
+                  said.customize(nameOf(choice.entity)),
                   look.people,
                   personCard(choice, registries, look.people, this.templates),
                   (config) => {
@@ -662,18 +1022,20 @@ export class MnmlPlanEditor extends LitElement {
                   },
                 );
               })}
+              ${parting === undefined ? nothing : this.partsButton(parting)}
               ${this.moves(nameOf(choice.entity), index, chosen.length, (by) => {
                 this.change({ people: movedBy(chosen, index, by) });
               })}
             </span>
-          </div>`,
-      )}
+          </div>
+          ${parting === undefined ? nothing : this.drawParts(parting, registries)}`;
+      })}
       ${others.map(
         (entity) =>
           html`<div class="plan-row off">
             <input
               type="checkbox"
-              aria-label=${`Show ${nameOf(entity)}`}
+              aria-label=${said.show(nameOf(entity))}
               .checked=${live(false)}
               @change=${() => {
                 this.change({ people: [...chosen, { entity }] });
@@ -687,11 +1049,12 @@ export class MnmlPlanEditor extends LitElement {
 
   private carProblem(plan: Plan, config: Record<string, Value>, was?: string): string | undefined {
     const car = carFrom(config);
+    const said = this.words().plan;
     if (car === undefined) {
-      return 'A car needs a key: lower case letters, digits, - and _, such as sedan.';
+      return said.carKey;
     }
     return car.key !== was && plan.cars.some((each) => each.key === car.key)
-      ? `Another car has the key ${car.key}.`
+      ? said.carTaken(car.key)
       : undefined;
   }
 
@@ -702,13 +1065,10 @@ export class MnmlPlanEditor extends LitElement {
       template: look.cars,
       slots: {},
     };
+    const said = this.words().plan;
     return html`<section class="plan-section">
       ${this.drawHeading(plan, 'garage')} ${this.drawLook(plan, 'garage')}
-      ${
-        plan.cars.length === 0
-          ? html`<p class="muted">A car's entities are chosen when it is added.</p>`
-          : nothing
-      }
+      ${plan.cars.length === 0 ? html`<p class="muted">${said.carsAbout}</p>` : nothing}
       ${plan.cars.map(
         (car, index) =>
           html`<div class="plan-row">
@@ -717,9 +1077,9 @@ export class MnmlPlanEditor extends LitElement {
               ${this.moves(car.key, index, plan.cars.length, (by) => {
                 this.change({ cars: movedBy(plan.cars, index, by) });
               })}
-              ${iconButton('mdi:tune-variant', `Customize ${car.key}`, () => {
+              ${iconButton('mdi:tune-variant', said.customize(car.key), () => {
                 this.edit(
-                  `Customize ${car.key}`,
+                  said.customize(car.key),
                   look.cars,
                   carCard(car, look.cars, this.templates),
                   (config) => {
@@ -731,7 +1091,7 @@ export class MnmlPlanEditor extends LitElement {
                   (config) => this.carProblem(plan, config, car.key),
                 );
               })}
-              ${iconButton('mdi:delete-outline', `Remove ${car.key}`, () => {
+              ${iconButton('mdi:delete-outline', said.remove(car.key), () => {
                 this.change({ cars: plan.cars.filter((each) => each !== car) });
               })}
             </span>
@@ -743,7 +1103,7 @@ export class MnmlPlanEditor extends LitElement {
           class="action"
           @click=${() => {
             this.edit(
-              'A car',
+              said.aCar,
               look.cars,
               blank,
               (config) => {
@@ -756,7 +1116,7 @@ export class MnmlPlanEditor extends LitElement {
             );
           }}
         >
-          ${icon('mdi:car-side')}<span>Add a car</span>
+          ${icon('mdi:car-side')}<span>${said.addCar}</span>
         </button>
       </div>
     </section>`;
@@ -776,42 +1136,67 @@ export class MnmlPlanEditor extends LitElement {
     choice: SystemChoice,
     index: number,
   ): TemplateResult {
-    const label = SYSTEM_NAMES[choice.template] ?? choice.template;
+    const label = this.titleOf(choice.template);
+    const said = this.words().plan;
+    const template = this.templates[choice.template];
+    const parting: Parting | undefined =
+      choice.spelled === true || template === undefined
+        ? undefined
+        : {
+            key: `system:${choice.template}`,
+            name: label,
+            template: choice.template,
+            found: () => discover(template, undefined, registries),
+            slots: choice.slots,
+            area: undefined,
+            write: (slots) => {
+              this.change({
+                system: plan.system.map((each) =>
+                  each === choice
+                    ? { template: choice.template, ...(slots === undefined ? {} : { slots }) }
+                    : each,
+                ),
+              });
+            },
+          };
     return html`<div class="plan-row">
-      <input
-        type="checkbox"
-        aria-label=${`Show ${label}`}
-        .checked=${live(true)}
-        @change=${() => {
-          this.change({ system: plan.system.filter((each) => each !== choice) });
-        }}
-      />
-      ${this.drawTile(systemCard(choice, registries, this.templates))}
-      <span class="row-actions">
-        ${iconButton('mdi:tune-variant', `Customize ${label}`, () => {
-          this.edit(
-            `Customize ${label}`,
-            choice.template,
-            systemCard(choice, registries, this.templates),
-            this.keepSystem(plan, registries, choice),
-          );
-        })}
-        ${this.moves(label, index, plan.system.length, (by) => {
-          this.change({ system: movedBy(plan.system, index, by) });
-        })}
-      </span>
-    </div>`;
+        <input
+          type="checkbox"
+          aria-label=${said.show(label)}
+          .checked=${live(true)}
+          @change=${() => {
+            this.change({ system: plan.system.filter((each) => each !== choice) });
+          }}
+        />
+        ${this.drawTile(systemCard(choice, registries, this.templates))}
+        <span class="row-actions">
+          ${iconButton('mdi:tune-variant', said.customize(label), () => {
+            this.edit(
+              said.customize(label),
+              choice.template,
+              systemCard(choice, registries, this.templates),
+              this.keepSystem(plan, registries, choice),
+            );
+          })}
+          ${parting === undefined ? nothing : this.partsButton(parting)}
+          ${this.moves(label, index, plan.system.length, (by) => {
+            this.change({ system: movedBy(plan.system, index, by) });
+          })}
+        </span>
+      </div>
+      ${parting === undefined ? nothing : this.drawParts(parting, registries)}`;
   }
 
   private drawSystemOther(plan: Plan, registries: Registries, name: string): TemplateResult {
     const fills = this.remembered(`system:${name}`, () =>
       systemFills(registries, this.templates, name),
     );
-    const label = SYSTEM_NAMES[name] ?? name;
+    const label = this.titleOf(name);
+    const said = this.words().plan;
     return html`<div class="plan-row off">
       <input
         type="checkbox"
-        aria-label=${`Show ${label}`}
+        aria-label=${said.show(label)}
         .checked=${live(false)}
         ?disabled=${!fills}
         @change=${() => {
@@ -820,11 +1205,7 @@ export class MnmlPlanEditor extends LitElement {
       />
       <span class="plan-words">
         <span>${label}</span>
-        ${
-          fills
-            ? nothing
-            : html`<span class="muted">MNML does not find its entities in this home.</span>`
-        }
+        ${fills ? nothing : html`<span class="muted">${said.notFound}</span>`}
       </span>
       ${
         fills
@@ -841,7 +1222,7 @@ export class MnmlPlanEditor extends LitElement {
                 );
               }}
             >
-              Choose its entities
+              ${said.chooseEntities}
             </button>`
       }
     </div>`;
@@ -864,23 +1245,24 @@ export class MnmlPlanEditor extends LitElement {
     count: number,
     move: (by: number) => void,
   ): TemplateResult {
+    const said = this.words().plan;
+    const up = said.moveUp(label);
+    const down = said.moveDown(label);
     const moving = (by: number): void => {
       move(by);
       void this.updateComplete.then(() => {
-        const ways = by < 0 ? ['up', 'down'] : ['down', 'up'];
-        ways
+        const buttons = [...this.renderRoot.querySelectorAll('button')];
+        (by < 0 ? [up, down] : [down, up])
           .map((way) =>
-            this.renderRoot.querySelector<HTMLButtonElement>(
-              `button[aria-label="Move ${label} ${way}"]`,
-            ),
+            buttons.find((button) => button.getAttribute('aria-label') === way && !button.disabled),
           )
-          .find((button) => button !== null && !button.disabled)
+          .find((button) => button !== undefined)
           ?.focus();
       });
     };
     return html`${iconButton(
       'mdi:arrow-up',
-      `Move ${label} up`,
+      up,
       () => {
         moving(-1);
       },
@@ -888,7 +1270,7 @@ export class MnmlPlanEditor extends LitElement {
     )}
     ${iconButton(
       'mdi:arrow-down',
-      `Move ${label} down`,
+      down,
       () => {
         moving(1);
       },
@@ -896,14 +1278,15 @@ export class MnmlPlanEditor extends LitElement {
     )}`;
   }
 
-  private drawHeading(plan: Plan, key: SectionKey): TemplateResult {
+  private drawHeading(plan: Plan, key: PlanSection): TemplateResult {
     const order = orderOf(plan);
     const index = order.indexOf(key);
-    const name = SECTION_LOOKS[key].title;
+    const said = this.words().plan;
+    const name = said.sections[key];
     return html`<div class="plan-heading">
       <h2>${name}</h2>
       <span class="row-actions">
-        ${this.moves(`the ${name} section`, index, order.length, (by) => {
+        ${this.moves(said.section(name), index, order.length, (by) => {
           const draft = this.draft;
           if (draft !== undefined) {
             this.draft = withOrder(draft, movedBy(order, index, by));
@@ -914,9 +1297,12 @@ export class MnmlPlanEditor extends LitElement {
     </div>`;
   }
 
-  private drawPart(plan: Plan, key: SectionKey, registries: Registries): TemplateResult {
+  private drawPart(plan: Plan, key: PlanSection, registries: Registries): TemplateResult {
     if (key === 'rooms') {
       return this.drawRooms(plan, registries);
+    }
+    if (key === 'devices') {
+      return this.drawDevices(plan, registries);
     }
     if (key === 'people') {
       return this.drawPeople(plan, registries);
@@ -932,62 +1318,85 @@ export class MnmlPlanEditor extends LitElement {
   }
 
   private drawGlances(plan: Plan): TemplateResult {
+    const said = this.words().plan;
     return html`<section class="plan-section">
-      <h2>Glances</h2>
+      <h2>${said.glances}</h2>
       <div class="plan-row">
         <input
           type="checkbox"
-          aria-label="Show the Glances strip"
+          aria-label=${said.showGlances}
           .checked=${live(plan.glances !== undefined)}
           @change=${() => {
             this.reshaped((draft) => withGlances(draft, draft.glances === undefined));
           }}
         />
         <span class="plan-words">
-          <span>The Glances strip</span>
-          <span class="muted"
-            >One line across the top: the weather, the alarm, and whatever needs you.</span
-          >
+          <span>${said.strip}</span>
+          <span class="muted">${said.stripAbout}</span>
         </span>
       </div>
     </section>`;
   }
 
   private drawPopups(plan: Plan): TemplateResult {
+    const said = this.words().plan;
     return html`<section class="plan-section">
-      <h2>Pop-ups</h2>
-      <p class="muted">How a tile's pop-up opens on each screen.</p>
+      <h2>${said.popups}</h2>
+      <p class="muted">${said.popupsAbout}</p>
       ${DEVICES.map(
-        ({ device, label, otherwise }) =>
+        (device) =>
           html`<label class="plan-field">
-            <span>${label}</span>
+            <span>${said.screens[device]}</span>
             <select
               class="area-picker"
               .value=${live(plan.open[device] ?? '')}
               @change=${(event: Event) => {
-                const value = OPENINGS.find((each) => each.opening === text(event))?.opening;
+                const value = OPENINGS.find((each) => each === text(event));
                 this.change({ open: withOpening(plan.open, device, value) });
               }}
             >
               <option value="" ?selected=${plan.open[device] === undefined}>
-                The default, ${otherwise}
+                ${said.byDefault(said.defaults[device])}
               </option>
               ${OPENINGS.map(
-                ({ opening, label: words }) =>
+                (opening) =>
                   html`<option value=${opening} ?selected=${plan.open[device] === opening}>
-                    ${words}
+                    ${said.openings[opening]}
                   </option>`,
               )}
             </select>
           </label>`,
       )}
+      <label class="plan-field">
+        <span>${said.closeAfter}</span>
+        <input
+          class="fact-input"
+          type="number"
+          min="1"
+          placeholder=${said.never}
+          .value=${live(plan.idle_close === undefined ? '' : String(plan.idle_close))}
+          @change=${(event: Event) => {
+            const seconds = Number(text(event));
+            this.change({ idle_close: text(event) !== '' && seconds > 0 ? seconds : undefined });
+          }}
+        />
+      </label>
     </section>`;
+  }
+
+  private pending(): TemplateResult | typeof nothing {
+    const count = this.fresh ? 0 : this.changes();
+    if (count === 0) {
+      return nothing;
+    }
+    return html`<span class="muted" role="status">${this.words().plan.unbuilt(count)}</span>`;
   }
 
   protected override render(): TemplateResult {
     const plan = this.draft;
+    const said = this.words().plan;
     if (plan === undefined) {
-      return html`<p class="muted loading">Reading the home...</p>`;
+      return html`<p class="muted loading">${said.readingHome}</p>`;
     }
     const registries = registriesOf(this.hass);
     return html`<div class="library plan">
@@ -995,16 +1404,19 @@ export class MnmlPlanEditor extends LitElement {
         <span class="plan-title">
           <button
             type="button"
-            class="icon-button"
-            aria-label="Back to the dashboards"
-            title="Back to the dashboards"
-            @click=${() => this.host?.leave()}
+            class="icon-button back"
+            aria-label=${said.back}
+            title=${said.back}
+            @click=${() => {
+              this.leave();
+            }}
           >
             ${icon('mdi:arrow-left')}
           </button>
-          <h1>${this.fresh ? 'A new dashboard' : `Edit ${this.plan?.title ?? plan.title}`}</h1>
+          <h1>${this.fresh ? said.fresh : said.edit(this.plan?.title ?? plan.title)}</h1>
         </span>
         <div class="library-tools">
+          ${this.pending()}
           <button
             type="button"
             class="action primary"
@@ -1014,7 +1426,7 @@ export class MnmlPlanEditor extends LitElement {
             }}
           >
             ${icon(this.fresh ? 'mdi:check' : 'mdi:refresh')}<span
-              >${this.fresh ? 'Create' : 'Rebuild'}</span
+              >${this.fresh ? said.create : said.rebuild}</span
             >
           </button>
         </div>

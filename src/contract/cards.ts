@@ -15,6 +15,7 @@ import type {
   SensorId,
   ServiceName,
   Subnet,
+  TimerId,
   WeatherId,
 } from './entities.ts';
 import type { Value } from './templates.ts';
@@ -22,6 +23,7 @@ import type { Value } from './templates.ts';
 export type Color = 'red' | 'orange' | 'amber' | 'blue';
 
 export interface StateRule {
+  attribute?: string;
   is?: string[];
   not?: string[];
 }
@@ -32,19 +34,56 @@ export interface EntityRule extends StateRule {
 
 interface StateIsCondition {
   condition: 'state';
-  entity: EntityId;
+  entity?: EntityId;
+  attribute?: string;
   state: string | string[];
   state_not?: never;
 }
 
 interface StateNotCondition {
   condition: 'state';
-  entity: EntityId;
+  entity?: EntityId;
+  attribute?: string;
   state?: never;
   state_not: string | string[];
 }
 
-export type Condition = StateIsCondition | StateNotCondition;
+interface NumericStateCondition {
+  condition: 'numeric_state';
+  entity?: EntityId;
+  attribute?: string;
+  above?: number | EntityId;
+  below?: number | EntityId;
+}
+
+interface ScreenCondition {
+  condition: 'screen';
+  media_query: string;
+}
+
+interface UserCondition {
+  condition: 'user';
+  users: string[];
+}
+
+interface LogicalCondition {
+  condition: 'and' | 'or' | 'not';
+  conditions: Condition[];
+}
+
+interface CoreCondition {
+  condition: string;
+  [key: string]: unknown;
+}
+
+export type Condition =
+  | StateIsCondition
+  | StateNotCondition
+  | NumericStateCondition
+  | ScreenCondition
+  | UserCondition
+  | LogicalCondition
+  | CoreCondition;
 
 interface StateBase {
   when?: EntityRule;
@@ -56,6 +95,8 @@ interface StateText extends StateBase {
   attribute?: never;
   minutes?: never;
   relative?: never;
+  since?: never;
+  remaining?: never;
   serial?: never;
   name?: never;
   icon?: never;
@@ -66,7 +107,9 @@ interface StateAttribute extends StateBase {
   text?: never;
   attribute: string;
   minutes?: never;
-  relative?: never;
+  relative?: true;
+  since?: never;
+  remaining?: never;
   serial?: never;
   name?: never;
   icon?: true;
@@ -78,6 +121,8 @@ interface StateMinutes extends StateBase {
   attribute?: never;
   minutes: true;
   relative?: never;
+  since?: never;
+  remaining?: never;
   serial?: never;
   name?: never;
   icon?: true;
@@ -89,6 +134,21 @@ interface StateRelative extends StateBase {
   attribute?: never;
   minutes?: never;
   relative: true;
+  since?: never;
+  remaining?: never;
+  serial?: never;
+  name?: never;
+  icon?: true;
+}
+
+interface StateSince extends StateBase {
+  entity?: EntityId;
+  text?: never;
+  attribute?: never;
+  minutes?: never;
+  relative?: never;
+  since: true;
+  remaining?: never;
   serial?: never;
   name?: never;
   icon?: true;
@@ -100,6 +160,8 @@ interface StateSerial extends StateBase {
   attribute?: never;
   minutes?: never;
   relative?: never;
+  since?: never;
+  remaining?: never;
   serial: true;
   name?: never;
   icon?: never;
@@ -111,6 +173,8 @@ interface StateName extends StateBase {
   attribute?: never;
   minutes?: never;
   relative?: never;
+  since?: never;
+  remaining?: never;
   serial?: never;
   name: true;
   icon?: never;
@@ -122,6 +186,21 @@ interface StateValue extends StateBase {
   attribute?: never;
   minutes?: never;
   relative?: never;
+  since?: never;
+  remaining?: never;
+  serial?: never;
+  name?: never;
+  icon?: true;
+}
+
+interface StateRemaining extends StateBase {
+  entity?: TimerId;
+  text?: never;
+  attribute?: never;
+  minutes?: never;
+  relative?: never;
+  since?: never;
+  remaining: true;
   serial?: never;
   name?: never;
   icon?: true;
@@ -132,6 +211,8 @@ export type StateItem =
   | StateAttribute
   | StateMinutes
   | StateRelative
+  | StateSince
+  | StateRemaining
   | StateSerial
   | StateName
   | StateValue;
@@ -163,6 +244,7 @@ export interface ToggleControl extends ControlBase {
   icon?: MdiIcon;
   color?: Color;
   when?: StateRule;
+  confirm?: StateRule;
   primary?: true;
 }
 
@@ -177,7 +259,7 @@ export interface SliderControl extends ControlBase {
 
 export interface SelectControl extends ControlBase {
   type: 'select';
-  entity: SelectId | ClimateId;
+  entity: SelectId | ClimateId | TimerId;
   attribute?: ModeAttribute;
   color?: Color;
   when?: StateRule;
@@ -191,6 +273,7 @@ export interface ServiceControl extends ControlBase {
   name: string;
   icon: MdiIcon;
   primary?: true;
+  confirm?: StateRule;
 }
 
 export interface NavControl extends ControlBase {
@@ -207,8 +290,10 @@ export interface IndicatorControl extends ControlBase {
   color: Color;
 }
 
-interface StatusRule extends StateRule {
+interface StatusRule {
   entities: EntityId[];
+  is?: string[];
+  not?: string[];
   below?: number;
   within_days?: number;
   label?: 'device';
@@ -241,6 +326,20 @@ export interface ScenesControl extends ControlBase {
   icon: MdiIcon;
 }
 
+export interface MessagesControl extends ControlBase {
+  type: 'messages';
+  popup: PopupHash;
+  name: string;
+  icon: MdiIcon;
+  color?: Color;
+}
+
+export interface DismissControl extends ControlBase {
+  type: 'dismiss';
+  name: string;
+  icon: MdiIcon;
+}
+
 export type Control =
   | ToggleControl
   | SliderControl
@@ -250,7 +349,9 @@ export type Control =
   | IndicatorControl
   | StatusControl
   | TyresControl
-  | ScenesControl;
+  | ScenesControl
+  | MessagesControl
+  | DismissControl;
 
 export interface HeadingCard {
   type: 'custom:mnml-heading-card';
@@ -280,7 +381,7 @@ export interface ListRow {
   color?: Color;
   when?: StateRule;
   show?: EntityRule;
-  values?: EntityId[];
+  values?: (EntityId | null)[];
 }
 
 export type ListSummary = 'lowest' | 'highest' | { sum: number };
@@ -288,9 +389,11 @@ export type ListSummary = 'lowest' | 'highest' | { sum: number };
 export interface ListCard {
   type: 'custom:mnml-list-card';
   lowest_first?: true;
+  highest_first?: true;
   fold?: true;
   summary?: ListSummary;
   title?: string;
+  entity?: EntityId;
   icon?: MdiIcon;
   headers?: string[];
   rows: ListRow[];
@@ -312,12 +415,59 @@ export type MessageSource =
   | { source: string; entity: EntityId; name?: never }
   | { source: string; entity?: never; name: string };
 
-export interface MessagesCard {
+interface SensorMessages {
   type: 'custom:mnml-messages-card';
   entity: SensorId;
+  notifications?: never;
+  repairs?: never;
+  popup?: never;
   clear: ScriptId;
   sources?: MessageSource[];
+  name?: never;
+  icon?: never;
+  color?: never;
 }
+
+interface NotificationMessages {
+  type: 'custom:mnml-messages-card';
+  entity?: never;
+  notifications: true;
+  repairs?: never;
+  popup?: never;
+  clear?: never;
+  sources?: never;
+  name?: never;
+  icon?: never;
+  color?: never;
+}
+
+interface RepairMessages {
+  type: 'custom:mnml-messages-card';
+  entity?: never;
+  notifications?: never;
+  repairs: true;
+  popup?: never;
+  clear?: never;
+  sources?: never;
+  name?: never;
+  icon?: never;
+  color?: never;
+}
+
+interface MessagesRow {
+  type: 'custom:mnml-messages-card';
+  entity?: never;
+  notifications?: never;
+  repairs?: never;
+  popup: PopupHash;
+  clear?: never;
+  sources?: never;
+  name: string;
+  icon: MdiIcon;
+  color?: Color;
+}
+
+export type MessagesCard = SensorMessages | NotificationMessages | RepairMessages | MessagesRow;
 
 export interface ClientNetwork {
   name: string;
@@ -358,6 +508,7 @@ export interface ReportCard {
 export interface GlanceOne {
   entity: EntityId;
   entities?: never;
+  messages?: never;
   name?: string;
   icon?: MdiIcon;
   color?: Color;
@@ -366,7 +517,9 @@ export interface GlanceOne {
   state?: StateItem[];
   popup?: PopupHash;
   toggle?: true;
+  confirm?: StateRule;
   quiet?: true;
+  calm?: true;
   bare?: true;
   alert?: StateRule;
   people?: PersonId[];
@@ -374,21 +527,25 @@ export interface GlanceOne {
   not?: never;
   below?: never;
   sum?: never;
+  total?: never;
   critical?: never;
 }
 
 export interface GlanceCount {
   entity?: never;
   entities: EntityId[];
+  messages?: never;
   name: string;
   icon?: MdiIcon;
   color?: Color;
   when?: never;
-  show?: never;
+  show?: EntityRule;
   state?: never;
   popup?: PopupHash;
   toggle?: never;
+  confirm?: never;
   quiet?: never;
+  calm?: never;
   bare?: never;
   alert?: never;
   people?: never;
@@ -396,10 +553,37 @@ export interface GlanceCount {
   not?: string[];
   below?: number;
   sum?: true;
+  total?: true;
   critical?: number;
 }
 
-export type Glance = GlanceOne | GlanceCount;
+export interface GlanceMessages {
+  entity?: never;
+  entities?: never;
+  messages: true;
+  name: string;
+  icon?: MdiIcon;
+  color?: Color;
+  when?: never;
+  show?: never;
+  state?: never;
+  popup: PopupHash;
+  toggle?: never;
+  confirm?: never;
+  quiet?: never;
+  calm?: never;
+  bare?: never;
+  alert?: never;
+  people?: never;
+  is?: never;
+  not?: never;
+  below?: never;
+  sum?: never;
+  total?: never;
+  critical?: never;
+}
+
+export type Glance = GlanceOne | GlanceCount | GlanceMessages;
 
 export interface GlancesCard {
   type: 'custom:mnml-glances-card';
@@ -480,6 +664,7 @@ type Subject = NamedSubject | EntitySubject;
 
 export type HeaderCard = {
   type: 'custom:mnml-header-card';
+  messages?: true;
   color?: Color;
   when?: StateRule;
   state?: StateItem[];
@@ -537,16 +722,28 @@ export interface PopupOpen {
   desktop?: PopupOpening;
 }
 
+export type PopupScreen = keyof PopupOpen;
+
+export interface PopupAlert extends StateRule {
+  entity: EntityId;
+  popup: PopupHash;
+  screens?: PopupScreen[];
+  users?: string[];
+}
+
 export interface PopupsCard {
   type: 'custom:mnml-popups-card';
   width: `${number}px`;
   open?: PopupOpen;
+  idle_close?: number;
+  alerts?: PopupAlert[];
   popups?: Popup[];
 }
 
 export interface TemplateCard {
   type: 'custom:mnml-template-card';
   template: string;
+  device?: string;
   area?: string;
   slots?: Record<string, Value>;
 }

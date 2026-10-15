@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 
 import { test } from 'vitest';
 
-import { define, mounted, text } from '../test/render.ts';
+import type { HomeAssistant } from '../ha/hass.ts';
+import { fakeHass } from '../test/hass.ts';
+import { configure, created, define, paint as painted, text } from '../test/render.ts';
 
 import { MnmlReportCard } from './report.ts';
 
@@ -21,23 +23,15 @@ const DETAILS = [
   '  client: 23 a reboot is pending',
 ].join('\n');
 
-function hassWith(attributes: Record<string, unknown>): unknown {
-  return {
-    states: { 'sensor.checks': { entity_id: 'sensor.checks', state: '2', attributes } },
-    entities: {},
-    devices: {},
-    locale: { language: 'en' },
-    formatEntityState: (stateObj: { state: string }): string => stateObj.state,
-  };
-}
+const card = (): MnmlReportCard => created('mnml-report-card', MnmlReportCard);
 
-async function paint(attributes: Record<string, unknown>, config: unknown = CONFIG) {
-  const made = document.createElement('mnml-report-card');
-  assert.ok(made instanceof MnmlReportCard);
-  made.setConfig(config as never);
-  made.hass = hassWith(attributes) as never;
-  return mounted(made);
-}
+const hassWith = (attributes: Record<string, unknown>): HomeAssistant =>
+  fakeHass({ states: { 'sensor.checks': { state: '2', attributes } } });
+
+const paint = (
+  attributes: Record<string, unknown>,
+  config: unknown = CONFIG,
+): Promise<ShadowRoot> => painted(card(), config, hassWith(attributes));
 
 test('each line at the first indent is an entry, the deeper lines under it its details', async () => {
   const root = await paint({ details: DETAILS });
@@ -85,6 +79,6 @@ test('a report card without an entity is an error card', () => {
   const made = document.createElement('mnml-report-card');
   assert.ok(made instanceof MnmlReportCard);
   assert.throws(() => {
-    made.setConfig({ type: 'custom:mnml-report-card' } as never);
+    configure(made, { type: 'custom:mnml-report-card' });
   }, /entity is required/);
 });

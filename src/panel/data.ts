@@ -1,4 +1,5 @@
-import { isMapping } from '../contract/templates.ts';
+import type { MdiIcon } from '../contract/entities.ts';
+import { isMapping, sameValue, templateIcon, templateTitle } from '../contract/templates.ts';
 import type {
   SlotSpec,
   Template,
@@ -7,13 +8,15 @@ import type {
   WrittenSlot,
   WrittenTemplate,
 } from '../contract/templates.ts';
-import { applyChanges, changesOf, nodeHash } from '../templates/changes.ts';
+import type { Registries } from '../ha/registries.ts';
+import { applyChanges, changesOf } from '../templates/changes.ts';
 import type { Change, Conflict } from '../templates/changes.ts';
-import type { Registries } from '../templates/discover.ts';
-import { TemplateError, toValue } from '../templates/expand.ts';
+import { TemplateError } from '../templates/expand.ts';
 import { SLOT_SHAPES } from '../templates/families.ts';
 import type { Role } from '../templates/roles.ts';
 import { withShapes } from '../templates/slot-shapes.ts';
+import { PANEL_EN } from '../words/panel/en.ts';
+import type { PanelWords } from '../words/panel/en.ts';
 
 import type { Board, Built } from './building.ts';
 
@@ -31,6 +34,8 @@ export interface Use {
 
 export interface Row {
   name: string;
+  title: string;
+  icon: MdiIcon;
   description: string;
   family: string | undefined;
   status: Status;
@@ -152,13 +157,15 @@ export function rowsOf(
   uses: ReadonlyMap<string, Use>,
   roles: Readonly<Record<string, Role>>,
 ): Row[] {
-  const names = [...new Set([...Object.keys(shipped), ...Object.keys(kept.own)])].toSorted();
-  return names.map((name) => {
+  const names = [...new Set([...Object.keys(shipped), ...Object.keys(kept.own)])];
+  const rows = names.map((name): Row => {
     const own = kept.own[name];
     const base = shipped[name];
     const changes = kept.changes[name] ?? [];
-    const conflicts =
-      base === undefined || changes.length === 0 ? 0 : applyChanges(base, changes).conflicts.length;
+    const applied =
+      base === undefined || changes.length === 0 ? undefined : applyChanges(base, changes);
+    const current = own ?? applied?.template ?? base;
+    const conflicts = applied?.conflicts.length ?? 0;
     const status: Status =
       own !== undefined
         ? 'own'
@@ -169,7 +176,9 @@ export function rowsOf(
             : 'shipped';
     return {
       name,
-      description: (own ?? base)?.description ?? '',
+      title: templateTitle(current, name),
+      icon: templateIcon(current),
+      description: current?.description ?? '',
       family: own === undefined ? (owner[name] ?? 'common') : undefined,
       status,
       changes: changes.length,
@@ -177,6 +186,7 @@ export function rowsOf(
       role: roles[name] ?? 'tile',
     };
   });
+  return rows.toSorted((a, b) => a.title.localeCompare(b.title) || a.name.localeCompare(b.name));
 }
 
 export function draftOf(name: string, shipped: Templates, kept: Kept): Draft | undefined {
@@ -201,20 +211,18 @@ export function draftOf(name: string, shipped: Templates, kept: Kept): Draft | u
   };
 }
 
-export function describe(row: Row): string {
+export function describe(row: Row, words: PanelWords = PANEL_EN): string {
+  const said = words.rows;
   const parts: string[] = [];
   if (row.status === 'customised') {
-    parts.push(`customised, ${row.changes} ${row.changes === 1 ? 'change' : 'changes'}`);
+    parts.push(said.customised(row.changes));
   } else if (row.status === 'conflict') {
-    parts.push('conflict');
+    parts.push(said.conflict);
   } else if (row.status === 'own') {
-    parts.push('yours');
+    parts.push(said.yours);
   }
   if (row.use.cards > 0) {
-    const boards = row.use.dashboards.length;
-    parts.push(
-      `on ${row.use.cards} ${row.use.cards === 1 ? 'card' : 'cards'}, ${boards} ${boards === 1 ? 'dashboard' : 'dashboards'}`,
-    );
+    parts.push(said.on(row.use.cards, row.use.dashboards.length));
   }
   return parts.join(' • ');
 }
@@ -229,7 +237,7 @@ export function roundTrips(
     return true;
   }
   const kept = entry === undefined ? shipped : applyChanges(shipped, entry.changes).template;
-  return nodeHash(toValue(kept)) === nodeHash(toValue(shapedOf(name, draft)));
+  return sameValue(kept, shapedOf(name, draft));
 }
 
 export function storedAs(entry: Entry | undefined, kept: Kept, name: string): boolean {
@@ -239,8 +247,8 @@ export function storedAs(entry: Entry | undefined, kept: Kept, name: string): bo
     return own === undefined && changes === undefined;
   }
   return entry.kind === 'own'
-    ? own !== undefined && nodeHash(toValue(own)) === nodeHash(toValue(entry.template))
-    : changes !== undefined && nodeHash(toValue(changes)) === nodeHash(toValue(entry.changes));
+    ? own !== undefined && sameValue(own, entry.template)
+    : changes !== undefined && sameValue(changes, entry.changes);
 }
 
 export function entryOf(

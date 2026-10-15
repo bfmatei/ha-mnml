@@ -1,70 +1,74 @@
-import { SECTION_LOOKS, SYSTEM_TEMPLATES, isPersonId } from '../contract/builder.ts';
-import type { Plan, Recipe, RoomChoice, SectionKey, SectionLook } from '../contract/builder.ts';
 import type { PersonId } from '../contract/entities.ts';
+import { SECTION_LOOKS, SYSTEM_TEMPLATES, isPersonId } from '../contract/plan.ts';
+import type {
+  Plan,
+  DashboardTemplate,
+  RoomChoice,
+  SectionKey,
+  SectionLook,
+} from '../contract/plan.ts';
 import { isMapping } from '../contract/templates.ts';
-import type { Instance, Templates, Value } from '../contract/templates.ts';
-import { areaOf, discover } from '../templates/discover.ts';
-import type { EntityEntry, Registries } from '../templates/discover.ts';
+import type { Filter, Instance, Templates, Value } from '../contract/templates.ts';
+import type { EntityEntry, Registries } from '../ha/registries.ts';
+import { discover } from '../templates/discover.ts';
+import { areaOf } from '../templates/entity-index.ts';
 import { expand, filled } from '../templates/expand.ts';
+import { matches } from '../templates/filters.ts';
 
 const NAMING = new Set(['key', 'name', 'icon']);
 
 type Sign = 'tracker' | 'system' | 'room';
 
 interface Mark {
-  platform?: string;
-  domain?: string;
-  device_class?: string;
-  translation_key?: string;
-  entity_category?: string;
-  source_type?: string;
+  filter: Filter;
   measured?: true;
   plug?: true;
   sign: Sign;
 }
 
 const MARKS: readonly Mark[] = [
-  { platform: 'mobile_app', sign: 'tracker' },
-  { domain: 'device_tracker', source_type: 'gps', sign: 'tracker' },
-  { entity_category: 'diagnostic', sign: 'system' },
-  { entity_category: 'config', sign: 'system' },
-  { domain: 'update', sign: 'system' },
-  { domain: 'light', sign: 'room' },
-  { domain: 'climate', sign: 'room' },
-  { domain: 'sensor', device_class: 'temperature', measured: true, sign: 'room' },
-  { domain: 'sensor', device_class: 'humidity', measured: true, sign: 'room' },
-  { domain: 'switch', device_class: 'outlet', sign: 'room' },
-  { domain: 'sensor', device_class: 'power', plug: true, sign: 'room' },
-  { domain: 'cover', sign: 'room' },
-  { domain: 'lock', sign: 'room' },
-  { domain: 'binary_sensor', device_class: 'window', sign: 'room' },
-  { domain: 'binary_sensor', device_class: 'door', sign: 'room' },
-  { domain: 'binary_sensor', device_class: 'moisture', sign: 'room' },
-  { domain: 'media_player', sign: 'room' },
-  { domain: 'camera', sign: 'room' },
-  { domain: 'fan', sign: 'room' },
-  { domain: 'humidifier', sign: 'room' },
-  { domain: 'vacuum', sign: 'room' },
-  { platform: 'prusalink', sign: 'room' },
+  { filter: { platform: 'mobile_app' }, sign: 'tracker' },
+  { filter: { domain: 'device_tracker', attribute: { source_type: 'gps' } }, sign: 'tracker' },
+  { filter: { entity_category: 'diagnostic' }, sign: 'system' },
+  { filter: { entity_category: 'config' }, sign: 'system' },
+  { filter: { domain: 'update' }, sign: 'system' },
+  { filter: { domain: 'light' }, sign: 'room' },
+  { filter: { domain: 'climate' }, sign: 'room' },
+  { filter: { domain: 'sensor', device_class: 'temperature' }, measured: true, sign: 'room' },
+  { filter: { domain: 'sensor', device_class: 'humidity' }, measured: true, sign: 'room' },
+  { filter: { domain: 'switch', device_class: 'outlet' }, sign: 'room' },
+  { filter: { domain: 'sensor', device_class: 'power' }, plug: true, sign: 'room' },
+  { filter: { domain: 'cover' }, sign: 'room' },
+  { filter: { domain: 'lock' }, sign: 'room' },
+  { filter: { domain: 'binary_sensor', device_class: 'window' }, sign: 'room' },
+  { filter: { domain: 'binary_sensor', device_class: 'door' }, sign: 'room' },
+  { filter: { domain: 'binary_sensor', device_class: 'moisture' }, sign: 'room' },
+  { filter: { domain: 'media_player' }, sign: 'room' },
+  { filter: { domain: 'camera' }, sign: 'room' },
+  { filter: { domain: 'fan' }, sign: 'room' },
+  { filter: { domain: 'humidifier' }, sign: 'room' },
+  { filter: { domain: 'vacuum' }, sign: 'room' },
+  { filter: { platform: 'prusalink' }, sign: 'room' },
   {
-    domain: 'sensor',
-    platform: 'smartthings',
-    translation_key: 'washer_machine_state',
+    filter: { domain: 'sensor', platform: 'smartthings', translation_key: 'washer_machine_state' },
     sign: 'room',
   },
   {
-    domain: 'sensor',
-    platform: 'smartthings',
-    translation_key: 'dryer_machine_state',
+    filter: { domain: 'sensor', platform: 'smartthings', translation_key: 'dryer_machine_state' },
     sign: 'room',
   },
   {
-    domain: 'sensor',
-    platform: 'smartthings',
-    translation_key: 'dishwasher_machine_state',
+    filter: {
+      domain: 'sensor',
+      platform: 'smartthings',
+      translation_key: 'dishwasher_machine_state',
+    },
     sign: 'room',
   },
-  { domain: 'sensor', platform: 'home_connect', translation_key: 'operation_state', sign: 'room' },
+  {
+    filter: { domain: 'sensor', platform: 'home_connect', translation_key: 'operation_state' },
+    sign: 'room',
+  },
 ];
 
 export type AreaKind = 'room' | 'phones' | 'system' | 'empty';
@@ -91,17 +95,10 @@ function signOf(
   registries: Registries,
   plugs: ReadonlySet<string>,
 ): Sign | undefined {
-  const domain = entry.entity_id.split('.')[0];
-  const attributes = registries.states[entry.entity_id]?.attributes;
   const device = deviceId(entry);
   return MARKS.find(
     (mark) =>
-      (mark.platform === undefined || mark.platform === entry.platform) &&
-      (mark.domain === undefined || mark.domain === domain) &&
-      (mark.device_class === undefined || mark.device_class === attributes?.['device_class']) &&
-      (mark.translation_key === undefined || mark.translation_key === entry.translation_key) &&
-      (mark.entity_category === undefined || mark.entity_category === entry.entity_category) &&
-      (mark.source_type === undefined || mark.source_type === attributes?.['source_type']) &&
+      matches(entry, mark.filter, registries) &&
       (mark.measured !== true || measured(entry, registries)) &&
       (mark.plug !== true || (device !== undefined && plugs.has(device))),
   )?.sign;
@@ -154,17 +151,22 @@ export function areaKinds(registries: Registries): Readonly<Record<string, AreaK
   return Object.fromEntries(Object.keys(registries.areas).map((area) => [area, kindOf(area)]));
 }
 
-export function unplaced(registries: Registries): number {
-  return new Set(
-    holdings(registries).held.flatMap(({ area, device, shown }) =>
-      shown &&
-      area === undefined &&
-      device !== undefined &&
-      registries.devices[device] !== undefined
-        ? [device]
-        : [],
-    ),
-  ).size;
+export interface Unplaced {
+  devices: number;
+  entities: number;
+  share: number;
+}
+
+export function unplaced(registries: Registries): Unplaced {
+  const shown = holdings(registries).held.filter((each) => each.shown);
+  const away = shown.filter((each) => each.area === undefined);
+  const known = (device: string | undefined): device is string =>
+    device !== undefined && registries.devices[device] !== undefined;
+  return {
+    devices: new Set(away.flatMap(({ device }) => (known(device) ? [device] : []))).size,
+    entities: away.filter(({ device }) => !known(device)).length,
+    share: shown.length === 0 ? 0 : away.length / shown.length,
+  };
 }
 
 function draws(templates: Templates, instance: Instance, found: Record<string, Value>): boolean {
@@ -228,7 +230,7 @@ export function peopleIn(registries: Registries): PersonId[] {
   ].filter(isPersonId);
 }
 
-export const DEFAULT_RECIPE: Recipe = {
+export const DEFAULT_DASHBOARD_TEMPLATE: DashboardTemplate = {
   title: 'Home',
   icon: 'mdi:home-variant',
   open: { tablet: 'unfold', desktop: 'unfold' },
@@ -238,8 +240,8 @@ export const DEFAULT_RECIPE: Recipe = {
 
 const KEYS: readonly SectionKey[] = ['rooms', 'people', 'garage', 'system'];
 
-function lookIn(recipe: Recipe, key: SectionKey): SectionLook {
-  const given = recipe.sections[key];
+function lookIn(dashboardTemplate: DashboardTemplate, key: SectionKey): SectionLook {
+  const given = dashboardTemplate.sections[key];
   const fallback = SECTION_LOOKS[key];
   if (given === undefined) {
     return {};
@@ -253,19 +255,23 @@ function lookIn(recipe: Recipe, key: SectionKey): SectionLook {
   };
 }
 
-export function planFrom(recipe: Recipe, registries: Registries, templates: Templates): Plan {
+export function planFrom(
+  dashboardTemplate: DashboardTemplate,
+  registries: Registries,
+  templates: Templates,
+): Plan {
   const looks = Object.fromEntries(
     KEYS.flatMap((key) => {
-      const look = lookIn(recipe, key);
+      const look = lookIn(dashboardTemplate, key);
       return Object.keys(look).length === 0 ? [] : [[key, look]];
     }),
   );
-  const { rooms, people, system } = recipe.sections;
+  const { rooms, people, system } = dashboardTemplate.sections;
   const roomTemplate = rooms?.template ?? 'room';
   return {
-    title: recipe.title,
-    icon: recipe.icon,
-    ...(recipe.glances === true ? { glances: {} } : {}),
+    title: dashboardTemplate.title,
+    icon: dashboardTemplate.icon,
+    ...(dashboardTemplate.glances === true ? { glances: {} } : {}),
     rooms: rooms === undefined ? [] : roomsIn(registries, templates, roomTemplate),
     people: people === undefined ? [] : peopleIn(registries).map((entity) => ({ entity })),
     cars: [],
@@ -275,12 +281,12 @@ export function planFrom(recipe: Recipe, registries: Registries, templates: Temp
         : (system.templates ?? SYSTEM_TEMPLATES)
             .filter((name) => systemFills(registries, templates, name))
             .map((template) => ({ template })),
-    open: { ...recipe.open },
+    open: { ...dashboardTemplate.open },
     ...(Object.keys(looks).length === 0 ? {} : { sections: looks }),
-    ...(recipe.order === undefined ? {} : { order: [...recipe.order] }),
+    ...(dashboardTemplate.order === undefined ? {} : { order: [...dashboardTemplate.order] }),
   };
 }
 
 export function defaultPlan(registries: Registries, templates: Templates): Plan {
-  return planFrom(DEFAULT_RECIPE, registries, templates);
+  return planFrom(DEFAULT_DASHBOARD_TEMPLATE, registries, templates);
 }

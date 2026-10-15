@@ -10,5 +10,5 @@ test("without Home Assistant's form, the template card's editor refuses, so Home
   assert.ok(editor instanceof MnmlTemplateCardEditor);
   assert.throws(() => {
     editor.setConfig({ type: 'custom:mnml-template-card', template: 'section-heading' });
-  }, /Home Assistant's form is not loaded/);
+  }, /Home Assistant's form loads with its dashboards/);
 });

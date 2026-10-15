@@ -3,9 +3,10 @@ import assert from 'node:assert/strict';
 import { test } from 'vitest';
 
 import { announce, withdraw } from '../cards/parts/popup-registry.ts';
+import { fakeHass } from '../test/hass.ts';
 import { define, mounted } from '../test/render.ts';
 
-import { MnmlCardEditor, hashesOf } from './card-editor.ts';
+import { MnmlCardEditor, popupsOf } from './card-editor.ts';
 import { MnmlRowMenu } from './row-menu.ts';
 import { MnmlWords } from './words.ts';
 
@@ -94,8 +95,8 @@ test('a new configuration from the YAML tab redraws', async () => {
 test('hass reaches every form without a redraw', async () => {
   const { editor, root } = await open(SLIDER);
   const before = form(root);
-  editor.hass = { states: {} } as never;
-  const latest = { states: {} } as never;
+  editor.hass = fakeHass();
+  const latest = fakeHass();
   editor.hass = latest;
   await editor.updateComplete;
   assert.equal(form(root), before);
@@ -129,7 +130,7 @@ test('a card the editor cannot hold is refused with the reason, so Home Assistan
 
 test("the pop-up picker offers the hashes of the dashboard's pop-ups", () => {
   assert.deepEqual(
-    hashesOf({
+    popupsOf({
       config: {
         views: [
           {
@@ -150,7 +151,7 @@ test("the pop-up picker offers the hashes of the dashboard's pop-ups", () => {
           },
         ],
       },
-    }),
+    }).map((popup) => popup.hash),
     ['#living', '#kitchen'],
   );
 });
@@ -165,7 +166,7 @@ test('the context Home Assistant hands every card editor does not break it', asy
 
 test('the hashes come from the dashboard configuration as Home Assistant hands it, views at the top', () => {
   assert.deepEqual(
-    hashesOf({
+    popupsOf({
       views: [
         {
           cards: [
@@ -177,7 +178,7 @@ test('the hashes come from the dashboard configuration as Home Assistant hands i
           ],
         },
       ],
-    }),
+    }).map((popup) => popup.hash),
     ['#living'],
   );
 });
@@ -189,16 +190,31 @@ test("the dashboard's pop-ups reach the pop-up picker", async () => {
     icon: 'mdi:door',
     popup: '#hall',
   });
+  const header = { type: 'custom:mnml-header-card', name: 'Living', icon: 'mdi:sofa' };
   editor.lovelace = {
     config: {
-      views: [{ cards: [{ type: 'custom:mnml-popups-card', popups: [{ hash: '#living' }] }] }],
+      views: [
+        {
+          cards: [
+            {
+              type: 'custom:mnml-popups-card',
+              popups: [
+                { hash: '#living', cards: [header] },
+                { hash: '#living-lights', cards: [] },
+              ],
+            },
+          ],
+        },
+      ],
     },
   };
   await editor.updateComplete;
   const schemas = [...root.querySelectorAll('ha-form')].map((each) =>
     JSON.stringify(each instanceof FakeForm ? each.schema : undefined),
   );
-  assert.ok(schemas.some((schema) => schema.includes('#living')));
+  const offered = schemas.find((schema) => schema.includes('#living')) ?? '';
+  assert.match(offered, /\{"value":"#living","label":"Living"\}/);
+  assert.match(offered, /\{"value":"#living-lights","label":"Living: lights"\}/);
 });
 
 test('an edit leaves the rest of the card as it is, an empty list over a default included', async () => {

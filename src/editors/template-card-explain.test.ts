@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import { test, vi } from 'vitest';
 
 import type { explain } from '../templates/explain.ts';
-import { fakeStore } from '../test/fake-hass.ts';
-import { define, mounted } from '../test/render.ts';
+import { fakeHass, fakeStore } from '../test/hass.ts';
+import { created, define, mounted, updated } from '../test/render.ts';
+import { until } from '../test/until.ts';
 
 import { MnmlTemplateCardEditor } from './template-card.ts';
 
@@ -24,15 +25,6 @@ vi.mock('../templates/explain.ts', async (original) => {
 define('ha-form', class extends HTMLElement {});
 define('mnml-template-card-editor', MnmlTemplateCardEditor);
 
-const settle = async (rounds = 6): Promise<void> => {
-  await new Promise((resolve) => {
-    setTimeout(resolve, 0);
-  });
-  if (rounds > 1) {
-    await settle(rounds - 1);
-  }
-};
-
 test('what an area finds is worked out again only when the registries change, not on every state', async () => {
   const store = fakeStore();
   store.kept = {
@@ -44,25 +36,17 @@ test('what an area finds is worked out again only when the registries change, no
       },
     },
   };
-  const hass = {
-    ...store.hass,
-    areas: { living: { area_id: 'living', name: 'Living' } },
-    devices: {},
-    entities: {},
-    states: {},
-  };
-  const editor = document.createElement('mnml-template-card-editor');
-  assert.ok(editor instanceof MnmlTemplateCardEditor);
+  const hass = { ...store.hass, areas: { living: { area_id: 'living', name: 'Living' } } };
+  const editor = created('mnml-template-card-editor', MnmlTemplateCardEditor);
   editor.setConfig({ type: 'custom:mnml-template-card', template: 'roomy', area: 'living' });
-  editor.hass = hass as never;
-  await mounted(editor);
-  await settle();
+  editor.hass = hass;
+  const root = await mounted(editor);
+  await until(() => explained.count > 0, 'what the area finds');
+  await updated(root);
   const before = explained.count;
-  assert.ok(before > 0);
-  editor.hass = { ...hass, states: { 'light.a': { entity_id: 'light.a', state: 'on' } } } as never;
-  await settle();
+  editor.hass = fakeHass({ ...hass, states: { 'light.a': { state: 'on' } } });
+  await updated(root);
   assert.equal(explained.count, before);
-  editor.hass = { ...hass, areas: { ...hass.areas } } as never;
-  await settle();
-  assert.equal(explained.count, before + 1);
+  editor.hass = { ...hass, areas: { ...hass.areas } };
+  await until(() => explained.count === before + 1, 'the registries worked out again');
 });

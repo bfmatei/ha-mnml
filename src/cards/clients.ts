@@ -5,18 +5,20 @@ import { styleMap } from 'lit/directives/style-map.js';
 
 import type { ClientFields, ClientsCard } from '../contract/cards.ts';
 import type { MdiIcon } from '../contract/entities.ts';
+import { CARD_STRUCTURES } from '../contract/structure.ts';
+import type { Structure } from '../contract/structure.ts';
 import { ipv4, subnetRange } from '../contract/subnet.ts';
 import { DASH, unavailableValue } from '../ha/format.ts';
 import { hasValue, isUnavailable, stateOf } from '../ha/hass.ts';
 import type { HassEntity, HomeAssistant } from '../ha/hass.ts';
 import { UNAVAILABLE } from '../ha/rules.ts';
 import { colorStyle } from '../ha/templates.ts';
+import type { Words } from '../words/en.ts';
+import { wordsFor } from '../words/words.ts';
 
-import { MnmlCard, requireList, requireString } from './base.ts';
-import type { KeySchema } from './keys.ts';
+import { MnmlCard } from './base.ts';
 import { SECTION_STYLE, section } from './parts/section.ts';
 import type { Fold } from './parts/section.ts';
-import { CLIENTS_CARD } from './schemas.ts';
 import { BASE_STYLE, HEADING_STYLE } from './styles.ts';
 
 const CLIENTS_STYLE = css`
@@ -69,21 +71,21 @@ const CLIENTS_STYLE = css`
   }
 `;
 
+type Saying = Words['clients'];
+
 interface Connection {
   icon: MdiIcon;
-  label: string;
+  label: 'wifi' | 'ethernet' | 'otherConnection';
 }
 
 const CONNECTIONS: Record<string, Connection> = {
-  WIRELESS: { icon: 'mdi:wifi', label: 'Wi-Fi' },
-  WIRED: { icon: 'mdi:ethernet', label: 'Ethernet' },
+  WIRELESS: { icon: 'mdi:wifi', label: 'wifi' },
+  WIRED: { icon: 'mdi:ethernet', label: 'ethernet' },
 };
-
-const OTHER = 'Other';
 
 const OTHER_ICON: MdiIcon = 'mdi:help-network-outline';
 
-const OTHER_CONNECTION: Connection = { icon: OTHER_ICON, label: 'Other connection' };
+const OTHER_CONNECTION: Connection = { icon: OTHER_ICON, label: 'otherConnection' };
 
 const NAME_SOURCES = new Set(['rDNS', 'etc/hosts']);
 
@@ -146,12 +148,12 @@ function clientsOf(stateObj: HassEntity, config: ClientsCard): Client[] {
     }));
 }
 
-function row(placed: Placed, names: Map<string, string>): TemplateResult {
+function row(placed: Placed, names: Map<string, string>, words: Saying): TemplateResult {
   const { client } = placed;
   const fqdn = names.get(client.ipAddress);
   const connection = CONNECTIONS[client.type] ?? OTHER_CONNECTION;
   return html`<div class="row">
-    <ha-icon .icon=${connection.icon} role="img" aria-label=${connection.label}></ha-icon>
+    <ha-icon .icon=${connection.icon} role="img" aria-label=${words[connection.label]}></ha-icon>
     <div class="who">
       <span class="name">${client.name || fqdn || client.ipAddress || DASH}</span>
       ${fqdn !== undefined && client.name !== '' ? html`<span class="fqdn">${fqdn}</span>` : nothing}
@@ -163,25 +165,17 @@ function row(placed: Placed, names: Map<string, string>): TemplateResult {
 function group(
   placed: Placed[],
   names: Map<string, string>,
+  words: Saying,
   title: string,
   iconName: MdiIcon,
   fold?: Fold,
 ): TemplateResult {
   const sorted = [...placed].sort((a, b) => a.address - b.address);
   const card = html`<div class="card">
-    <div class="list">${sorted.map((entry) => row(entry, names))}</div>
+    <div class="list">${sorted.map((entry) => row(entry, names, words))}</div>
   </div>`;
   const count = sorted.length;
-  return section(
-    card,
-    title,
-    iconName,
-    {
-      text: String(count),
-      label: `${count} ${count === 1 ? 'client' : 'clients'}`,
-    },
-    fold,
-  );
+  return section(card, title, iconName, { text: String(count), label: words.count(count) }, fold);
 }
 
 export class MnmlClientsCard extends MnmlCard<ClientsCard> {
@@ -189,13 +183,11 @@ export class MnmlClientsCard extends MnmlCard<ClientsCard> {
 
   @state() private choices: ReadonlyMap<string, boolean> = new Map();
 
-  protected schema(): KeySchema {
-    return CLIENTS_CARD;
+  protected structure(): Structure {
+    return CARD_STRUCTURES['custom:mnml-clients-card'];
   }
 
   protected override validate(config: ClientsCard): void {
-    requireString('entity', config.entity);
-    requireList('networks', config.networks);
     for (const network of config.networks) {
       if (subnetRange(network.subnet) === undefined) {
         throw new Error(`${network.name}: subnet ${network.subnet} is not an IPv4 range`);
@@ -208,20 +200,21 @@ export class MnmlClientsCard extends MnmlCard<ClientsCard> {
     if (stateObj === undefined) {
       return undefined;
     }
+    const words = wordsFor(hass.locale.language).clients;
     if (isUnavailable(stateObj)) {
       const card = html`<div class="card">
         <div class="empty colored" style=${styleMap(colorStyle(UNAVAILABLE))}>
           ${unavailableValue(hass, stateObj)}
         </div>
       </div>`;
-      return section(card, 'Clients', CLIENTS_ICON);
+      return section(card, words.title, CLIENTS_ICON);
     }
     if (!hasValue(stateObj) || !Array.isArray(stateObj.attributes[config.attribute ?? 'data'])) {
       return undefined;
     }
     const clients = clientsOf(stateObj, config);
     if (clients.length === 0) {
-      return html`<div class="card"><div class="empty">No clients</div></div>`;
+      return html`<div class="card"><div class="empty">${words.none}</div></div>`;
     }
     const names = new Map(
       listOf(stateOf(hass, config.names), 'auto_clients')
@@ -257,9 +250,13 @@ export class MnmlClientsCard extends MnmlCard<ClientsCard> {
       ${config.networks.map((network, index) => {
         const placed = groups[index] ?? [];
         return placed.length > 0
-          ? group(placed, names, network.name, network.icon, fold(network.name, false))
+          ? group(placed, names, words, network.name, network.icon, fold(network.name, false))
           : nothing;
-      })}${other.length > 0 ? group(other, names, OTHER, OTHER_ICON, fold(OTHER, true)) : nothing}
+      })}${
+        other.length > 0
+          ? group(other, names, words, words.other, OTHER_ICON, fold(words.other, true))
+          : nothing
+      }
     </div>`;
   }
 }

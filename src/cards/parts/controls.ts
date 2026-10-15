@@ -6,7 +6,9 @@ import { styleMap } from 'lit/directives/style-map.js';
 import type {
   Color,
   Control,
+  DismissControl,
   IndicatorControl,
+  MessagesControl,
   NavControl,
   ScenesControl,
   SelectControl,
@@ -16,28 +18,33 @@ import type {
   ToggleControl,
   TyresControl,
 } from '../../contract/cards.ts';
-import type { EntityId, MdiIcon } from '../../contract/entities.ts';
-import { CONTROL_TYPES } from '../../contract/structure.ts';
+import type { EntityId, MdiIcon, PopupHash } from '../../contract/entities.ts';
 import { formatState } from '../../ha/format.ts';
 import {
+  callAction,
   callService,
+  haptic,
   hasValue,
   isUnavailable,
   numericState,
   run,
   stateOf,
+  toggleAction,
   toggleEntity,
 } from '../../ha/hass.ts';
 import type { HassEntity, HomeAssistant } from '../../ha/hass.ts';
+import { messageCount } from '../../ha/message-count.ts';
 import { entityName, nameOf } from '../../ha/names.ts';
 import { navigate, prebuild } from '../../ha/navigation.ts';
 import { partOf } from '../../ha/part.ts';
 import { UNAVAILABLE, matches, shown, tint, tyreBand } from '../../ha/rules.ts';
 import { colorStyle, icon, quietly, stateIcon } from '../../ha/templates.ts';
-import { requireList, requireOneOf } from '../base.ts';
+import { isTimer, timerPresets } from '../../ha/timer.ts';
+import { wordsFor } from '../../words/words.ts';
 import type { Host } from '../base.ts';
 
-import { modeChoice, openMenu, optionChoice, sceneChoice } from './menu.ts';
+import { asks, confirmed, isArmed } from './confirm.ts';
+import { modeChoice, openMenu, optionChoice, presetChoice, sceneChoice } from './menu.ts';
 import type { Choice } from './menu.ts';
 import { sliderSpec } from './slider-spec.ts';
 import { openSliderOverlay } from './slider.ts';
@@ -56,6 +63,7 @@ interface Look {
   spoken?: string;
   color?: Color | undefined;
   primary?: boolean | undefined;
+  armed?: string | undefined;
 }
 
 function classes(look: Look, inert: boolean): ReturnType<typeof classMap> {
@@ -64,6 +72,7 @@ function classes(look: Look, inert: boolean): ReturnType<typeof classMap> {
     inert,
     primary: look.primary === true,
     colored: look.color !== undefined,
+    armed: look.armed !== undefined,
   });
 }
 
@@ -79,13 +88,13 @@ function pressed(
     style=${styleMap(colorStyle(look.color))}
     data-part=${look.part ?? nothing}
     aria-label=${look.spoken ?? look.title}
-    ${tip(look.title)}
+    ${tip(look.armed === undefined ? look.title : undefined)}
     aria-pressed=${extra.pressed === undefined ? nothing : String(extra.pressed)}
     aria-haspopup=${extra.menu ? 'menu' : nothing}
     aria-expanded=${extra.menu ? 'false' : nothing}
     @click=${quietly(run)}
   >
-    ${glyph}
+    ${glyph}${look.armed === undefined ? nothing : html`<span class="ask">${look.armed}</span>`}
   </button>`;
 }
 
@@ -131,17 +140,26 @@ function isOn(entityId: EntityId, stateObj: HassEntity | undefined): boolean {
 
 function toggle(control: ToggleControl, ctx: ControlContext): TemplateResult {
   const stateObj = stateOf(ctx.hass, control.entity);
+  const name = entityName(ctx.hass, control.entity);
+  const action = toggleAction(ctx.hass, control.entity);
+  const armed = isArmed(ctx.host, control) && asks(ctx.hass, control.confirm, control.entity);
+  const words = wordsFor(ctx.hass.locale.language);
   return pressed(
     {
-      title: entityName(ctx.hass, control.entity),
+      title: name,
       part: partOf(control),
+      spoken: armed ? words.askAbout(action, name) : undefined,
       primary: control.primary,
       color: tint(control.color, control.when, stateObj),
+      armed: armed ? words.ask(action) : undefined,
     },
     stateIcon(ctx.hass, stateObj, control.icon),
     () => {
       const hass = ctx.host.hass ?? ctx.hass;
-      run(ctx.host, toggleEntity(hass, control.entity));
+      confirmed(ctx.host, control, asks(hass, control.confirm, control.entity), () => {
+        haptic('light');
+        run(ctx.host, toggleEntity(hass, control.entity));
+      });
     },
     { pressed: isOn(control.entity, stateObj) },
   );
@@ -167,10 +185,18 @@ function select(control: SelectControl, ctx: ControlContext): TemplateResult | u
   if (stateObj === undefined) {
     return undefined;
   }
-  const choice =
-    control.attribute === undefined
-      ? optionChoice(ctx.hass, control.entity, stateObj)
-      : modeChoice(ctx.hass, control.entity, stateObj, control.attribute);
+  const entity = control.entity;
+  const choice = isTimer(entity)
+    ? presetChoice(
+        ctx.hass,
+        entity,
+        timerPresets(ctx.hass, entity, () => {
+          ctx.host.refresh();
+        }),
+      )
+    : control.attribute === undefined
+      ? optionChoice(ctx.hass, entity, stateObj)
+      : modeChoice(ctx.hass, entity, stateObj, control.attribute);
   if (choice.options.length === 0) {
     return undefined;
   }
@@ -188,35 +214,89 @@ function select(control: SelectControl, ctx: ControlContext): TemplateResult | u
 }
 
 function service(control: ServiceControl, ctx: ControlContext): TemplateResult {
+  const armed = isArmed(ctx.host, control) && asks(ctx.hass, control.confirm, control.entity);
+  const asked = armed ? wordsFor(ctx.hass.locale.language).ask(control.name) : undefined;
   return pressed(
-    { title: control.name, part: partOf(control), primary: control.primary },
+    {
+      title: control.name,
+      part: partOf(control),
+      spoken: asked,
+      primary: control.primary,
+      armed: asked,
+    },
     icon(control.icon),
     () => {
       const hass = ctx.host.hass ?? ctx.hass;
-      run(ctx.host, callService(hass, control.entity, control.service));
+      confirmed(ctx.host, control, asks(hass, control.confirm, control.entity), () => {
+        run(ctx.host, callService(hass, control.entity, control.service));
+      });
     },
   );
 }
 
-function nav(control: NavControl, ctx: ControlContext): TemplateResult {
-  const stateObj = stateOf(ctx.hass, control.entity);
-  const title = entityName(ctx.hass, control.entity);
+function linked(look: Look, glyph: TemplateResult, popup: PopupHash): TemplateResult {
   return html`<button
     type="button"
-    class=${classes({ title, color: tint(control.color, control.when, stateObj) }, false)}
-    style=${styleMap(colorStyle(tint(control.color, control.when, stateObj)))}
-    data-part=${partOf(control)}
-    aria-label=${title}
-    ${tip(title)}
+    class=${classes(look, false)}
+    style=${styleMap(colorStyle(look.color))}
+    data-part=${look.part ?? nothing}
+    aria-label=${look.spoken ?? look.title}
+    ${tip(look.title)}
     @pointerdown=${quietly(() => {
-      prebuild(control.popup);
+      prebuild(popup);
     })}
     @click=${quietly((event) => {
-      navigate(control.popup, anchorOf(event));
+      navigate(popup, anchorOf(event));
     })}
   >
-    ${stateIcon(ctx.hass, stateObj)}
+    ${glyph}
   </button>`;
+}
+
+function nav(control: NavControl, ctx: ControlContext): TemplateResult {
+  const stateObj = stateOf(ctx.hass, control.entity);
+  return linked(
+    {
+      title: entityName(ctx.hass, control.entity),
+      part: partOf(control),
+      color: tint(control.color, control.when, stateObj),
+    },
+    stateIcon(ctx.hass, stateObj),
+    control.popup,
+  );
+}
+
+function messages(control: MessagesControl, ctx: ControlContext): TemplateResult | undefined {
+  const all = messageCount(ctx.host, ctx.hass)?.all ?? 0;
+  if (all === 0) {
+    return undefined;
+  }
+  return linked(
+    { title: `${control.name}: ${all}`, part: partOf(control), color: control.color },
+    icon(control.icon),
+    control.popup,
+  );
+}
+
+function dismiss(control: DismissControl, ctx: ControlContext): TemplateResult | undefined {
+  if ((messageCount(ctx.host, ctx.hass)?.notifications ?? 0) === 0) {
+    return undefined;
+  }
+  const asked = isArmed(ctx.host, control)
+    ? wordsFor(ctx.hass.locale.language).ask(control.name)
+    : undefined;
+  return pressed(
+    { title: control.name, part: partOf(control), spoken: asked, armed: asked },
+    icon(control.icon),
+    () => {
+      confirmed(ctx.host, control, true, () => {
+        run(
+          ctx.host,
+          callAction(ctx.host.hass ?? ctx.hass, 'persistent_notification.dismiss_all', {}),
+        );
+      });
+    },
+  );
 }
 
 function indicator(control: IndicatorControl, ctx: ControlContext): TemplateResult {
@@ -353,7 +433,8 @@ function tyres(control: TyresControl, ctx: ControlContext): TemplateResult | und
   if (control.silent === true && !low && !warn && off === undefined) {
     return undefined;
   }
-  const title = low ? 'Tyre pressure low' : warn ? 'Tyre pressure dropping' : 'Tyres';
+  const words = wordsFor(ctx.hass.locale.language).tyres;
+  const title = low ? words.low : warn ? words.dropping : words.name;
   return inert(
     {
       title: off === undefined || low || warn ? title : `${title}: ${formatState(ctx.hass, off)}`,
@@ -401,12 +482,19 @@ function isAction(control: Control): control is Action {
 
 function controlEntity(control: Control): EntityId | undefined {
   switch (control.type) {
+    case 'toggle':
+    case 'slider':
+    case 'select':
+    case 'service':
+    case 'nav':
+    case 'indicator':
+      return control.entity;
     case 'status':
     case 'tyres':
     case 'scenes':
+    case 'messages':
+    case 'dismiss':
       return undefined;
-    default:
-      return control.entity;
   }
 }
 
@@ -447,20 +535,12 @@ function renderControl(control: Control, ctx: ControlContext): TemplateResult | 
       return tyres(control, ctx);
     case 'scenes':
       return scenes(control, ctx);
+    case 'messages':
+      return messages(control, ctx);
+    case 'dismiss':
+      return dismiss(control, ctx);
     default:
       return undefined;
-  }
-}
-
-export function requireControls(name: string, controls: readonly Control[] | undefined): void {
-  for (const [index, control] of (controls ?? []).entries()) {
-    requireOneOf(`${name}[${index}].type`, control.type, CONTROL_TYPES);
-    if (control.type === 'status') {
-      requireList(`${name}[${index}].rules`, control.rules);
-      for (const [at, rule] of control.rules.entries()) {
-        requireList(`${name}[${index}].rules[${at}].entities`, rule.entities);
-      }
-    }
   }
 }
 

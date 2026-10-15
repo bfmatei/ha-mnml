@@ -2,11 +2,12 @@ import assert from 'node:assert/strict';
 
 import { test } from 'vitest';
 
-import type { Plan } from '../contract/builder.ts';
 import type { CustomCard, TemplateCard } from '../contract/cards.ts';
-import type { Dashboard } from '../home/types.ts';
+import type { Dashboard } from '../contract/dashboard.ts';
+import type { Plan } from '../contract/plan.ts';
+import type { Registries } from '../ha/registries.ts';
+import { homes } from '../templates/corpus.ts';
 import { discover } from '../templates/discover.ts';
-import type { Registries } from '../templates/discover.ts';
 import { expand } from '../templates/expand.ts';
 import { readTemplates } from '../templates/shipped.ts';
 
@@ -68,6 +69,22 @@ test('a plan makes one sections view, a heading and its cards per part, and the 
     ],
   );
   assert.deepEqual(view?.sections.at(-1)?.cards, [
+    { type: 'custom:mnml-popups-card', width: '560px', open: { desktop: 'unfold' } },
+  ]);
+});
+
+test("the plan's idle close and alerts are written on the pop-ups card, and no alerts writes none", () => {
+  const alerts = [{ entity: 'lock.front_door' as const, is: ['jammed'], popup: '#hall' as const }];
+  assert.deepEqual(sent({ ...PLAN, idle_close: 90, alerts }).views[0]?.sections.at(-1)?.cards, [
+    {
+      type: 'custom:mnml-popups-card',
+      width: '560px',
+      open: { desktop: 'unfold' },
+      idle_close: 90,
+      alerts,
+    },
+  ]);
+  assert.deepEqual(sent({ ...PLAN, alerts: [] }).views[0]?.sections.at(-1)?.cards, [
     { type: 'custom:mnml-popups-card', width: '560px', open: { desktop: 'unfold' } },
   ]);
 });
@@ -189,6 +206,104 @@ test('the sections come in the order the plan gives', () => {
     .filter((card) => card.template === 'section-heading')
     .map((card) => card.slots?.['title']);
   assert.deepEqual(titles, ['People', 'Rooms']);
+});
+
+function devicesHome(): Registries {
+  const home = homes()['devices'];
+  assert.ok(home);
+  return home;
+}
+
+test('the devices chosen are a Devices section after the rooms, each its template on its device', () => {
+  const plan: Plan = {
+    ...PLAN,
+    rooms: [{ area: 'living' }],
+    devices: [
+      { device: 'roborock_s8', template: 'vacuum-card' },
+      { device: 'prusa_mk4', template: 'camera-card' },
+    ],
+  };
+  const [view] = sent(plan, devicesHome()).views;
+  assert.deepEqual(
+    view?.sections.map((section) =>
+      section.cards.map((card) => ('template' in card ? card.template : card.type)),
+    ),
+    [
+      ['section-heading', 'room'],
+      ['section-heading', 'vacuum-card', 'camera-card'],
+      ['custom:mnml-popups-card'],
+    ],
+  );
+  const [heading, ...cards] = view?.sections[1]?.cards ?? [];
+  assert.deepEqual(heading && 'slots' in heading ? heading.slots : undefined, {
+    title: 'Devices',
+    icon: 'mdi:devices',
+  });
+  assert.deepEqual(cards, [
+    { type: 'custom:mnml-template-card', template: 'vacuum-card', device: 'roborock_s8' },
+    { type: 'custom:mnml-template-card', template: 'camera-card', device: 'prusa_mk4' },
+  ]);
+});
+
+test('a device that is gone is left out, the section takes its look and order, and none drawn has none', () => {
+  const plan: Plan = {
+    ...PLAN,
+    devices: [
+      { device: 'gone', template: 'vacuum-card' },
+      { device: 'roborock_s8', template: 'vacuum-card' },
+    ],
+    sections: { devices: { title: 'Things', icon: 'mdi:robot-vacuum' } },
+    order: ['devices'],
+  };
+  const drawn = sent(plan, devicesHome()).views[0]?.sections[0]?.cards ?? [];
+  assert.deepEqual(
+    drawn.map((card) => ('slots' in card && card.slots !== undefined ? card.slots : card)),
+    [
+      { title: 'Things', icon: 'mdi:robot-vacuum' },
+      { type: 'custom:mnml-template-card', template: 'vacuum-card', device: 'roborock_s8' },
+    ],
+  );
+  const headings = (registries: Registries, devices: Plan['devices']): unknown[] =>
+    sent({ ...plan, devices }, registries)
+      .views.flatMap((view) => view.sections.flatMap((section) => section.cards))
+      .flatMap((card) =>
+        'template' in card && card.template === 'section-heading' ? [card.slots?.['title']] : [],
+      );
+  assert.deepEqual(headings(HOME, plan.devices), ['Rooms', 'People']);
+  assert.deepEqual(headings(devicesHome(), []), ['Rooms']);
+  assert.deepEqual(headings(devicesHome(), undefined), ['Rooms']);
+});
+
+test('every card of a Devices section draws on its device, with the pop-up it brings', () => {
+  const plan: Plan = {
+    ...PLAN,
+    rooms: [],
+    people: [],
+    devices: [
+      { device: 'roborock_s8', template: 'vacuum-card' },
+      { device: 'daikin_ac', template: 'ac-item' },
+      { device: 'prusa_mk4', template: '3d-printer-card' },
+    ],
+  };
+  const home = devicesHome();
+  const cards = sent(plan, home)
+    .views.flatMap((view) => view.sections.flatMap((section) => section.cards))
+    .filter(
+      (card): card is TemplateCard =>
+        card.type === 'custom:mnml-template-card' && card.device !== undefined,
+    );
+  assert.deepEqual(
+    cards.map((card) => card.template),
+    ['vacuum-card', 'ac-item', '3d-printer-card'],
+  );
+  for (const card of cards) {
+    const template = TEMPLATES[card.template];
+    assert.ok(template, card.template);
+    const found = discover(template, undefined, home, card.device);
+    const expanded = expand(TEMPLATES, { template: card.template }, found);
+    assert.equal(expanded.missing, undefined, card.template);
+    assert.equal(expanded.popups.length > 0, true, card.template);
+  }
 });
 
 const NOBODY: Registries = { areas: {}, devices: {}, entities: {}, states: {} };

@@ -10,7 +10,7 @@ A minimal card set for Home Assistant, with its editors, its templates and its t
 - **Pop-ups** for everything a tile opens, drawn by one `custom:mnml-popups-card` on the dashboard and opened by hash (`#living`, `#living-lights`). They are dialogs on a desktop and sheets on a phone, and moving from one to another keeps the backdrop still.
 - **Templates** for whole tiles and their pop-ups: a room (with its cameras, covers, air, appliances, pets and plants), a person, a car, a server, the network, AdGuard Home, Home Assistant, a media server, the home's energy, and a strip of glances at its overall statuses. Place one by area and it finds its own entities, or spell its slots by hand, or write your own.
 - **A dashboard builder** in the MNML panel, which makes a whole dashboard from your home in one click, or step by step, and rebuilds it when the home changes.
-- **Two materials,** chosen when you add the integration and changed any time in its options: **glass** and **flat**, two MNML themes of one design. The cards work under any other theme, in the flat material.
+- **Two materials,** glass and flat ([The theme](#the-theme)).
 - **A home generator** for those who keep their dashboard in code: describe the home once, typed, and get the whole dashboard.
 
 ## Screenshots
@@ -31,7 +31,7 @@ A minimal card set for Home Assistant, with its editors, its templates and its t
 
 ![The demo home in the flat material, light and dark](docs/screenshots/flat-desktop.png)
 
-Every screenshot is of the demo home, Joe's and Jane's, on a throwaway Home Assistant; `pnpm screenshots` takes them again, in the glass design and then in the flat one, and joins each desktop's light and dark into one, light above the diagonal and dark below it.
+Every screenshot is of the demo home, Joe's and Jane's, on a throwaway Home Assistant. `pnpm screenshots` takes them again, in the glass design and then in the flat one. It joins each desktop's light and dark into one, light above the diagonal and dark below it.
 
 ## Install
 
@@ -54,7 +54,7 @@ The theme lives in `config/themes/mnml-integration/`, which the integration owns
 
 ## Quick start
 
-The fastest start is the builder: open **MNML** in the sidebar and pick **Quick start**. MNML makes a dashboard with a tile for each room it finds something in, one for each person, and the system cards it finds the entities of, and puts it in the sidebar. **Step by step** lets you choose the rooms and their order, the people, the system cards and how pop-ups open first; either way, the dashboard's row opens the builder again to change it and **Rebuild**, and **Undo** goes back one rebuild. A dashboard is shared with **Share**, as a dashboard template without your home's areas, people or entities, and made from one with **From a template**, filled with the home that imports it. [Building a dashboard](docs/editors.md#building-a-dashboard) and [Sharing a dashboard](docs/editors.md#sharing-a-dashboard) have the details.
+The fastest start is the builder: open **MNML** in the sidebar and pick **Quick start**. MNML makes a dashboard with a tile for each room it finds something in, one for each person, and the system cards it finds the entities of, and puts it in the sidebar. **Step by step** lets you choose the rooms and their order, the people, the system cards and how pop-ups open first. Either way, the dashboard's row opens the builder again to change it and **Rebuild**, and **Undo** goes back one rebuild. A dashboard is shared with **Share**, as a dashboard template without your home's areas, people or entities, and made from one with **From a template**, filled with the home that imports it. [Building a dashboard](docs/editors.md#building-a-dashboard) and [Sharing a dashboard](docs/editors.md#sharing-a-dashboard) have the details.
 
 To place cards by hand, add the one pop-up card anywhere on a dashboard; it takes no space:
 
@@ -111,22 +111,25 @@ A template with a shipped name replaces the shipped one everywhere, inside other
 
 ## Editing in the UI
 
-Every card is in Home Assistant's card picker (**Add card**, **By card**, then search for MNML), and every card with keys but the pop-ups card opens in a form: Home Assistant's own pickers for entities and icons, sections that open on a click, and a list editor for controls, rows and the other parts, with copy and paste between cards. The template card's editor has a gallery of the tiles with a live preview, the pop-ups and parts folded under them, and a form for the chosen template: it finds the template's devices in an area, or in the whole home, or lets you fill them in yourself, in panels the template describes; for an admin, **Edit this template** opens it in the MNML panel. The YAML it writes is the YAML you would write. [Editing in the UI](docs/editors.md) has the details.
+Every card is in Home Assistant's card picker (**Add card**, **By card**, then search for MNML). Every card with keys but the pop-ups card opens in a form: Home Assistant's own pickers for entities and icons, sections that open on a click, and a list editor for controls, rows and the other parts, with copy and paste between cards. The template card's editor has a gallery of the tiles with a live preview, the pop-ups and parts folded under them, and a form for the chosen template. The form finds the template's devices in an area, or in the whole home, or lets you fill them in yourself, in panels the template describes. For an admin, **Edit this template** opens it in the MNML panel. The YAML it writes is the YAML you would write. [Editing in the UI](docs/editors.md) has the details.
 
 ![A card's editor](docs/screenshots/card-editor.png)
 
 ## Learn more
 
-| Page                                 | What it covers                                                                       |
-| ------------------------------------ | ------------------------------------------------------------------------------------ |
-| [The cards' keys](docs/keys.md)      | Every card and every key it takes; a key a card does not know is an error card       |
-| [Templates](docs/templates.md)       | The template language, where the home's templates live, and every template           |
-| [Editing in the UI](docs/editors.md) | The card picker, each card's editor, the template card's gallery, and the MNML panel |
-| [The home dashboard](docs/home.md)   | What each tile and pop-up of a whole home shows, and why                             |
-| [Data the cards read](docs/data.md)  | The sensors the messages, clients and car plan cards expect, and how to make them    |
-| [Design](docs/design.md)             | How the cards look and why: colour, sizes, motion                                    |
-| [How the cards work](docs/cards.md)  | The pop-up shell, routing, and what the cards take from Home Assistant               |
-| [Architecture](docs/architecture.md) | The source tree, the build, releases, tests and the throwaway Home Assistant         |
+| Page                                               | What it covers                                                                        |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| [The cards' keys](docs/keys.md)                    | Every card and every key it takes; a key a card does not know is an error card        |
+| [Templates](docs/templates.md)                     | The template language and where the home's templates live                             |
+| [The shipped templates](docs/catalog.md)           | Every shipped template, its slots and the rules that find them, written from the YAML |
+| [How a template card draws](docs/template-card.md) | One template card, from its configuration to the drawn card                           |
+| [Glossary](docs/glossary.md)                       | The words the docs and the code use, one meaning each                                 |
+| [Editing in the UI](docs/editors.md)               | The card picker, each card's editor, the template card's gallery, and the MNML panel  |
+| [The home dashboard](docs/home.md)                 | What each tile and pop-up of a whole home shows, and why                              |
+| [Data the cards read](docs/data.md)                | The sensors the messages, clients and car plan cards expect, and how to make them     |
+| [Design](docs/design.md)                           | How the cards look and why: colour, sizes, motion                                     |
+| [How the cards work](docs/cards.md)                | The pop-up shell, routing, and what the cards take from Home Assistant                |
+| [Architecture](docs/architecture.md)               | The source tree, the build, releases, tests and the throwaway Home Assistant          |
 
 [examples/cards.yaml](examples/cards.yaml) is a dashboard with one of every card, and [examples/templates.yaml](examples/templates.yaml) one of rooms placed by area.
 
@@ -157,7 +160,7 @@ The demo is a whole home: nine rooms, Joe and Jane, two cars, a server, the netw
 
 ## Working on MNML
 
-You need Node 22.18 or newer, pnpm (the version `packageManager` in `package.json` names), uv (for Python 3.14), and Docker, for `pnpm check`'s hassfest and for the throwaway Home Assistant.
+You need Node 26, pnpm (the version `packageManager` in `package.json` names), uv, which installs the Python that `.python-version` names, and Docker. Docker runs the throwaway Home Assistant and `pnpm check`'s hassfest, which `pnpm check` skips, saying so, when Docker is not running.
 
 ```bash
 pnpm install && uv sync
@@ -173,7 +176,7 @@ pnpm videos   # out/videos/: five silent tutorial videos of the demo and the pan
 pnpm icons    # custom_components/mnml/brand/: the PNG icons from icon-light.svg and icon-dark.svg
 ```
 
-[AGENTS.md](AGENTS.md) holds the working rules, for people and coding agents alike.
+[AGENTS.md](AGENTS.md) holds the working rules, for people and coding agents alike, and [CONTRIBUTING.md](CONTRIBUTING.md) the setup and the pull request rules.
 
 ## License
 

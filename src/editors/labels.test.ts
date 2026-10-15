@@ -5,9 +5,12 @@ import { test } from 'vitest';
 import { CARD_STRUCTURES } from '../contract/structure.ts';
 import type { Key, Structure } from '../contract/structure.ts';
 import { humanise } from '../ha/format.ts';
+import { EDITORS_EN } from '../words/panel/editors-en.ts';
+import { EDITORS_RO } from '../words/panel/editors-ro.ts';
 
-import { DESCRIPTIONS } from './cards.ts';
-import { LABELS } from './labels.ts';
+import { DESCRIPTIONS, descriptionsFor } from './cards.ts';
+import type { Form } from './form.ts';
+import { labelsOf } from './labels.ts';
 
 const keysIn = (structure: Structure): Readonly<Record<string, Key>>[] =>
   structure.kind === 'plain' ? [structure.keys] : structure.variants.map((variant) => variant.keys);
@@ -41,9 +44,12 @@ function drawn(): Map<string, Structure> {
 }
 
 const DRAWN = drawn();
+const LANGUAGES = [EDITORS_EN, EDITORS_RO];
 
-test('every card and part the editors draw has labels, and the table labels nothing else', () => {
-  assert.deepEqual(Object.keys(LABELS).toSorted(), [...DRAWN.keys()].toSorted());
+test('every card and part the editors draw has labels in every language, and the table labels nothing else', () => {
+  for (const words of LANGUAGES) {
+    assert.deepEqual(Object.keys(labelsOf(words)).toSorted(), [...DRAWN.keys()].toSorted());
+  }
 });
 
 const SHORT_WORDS: ReadonlySet<string> = new Set(['at', 'by', 'in', 'is', 'of', 'on', 'to', 'up']);
@@ -51,56 +57,67 @@ const SHORT_WORDS: ReadonlySet<string> = new Set(['at', 'by', 'in', 'is', 'of', 
 const keyNames = (structure: Structure): Set<string> =>
   new Set(keysIn(structure).flatMap((each) => Object.keys(each)));
 
-test('every label and help names a key of its card or part, and no label repeats the humanised key it falls back to', () => {
-  const unknown: string[] = [];
-  const repeated: string[] = [];
-  for (const [name, structure] of DRAWN) {
-    const labels = LABELS[name];
-    const keys = keyNames(structure);
-    for (const key of [...Object.keys(labels?.keys ?? {}), ...Object.keys(labels?.help ?? {})]) {
-      if (!keys.has(key)) {
-        unknown.push(`${name}.${key}`);
-      }
-    }
-    for (const [key, label] of Object.entries(labels?.keys ?? {})) {
-      if (label === humanise(key)) {
-        repeated.push(`${name}.${key}`);
-      }
+test('the key labels name every key the editors draw, and nothing else', () => {
+  const keys = new Set<string>();
+  for (const structure of DRAWN.values()) {
+    for (const key of keyNames(structure)) {
+      keys.add(key);
     }
   }
-  assert.deepEqual(unknown, [], 'labels or help for keys the structure lacks');
-  assert.deepEqual(repeated, [], 'labels the fallback already gives');
+  assert.deepEqual(Object.keys(EDITORS_EN.keys).toSorted(), [...keys].toSorted());
 });
 
-test('a key without a label reads by its humanised name, so it is plain lowercase words, none an abbreviation of two letters such as ip', () => {
+test('in English a key reads as its humanised name, unless that holds an abbreviation of two letters such as ip', () => {
   const unreadable: string[] = [];
-  for (const [name, structure] of DRAWN) {
-    const labelled = LABELS[name]?.keys ?? {};
-    for (const key of keyNames(structure)) {
-      const words = key.split('_');
-      const plain = words.every(
-        (word) => /^[a-z]+$/.test(word) && (word.length > 2 || SHORT_WORDS.has(word)),
-      );
-      if (!Object.hasOwn(labelled, key) && !plain) {
-        unreadable.push(`${name}.${key}`);
-      }
+  for (const [key, label] of Object.entries(EDITORS_EN.keys)) {
+    const plain = key
+      .split('_')
+      .every((word) => /^[a-z]+$/.test(word) && (word.length > 2 || SHORT_WORDS.has(word)));
+    if (plain !== (label === humanise(key))) {
+      unreadable.push(`${key}: ${label}`);
     }
   }
-  assert.deepEqual(unreadable, [], 'keys that need a label of their own');
+  assert.deepEqual(unreadable, []);
 });
 
 test('every kind of a card or part has its own label, and a part without kinds has none', () => {
-  for (const [name, structure] of DRAWN) {
-    const labels = LABELS[name];
-    assert.ok(labels, name);
-    if (structure.kind === 'plain') {
-      assert.equal(labels.kinds, undefined, name);
-      assert.equal(labels.otherwise, undefined, name);
-      continue;
+  for (const words of LANGUAGES) {
+    const table = labelsOf(words);
+    for (const [name, structure] of DRAWN) {
+      const labels = table[name];
+      assert.ok(labels, name);
+      if (structure.kind === 'plain') {
+        assert.equal(labels.kinds, undefined, name);
+        assert.equal(labels.otherwise, undefined, name);
+        continue;
+      }
+      assert.equal(labels.sections, undefined, name);
+      const kinds = structure.variants.flatMap((variant) => variant.when ?? []);
+      assert.deepEqual(Object.keys(labels.kinds ?? {}).toSorted(), kinds.toSorted(), name);
+      assert.equal(labels.otherwise !== undefined, structure.kind === 'marked', name);
     }
-    assert.equal(labels.sections, undefined, name);
-    const kinds = structure.variants.flatMap((variant) => variant.when ?? []);
-    assert.deepEqual(Object.keys(labels.kinds ?? {}).toSorted(), kinds.toSorted(), name);
-    assert.equal(labels.otherwise !== undefined, structure.kind === 'marked', name);
   }
+});
+
+const iconsOf = (form: Form): string[] =>
+  form.kind === 'plain'
+    ? form.sections.map((section) => section.icon ?? '')
+    : form.variants.flatMap((variant) => iconsOf(variant.form));
+
+test('a panel keeps its icon in every language, and its keys', () => {
+  const romanian = descriptionsFor(EDITORS_RO);
+  for (const [type, form] of Object.entries(DESCRIPTIONS)) {
+    const other = romanian[type];
+    assert.ok(other, type);
+    assert.deepEqual(iconsOf(other), iconsOf(form), type);
+    assert.ok(!iconsOf(form).includes(''), type);
+  }
+  const tile = romanian['custom:mnml-tile-card'];
+  assert.ok(tile?.kind === 'tagged' || tile?.kind === 'marked');
+  const named = tile.variants[0]?.form;
+  assert.deepEqual(
+    named?.sections.map((section) => section.title),
+    ['Subiect', 'Stare', 'Cipuri', 'Element'],
+  );
+  assert.equal(named?.labels?.['popup'], 'Pop-up');
 });

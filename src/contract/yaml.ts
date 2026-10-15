@@ -5,7 +5,7 @@ const YAML_1_1_SPECIALS = new Set(['=', '<<']);
 
 function readsAsString(text: string): boolean {
   try {
-    return typeof parse(text) === 'string';
+    return typeof parse(text, { logLevel: 'error' }) === 'string';
   } catch {
     return false;
   }

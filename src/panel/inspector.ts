@@ -1,14 +1,19 @@
 import { css, html, nothing } from 'lit';
 import type { TemplateResult } from 'lit';
 
-import { isMapping } from '../contract/templates.ts';
+import { isMapping, pathLabel, slotGroup, templateTitle } from '../contract/templates.ts';
 import type { Kind, SlotSpec, Template, Templates, Value } from '../contract/templates.ts';
 import { objectForm } from '../editors/draw.ts';
 import type { Context } from '../editors/draw.ts';
-import { switchVariant, variantOf } from '../editors/shape.ts';
-import type { PlainShape } from '../editors/shape.ts';
+import { IN_PLACE, REDRAW } from '../editors/drawing.ts';
+import type { Drawing } from '../editors/drawing.ts';
+import { switchVariant, variantOf } from '../editors/form.ts';
+import type { PlainForm } from '../editors/form.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
 import { icon } from '../ha/templates.ts';
+import { PANEL_EN } from '../words/panel/en.ts';
+import type { PanelWords } from '../words/panel/en.ts';
+import { panelWordsFor } from '../words/panel/words.ts';
 
 import { pick, select, simpleForm } from './form.ts';
 import type { Part } from './outline.ts';
@@ -20,7 +25,7 @@ export interface InspectorActions {
   template: Template;
   templates: Templates;
   value: (path: Path) => Record<string, Value>;
-  update: (path: Path, next: Record<string, Value>, redraw: boolean) => void;
+  update: (path: Path, next: Record<string, Value>, drawing: Drawing) => void;
   redraw: () => void;
 }
 
@@ -48,6 +53,31 @@ export function slotKinds(
 
 export const slotPaths = (slots: Readonly<Record<string, SlotSpec>> | undefined): string[] =>
   slotKinds(slots).map((slot) => slot.path);
+
+export interface SlotChoice {
+  value: string;
+  label: string;
+  group: string;
+}
+
+export function slotChoices(
+  slots: Readonly<Record<string, SlotSpec>> | undefined,
+  paths: readonly string[],
+  basics: string = PANEL_EN.slots.basics,
+): SlotChoice[] {
+  return paths.map((path) => {
+    const top = path.split('.')[0] ?? path;
+    const spec = slots !== undefined && Object.hasOwn(slots, top) ? slots[top] : undefined;
+    return {
+      value: path,
+      label: pathLabel(slots, path),
+      group: spec === undefined ? basics : slotGroup(top, spec, basics),
+    };
+  });
+}
+
+const saidOf = (actions: InspectorActions): PanelWords =>
+  panelWordsFor(actions.hass?.locale.language);
 
 const text = (value: Value | undefined, fallback = ''): string =>
   typeof value === 'string' ? value : fallback;
@@ -84,17 +114,18 @@ function drawCondition(part: Part, actions: InspectorActions): TemplateResult {
     actions.update(
       part.path,
       withCondition(actions.value(part.path), wanted, chosen.length > 0 ? chosen : first),
-      true,
+      REDRAW,
     );
   };
+  const said = saidOf(actions);
   return html`<section class="inspect-section">
-    <h3>When it shows</h3>
+    <h3>${said.stage.when}</h3>
     ${pick({
-      label: 'Show',
+      label: said.stage.show,
       options: [
-        { value: 'always', label: 'Always' },
-        { value: 'if', label: 'Only when found' },
-        { value: 'unless', label: 'Only when not found' },
+        { value: 'always', label: said.stage.shows.always },
+        { value: 'if', label: said.stage.shows.if },
+        { value: 'unless', label: said.stage.shows.unless },
       ],
       value: show,
       changed: (wanted) => {
@@ -106,9 +137,24 @@ function drawCondition(part: Part, actions: InspectorActions): TemplateResult {
         ? nothing
         : simpleForm({
             hass: actions.hass,
-            schema: [{ name: 'slots', selector: select(slotPaths(actions.template.slots), true) }],
+            schema: [
+              {
+                name: 'slots',
+                selector: select(
+                  slotChoices(
+                    actions.template.slots,
+                    slotPaths(actions.template.slots),
+                    said.slots.basics,
+                  ).map((choice) => ({
+                    value: choice.value,
+                    label: `${choice.group}: ${choice.label}`,
+                  })),
+                  true,
+                ),
+              },
+            ],
             data: { slots },
-            labels: { slots: 'Depends on' },
+            labels: { slots: said.stage.dependsOn },
             changed: (data) => {
               change(
                 show,
@@ -120,8 +166,8 @@ function drawCondition(part: Part, actions: InspectorActions): TemplateResult {
   </section>`;
 }
 
-function drawBindings(part: Part, shape: PlainShape, actions: InspectorActions): TemplateResult {
-  const fields = Object.entries(shape.fields).filter(
+function drawBindings(part: Part, form: PlainForm, actions: InspectorActions): TemplateResult {
+  const fields = Object.entries(form.fields).filter(
     ([, spec]) => spec.kind !== 'parts' && spec.kind !== 'part',
   );
   const bound = fields.filter(([key]) => {
@@ -131,9 +177,10 @@ function drawBindings(part: Part, shape: PlainShape, actions: InspectorActions):
   const free = fields
     .filter(([key]) => !bound.some(([taken]) => taken === key))
     .map(([key, spec]) => ({ value: key, label: spec.label ?? key, kind: spec.kind }));
+  const said = saidOf(actions).inspector;
   return html`<section class="inspect-section">
-    <h3>Linked to slots</h3>
-    ${bound.length === 0 ? nothing : html`<p class="muted">A slot is written in double brackets, such as [[name]], alone or inside text.</p>`}
+    <h3>${said.linked}</h3>
+    ${bound.length === 0 ? nothing : html`<p class="muted">${said.brackets}</p>`}
     ${bound.map(
       ([key, spec]) =>
         html`<div class="binding">
@@ -146,18 +193,18 @@ function drawBindings(part: Part, shape: PlainShape, actions: InspectorActions):
               actions.update(
                 part.path,
                 { ...actions.value(part.path), [key]: text(data[key]) },
-                false,
+                IN_PLACE,
               );
             },
           })}
           <button
             type="button"
             class="icon-button"
-            aria-label=${`Set ${spec.label ?? key} by hand`}
-            title=${`Set ${spec.label ?? key} by hand`}
+            aria-label=${said.byHand(spec.label ?? key)}
+            title=${said.byHand(spec.label ?? key)}
             @click=${() => {
               const { [key]: _gone, ...rest } = actions.value(part.path);
-              actions.update(part.path, rest, true);
+              actions.update(part.path, rest, REDRAW);
             }}
           >
             ${icon('mdi:link-variant-off')}
@@ -174,7 +221,7 @@ function drawBindings(part: Part, shape: PlainShape, actions: InspectorActions):
               actions.update(
                 part.path,
                 { ...actions.value(part.path), [field]: `[[${slot}]]` },
-                true,
+                REDRAW,
               );
             }}
           ></mnml-binder>`
@@ -183,39 +230,40 @@ function drawBindings(part: Part, shape: PlainShape, actions: InspectorActions):
   </section>`;
 }
 
-const unknown = (message: string): TemplateResult[] => [
+const unknown = (message: string, said: PanelWords['inspector']): TemplateResult[] => [
   html`<section class="inspect-section">
-    <h3>Fixed values</h3>
+    <h3>${said.fixed}</h3>
     <p class="muted">${message}</p>
   </section>`,
 ];
 
 function drawValues(part: Part, actions: InspectorActions): TemplateResult[] {
-  const shape = part.shape;
-  if (shape === undefined) {
-    return unknown('This part has no form of its own; change it in the YAML tab.');
+  const form = part.form;
+  const said = saidOf(actions).inspector;
+  if (form === undefined) {
+    return unknown(said.noForm, said);
   }
-  let variant: PlainShape;
+  let variant: PlainForm;
   try {
-    variant = variantOf(shape, part.value);
+    variant = variantOf(form, part.value);
   } catch {
-    return unknown('This part is of a kind the form does not know; change it in the YAML tab.');
+    return unknown(said.unknownKind, said);
   }
   const kinds =
-    shape.kind === 'plain'
+    form.kind === 'plain'
       ? nothing
       : pick({
-          label: 'Type',
-          options: shape.variants.map((each) => ({
+          label: said.type,
+          options: form.variants.map((each) => ({
             value: each.when ?? PLAIN,
-            label: each.shape.label,
+            label: each.form.label,
           })),
-          value: shape.variants.find((each) => each.shape === variant)?.when ?? PLAIN,
+          value: form.variants.find((each) => each.form === variant)?.when ?? PLAIN,
           changed: (when) => {
             actions.update(
               part.path,
-              switchVariant(shape, actions.value(part.path), when === PLAIN ? undefined : when),
-              true,
+              switchVariant(form, actions.value(part.path), when === PLAIN ? undefined : when),
+              REDRAW,
             );
           },
         });
@@ -229,14 +277,14 @@ function drawValues(part: Part, actions: InspectorActions): TemplateResult[] {
       );
     }),
   );
-  const values: PlainShape = {
+  const values: PlainForm = {
     ...variant,
     fields: literal,
     sections: [{ title: variant.label, keys: Object.keys(literal) }],
   };
   const context: Context = {
     hass: actions.hass,
-    hashes: [],
+    popups: [],
     open: actions.open,
     redraw: actions.redraw,
   };
@@ -244,13 +292,13 @@ function drawValues(part: Part, actions: InspectorActions): TemplateResult[] {
     drawBindings(part, variant, actions),
     html`<section class="inspect-section">
       ${kinds}
-      <h3>Fixed values</h3>
+      <h3>${said.fixed}</h3>
       ${objectForm(
         values,
         {
           get: (): Record<string, Value> => actions.value(part.path),
-          set: (next, redraw): void => {
-            actions.update(part.path, next, redraw);
+          set: (next, drawing): void => {
+            actions.update(part.path, next, drawing);
           },
         },
         context,
@@ -266,20 +314,23 @@ function drawFragment(part: Part, actions: InspectorActions): TemplateResult {
   const fragment = actions.templates[name];
   const slots = isMapping(part.value['slots']) ? part.value['slots'] : {};
   const specs = Object.keys(fragment?.slots ?? {});
+  const said = saidOf(actions).inspector;
   return html`<section class="inspect-section">
-    <h3>Shared piece</h3>
+    <h3>${said.shared}</h3>
     ${pick({
-      label: 'Uses',
-      options: Object.keys(actions.templates).toSorted(),
+      label: said.uses,
+      options: Object.entries(actions.templates)
+        .map(([each, template]) => ({ value: each, label: templateTitle(template, each) }))
+        .toSorted((a, b) => a.label.localeCompare(b.label)),
       value: name,
       changed: (chosen) => {
-        actions.update(part.path, { ...actions.value(part.path), template: chosen }, true);
+        actions.update(part.path, { ...actions.value(part.path), template: chosen }, REDRAW);
       },
     })}
     ${
       specs.length === 0
         ? nothing
-        : html`<h3>What it is given</h3>
+        : html`<h3>${said.given}</h3>
             ${specs.map((slot) => {
               const given = slots[slot];
               return simpleForm({
@@ -294,9 +345,7 @@ function drawFragment(part: Part, actions: InspectorActions): TemplateResult {
                         : JSON.stringify(given),
                 },
                 helpers: {
-                  [slot]:
-                    fragment?.slots?.[slot]?.help ??
-                    'A value, or a slot of this template in double brackets',
+                  [slot]: fragment?.slots?.[slot]?.help ?? said.givenHelp,
                 },
                 changed: (data) => {
                   const now = actions.value(part.path);
@@ -306,7 +355,7 @@ function drawFragment(part: Part, actions: InspectorActions): TemplateResult {
                     value === ''
                       ? Object.fromEntries(Object.entries(before).filter(([key]) => key !== slot))
                       : { ...before, [slot]: value };
-                  actions.update(part.path, { ...now, slots: next }, false);
+                  actions.update(part.path, { ...now, slots: next }, IN_PLACE);
                 },
               });
             })}`
@@ -315,15 +364,16 @@ function drawFragment(part: Part, actions: InspectorActions): TemplateResult {
 }
 
 export function drawInspector(part: Part | undefined, actions: InspectorActions): TemplateResult {
+  const said = saidOf(actions).inspector;
   if (part === undefined) {
     return html`<div class="inspector">
-      <p class="muted">Pick a part in the outline to change it.</p>
+      <p class="muted">${said.pick}</p>
     </div>`;
   }
   return html`<div class="inspector">
     <div class="inspect-head">
       <h2>${part.label}</h2>
-      <span class="muted">${part.kind === 'fragment' ? 'a shared piece' : part.kind}</span>
+      <span class="muted">${said.kinds[part.kind]}</span>
     </div>
     ${drawCondition(part, actions)}
     ${part.kind === 'fragment' ? drawFragment(part, actions) : drawValues(part, actions)}

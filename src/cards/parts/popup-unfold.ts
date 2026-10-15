@@ -102,40 +102,103 @@ export async function reveal(from: Element): Promise<void> {
   await settled(from);
 }
 
+function around(from: Element): { elements: Element[]; roots: ShadowRoot[] } {
+  const elements: Element[] = [];
+  const roots: ShadowRoot[] = [];
+  let node: Node | null = from;
+  while (node !== null) {
+    if (node instanceof Element) {
+      elements.push(node);
+    }
+    if (node instanceof ShadowRoot) {
+      roots.push(node);
+      node = node.host;
+    } else {
+      node = node.parentNode;
+    }
+  }
+  return { elements, roots };
+}
+
+function watch(anchor: Element, wake: () => void): () => void {
+  const { elements, roots } = around(anchor);
+  const scrolled: (Window | ShadowRoot)[] = [window, ...roots];
+  for (const target of scrolled) {
+    target.addEventListener('scroll', wake, { capture: true, passive: true });
+  }
+  window.addEventListener('resize', wake);
+  const sizes = typeof ResizeObserver === 'function' ? new ResizeObserver(wake) : undefined;
+  for (const element of elements) {
+    sizes?.observe(element);
+  }
+  return () => {
+    for (const target of scrolled) {
+      target.removeEventListener('scroll', wake, { capture: true });
+    }
+    window.removeEventListener('resize', wake);
+    sizes?.disconnect();
+  };
+}
+
+const moves = (next: Place, was: Place): boolean =>
+  next.left !== was.left ||
+  next.width !== was.width ||
+  next.edge !== was.edge ||
+  next.up !== was.up ||
+  next.maxHeight !== was.maxHeight;
+
 export function following(
   read: () => Partial<Unfolded> | undefined,
   dialog: () => number,
   moved: (place: Place) => void,
 ): Following {
   let frame: number | undefined;
+  let still = 0;
+  let watching: { anchor: Element; unwatch: () => void } | undefined;
+  const letGo = (): void => {
+    watching?.unwatch();
+    watching = undefined;
+  };
   const tick = (): void => {
     frame = undefined;
     const now = read();
     if (!unfolded(now)) {
+      letGo();
       return;
     }
     const next = placed(now.anchor.getBoundingClientRect(), dialog());
-    const was = now.place;
-    if (
-      next.left !== was.left ||
-      next.width !== was.width ||
-      next.edge !== was.edge ||
-      next.up !== was.up ||
-      next.maxHeight !== was.maxHeight
-    ) {
+    if (moves(next, now.place)) {
+      still = 0;
       moved(next);
+    } else {
+      still += 1;
     }
-    frame = requestAnimationFrame(tick);
+    if (still < SETTLE_FRAMES) {
+      frame = requestAnimationFrame(tick);
+    }
+  };
+  const wake = (): void => {
+    still = 0;
+    frame ??= requestAnimationFrame(tick);
   };
   return {
     start: () => {
-      frame ??= requestAnimationFrame(tick);
+      const now = read();
+      if (!unfolded(now)) {
+        return;
+      }
+      if (watching?.anchor !== now.anchor) {
+        letGo();
+        watching = { anchor: now.anchor, unwatch: watch(now.anchor, wake) };
+      }
+      wake();
     },
     stop: () => {
       if (frame !== undefined) {
         cancelAnimationFrame(frame);
         frame = undefined;
       }
+      letGo();
     },
   };
 }

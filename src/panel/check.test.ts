@@ -19,7 +19,19 @@ test('a draft that does not expand with its example is refused with the reason',
     slots: { title: { kind: 'text', required: true } },
     card: { type: 'custom:mnml-heading-card', title: '[[title]]', icon: 'mdi:flower' },
   });
-  assert.match(problem ?? '', /^With the example: .*title is required/);
+  assert.equal(problem, 'With the example: Title is needed');
+});
+
+test('a draft whose title or icon is not one is refused with the reason', () => {
+  const card = { type: 'custom:mnml-heading-card', title: 'Garden', icon: 'mdi:flower' };
+  assert.equal(
+    problemOf(SHIPPED, 'garden', { title: 'Garden', icon: 'mdi:flower', card, example: {} }),
+    undefined,
+  );
+  assert.equal(
+    problemOf(SHIPPED, 'garden', JSON.parse('{"icon": "flower", "card": {}, "example": {}}')),
+    'Its icon is mdi: and the name of an icon, such as mdi:sofa',
+  );
 });
 
 test('a draft whose card refuses its own configuration is refused with the card and the reason', () => {
@@ -34,7 +46,7 @@ test("a slot's default of another kind than the slot's is refused, in a field to
   const card = { type: 'custom:mnml-heading-card', title: 'Garden', icon: 'mdi:flower' };
   assert.equal(
     problemOf(SHIPPED, 'garden', { slots: { size: { kind: 'number', default: 'big' } }, card }),
-    'the default of size is not of kind number',
+    'The default of Size is not a number',
   );
   assert.equal(
     problemOf(SHIPPED, 'garden', {
@@ -43,7 +55,7 @@ test("a slot's default of another kind than the slot's is refused, in a field to
       },
       card,
     }),
-    'the default of nozzle.lights is not of kind entities',
+    'The default of Nozzle: Lights is not a list of entities',
   );
 });
 

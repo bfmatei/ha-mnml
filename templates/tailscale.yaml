@@ -1,5 +1,7 @@
 tailscale:
   description: A tailnet's tile, and its offline, relayed and update chips; it brings the tailnet's pop-up.
+  title: Tailscale
+  icon: mdi:vpn
   slots:
     devices:
       shape: tailscale_device
@@ -30,14 +32,14 @@ tailscale:
   retired: [essential, personal, updates, direct]
   card:
     type: custom:mnml-tile-card
-    name: Tailscale
+    name: '[[words.tailscale]]'
     icon: mdi:vpn
     popup: '#tailscale'
     chips:
       - id: offline
         if: devices.?essential
         type: status
-        name: Offline
+        name: '[[words.offline]]'
         icon: mdi:lan-disconnect
         silent: true
         rules:
@@ -54,7 +56,7 @@ tailscale:
       - id: relayed
         if: devices.*.udp
         type: status
-        name: Relayed
+        name: '[[words.relayed]]'
         icon: mdi:transit-connection-variant
         silent: true
         rules:
@@ -64,7 +66,7 @@ tailscale:
               if: devices.*.udp,
               entities: ['[[devices.*.udp]]'],
               label: device,
-              words: { 'off': Relayed },
+              words: { 'off': '[[words.relayed]]' },
               color: orange,
               is: ['off'],
             },
@@ -72,7 +74,7 @@ tailscale:
       - id: update
         if: devices.?essential.update
         type: status
-        name: Update
+        name: '[[words.update]]'
         icon: mdi:package-up
         silent: true
         rules:
@@ -104,6 +106,8 @@ tailscale:
 
 tailscale-popup:
   description: The tailnet's pop-up, a card per device, the essential ones under Infrastructure and the others under Devices.
+  title: Tailscale pop-up
+  icon: mdi:vpn
   slots:
     devices: { shape: tailscale_device, kind: objects, required: true }
     soon_days: { kind: number, default: 14 }
@@ -113,12 +117,12 @@ tailscale-popup:
     cards:
       - id: header
         type: custom:mnml-header-card
-        name: Tailscale
+        name: '[[words.tailscale]]'
         icon: mdi:vpn
       - id: infrastructure
         if: devices.?essential
         type: custom:mnml-heading-card
-        title: Infrastructure
+        title: '[[words.infrastructure]]'
         icon: mdi:server-network
       - id: each-essential
         each: devices
@@ -129,7 +133,7 @@ tailscale-popup:
       - id: devices
         if: devices.!essential
         type: custom:mnml-heading-card
-        title: Devices
+        title: '[[words.devices]]'
         icon: mdi:devices
       - id: each-personal
         each: devices
@@ -151,6 +155,8 @@ tailscale-popup:
 
 tailscale-device:
   description: A tailnet device's card, its name, Connected or when it was last seen, and icons for a pending update, a key about to expire and how it connects.
+  title: Tailscale device
+  icon: mdi:devices
   slots:
     device: { shape: tailscale_device, required: true }
     alert:
@@ -179,7 +185,7 @@ tailscale-device:
       - id: update
         if: device.update
         type: status
-        name: Update
+        name: '[[words.update]]'
         icon: mdi:package-up
         silent: true
         rules:
@@ -188,14 +194,14 @@ tailscale-device:
               id: update,
               if: device.update,
               entities: ['[[device.update]]'],
-              color: red,
+              color: amber,
               is: ['on'],
             },
           ]
       - id: key
         if: device.expires
         type: status
-        name: Key expires soon
+        name: '[[words.key_expires_soon]]'
         icon: mdi:key-alert-outline
         silent: true
         rules:
@@ -211,7 +217,7 @@ tailscale-device:
       - id: connection
         if: device.udp
         type: status
-        name: Connection
+        name: '[[words.connection]]'
         icon: mdi:transit-connection-variant
         rules:
           - id: relayed
@@ -219,16 +225,16 @@ tailscale-device:
             entities: ['[[device.udp]]']
             color: orange
             is: ['off']
-            words: { 'off': Relayed }
+            words: { 'off': '[[words.relayed]]' }
           - id: direct
             if: device.udp
             entities: ['[[device.udp]]']
             color: blue
             is: ['on']
-            words: { 'on': Direct }
+            words: { 'on': '[[words.direct]]' }
       - id: connected
         type: status
-        name: Connected
+        name: '[[words.connected]]'
         icon: mdi:lan-connect
         silent: true
         rules:

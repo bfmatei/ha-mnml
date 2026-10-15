@@ -6,7 +6,7 @@
 
 **Shape and type, in both designs.**
 
-- **The font** is the system stack.
+- **The font** is the system stack, in `ha-font-family-body`; headings take the same (`ha-font-family-heading`).
 
 **In the glass theme,**
 
@@ -40,25 +40,31 @@ A `Palette` has two opaque surfaces (the page and the card, which HA's menus and
 
 `buildTheme()` in `src/theme/theme.ts` spells the mapping:
 
-| Palette     | Home Assistant variables                                                                                                                                                                          |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `page`      | `primary-background-color`, `secondary-background-color`, the app header, the sidebar, and the base of `lovelace-background`                                                                      |
-| `card`      | `card-background-color` (menus, dialogs), `text-accent-color` (the sidebar's unread badge on `accent-color`)                                                                                      |
-| `material`  | `ha-card-background`, `ha-card-backdrop-filter`, `lovelace-background`, and the `mnml-*` variables below: the card, pill, raised pill, section, overlay, edge, highlight, shadows, well and scrim |
-| `text`      | `primary-text-color`, the header and sidebar text                                                                                                                                                 |
-| `dimmed`    | `secondary-text-color`, the sidebar icons                                                                                                                                                         |
-| `disabled`  | `disabled-text-color`, the disabled line of a text field                                                                                                                                          |
-| `divider`   | `divider-color`                                                                                                                                                                                   |
-| `icon`      | `state-icon-color` and `grey-color`. HA derives `--state-inactive-color` from the latter, so its own inactive icons take the theme's neutral                                                      |
-| `onPrimary` | `text-primary-color`: text on a fill in the primary colour                                                                                                                                        |
-| `yellow`    | `primary-color`, Monokai's accent; also `amber-color`, `yellow-color`, the sidebar's selected icon, `ha-color-focus`                                                                              |
-| `purple`    | `accent-color`, the fill of a slider with no colour of its own; also `purple-color`, `deep-purple-color`, `indigo-color`                                                                          |
-| `red`       | `red-color`, `pink-color`, `error-color`                                                                                                                                                          |
-| `orange`    | `orange-color`, `deep-orange-color`, `warning-color`                                                                                                                                              |
-| `green`     | `green-color`, `light-green-color`, `success-color`                                                                                                                                               |
-| `blue`      | `blue-color`, `light-blue-color`, `cyan-color`, `teal-color`, `info-color`                                                                                                                        |
+| Palette     | Home Assistant variables                                                                                                                                                                                                                                                                                   |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `page`      | `primary-background-color`, `secondary-background-color`, the app header, the sidebar, and the base of `lovelace-background`                                                                                                                                                                               |
+| `card`      | `card-background-color` (menus, dialogs), `text-accent-color` (the sidebar's unread badge on `accent-color`)                                                                                                                                                                                               |
+| `material`  | `ha-card-background`, `ha-card-backdrop-filter`, `lovelace-background`, `ha-section-background-color` (the pill), HA's elevations `ha-box-shadow-s`, `-m` and `-l` (the shadow), and the `mnml-*` variables below: the card, pill, raised pill, section, overlay, edge, highlight, shadows, well and scrim |
+| `text`      | `primary-text-color`, the header and sidebar text                                                                                                                                                                                                                                                          |
+| `dimmed`    | `secondary-text-color`, the sidebar icons                                                                                                                                                                                                                                                                  |
+| `disabled`  | `disabled-text-color`                                                                                                                                                                                                                                                                                      |
+| `divider`   | `divider-color`                                                                                                                                                                                                                                                                                            |
+| `icon`      | `state-icon-color` and `grey-color`. HA derives `--state-inactive-color` from the latter, so its own inactive icons take the theme's neutral                                                                                                                                                               |
+| `onPrimary` | `text-primary-color`: text on a fill in the primary colour                                                                                                                                                                                                                                                 |
+| `yellow`    | `primary-color`, Monokai's accent; also `amber-color`, `yellow-color`, the sidebar's selected icon, `ha-color-focus`                                                                                                                                                                                       |
+| `purple`    | `accent-color`, the fill of a slider with no colour of its own; also `purple-color`, `deep-purple-color`, `indigo-color`                                                                                                                                                                                   |
+| `red`       | `red-color`, `pink-color`, `error-color`                                                                                                                                                                                                                                                                   |
+| `orange`    | `orange-color`, `deep-orange-color`, `warning-color`                                                                                                                                                                                                                                                       |
+| `green`     | `green-color`, `light-green-color`, `success-color`                                                                                                                                                                                                                                                        |
+| `blue`      | `blue-color`, `light-blue-color`, `cyan-color`, `teal-color`, `info-color`                                                                                                                                                                                                                                 |
 
 The semantic colours (`error`, `warning`, `success`, `info`) follow the accents, so HA's own dialogs match them too.
+
+**HA's own controls** take the palette too (`fieldOf()` and `controls()` in `src/theme/theme.ts`):
+
+- **A form field** is the pill over the card (`ha-color-form-background`), with a 6 % wash of the text colour over that while hovered (`-hover`), and the divider colour while disabled (`-disabled`).
+- **A switch** has the field's colour for its track (`ha-switch-background-color`), and the icon grey for its thumb and borders (`ha-switch-thumb-background-color`, `ha-switch-thumb-border-color`, `ha-switch-border-color`); **a checkbox** the icon grey for its border (`ha-checkbox-border-color`).
+- **The elevations** `ha-box-shadow-s`, `-m` and `-l`, of HA's menus and dialogs, are two layers each in the material's shadow colour at shares of its alpha, deeper and stronger from `s` to `l`. A material with no shadow, the flat one, writes none.
 
 **The text on a primary fill** is the card colour, so a filled button or the sidebar's selection reads against it.
 
@@ -102,6 +108,8 @@ So a theme that replaces a scale reaches every token derived from it, and never 
 - the text on a primary fill;
 - headings and state lines;
 - the focus ring;
+- text (7:1) and labels (4.5:1) in a form field, resting and hovered, and a switch's thumb on its track (3:1);
+- a pill in a section of a pop-up against that section (1.15:1), so a raised pill reads as one in both modes;
 - text, state lines, headings, accents and icons on the glass, including an accent icon on its own 16 % tint, over the page, both ends of the base gradient and the peak of each glow over each end, which is the worst case;
 - the primary ramp's buttons, links and fills.
 

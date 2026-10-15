@@ -1,3 +1,11 @@
+import type { HomeAssistant } from '../ha/hass.ts';
+import { registriesOf } from '../ha/snapshot.ts';
+import { MnmlStrategyEditor } from '../strategy/editor.ts';
+import { MnmlStrategy, STRATEGY_EDITOR } from '../strategy/strategy.ts';
+import { suggestionsFor } from '../templates/stands.ts';
+import type { Suggestion } from '../templates/stands.ts';
+import { TEMPLATE_INDEX } from '../templates/template-index.ts';
+
 import { MnmlAgendaCard } from './agenda.ts';
 import { MnmlButtonCard } from './button.ts';
 import { MnmlCarPlanCard } from './car-plan.ts';
@@ -10,16 +18,19 @@ import { MnmlHeadingCard } from './heading.ts';
 import { MnmlListCard } from './list.ts';
 import { MnmlMediaCard } from './media.ts';
 import { MnmlMessagesCard } from './messages.ts';
+import { MnmlCardNote } from './parts/card-element.ts';
 import { MnmlSlider } from './parts/slider.ts';
 import { MnmlTooltip } from './parts/tooltip.ts';
 import { MnmlPopupsCard } from './popups.ts';
 import { MnmlReportCard } from './report.ts';
 import { MnmlSelectCard } from './select.ts';
 import { MnmlSliderCard } from './slider.ts';
-import { STUBS } from './stubs.ts';
+import { STUBS, templateCardStub } from './stubs.ts';
 import { MnmlTemplateCard } from './template.ts';
 import { MnmlTileCard } from './tile.ts';
 import { MnmlWeatherCard } from './weather.ts';
+
+type Suggest = (hass: HomeAssistant, entityId: string) => Suggestion[] | null;
 
 interface CustomCardEntry {
   type: string;
@@ -27,16 +38,36 @@ interface CustomCardEntry {
   description: string;
   preview: boolean;
   documentationURL: string;
+  getEntitySuggestion?: Suggest;
+}
+
+interface CustomStrategyEntry {
+  type: string;
+  strategyType: 'dashboard';
+  name: string;
+  description: string;
+  documentationURL: string;
 }
 
 declare global {
   interface Window {
     customCards?: CustomCardEntry[];
+    customStrategies?: CustomStrategyEntry[];
   }
 }
 
 const DOCS = 'https://github.com/bfmatei/ha-mnml/blob/main/docs/keys.md';
+const STRATEGY = 'll-strategy-dashboard-mnml';
+const STARTS: Readonly<Record<string, unknown>> = {
+  ...STUBS,
+  'mnml-template-card': templateCardStub,
+};
 const CARD_EDITOR = 'mnml-card-editor';
+
+const suggest: Suggest = (hass, entityId) => {
+  const found = suggestionsFor(TEMPLATE_INDEX, entityId, registriesOf(hass));
+  return found.length === 0 ? null : found;
+};
 
 interface Entry {
   tag: string;
@@ -45,6 +76,7 @@ interface Entry {
   description: string;
   preview: boolean;
   editor: string | undefined;
+  suggest?: Suggest;
 }
 
 const CARDS: readonly Entry[] = [
@@ -52,9 +84,10 @@ const CARDS: readonly Entry[] = [
     tag: 'mnml-template-card',
     card: MnmlTemplateCard,
     name: 'MNML Template',
-    description: 'A template from MNML or the dashboard, filled by area or by hand',
+    description: 'A template from MNML or the dashboard, filled by area, by device or by hand',
     preview: true,
     editor: 'mnml-template-card-editor',
+    suggest,
   },
   {
     tag: 'mnml-heading-card',
@@ -194,12 +227,17 @@ const CARDS: readonly Entry[] = [
   },
 ];
 
-if (customElements.get('mnml-slider') === undefined) {
-  customElements.define('mnml-slider', MnmlSlider);
-}
+const PARTS: readonly [string, CustomElementConstructor][] = [
+  ['mnml-slider', MnmlSlider],
+  ['mnml-tooltip', MnmlTooltip],
+  ['mnml-card-note', MnmlCardNote],
+  [STRATEGY_EDITOR, MnmlStrategyEditor],
+];
 
-if (customElements.get('mnml-tooltip') === undefined) {
-  customElements.define('mnml-tooltip', MnmlTooltip);
+for (const [tag, made] of PARTS) {
+  if (customElements.get(tag) === undefined) {
+    customElements.define(tag, made);
+  }
 }
 
 window.customCards ??= [];
@@ -207,7 +245,7 @@ for (const entry of CARDS) {
   if (customElements.get(entry.tag) === undefined) {
     const editor = entry.editor;
     Object.assign(entry.card, {
-      getStubConfig: STUBS[entry.tag],
+      getStubConfig: STARTS[entry.tag],
       ...(editor === undefined ? {} : { getConfigElement: editorOf(editor) }),
     });
     customElements.define(entry.tag, entry.card);
@@ -217,6 +255,21 @@ for (const entry of CARDS) {
       description: entry.description,
       preview: entry.preview,
       documentationURL: `${DOCS}#${entry.tag}`,
+      ...(entry.suggest === undefined ? {} : { getEntitySuggestion: entry.suggest }),
     });
   }
+}
+
+window.customStrategies ??= [];
+if (customElements.get(STRATEGY) === undefined) {
+  customElements.define(STRATEGY, MnmlStrategy);
+  window.customStrategies.push({
+    type: 'mnml',
+    strategyType: 'dashboard',
+    name: 'MNML',
+    description:
+      'A dashboard of the rooms, people and system cards MNML finds, rebuilt as the home changes',
+    documentationURL:
+      'https://github.com/bfmatei/ha-mnml/blob/main/docs/home.md#the-dashboard-strategy',
+  });
 }

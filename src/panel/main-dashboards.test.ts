@@ -2,10 +2,13 @@ import assert from 'node:assert/strict';
 
 import { test, vi } from 'vitest';
 
-import { HOME } from '../builder/fixture.ts';
-import type { Plan } from '../contract/builder.ts';
+import { HOME, SCATTERED } from '../builder/fixture.ts';
+import type { Plan } from '../contract/plan.ts';
+import type { HomeAssistant } from '../ha/hass.ts';
+import type { Registries } from '../ha/registries.ts';
 import { readTemplates } from '../templates/shipped.ts';
-import { text } from '../test/render.ts';
+import { fakeConnection, fakeHass } from '../test/hass.ts';
+import { press, text, updated } from '../test/render.ts';
 
 vi.mock('../store/store.ts', () => ({
   onShared: () => () => undefined,
@@ -24,48 +27,42 @@ vi.mock('../store/shipped.ts', () => ({
 
 vi.mock(import('../editors/ha-form.ts'), async (original) => ({
   ...(await original()),
-  loadHaForm: () => Promise.resolve(),
+  loadHaForm: () => Promise.resolve(undefined),
 }));
 
 const { MnmlPanel } = await import('./main.ts');
 
-function hassWith(list: () => Promise<unknown>): object {
-  return {
+let open = 0;
+
+function answered(answer: Promise<unknown>): Promise<unknown> {
+  open += 1;
+  return answer.finally(() => {
+    open -= 1;
+  });
+}
+
+const settled = (): Promise<void> => updated(document, () => open === 0);
+
+function hassWith(list: () => Promise<unknown>): HomeAssistant {
+  return fakeHass({
     ...HOME,
-    locale: { language: 'en' },
-    connection: {
+    connection: fakeConnection({
       sendMessagePromise: (message: { type: string }) =>
-        message.type === 'mnml/dashboards/list'
-          ? list()
-          : message.type === 'lovelace/dashboards/list'
-            ? Promise.resolve([])
-            : Promise.resolve({ views: [] }),
-    },
-  };
+        answered(
+          message.type === 'mnml/dashboards/list'
+            ? list()
+            : message.type === 'lovelace/dashboards/list'
+              ? Promise.resolve([])
+              : Promise.resolve({ views: [] }),
+        ),
+    }),
+  });
 }
-
-async function settled(
-  panel: HTMLElement & { updateComplete: Promise<boolean> },
-  rounds = 5,
-): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  await panel.updateComplete;
-  if (rounds > 1) {
-    await settled(panel, rounds - 1);
-  }
-}
-
-HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement): void {
-  this.open = true;
-};
-HTMLDialogElement.prototype.close = function close(this: HTMLDialogElement): void {
-  this.open = false;
-};
 
 type Message = { type: string } & Record<string, unknown>;
 
 interface Home {
-  hass: object;
+  hass: HomeAssistant;
   sent: Message[];
   boards: { id: string; url_path: string; title: string; mode: string }[];
   built: Record<string, unknown>;
@@ -101,51 +98,45 @@ function answer(home: Home, message: Message): unknown {
     home.boards = home.boards.filter((board) => board.id !== message['dashboard_id']);
   } else if (message.type === 'lovelace/config') {
     return { views: [] };
+  } else if (message.type === 'config/area_registry/create') {
+    return { area_id: String(message['name']).toLowerCase() };
   }
   return null;
 }
 
-function home(): Home {
+function home(registries: Registries = HOME): Home {
   const made: Home = {
+    hass: fakeHass({
+      ...registries,
+      connection: fakeConnection({
+        sendMessagePromise: (message: Message) => {
+          made.sent.push(message);
+          const left = made.refuse.get(message.type) ?? 0;
+          if (left > 0) {
+            made.refuse.set(message.type, left - 1);
+            return answered(
+              Promise.reject({ code: 'home_assistant_error', message: 'Cannot save' }),
+            );
+          }
+          return answered(Promise.resolve(answer(made, message)));
+        },
+      }),
+    }),
     sent: [],
     boards: [],
     built: {},
     refuse: new Map(),
-    hass: {},
-  };
-  made.hass = {
-    ...HOME,
-    locale: { language: 'en' },
-    connection: {
-      sendMessagePromise: (message: Message) => {
-        made.sent.push(message);
-        const left = made.refuse.get(message.type) ?? 0;
-        if (left > 0) {
-          made.refuse.set(message.type, left - 1);
-          return Promise.reject({ code: 'home_assistant_error', message: 'Cannot save' });
-        }
-        return Promise.resolve(answer(made, message));
-      },
-    },
   };
   return made;
 }
 
 async function opened(path: string, at: Home): Promise<InstanceType<typeof MnmlPanel>> {
   const panel = new MnmlPanel();
-  panel.hass = at.hass as never;
+  panel.hass = at.hass;
   panel.route = { path };
   document.body.append(panel);
-  await settled(panel);
+  await settled();
   return panel;
-}
-
-function press(root: ParentNode | null | undefined, label: string): void {
-  const button = [...(root?.querySelectorAll('button') ?? [])].find(
-    (each) => each.getAttribute('aria-label') === label || text(each) === label,
-  );
-  assert.ok(button, label);
-  button.click();
 }
 
 function editorOf(panel: InstanceType<typeof MnmlPanel>): ShadowRoot {
@@ -163,16 +154,16 @@ test("a create whose cards Home Assistant refuses keeps the edits and the dashbo
   title.value = 'Our flat';
   title.dispatchEvent(new Event('input'));
   press(editorOf(panel), 'Create');
-  await settled(panel);
+  await settled();
   assert.match(text(editorOf(panel)), /Cannot save/);
   assert.equal(
     editorOf(panel).querySelector<HTMLInputElement>('input.fact-input')?.value,
     'Our flat',
   );
   press(editorOf(panel), 'Rebuild');
-  await settled(panel);
+  await settled();
   press(panel.shadowRoot?.querySelector('dialog'), 'Rebuild');
-  await settled(panel);
+  await settled();
   const created = at.sent.filter((message) => message.type === 'lovelace/dashboards/create');
   assert.equal(created.length, 1);
   assert.deepEqual(Object.keys(at.built), [created[0]?.['url_path']]);
@@ -197,9 +188,9 @@ test('a rebuild Home Assistant refuses keeps the edits in the builder', async ()
   title.value = 'Our flat';
   title.dispatchEvent(new Event('input'));
   press(editorOf(panel), 'Rebuild');
-  await settled(panel);
+  await settled();
   press(panel.shadowRoot?.querySelector('dialog'), 'Rebuild');
-  await settled(panel);
+  await settled();
   assert.match(text(editorOf(panel)), /Cannot save/);
   assert.equal(
     editorOf(panel).querySelector<HTMLInputElement>('input.fact-input')?.value,
@@ -223,9 +214,9 @@ test("Home Assistant's dashboards that cannot be read are not taken as gone, and
   assert.doesNotMatch(text(panel.shadowRoot), /No longer in Home Assistant/);
   assert.match(text(panel.shadowRoot), /cannot read Home Assistant's dashboards: Cannot save/);
   panel.route = { path: '/dashboards/dashboard-flat' };
-  await settled(panel);
+  await settled();
   press(editorOf(panel), 'Rebuild');
-  await settled(panel);
+  await settled();
   assert.equal(panel.shadowRoot?.querySelector('dialog'), null);
   assert.match(text(editorOf(panel)), /cannot read Home Assistant's dashboards/);
   assert.equal(
@@ -248,12 +239,12 @@ test('a dashboard deleted in Home Assistant but not forgotten by MNML is shown a
   const panel = await opened('/dashboards', at);
   const list = panel.shadowRoot?.querySelector('mnml-dashboards')?.shadowRoot;
   press(list, 'Forget Flat');
-  await settled(panel);
+  await settled();
   press(panel.shadowRoot?.querySelector('dialog'), 'Delete it too');
-  await settled(panel);
+  await settled();
   assert.match(text(panel.shadowRoot?.querySelector('dialog')), /That did not work/);
   press(panel.shadowRoot?.querySelector('dialog'), 'OK');
-  await settled(panel);
+  await settled();
   const now = panel.shadowRoot?.querySelector('mnml-dashboards')?.shadowRoot;
   assert.match(text(now), /No longer in Home Assistant/);
   assert.equal(now?.querySelector('[aria-label="Open Flat"]'), null);
@@ -262,12 +253,10 @@ test('a dashboard deleted in Home Assistant but not forgotten by MNML is shown a
 
 test('a store that cannot be read says so on the Dashboards tab, rather than offering to build', async () => {
   const panel = new MnmlPanel();
-  panel.hass = hassWith(() =>
-    Promise.reject({ code: 'not_loaded', message: 'not loaded' }),
-  ) as never;
+  panel.hass = hassWith(() => Promise.reject({ code: 'not_loaded', message: 'not loaded' }));
   panel.route = { path: '/dashboards' };
   document.body.append(panel);
-  await settled(panel);
+  await settled();
   const page = text(panel.shadowRoot);
   assert.match(page, /MNML cannot read the dashboards it built: not loaded/);
   assert.equal(panel.shadowRoot?.querySelector('mnml-dashboards'), null);
@@ -276,34 +265,121 @@ test('a store that cannot be read says so on the Dashboards tab, rather than off
 
 test("the builder page follows Home Assistant's states, as the panel is given them", async () => {
   const panel = new MnmlPanel();
-  panel.hass = hassWith(() => Promise.resolve({ dashboards: {} })) as never;
+  panel.hass = hassWith(() => Promise.resolve({ dashboards: {} }));
   panel.route = { path: '/dashboards/new' };
   document.body.append(panel);
-  await settled(panel);
+  await settled();
   const editor = panel.shadowRoot?.querySelector('mnml-plan-editor');
   assert.ok(editor);
   const next = hassWith(() => Promise.resolve({ dashboards: {} }));
-  panel.hass = next as never;
+  panel.hass = next;
   assert.equal(Reflect.get(editor, 'hass'), next);
   panel.remove();
 });
 
 test('the panel opens on its dashboards, and keeps its templates at /templates', async () => {
   const panel = new MnmlPanel();
-  panel.hass = hassWith(() => Promise.resolve({ dashboards: {} })) as never;
+  panel.hass = hassWith(() => Promise.resolve({ dashboards: {} }));
   panel.route = { path: '' };
   document.body.append(panel);
-  await settled(panel);
+  await settled();
   const tabs = [...(panel.shadowRoot?.querySelectorAll('.tab') ?? [])].map((tab) => text(tab));
   assert.deepEqual(tabs, ['Dashboards', 'Templates']);
   assert.ok(panel.shadowRoot?.querySelector('mnml-dashboards'));
   assert.equal(panel.shadowRoot?.querySelector('.tab.active')?.textContent?.trim(), 'Dashboards');
   panel.route = { path: '/templates' };
-  await settled(panel);
+  await settled();
   assert.ok(panel.shadowRoot?.querySelector('mnml-library'));
   assert.equal(panel.shadowRoot?.querySelector('.tab.active')?.textContent?.trim(), 'Templates');
   panel.route = { path: '/dashboards' };
-  await settled(panel);
+  await settled();
   assert.ok(panel.shadowRoot?.querySelector('mnml-dashboards'));
+  panel.remove();
+});
+
+test("a route away from a dashboard's builder with changes not built asks first, and stays when told to", async () => {
+  const at = home();
+  at.boards.push({
+    id: 'dashboard_flat',
+    url_path: 'dashboard-flat',
+    title: 'Flat',
+    mode: 'storage',
+  });
+  at.built['dashboard-flat'] = { plan: PLAN };
+  const panel = await opened('/dashboards/dashboard-flat', at);
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+  const title = editorOf(panel).querySelector<HTMLInputElement>('input.fact-input');
+  assert.ok(title);
+  title.value = 'Our flat';
+  title.dispatchEvent(new Event('input'));
+  await settled();
+  panel.route = { path: '/templates' };
+  await settled();
+  assert.equal(confirm.mock.calls.length, 1);
+  assert.match(String(confirm.mock.calls[0]?.[0]), /Leave without building your changes/);
+  assert.equal(
+    editorOf(panel).querySelector<HTMLInputElement>('input.fact-input')?.value,
+    'Our flat',
+  );
+  confirm.mockReturnValue(true);
+  panel.route = { path: '/templates' };
+  await settled();
+  assert.ok(panel.shadowRoot?.querySelector('mnml-library'));
+  confirm.mockRestore();
+  panel.remove();
+});
+
+test('the area assistant opens from the builder, asks before it writes, keeps Undo for the session, and Back returns to the builder', async () => {
+  const at = home(SCATTERED);
+  const panel = await opened('/dashboards/new', at);
+  press(editorOf(panel), 'Sort them into areas');
+  await settled();
+  const areas = (): ShadowRoot => {
+    const root = panel.shadowRoot?.querySelector('mnml-areas')?.shadowRoot;
+    assert.ok(root, 'the area assistant');
+    return root;
+  };
+  press(areas(), 'Assign 4 in Home Assistant');
+  await settled();
+  const asked = panel.shadowRoot?.querySelector('dialog');
+  assert.match(
+    text(asked),
+    /MNML makes the area Office, then places 2 devices and 2 entities in their areas\./,
+  );
+  press(asked, 'Assign');
+  await settled();
+  const written = (): Message[] => at.sent.filter((message) => message.type.startsWith('config/'));
+  assert.deepEqual(written(), [
+    { type: 'config/area_registry/create', name: 'Office' },
+    { type: 'config/device_registry/update', device_id: 'bulb', area_id: 'attic' },
+    { type: 'config/device_registry/update', device_id: 'thermometer', area_id: 'attic' },
+    { type: 'config/entity_registry/update', entity_id: 'light.office_desk', area_id: 'office' },
+    {
+      type: 'config/entity_registry/update',
+      entity_id: 'sensor.office_temperature',
+      area_id: 'office',
+    },
+  ]);
+  at.sent.length = 0;
+  press(areas(), 'Undo');
+  await settled();
+  press(panel.shadowRoot?.querySelector('dialog'), 'Put them back');
+  await settled();
+  assert.deepEqual(written(), [
+    { type: 'config/device_registry/update', device_id: 'bulb', area_id: null },
+    { type: 'config/device_registry/update', device_id: 'thermometer', area_id: null },
+    { type: 'config/entity_registry/update', entity_id: 'light.office_desk', area_id: null },
+    {
+      type: 'config/entity_registry/update',
+      entity_id: 'sensor.office_temperature',
+      area_id: null,
+    },
+    { type: 'config/area_registry/delete', area_id: 'office' },
+  ]);
+  assert.ok(![...areas().querySelectorAll('button')].some((each) => text(each) === 'Undo'));
+  press(areas(), 'Back');
+  await settled();
+  assert.ok(editorOf(panel));
+  assert.equal(location.pathname, '/mnml/dashboards/new');
   panel.remove();
 });

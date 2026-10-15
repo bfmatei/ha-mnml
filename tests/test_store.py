@@ -1,3 +1,5 @@
+import json
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.config_entries import ConfigEntryState
@@ -8,8 +10,6 @@ from custom_components.mnml.frontend import async_register_frontend
 from custom_components.mnml.store import STORE, TemplateStore
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     import pytest
     from homeassistant.core import HomeAssistant
     from pytest_homeassistant_custom_component.typing import (
@@ -21,21 +21,8 @@ if TYPE_CHECKING:
 
 GARDEN = {"card": {"type": "custom:mnml-heading-card", "title": "Garden", "icon": "mdi:flower"}}
 CHANGE = {"op": "remove", "path": ["card", "chips?", "#lock"], "base": "0123456789abcdef"}
-CHIPS = ["card", "chips?"]
-WRONG_CHANGES = (
-    {"op": "set", "path": ["card"], "value": "x", "base": "b"},
-    {"op": "set", "path": ["card"], "key": "name", "base": "b"},
-    {"op": "insert", "path": CHIPS, "after": None, "value": "chip", "base": "b"},
-    {"op": "insert", "path": CHIPS, "after": None, "value": {"type": "indicator"}, "base": "b"},
-    {"op": "insert", "path": CHIPS, "value": {"id": "door"}, "base": "b"},
-    {"op": "move", "path": CHIPS, "after": None, "base": "b"},
-    {"op": "move", "path": CHIPS, "id": "ac", "after": 3, "base": "b"},
-    {"op": "remove", "path": [], "base": "b"},
-    {"op": "set", "path": ["__proto__"], "key": "polluted", "value": True, "base": "b"},
-    {"op": "set", "path": ["card"], "key": "constructor", "value": True, "base": "b"},
-    {"op": "remove", "path": ["card", ""], "base": "b"},
-    {"op": "remove", "path": ["card"], "base": "b"},
-    {"op": "move", "path": CHIPS, "id": "ac", "after": "ac", "base": "b"},
+CHANGES: dict[str, list[dict[str, Any]]] = json.loads(
+    Path(__file__).with_name("changes.json").read_text(encoding="utf-8")
 )
 
 
@@ -83,6 +70,17 @@ async def test_changes_to_a_shipped_template_are_kept_and_can_be_deleted(
     assert (await call(client, {"type": "mnml/templates/delete", "name": "room"}))["success"]
     gone = await call(client, {"type": "mnml/templates/delete", "name": "room"})
     assert gone["error"]["code"] == "not_found"
+
+
+async def test_every_change_of_a_known_shape_is_kept(
+    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, setup_mnml: SetupMnml
+) -> None:
+    await setup_mnml()
+    client = await hass_ws_client(hass)
+    for example in CHANGES["valid"]:
+        entry = {"kind": "changes", "changes": [example["change"]]}
+        reply = await call(client, {"type": "mnml/templates/save", "name": "room", "entry": entry})
+        assert reply["success"], example["why"]
 
 
 async def test_eleven_saves_keep_ten_earlier_versions(
@@ -140,7 +138,10 @@ async def test_a_save_of_the_wrong_shape_is_refused(
         ("garden\n", {"kind": "own", "template": GARDEN}),
         ("garden", {"kind": "own", "template": {"card": None}}),
         ("garden", {"kind": "own", "template": {**GARDEN, "popups": "#garden"}}),
-        *(("room", {"kind": "changes", "changes": [change]}) for change in WRONG_CHANGES),
+        *(
+            ("room", {"kind": "changes", "changes": [example["change"]]})
+            for example in CHANGES["invalid"]
+        ),
     ):
         reply = await call(client, {"type": "mnml/templates/save", "name": name, "entry": entry})
         assert reply["error"]["code"] == "invalid_format", (name, entry)

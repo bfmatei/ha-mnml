@@ -1,5 +1,7 @@
 car:
   description: A car's tile, its fuel, and its doors, windows, alarm and tyres chips; it brings the car's pop-up. The defaults are BMW CarData's words.
+  title: Car
+  icon: mdi:car
   slots:
     key:
       {
@@ -79,7 +81,7 @@ car:
     chips:
       - id: doors
         type: status
-        name: Doors
+        name: '[[words.doors]]'
         icon: mdi:car-door
         silent: true
         rules:
@@ -95,7 +97,7 @@ car:
             is: ['on']
       - id: windows
         type: status
-        name: Windows
+        name: '[[words.windows]]'
         icon: mdi:car-windshield-outline
         silent: true
         rules:
@@ -106,7 +108,7 @@ car:
       - id: alarm
         if: [alarm_active, alarm]
         type: status
-        name: Alarm
+        name: '[[words.alarm]]'
         icon: mdi:shield-car
         silent: true
         rules:
@@ -192,6 +194,8 @@ car:
 
 car-plan:
   description: A car seen from above, its openings and tyres.
+  title: Car plan
+  icon: mdi:car-info
   slots:
     doors: { kind: entities, required: true, group: Openings }
     hood: { kind: entity, required: true, group: Openings }
@@ -206,7 +210,7 @@ car-plan:
     tyre_warn_share: { kind: number, default: 0.95, group: Tyres }
   card:
     type: custom:mnml-car-plan-card
-    title: Status
+    title: '[[words.status]]'
     icon: mdi:car-info
     doors: '[[doors]]'
     hood: '[[hood]]'
@@ -236,7 +240,9 @@ car-plan:
       [sensor.suv_target_fl, sensor.suv_target_fr, sensor.suv_target_rl, sensor.suv_target_rr]
 
 car-popup:
-  description: A car's pop-up, its security, its plan, its details and where it is.
+  description: "A car's pop-up: its fuel and range in its header, its security, its plan, its details and where it is."
+  title: Car pop-up
+  icon: mdi:car
   slots:
     key: { kind: text, required: true }
     icon: { kind: icon, default: mdi:car }
@@ -274,10 +280,9 @@ car-popup:
         label: device
         icon: '[[icon]]'
         entity: '[[metadata]]'
-        state: [{ id: part, serial: true }]
       - id: security
         type: custom:mnml-list-card
-        title: Security
+        title: '[[words.security]]'
         icon: mdi:shield-car
         rows:
           - id: lock
@@ -290,12 +295,12 @@ car-popup:
             if: alarm
             entity: '[[alarm]]'
             words: '[[alarm_words]]'
-            color: amber
-            when: { not: '[[disarmed]]' }
+            color: red
+            when: { is: ['[[disarmed]]'] }
           - id: alarm_active
             if: alarm_active
             entity: '[[alarm_active]]'
-            name: Alarm
+            name: '[[words.alarm]]'
             flag: true
             color: red
             show: { is: ['on'] }
@@ -312,10 +317,13 @@ car-popup:
           tyre_targets: '[[tyre_targets]]'
           tyre_low_share: '[[tyre_low_share]]'
           tyre_warn_share: '[[tyre_warn_share]]'
+      - id: details-heading
+        type: custom:mnml-heading-card
+        title: '[[words.details]]'
+        icon: mdi:information-outline
+        state: [{ id: vin, entity: '[[metadata]]', serial: true }]
       - id: details
         type: custom:mnml-list-card
-        title: Details
-        icon: mdi:information-outline
         rows:
           - id: fuel
             if: fuel
@@ -332,7 +340,7 @@ car-popup:
           - id: service
             if: service
             entity: '[[service]]'
-            name: Service in
+            name: '[[words.service_in]]'
           - id: battery_voltage
             if: battery_voltage
             entity: '[[battery_voltage]]'
@@ -342,7 +350,7 @@ car-popup:
       - id: heading
         if: location
         type: custom:mnml-heading-card
-        title: Location
+        title: '[[words.location]]'
         icon: mdi:map-marker
       - id: map
         if: location

@@ -9,32 +9,38 @@ import { toYaml } from '../contract/yaml.ts';
 import { field } from '../ha/field.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
 import { toValue } from '../templates/expand.ts';
+import { PANEL_EN } from '../words/panel/en.ts';
+import type { PanelWords } from '../words/panel/en.ts';
+import { panelWordsFor } from '../words/panel/words.ts';
 
 import { messageOf } from './message.ts';
 import { PANEL_STYLE } from './style.ts';
 
-export function readYaml(text: string): Value {
+export function readYaml(text: string, words: PanelWords = PANEL_EN): Value {
   const document = parseDocument(text);
   const [problem] = document.errors;
   if (problem !== undefined) {
     const line = problem.linePos?.[0];
-    throw new Error(line === undefined ? problem.message : `line ${line.line}: ${problem.message}`);
+    throw new Error(
+      line === undefined ? problem.message : words.yaml.line(line.line, problem.message),
+    );
   }
   const tag = document.warnings.find((warning) => warning.code === 'TAG_RESOLVE_FAILED');
   if (tag !== undefined) {
-    const name = /!\S+/.exec(tag.message)?.[0] ?? 'a tag';
-    throw new Error(`${name} is a YAML tag, and a template takes none`);
+    const name = /!\S+/.exec(tag.message)?.[0] ?? words.yaml.aTag;
+    throw new Error(words.yaml.tag(name));
   }
   return toValue(document.toJS());
 }
 
-export const NOT_A_TEMPLATE =
-  'a template is a mapping with a card; its card is a mapping, or a list for a shipped fragment, and its popups, if any, a list of mappings';
-
-export function readTemplate(text: string, shipped = false): WrittenTemplate {
-  const value = readYaml(text);
+export function readTemplate(
+  text: string,
+  shipped = false,
+  words: PanelWords = PANEL_EN,
+): WrittenTemplate {
+  const value = readYaml(text, words);
   if (!isStorable(value, shipped)) {
-    throw new Error(NOT_A_TEMPLATE);
+    throw new Error(words.yaml.notTemplate);
   }
   return value;
 }
@@ -55,13 +61,18 @@ export class MnmlYaml extends LitElement {
     }
   }
 
+  private words(): PanelWords {
+    return panelWordsFor(this.hass?.locale.language);
+  }
+
   protected override render(): TemplateResult {
+    const said = this.words().yaml;
     const editor =
       customElements.get('ha-code-editor') === undefined
         ? html`<textarea
             class="yaml-text"
             spellcheck="false"
-            aria-label="The template in YAML"
+            aria-label=${said.label}
             .value=${this.text}
             @input=${(event: Event) => {
               const value = field(event.target, 'value');
@@ -70,7 +81,7 @@ export class MnmlYaml extends LitElement {
           ></textarea>`
         : html`<ha-code-editor
             mode="yaml"
-            aria-label="The template in YAML"
+            aria-label=${said.label}
             .hass=${this.hass}
             .value=${this.text}
             .error=${this.problem !== undefined}
@@ -81,12 +92,10 @@ export class MnmlYaml extends LitElement {
             }}
           ></ha-code-editor>`;
     return html`<div class="yaml">
-      <p class="muted">
-        The whole template. Apply sends it back to the other tabs; Save stores it.
-      </p>
+      <p class="muted">${said.about}</p>
       ${editor}
       ${this.problem === undefined ? nothing : html`<p class="problem-line">${this.problem}</p>`}
-      <button type="button" class="action" @click=${this.applyText}>Apply</button>
+      <button type="button" class="action" @click=${this.applyText}>${said.apply}</button>
     </div>`;
   }
 
@@ -97,7 +106,7 @@ export class MnmlYaml extends LitElement {
 
   private check(text: string): WrittenTemplate | undefined {
     try {
-      const read = readTemplate(text, Array.isArray(this.template?.card));
+      const read = readTemplate(text, Array.isArray(this.template?.card), this.words());
       this.problem = undefined;
       return read;
     } catch (error) {

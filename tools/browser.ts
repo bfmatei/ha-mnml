@@ -61,6 +61,11 @@ export function errorCards(page: Page): Promise<string[]> {
       if (node.localName === 'hui-error-card') {
         found.push(node.textContent?.trim().slice(0, 160) ?? 'error card');
       }
+      const failed =
+        node.localName === 'mnml-card-note' ? node.shadowRoot?.querySelector('.failed') : null;
+      if (failed !== null && failed !== undefined) {
+        found.push(failed.textContent?.trim().slice(0, 160) ?? 'error note');
+      }
       for (const child of [...(node.shadowRoot?.children ?? []), ...node.children]) {
         walk(child);
       }

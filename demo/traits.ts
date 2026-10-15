@@ -382,7 +382,7 @@ export const TRAITS: Record<string, Trait> = {
     name: 'Home',
   },
   'input_boolean.infrastructure_vacation': {
-    icon: 'mdi:palm-tree',
+    icon: 'mdi:airplane',
     name: 'Vacation',
   },
   'light.bathroom_lights': {

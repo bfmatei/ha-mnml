@@ -4,8 +4,14 @@ import { property, state } from 'lit/decorators.js';
 import { live } from 'lit/directives/live.js';
 
 import { BASE_STYLE, CONTROL_STYLE } from '../cards/styles.ts';
+import { sameValue } from '../contract/templates.ts';
 import type { Value } from '../contract/templates.ts';
 import { icon, quietly } from '../ha/templates.ts';
+import { EDITORS_EN } from '../words/panel/editors-en.ts';
+import type { EditorWords } from '../words/panel/editors-en.ts';
+
+import { IN_PLACE, REDRAW } from './drawing.ts';
+import type { Drawing } from './drawing.ts';
 
 type Pair = readonly [string, string];
 
@@ -42,9 +48,6 @@ const WORDS_STYLE = css`
 const pairsOf = (words: Readonly<Record<string, Value>>): Pair[] =>
   Object.entries(words).map(([state, word]) => [state, typeof word === 'string' ? word : '']);
 
-const same = (a: readonly Pair[], b: readonly Pair[]): boolean =>
-  JSON.stringify(a) === JSON.stringify(b);
-
 const clashes = (pairs: readonly Pair[], position: number): boolean =>
   pairs.some(([other], at) => at !== position && other === pairs[position]?.[0]);
 
@@ -55,15 +58,18 @@ export class MnmlWords extends LitElement {
 
   @property({ attribute: false }) words: Readonly<Record<string, Value>> = {};
   @property({ attribute: false }) options: readonly string[] | undefined;
-  @property({ attribute: false }) changed: (next: Record<string, string>, redraw: boolean) => void =
-    () => undefined;
+  @property({ attribute: false }) labels: EditorWords['words'] = EDITORS_EN.words;
+  @property({ attribute: false }) changed: (
+    next: Record<string, string>,
+    drawing: Drawing,
+  ) => void = () => undefined;
   @state() private shown: readonly Pair[] | undefined;
 
   protected override willUpdate(changed: PropertyValues<this>): void {
     if (
       changed.has('words') &&
       this.shown !== undefined &&
-      !same(pairsOf(this.words), stated(this.shown))
+      !sameValue(pairsOf(this.words), stated(this.shown))
     ) {
       this.shown = undefined;
     }
@@ -72,16 +78,17 @@ export class MnmlWords extends LitElement {
   protected override render(): TemplateResult {
     const pairs = this.visible();
     const colours = this.options !== undefined;
+    const labels = this.labels;
     const named = (state: string): string =>
-      state === '' ? (colours ? 'a word' : 'a state') : state;
-    const add = colours ? 'Add a colour' : 'Add a word';
+      state === '' ? (colours ? labels.aWord : labels.aState) : state;
+    const add = colours ? labels.addColour : labels.addWord;
     return html`<div class="words">
       ${pairs.map((pair, index) => {
         const [state] = pair;
-        const remove = `Remove the ${colours ? 'colour' : 'word'} for ${named(state)}`;
+        const remove = (colours ? labels.removeColour : labels.removeWord)(named(state));
         return html`<input
             class="word"
-            aria-label=${colours ? 'Word' : 'State'}
+            aria-label=${colours ? labels.word : labels.state}
             aria-invalid=${String(clashes(pairs, index))}
             .value=${live(state)}
             @input=${(event: Event) => {
@@ -95,7 +102,7 @@ export class MnmlWords extends LitElement {
             @click=${quietly(() => {
               this.settle(
                 this.visible().filter((_, position) => position !== index),
-                true,
+                REDRAW,
               );
             })}
           >
@@ -124,12 +131,12 @@ export class MnmlWords extends LitElement {
     if (this.options === undefined) {
       return html`<input
         class="word"
-        aria-label=${`Word for ${state}`}
+        aria-label=${this.labels.wordFor(state)}
         .value=${live(word)}
         @input=${changed}
       />`;
     }
-    return html`<select aria-label=${`Colour for ${state}`} @change=${changed}>
+    return html`<select aria-label=${this.labels.colourFor(state)} @change=${changed}>
       ${this.options.map(
         (option) => html`<option value=${option} ?selected=${option === word}>${option}</option>`,
       )}
@@ -150,17 +157,17 @@ export class MnmlWords extends LitElement {
       }
       return side === 0 ? [typed, word] : [state, typed];
     });
-    this.settle(next, false);
+    this.settle(next, IN_PLACE);
   }
 
-  private settle(next: readonly Pair[], redraw: boolean): void {
+  private settle(next: readonly Pair[], drawing: Drawing): void {
     this.shown = next;
     if (next.some((_, position) => clashes(next, position))) {
       return;
     }
     const written = stated(next);
-    if (!same(written, pairsOf(this.words))) {
-      this.changed(Object.fromEntries(written), redraw);
+    if (!sameValue(written, pairsOf(this.words))) {
+      this.changed(Object.fromEntries(written), drawing);
     }
   }
 }

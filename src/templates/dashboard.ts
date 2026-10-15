@@ -1,11 +1,9 @@
-import { isMapping } from '../contract/templates.ts';
+import { LAYOUT_KEYS, isMapping } from '../contract/templates.ts';
 import type { Templates, Value } from '../contract/templates.ts';
 
 import { expand } from './expand.ts';
 
 type Mapping = Record<string, Value>;
-
-const LAYOUT = new Set(['grid_options', 'visibility', 'view_layout', 'layout_options', 'card_mod']);
 
 function slotsOf(node: Mapping): Mapping {
   const slots = node['slots'];
@@ -16,7 +14,7 @@ function laidOut(node: Mapping, card: Value): Value {
   if (!isMapping(card)) {
     return card;
   }
-  const own = Object.fromEntries(Object.entries(node).filter(([key]) => LAYOUT.has(key)));
+  const own = Object.fromEntries(Object.entries(node).filter(([key]) => LAYOUT_KEYS.has(key)));
   const shown = [card['visibility'], node['visibility']].flatMap((list) =>
     Array.isArray(list) ? list : [],
   );

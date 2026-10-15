@@ -1,25 +1,28 @@
 import { LitElement, css, nothing } from 'lit';
 import { state } from 'lit/decorators.js';
 
-import type { Condition, Popup, TemplateCard } from '../contract/cards.ts';
-import { isMapping } from '../contract/templates.ts';
+import type { Popup, TemplateCard } from '../contract/cards.ts';
+import { CARD_STRUCTURES } from '../contract/structure.ts';
+import { isMapping, sameValue, templateTitle } from '../contract/templates.ts';
 import type { Templates, Value } from '../contract/templates.ts';
 import type { ChildCard } from '../ha/card-helpers.ts';
-import { isCondition, visible } from '../ha/conditions.ts';
+import { Judge } from '../ha/conditions.ts';
+import { energyPrefs } from '../ha/energy.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
-import { registriesOf } from '../ha/registries.ts';
+import { registriesOf } from '../ha/snapshot.ts';
 import { SHIPPED_TEMPLATES } from '../store/shipped.ts';
 import { knownShared, onShared, resolvedTemplates, sharedTemplates } from '../store/store.ts';
 import type { SharedState } from '../store/store.ts';
 import { discover } from '../templates/discover.ts';
-import { expand, toValue } from '../templates/expand.ts';
+import { expand, TemplateError } from '../templates/expand.ts';
 import type { Expanded } from '../templates/expand.ts';
-import { SHAPES } from '../templates/families.ts';
+import { SIZES } from '../templates/families.ts';
+import type { Words } from '../words/en.ts';
+import { wordsFor } from '../words/words.ts';
 
-import { requireString } from './base.ts';
-import { requireKnownKeys } from './keys.ts';
+import { requireCard } from './keys.ts';
+import { cardOf } from './parts/card-element.ts';
 import { announce, checkPopups, withdraw } from './parts/popup-registry.ts';
-import { TEMPLATE_CARD } from './schemas.ts';
 
 function checked(template: string, popups: readonly Value[]): Popup[] {
   try {
@@ -35,8 +38,15 @@ function templates(shared: SharedState): Templates {
   return resolvedTemplates(shared, SHIPPED_TEMPLATES.templates());
 }
 
+function failureOf(error: unknown, name: string, shared: SharedState): string {
+  if (error instanceof TemplateError) {
+    return `${templateTitle(templates(shared)[name], name)}: ${error.said}`;
+  }
+  return error instanceof Error ? error.message : String(error);
+}
+
 const UNSIZED = { columns: 12, rows: 'auto' };
-const SIZES = new Map<string, Record<string, unknown>>();
+const PROBED = new Map<string, Record<string, unknown>>();
 
 function defaultSize(card: Value): Record<string, unknown> {
   const type = isMapping(card) ? card['type'] : undefined;
@@ -44,7 +54,7 @@ function defaultSize(card: Value): Record<string, unknown> {
     typeof type === 'string' && type.startsWith('custom:')
       ? type.slice('custom:'.length)
       : undefined;
-  const known = tag === undefined ? UNSIZED : SIZES.get(tag);
+  const known = tag === undefined ? UNSIZED : PROBED.get(tag);
   if (known !== undefined || tag === undefined) {
     return known ?? UNSIZED;
   }
@@ -58,7 +68,7 @@ function defaultSize(card: Value): Record<string, unknown> {
       ? probe.getGridOptions()
       : undefined;
   const size = isMapping(options) ? options : UNSIZED;
-  SIZES.set(tag, size);
+  PROBED.set(tag, size);
   return size;
 }
 
@@ -66,12 +76,12 @@ function literal(value: Value): boolean {
   return !JSON.stringify(value).includes('[[');
 }
 
-function same(a: Expanded, b: Expanded): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
+function discovers(config: TemplateCard): boolean {
+  return config.area !== undefined || config.device !== undefined || config.slots === undefined;
 }
 
-function discovers(config: TemplateCard): boolean {
-  return config.area !== undefined || config.slots === undefined;
+function wordsOf(hass: HomeAssistant | undefined): Words['templates'] {
+  return wordsFor(hass?.locale.language ?? '').templates;
 }
 
 export class MnmlTemplateCard extends LitElement {
@@ -93,38 +103,48 @@ export class MnmlTemplateCard extends LitElement {
   private seen: readonly unknown[] = [];
   private basis: SharedState | undefined;
   private loaded: Templates | undefined;
+  private words: Words['templates'] | undefined;
   private failing = false;
   private stopShared: (() => void) | undefined;
   private drawn: Value | undefined;
+  private energyOf: unknown;
+  private readonly judge = new Judge(() => {
+    this.rejudge();
+  });
+
   private readonly sharedChanged = (): void => {
     this.refresh(this.current);
     this.place();
   };
 
   setConfig(config: TemplateCard): void {
-    requireKnownKeys(config, TEMPLATE_CARD);
-    requireString('template', config.template);
+    requireCard(config, CARD_STRUCTURES['custom:mnml-template-card']);
     this.config = config;
     this.seen = [];
     this.basis = undefined;
     this.loaded = undefined;
+    this.words = undefined;
     this.drawn = undefined;
     this.expanded = undefined;
     this.popups = [];
     const shared = knownShared();
     if (!discovers(config) && shared.status === 'ready') {
       const loaded = SHIPPED_TEMPLATES.templates();
+      const words = wordsOf(this.current);
       const expanded = expand(
         templates(shared),
         { template: config.template, slots: config.slots ?? {} },
         {},
         SHIPPED_TEMPLATES.later(),
+        undefined,
+        words,
       );
       if (expanded.missing === undefined) {
         this.popups = checked(config.template, expanded.popups);
         this.expanded = expanded;
         this.basis = shared;
         this.loaded = loaded;
+        this.words = words;
       } else if (SHIPPED_TEMPLATES.failure(expanded.missing) === undefined) {
         this.wait(expanded.missing);
       } else {
@@ -158,7 +178,7 @@ export class MnmlTemplateCard extends LitElement {
       (name === undefined
         ? null
         : (templates(knownShared())[name]?.card ??
-          (Object.hasOwn(SHAPES, name) ? SHAPES[name] : undefined))) ??
+          (Object.hasOwn(SIZES, name) ? SIZES[name] : undefined))) ??
       null;
     const grid = isMapping(card) ? card['grid_options'] : undefined;
     const own = isMapping(grid) && literal(grid) ? grid : {};
@@ -178,6 +198,7 @@ export class MnmlTemplateCard extends LitElement {
     withdraw(this);
     this.stopShared?.();
     this.stopShared = undefined;
+    this.judge.close();
   }
 
   protected override render(): ChildCard | typeof nothing {
@@ -202,19 +223,22 @@ export class MnmlTemplateCard extends LitElement {
       return;
     }
     const loaded = SHIPPED_TEMPLATES.templates();
+    const words = wordsOf(hass);
     const registries = hass === undefined ? [] : [hass.areas, hass.devices, hass.entities];
     const unchanged =
       shared === this.basis &&
       loaded === this.loaded &&
+      words === this.words &&
       (!discovers(config) || registries.every((registry, index) => registry === this.seen[index]));
     if (unchanged) {
       return;
     }
     this.basis = shared;
     this.loaded = loaded;
+    this.words = words;
     this.seen = registries;
     this.failing = false;
-    const { expanded, popups } = this.expandIn(config, hass, shared);
+    const { expanded, popups } = this.expandIn(config, hass, shared, words);
     if (this.failing) {
       this.loaded = undefined;
     }
@@ -222,7 +246,7 @@ export class MnmlTemplateCard extends LitElement {
       this.wait(expanded.missing);
       return;
     }
-    if (this.expanded !== undefined && same(expanded, this.expanded)) {
+    if (this.expanded !== undefined && sameValue(expanded, this.expanded)) {
       return;
     }
     this.expanded = expanded;
@@ -234,37 +258,55 @@ export class MnmlTemplateCard extends LitElement {
     config: TemplateCard,
     hass: HomeAssistant | undefined,
     shared: SharedState,
+    words: Words['templates'],
   ): { expanded: Expanded; popups: Popup[] } {
     try {
       if (shared.status === 'failed') {
         throw new Error(shared.error);
       }
       const all = templates(shared);
-      const slots = config.slots ?? {};
+      const instance = { template: config.template, slots: config.slots ?? {} };
       const later = SHIPPED_TEMPLATES.later();
       if (hass === undefined || !discovers(config)) {
-        return this.complete(config, expand(all, { template: config.template, slots }, {}, later));
+        return this.complete(config, expand(all, instance, {}, later, undefined, words));
       }
       const template = all[config.template];
-      const area = config.area;
+      const { area, device } = config;
+      if (device !== undefined && !Object.hasOwn(hass.devices, device)) {
+        throw new Error(`${config.template}: no device named ${device}`);
+      }
       if (area !== undefined && !Object.hasOwn(hass.areas, area)) {
         throw new Error(`${config.template}: no area named ${area}`);
       }
-      const found = template === undefined ? {} : discover(template, area, registriesOf(hass));
-      return this.complete(config, expand(all, { template: config.template, slots }, found, later));
+      this.askEnergy(hass);
+      const found =
+        template === undefined ? {} : discover(template, area, registriesOf(hass), device);
+      return this.complete(config, expand(all, instance, found, later, undefined, words));
     } catch (error) {
       return {
         expanded: {
           card: {
             type: 'error',
-            error: error instanceof Error ? error.message : String(error),
-            origConfig: toValue(config),
+            error: failureOf(error, config.template, shared),
           },
           popups: [],
         },
         popups: [],
       };
     }
+  }
+
+  private askEnergy(hass: HomeAssistant): void {
+    if (this.energyOf === hass.connection) {
+      return;
+    }
+    this.energyOf = hass.connection;
+    void energyPrefs(hass.connection).then((prefs) => {
+      if (prefs !== undefined && this.energyOf === hass.connection) {
+        this.seen = [];
+        this.sharedChanged();
+      }
+    });
   }
 
   private complete(
@@ -299,30 +341,29 @@ export class MnmlTemplateCard extends LitElement {
     const hass = this.current;
     if (hass !== undefined && this.child !== undefined) {
       this.child.hass = hass;
-      const visibility = isMapping(expanded.card) ? expanded.card['visibility'] : undefined;
-      const conditions: Condition[] = [];
-      let judged = true;
-      for (const item of Array.isArray(visibility) ? visibility : []) {
-        if (isCondition(item)) {
-          conditions.push(item);
-        } else {
-          judged = false;
-        }
-      }
-      this.hidden = judged ? !visible(hass, conditions) : false;
+      this.rejudge();
     }
+  }
+
+  private rejudge(): void {
+    const hass = this.current;
+    const card = this.expanded?.card;
+    if (hass === undefined || !isMapping(card)) {
+      return;
+    }
+    this.hidden = !this.judge.shown(card['visibility'], hass, card['entity']);
   }
 
   private async draw(card: Value): Promise<void> {
     this.drawn = card;
-    const helpers = await window.loadCardHelpers?.();
-    if (helpers === undefined || this.drawn !== card) {
-      return;
-    }
     if (!isMapping(card)) {
       return;
     }
-    this.child = helpers.createCardElement(card);
+    const child = await cardOf(card);
+    if (this.drawn !== card) {
+      return;
+    }
+    this.child = child;
     this.place();
   }
 }

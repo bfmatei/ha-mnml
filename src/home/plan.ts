@@ -1,4 +1,4 @@
-import type { CarChoice, Plan, SystemChoice } from '../contract/builder.ts';
+import type { CarChoice, Plan, SystemChoice } from '../contract/plan.ts';
 import type { Value } from '../contract/templates.ts';
 
 import { glancesSlots, proxmoxSlots, roomSlots, snake, systemSlots } from './slots.ts';
@@ -40,6 +40,8 @@ export function homePlan(home: Home): Plan {
     cars: home.cars.map(carChoice),
     system: systemChoices(home),
     open: { ...home.popupOpen },
+    idle_close: home.idleClose,
+    alerts: home.alerts?.map((alert) => ({ ...alert })),
     sections: {
       rooms: { title: sections.rooms },
       people: { title: sections.people },

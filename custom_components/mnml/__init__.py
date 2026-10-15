@@ -55,20 +55,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: MnmlConfigEntry) -> bool
         )
     async_register(hass)
     url = await async_register_frontend(hass, const.WWW)
-    try:
-        await async_register_panel(hass, await hass.async_add_executor_job(panel_url, const.WWW))
-    except Exception:
-        remove_extra_js_url(hass, url)
-        raise
-    glass = bool(entry.options.get(const.CONF_GLASS, True))
-    try:
-        await async_check_home(hass, glass=glass)
-    except Exception:
-        remove_extra_js_url(hass, url)
-        async_remove_panel(hass)
-        raise
     entry.async_on_unload(partial(remove_extra_js_url, hass, url))
+    await async_register_panel(hass, await hass.async_add_executor_job(panel_url, const.WWW))
     entry.async_on_unload(partial(async_remove_panel, hass))
+    glass = glass_of(entry)
+    await async_check_home(hass, glass=glass)
     entry.runtime_data = MnmlData(glass=glass)
     await async_sync_default(hass, entry)
     entry.async_on_unload(entry.add_update_listener(async_options_updated))
@@ -111,8 +102,12 @@ async def async_check_home(hass: HomeAssistant, *, glass: bool) -> None:
     )
 
 
+def glass_of(entry: MnmlConfigEntry) -> bool:
+    return bool(entry.options.get(const.CONF_GLASS, const.DEFAULT_GLASS))
+
+
 async def async_options_updated(hass: HomeAssistant, entry: MnmlConfigEntry) -> None:
-    glass = bool(entry.options.get(const.CONF_GLASS, True))
+    glass = glass_of(entry)
     if glass != entry.runtime_data.glass:
         await async_check_home(hass, glass=glass)
         entry.runtime_data.glass = glass
@@ -120,7 +115,7 @@ async def async_options_updated(hass: HomeAssistant, entry: MnmlConfigEntry) -> 
 
 
 async def async_sync_default(hass: HomeAssistant, entry: MnmlConfigEntry) -> None:
-    on = bool(entry.options.get(const.CONF_DEFAULT_THEME, False))
+    on = bool(entry.options.get(const.CONF_DEFAULT_THEME, const.DEFAULT_DEFAULT_THEME))
     if on == bool(entry.data.get(const.APPLIED_DEFAULT_THEME, False)):
         return
     if on and not theme_loaded(hass):

@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { parse } from 'yaml';
 
 import { DEMO } from '../demo/home.ts';
+import { isEntityId } from '../src/contract/entities.ts';
 import { drawn } from '../src/home/view.ts';
 
 import { readEnv } from './env.ts';
@@ -23,7 +24,7 @@ const known = new Set(
 );
 const ids = new Set<string>();
 const walk = (value: unknown): void => {
-  if (typeof value === 'string' && /^[a-z_]+\.[a-z0-9_]+$/.test(value) && !SERVICES.has(value)) {
+  if (isEntityId(value) && !SERVICES.has(value)) {
     ids.add(value);
   } else if (Array.isArray(value)) {
     for (const item of value) {

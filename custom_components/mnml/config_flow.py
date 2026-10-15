@@ -4,7 +4,14 @@ import probatio as vol
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.core import callback
 
-from .const import CONF_DEFAULT_THEME, CONF_GLASS, DOMAIN, TITLE
+from .const import (
+    CONF_DEFAULT_THEME,
+    CONF_GLASS,
+    DEFAULT_DEFAULT_THEME,
+    DEFAULT_GLASS,
+    DOMAIN,
+    TITLE,
+)
 
 
 def options_schema(*, glass: bool, default_theme: bool) -> vol.Schema:
@@ -23,7 +30,8 @@ class MnmlConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             return self.async_create_entry(title=TITLE, data={}, options=user_input)
         return self.async_show_form(
-            step_id="user", data_schema=options_schema(glass=True, default_theme=False)
+            step_id="user",
+            data_schema=options_schema(glass=DEFAULT_GLASS, default_theme=DEFAULT_DEFAULT_THEME),
         )
 
     @staticmethod
@@ -38,7 +46,7 @@ class MnmlOptionsFlow(OptionsFlow):
             return self.async_create_entry(data=user_input)
         options = self.config_entry.options
         schema = options_schema(
-            glass=bool(options.get(CONF_GLASS, True)),
-            default_theme=bool(options.get(CONF_DEFAULT_THEME, False)),
+            glass=bool(options.get(CONF_GLASS, DEFAULT_GLASS)),
+            default_theme=bool(options.get(CONF_DEFAULT_THEME, DEFAULT_DEFAULT_THEME)),
         )
         return self.async_show_form(step_id="init", data_schema=schema)

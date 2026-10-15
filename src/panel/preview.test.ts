@@ -2,10 +2,13 @@ import assert from 'node:assert/strict';
 
 import { test } from 'vitest';
 
+import '../cards/register.ts';
 import { SHIPPED } from '../templates/shipped.ts';
-import { define, mounted, text } from '../test/render.ts';
+import { fakeHass } from '../test/hass.ts';
+import { define, mounted } from '../test/render.ts';
+import { until } from '../test/until.ts';
 
-import { MnmlPreview, trialOf, tryDraft } from './preview.ts';
+import { MnmlPreview, richestArea, trialOf, tryDraft } from './preview.ts';
 
 define('mnml-preview', MnmlPreview);
 
@@ -38,7 +41,21 @@ test('a marked trial tells each part of the card its path', () => {
   assert.ok(marked.sources.every((source) => source === '' || source.startsWith('popups/')));
 });
 
-test('a preview on a page without the card helpers says why it draws nothing', async () => {
+test("a preview on a page without Home Assistant's helpers draws MNML's cards itself", async () => {
+  const template = SHIPPED['room'];
+  assert.ok(template);
+  const preview = new MnmlPreview();
+  preview.trial = () =>
+    tryDraft(SHIPPED, 'room', template, trialOf(template, undefined), undefined);
+  const root = await mounted(preview);
+  const cards = (): string[] =>
+    [...(root.querySelector('.cards')?.children ?? [])].map((card) => card.localName);
+  await until(() => cards().length > 0, 'the cards');
+  assert.deepEqual(cards(), ['mnml-tile-card', 'mnml-popups-card']);
+  preview.remove();
+});
+
+test("a preview's pop-ups are named by their headers, and open by their hashes", async () => {
   const template = SHIPPED['room'];
   assert.ok(template);
   const preview = new MnmlPreview();
@@ -46,8 +63,20 @@ test('a preview on a page without the card helpers says why it draws nothing', a
     tryDraft(SHIPPED, 'room', template, trialOf(template, undefined), undefined);
   const root = await mounted(preview);
   await preview.updateComplete;
-  assert.match(text(root), /Home Assistant has not loaded its card helpers on this page/);
-  assert.equal(root.querySelector('.cards')?.childElementCount, 0);
+  const made = tryDraft(SHIPPED, 'room', template, trialOf(template, undefined), undefined);
+  const chips = [...root.querySelectorAll('.popup-list button.chip')];
+  assert.equal(chips.length, made.popups.length);
+  const labels = chips.map((chip) => chip.getAttribute('aria-label') ?? '');
+  assert.ok(
+    labels.every((label) => !label.includes('#')),
+    labels.join(', '),
+  );
+  const room = made.popups[0]?.hash ?? '';
+  assert.ok(
+    labels.some((label) => /^Open \w+: lights$/.test(label)),
+    labels.join(', '),
+  );
+  assert.ok(chips[0]?.getAttribute('title')?.endsWith(room));
   preview.remove();
 });
 
@@ -83,5 +112,48 @@ test('a draft naming a shape that is not known is not tried, and says why', () =
         undefined,
       ),
     /yard: the slot energy uses the shape metre, which is not known/,
+  );
+});
+
+test("the Design tab tries a template on the area where it finds the most, the area's own name and icon not counting", () => {
+  const template = SHIPPED['room'];
+  assert.ok(template);
+  const hass = fakeHass({
+    areas: {
+      porch: { area_id: 'porch', name: 'Porch', icon: 'mdi:door' },
+      den: { area_id: 'den', name: 'Den' },
+    },
+    entities: { 'light.den': { entity_id: 'light.den', area_id: 'den', platform: 'hue' } },
+    states: { 'light.den': { state: 'on' } },
+  });
+  const areas = [{ value: 'porch' }, { value: 'den' }];
+  assert.equal(richestArea(SHIPPED, 'room', template, areas, hass), 'den');
+});
+
+test('the Design tab prefers an area that fills every required slot to one that finds more', () => {
+  const template = {
+    slots: {
+      heater: { kind: 'entity', required: true, discover: { domain: 'climate' } },
+      lights: { kind: 'entities', discover: { domain: 'light' } },
+      plugs: { kind: 'entities', discover: { domain: 'switch' } },
+    },
+    card: { type: 'custom:mnml-entity-card', entity: '[[heater]]' },
+  } as const;
+  const placed: [string, string][] = [
+    ['light.den', 'den'],
+    ['switch.den', 'den'],
+    ['climate.hall', 'hall'],
+  ];
+  const hass = fakeHass({
+    areas: { den: { area_id: 'den', name: 'Den' }, hall: { area_id: 'hall', name: 'Hall' } },
+    entities: Object.fromEntries(
+      placed.map(([id, area]) => [id, { entity_id: id, area_id: area, platform: 'demo' }]),
+    ),
+    states: Object.fromEntries(placed.map(([id]) => [id, { state: 'on' }])),
+  });
+  const areas = [{ value: 'den' }, { value: 'hall' }];
+  assert.equal(
+    richestArea({ ...SHIPPED, heater: template }, 'heater', template, areas, hass),
+    'hall',
   );
 });

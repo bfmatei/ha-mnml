@@ -1,4 +1,4 @@
-type Hex = `#${string}`;
+export type Hex = `#${string}`;
 
 export interface Tint {
   color: Hex;
@@ -113,7 +113,7 @@ const GLASS: Theme = {
       card: { color: '#ffffff', alpha: 0.66 },
       pill: { color: '#4a3f6b', alpha: 0.1 },
       section: { color: '#ffffff', alpha: 0.5 },
-      raised: { color: '#ffffff', alpha: 0.75 },
+      raised: { color: '#4a3f6b', alpha: 0.1 },
       well: { color: '#3b3150', alpha: 0.28 },
       lip: { color: '#ffffff', alpha: 0.9 },
       scroll: { color: '#2a2140', alpha: 0.2 },
@@ -185,7 +185,7 @@ const FLAT: Theme = {
       card: { color: '#faf8fc', alpha: 1 },
       pill: { color: '#e8e6ee', alpha: 1 },
       section: { color: '#ffffff', alpha: 1 },
-      raised: { color: '#ffffff', alpha: 1 },
+      raised: { color: '#e8e6ee', alpha: 1 },
       well: { color: '#3b3150', alpha: 0.28 },
       lip: { color: '#ffffff', alpha: 0.9 },
       scroll: { color: '#2a2140', alpha: 0.2 },

@@ -6,21 +6,22 @@ import type { ClassInfo } from 'lit/directives/class-map.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
 import type { Color, ListCard, ListRow, ListSummary } from '../contract/cards.ts';
-import { DASH, formatState, unavailableValue } from '../ha/format.ts';
+import { CARD_STRUCTURES } from '../contract/structure.ts';
+import type { Structure } from '../contract/structure.ts';
+import { DASH, decimals, formatState, unavailableValue } from '../ha/format.ts';
 import { callService, hasValue, isUnavailable, numericState, run, stateOf } from '../ha/hass.ts';
 import type { HassEntity, HomeAssistant } from '../ha/hass.ts';
-import { nameOf } from '../ha/names.ts';
+import { distinctNames, nameOf } from '../ha/names.ts';
 import { partOf } from '../ha/part.ts';
-import { UNAVAILABLE, matches, shown } from '../ha/rules.ts';
+import { UNAVAILABLE, holds, shown } from '../ha/rules.ts';
 import { colorStyle, icon, quietly, relativeTime, stateIcon } from '../ha/templates.ts';
+import { wordsFor } from '../words/words.ts';
 
-import { MnmlCard, requireList, requireString } from './base.ts';
+import { MnmlCard } from './base.ts';
 import type { Host } from './base.ts';
-import type { KeySchema } from './keys.ts';
 import { SECTION_STYLE, section } from './parts/section.ts';
 import type { Fold, HeadingState } from './parts/section.ts';
 import { tip } from './parts/tooltip.ts';
-import { LIST_CARD } from './schemas.ts';
 import { BASE_STYLE, HEADING_STYLE } from './styles.ts';
 
 const LIST_STYLE = css`
@@ -69,6 +70,9 @@ const LIST_STYLE = css`
   .grid.table {
     grid-template-columns: 20px minmax(0, 1fr) repeat(var(--values), auto);
   }
+  .table .label + .value {
+    grid-column-start: 3;
+  }
   .cell {
     display: flex;
     align-items: center;
@@ -112,6 +116,108 @@ const LIST_STYLE = css`
   .value.colored,
   .icon-cell.colored {
     color: var(--m-color);
+  }
+  @container (width < 200px) {
+    .values-1 .header.label {
+      display: none;
+    }
+    .values-1 .label {
+      grid-column: 2 / -1;
+    }
+    .values-1 .icon-cell,
+    .values-1 .label {
+      height: 24px;
+      margin-block-start: 8px;
+    }
+    .values-1 .value:not(.header) {
+      height: 20px;
+      line-height: 20px;
+    }
+  }
+  @container (width < 264px) {
+    .values-2 .header.label {
+      display: none;
+    }
+    .values-2 .label {
+      grid-column: 2 / -1;
+    }
+    .values-2 .icon-cell,
+    .values-2 .label {
+      height: 24px;
+      margin-block-start: 8px;
+    }
+    .values-2 .value:not(.header) {
+      height: 20px;
+      line-height: 20px;
+    }
+  }
+  @container (width < 328px) {
+    .values-3 .header.label {
+      display: none;
+    }
+    .values-3 .label {
+      grid-column: 2 / -1;
+    }
+    .values-3 .icon-cell,
+    .values-3 .label {
+      height: 24px;
+      margin-block-start: 8px;
+    }
+    .values-3 .value:not(.header) {
+      height: 20px;
+      line-height: 20px;
+    }
+  }
+  @container (width < 392px) {
+    .values-4 .header.label {
+      display: none;
+    }
+    .values-4 .label {
+      grid-column: 2 / -1;
+    }
+    .values-4 .icon-cell,
+    .values-4 .label {
+      height: 24px;
+      margin-block-start: 8px;
+    }
+    .values-4 .value:not(.header) {
+      height: 20px;
+      line-height: 20px;
+    }
+  }
+  @container (width < 456px) {
+    .values-5 .header.label {
+      display: none;
+    }
+    .values-5 .label {
+      grid-column: 2 / -1;
+    }
+    .values-5 .icon-cell,
+    .values-5 .label {
+      height: 24px;
+      margin-block-start: 8px;
+    }
+    .values-5 .value:not(.header) {
+      height: 20px;
+      line-height: 20px;
+    }
+  }
+  @container (width < 520px) {
+    .values-6 .header.label {
+      display: none;
+    }
+    .values-6 .label {
+      grid-column: 2 / -1;
+    }
+    .values-6 .icon-cell,
+    .values-6 .label {
+      height: 24px;
+      margin-block-start: 8px;
+    }
+    .values-6 .value:not(.header) {
+      height: 20px;
+      line-height: 20px;
+    }
   }
   .bar {
     height: 4px;
@@ -203,7 +309,7 @@ function rowColor(
   if (below(row.low, value) || above(row.high, value)) {
     return 'orange';
   }
-  return row.color !== undefined && matches(row.when, stateObj.state) ? row.color : undefined;
+  return row.color !== undefined && holds(row.when, stateObj) ? row.color : undefined;
 }
 
 function share(hass: HomeAssistant, value: number | undefined): string {
@@ -277,12 +383,12 @@ function shareCell(
   return cell({ value: true }, share(hass, number), color);
 }
 
-function resetCell(hass: HomeAssistant, row: ListRow, host: Host): TemplateResult {
+function resetCell(hass: HomeAssistant, row: ListRow, name: string, host: Host): TemplateResult {
   const id = row.reset;
   if (id === undefined) {
     return cell({});
   }
-  const label = `Reset ${nameOf(hass, row.entity, row)}`;
+  const label = wordsFor(hass.locale.language).reset(name);
   return cell(
     {},
     html`<button
@@ -312,6 +418,7 @@ function emptyAsZero(row: ListRow, stateObj: HassEntity | undefined): HassEntity
 function renderRow(
   hass: HomeAssistant,
   row: ListRow,
+  name: string,
   mode: Mode,
   columns: number,
   resets: boolean,
@@ -328,10 +435,10 @@ function renderRow(
   }
   const stateObj = emptyAsZero(row, stateOf(hass, row.entity));
   const part = partOf(row);
-  const label = cell({ label: true }, nameOf(hass, row.entity, row), undefined, part);
+  const label = cell({ label: true }, name, undefined, part);
   if (mode === 'table') {
     const values = Array.from({ length: columns }, (_, index) =>
-      stateOf(hass, row.values?.[index]),
+      stateOf(hass, row.values?.[index] ?? undefined),
     );
     if (!values.some((value) => hasValue(value) || isUnavailable(value))) {
       return undefined;
@@ -372,19 +479,20 @@ function renderRow(
     label,
     ...(mode === 'bars' ? [barCell(row, number, color)] : []),
     cell({ value: true }, valueOf(hass, row, stateObj, number), color, part),
-    ...(resets ? [resetCell(hass, row, host)] : []),
+    ...(resets ? [resetCell(hass, row, name, host)] : []),
   ];
   return { row, stateObj, cells, number, color };
 }
 
-function lowestFirst(rendered: Rendered[]): Rendered[] {
-  return [...rendered].sort(
-    (a, b) => (a.number ?? Number.POSITIVE_INFINITY) - (b.number ?? Number.POSITIVE_INFINITY),
-  );
-}
-
-function decimals(state: string): number {
-  return state.split('.')[1]?.length ?? 0;
+function byValue(rendered: Rendered[], mode: Mode, config: ListCard): Rendered[] {
+  const direction = config.lowest_first ? 1 : config.highest_first ? -1 : 0;
+  if (direction === 0) {
+    return rendered;
+  }
+  const valueOf = (entry: Rendered): number =>
+    (mode === 'table' ? numericState(entry.stateObj) : entry.number) ??
+    direction * Number.POSITIVE_INFINITY;
+  return [...rendered].sort((a, b) => direction * (valueOf(a) - valueOf(b)));
 }
 
 function extreme(
@@ -411,7 +519,8 @@ function extreme(
     pick.row.of === undefined
       ? formatState(hass, pick.stateObj, pick.row.words)
       : share(hass, pick.number);
-  const text = `${summary === 'lowest' ? 'Lowest' : 'Highest'} ${value}`;
+  const words = wordsFor(hass.locale.language).list;
+  const text = summary === 'lowest' ? words.lowest(value) : words.highest(value);
   return { text, label: text };
 }
 
@@ -422,7 +531,7 @@ function total(
   header: string | undefined,
 ): HeadingState | undefined {
   const states = rendered
-    .map((entry) => stateOf(hass, entry.row.values?.[column]))
+    .map((entry) => stateOf(hass, entry.row.values?.[column] ?? undefined))
     .filter((stateObj) => numericState(stateObj) !== undefined);
   const [first] = states;
   const unit = 'unit_of_measurement';
@@ -459,22 +568,13 @@ export class MnmlListCard extends MnmlCard<ListCard> {
 
   @state() private choice: boolean | undefined;
 
-  protected schema(): KeySchema {
-    return LIST_CARD;
+  protected structure(): Structure {
+    return CARD_STRUCTURES['custom:mnml-list-card'];
   }
 
   protected override validate(config: ListCard): void {
-    requireList('rows', config.rows);
-    for (const [index, row] of config.rows.entries()) {
-      requireString(`rows[${index}].entity`, row.entity);
-    }
-    if (
-      config.summary !== undefined &&
-      config.summary !== 'lowest' &&
-      config.summary !== 'highest' &&
-      typeof config.summary.sum !== 'number'
-    ) {
-      throw new Error('summary must be lowest, highest or { sum: <column> }');
+    if (config.lowest_first && config.highest_first) {
+      throw new Error('lowest_first and highest_first do not go together');
     }
   }
 
@@ -483,13 +583,16 @@ export class MnmlListCard extends MnmlCard<ListCard> {
     const mode: Mode =
       nameHeader !== undefined ? 'table' : config.rows.some((row) => row.bar) ? 'bars' : 'plain';
     const resets = mode !== 'table' && config.rows.some((row) => row.reset !== undefined);
+    const names = distinctNames(hass, config.rows);
     const rendered = config.rows
-      .map((row) => renderRow(hass, row, mode, valueHeaders.length, resets, this))
+      .map((row, index) =>
+        renderRow(hass, row, names[index] ?? row.entity, mode, valueHeaders.length, resets, this),
+      )
       .filter((entry) => entry !== undefined);
     if (rendered.length === 0) {
       return undefined;
     }
-    const ordered = config.lowest_first && mode !== 'table' ? lowestFirst(rendered) : rendered;
+    const ordered = byValue(rendered, mode, config);
     const headers =
       nameHeader === undefined
         ? []
@@ -499,7 +602,12 @@ export class MnmlListCard extends MnmlCard<ListCard> {
           ];
     const card = html`<div class="card list">
       <div
-        class=${classMap({ grid: true, [mode]: true, resets })}
+        class=${classMap({
+          grid: true,
+          [mode]: true,
+          resets,
+          [`values-${valueHeaders.length}`]: mode === 'table',
+        })}
         style=${styleMap({ '--values': String(valueHeaders.length) })}
       >
         ${headers}${ordered.map((entry) => entry.cells)}
@@ -517,6 +625,8 @@ export class MnmlListCard extends MnmlCard<ListCard> {
         }
       : undefined;
     const summary = summarise(hass, rendered, config.summary, config.headers);
-    return section(card, config.title, config.icon, summary, fold);
+    const title =
+      config.title ?? (config.entity === undefined ? undefined : nameOf(hass, config.entity, {}));
+    return section(card, title, config.icon, summary, fold);
   }
 }

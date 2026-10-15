@@ -5,9 +5,11 @@ import { parse } from 'yaml';
 
 import { isMapping, isTemplate } from '../contract/templates.ts';
 import type { Filter, Rule, SlotSpec, Template } from '../contract/templates.ts';
+import type { Registries } from '../ha/registries.ts';
 
-import { TEXT_FILTERS, describe, discover, filterWords, fromDevice } from './discover.ts';
-import type { Registries } from './discover.ts';
+import { homes } from './corpus.ts';
+import { discover, fromDevice } from './discover.ts';
+import { SHIPPED } from './shipped.ts';
 
 const R: Registries = {
   areas: {
@@ -942,35 +944,115 @@ test('a device labelled mnml_<slot> fills an object slot with that device, its f
   );
 });
 
-test("the rule's sentence and the panel's words come from one vocabulary", () => {
-  assert.equal(
-    describe({ domain: 'binary_sensor', device_class: 'window' }),
-    `binary_sensor ${filterWords('device_class')} window`,
-  );
-  assert.equal(
-    describe({ domain: 'sensor', translation_key: 'status', entity_category: 'none' }),
-    `sensor ${filterWords('translation_key')} status, ${filterWords('entity_category')} primary`,
-  );
-  assert.equal(
-    describe({ domain: 'climate', exclude: { attribute: { hvac_modes: 'cool' } } }),
-    'climate but not with attribute hvac_modes cool',
-  );
-  assert.equal(describe({ label: 'main' }), 'any entity labelled main');
+function den(labels: { window?: string; heating?: string }): Registries {
+  return {
+    areas: { den: { area_id: 'den', name: 'Den' } },
+    devices: {
+      trv: { id: 'trv', area_id: 'den', name: 'Radiator' },
+      floor: { id: 'floor', area_id: 'den', name: 'Floor heating' },
+    },
+    entities: {
+      'binary_sensor.den_window_a': { entity_id: 'binary_sensor.den_window_a', area_id: 'den' },
+      'binary_sensor.den_window_b': {
+        entity_id: 'binary_sensor.den_window_b',
+        area_id: 'den',
+        labels: labels.window === undefined ? [] : [labels.window],
+      },
+      'climate.den_floor': { entity_id: 'climate.den_floor', device_id: 'floor' },
+      'climate.den_radiator': {
+        entity_id: 'climate.den_radiator',
+        device_id: 'trv',
+        labels: labels.heating === undefined ? [] : [labels.heating],
+      },
+    },
+    states: {
+      'binary_sensor.den_window_a': { attributes: { device_class: 'window' } },
+      'binary_sensor.den_window_b': { attributes: { device_class: 'window' } },
+      'climate.den_radiator': { attributes: { hvac_modes: ['off', 'heat'] } },
+      'climate.den_floor': { attributes: { hvac_modes: ['off', 'heat'] } },
+    },
+  };
+}
+
+test("a room's window and heating follow the mnml_window and mnml_heating labels", () => {
+  const room = SHIPPED['room'];
+  assert.ok(room !== undefined);
+  const labelled = discover(room, 'den', den({ window: 'mnml_window', heating: 'mnml_heating' }));
+  assert.equal(labelled['window'], 'binary_sensor.den_window_b');
+  assert.deepEqual(labelled['heating'], { entity: 'climate.den_radiator' });
+});
+
+const DEVICES = homes()['devices'] ?? R;
+
+const ON_DEVICE: Template = {
+  slots: {
+    key: { kind: 'text', required: true, discover: 'area.id' },
+    name: { kind: 'text', discover: 'area.name' },
+    icon: { kind: 'icon', discover: 'area.icon' },
+    temperature: { kind: 'entity', discover: 'area.temperature' },
+    vacuum: { ...SHIPPED['room']?.slots?.['vacuum'], kind: 'object', required: true },
+    climate: { kind: 'entity', discover: { domain: 'climate' } },
+    players: { kind: 'entities', discover: { domain: 'media_player' } },
+    near: { kind: 'entities', discover: { domain: 'media_player', scope: 'area' } },
+    anywhere: { kind: 'entities', discover: { domain: 'climate', scope: 'all' } },
+  },
+  card: {},
+};
+
+test("a card on a device finds its slots on that device and its via_device relatives; the device's name, and a key made from it, stand in for the area's", () => {
+  const found = discover(ON_DEVICE, undefined, DEVICES, 'roborock_s8');
+  assert.equal(found['key'], 'roborock_s8');
+  assert.equal(found['name'], 'Roborock S8');
+  assert.equal(found['icon'], 'mdi:sofa', "the device's area's icon");
+  const vacuum = found['vacuum'];
+  assert.ok(isMapping(vacuum));
+  assert.equal(vacuum['entity'], 'vacuum.roborock_s8');
+  assert.ok(isMapping(vacuum['dock']));
+  assert.equal(vacuum['dock']['mop_drying'], 'switch.roborock_s8_dock_mop_drying', 'its relative');
+  assert.equal(found['climate'], undefined, 'nothing of another device');
+  assert.equal(found['players'], undefined, 'not even of its own area');
+  assert.deepEqual(found['near'], ['media_player.living_room', 'media_player.living_room_tv']);
   assert.deepEqual(
-    TEXT_FILTERS.map((key) => filterWords(key)),
-    [
-      'with device class',
-      'from the integration',
-      'with translation key',
-      'in the category',
-      'with unit',
-      'with state class',
-      'named like',
-      'made by',
-      'of model',
-      'on a device of type',
-      'on a device of the integration',
-      'labelled',
-    ],
+    found['anywhere'],
+    discover(ON_DEVICE, undefined, DEVICES)['anywhere'],
+    'scope: all still looks everywhere',
   );
+  const ac = discover(ON_DEVICE, undefined, DEVICES, 'daikin_ac');
+  assert.equal(ac['key'], 'bedroom_ac', "the key is made from the device's name, not its id");
+  assert.equal(ac['name'], 'Bedroom AC');
+  assert.equal(ac['climate'], 'climate.bedroom_ac');
+  assert.equal(ac['vacuum'], undefined);
+});
+
+test("a card on a device takes the area given as the device's own: its sensors and its scope: area rules", () => {
+  const printer = discover(ON_DEVICE, undefined, DEVICES, 'prusa_mk4');
+  assert.equal(printer['temperature'], 'sensor.desk_sensor_temperature', 'its area, the office');
+  const elsewhere = discover(ON_DEVICE, 'living', DEVICES, 'prusa_mk4');
+  assert.equal(elsewhere['temperature'], undefined, 'the living has no temperature sensor');
+  assert.equal(elsewhere['icon'], 'mdi:sofa');
+  assert.equal(elsewhere['name'], 'Prusa MK4', 'the name is still the device');
+  assert.deepEqual(elsewhere['near'], ['media_player.living_room', 'media_player.living_room_tv']);
+});
+
+test('a card on a device takes the labels of that device only, and finds nothing on a device Home Assistant does not know', () => {
+  const labelled: Registries = {
+    ...DEVICES,
+    entities: {
+      ...DEVICES.entities,
+      'sensor.washer_operation_state': {
+        ...DEVICES.entities['sensor.washer_operation_state'],
+        entity_id: 'sensor.washer_operation_state',
+        labels: ['mnml_climate'],
+      },
+    },
+  };
+  assert.equal(
+    discover(ON_DEVICE, undefined, labelled, 'washer')['climate'],
+    'sensor.washer_operation_state',
+  );
+  assert.equal(
+    discover(ON_DEVICE, undefined, labelled, 'daikin_ac')['climate'],
+    'climate.bedroom_ac',
+  );
+  assert.deepEqual(discover(ON_DEVICE, undefined, DEVICES, 'nothing_here'), {});
 });

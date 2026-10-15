@@ -1,5 +1,4 @@
-import type { SectionKey } from '../contract/builder.ts';
-import type { ClientNetwork, CustomCard, PopupOpen } from '../contract/cards.ts';
+import type { ClientNetwork, PopupAlert, PopupOpen } from '../contract/cards.ts';
 import type {
   AlarmPanelId,
   BinarySensorId,
@@ -21,14 +20,17 @@ import type {
   NumberId,
   PersonId,
   SceneId,
+  ScheduleId,
   ScriptId,
   SelectId,
   SensorId,
   SwitchId,
+  TimerId,
   UpdateId,
   VacuumId,
   WeatherId,
 } from '../contract/entities.ts';
+import type { SectionKey } from '../contract/plan.ts';
 
 export interface LightZone {
   group: LightId;
@@ -53,6 +55,8 @@ export interface Thermostat {
 export interface Heating {
   entity: ClimateId;
   preset?: true;
+  presetTemperatures?: NumberId[];
+  schedule?: ScheduleId;
   thermostats: Thermostat[];
 }
 
@@ -246,6 +250,8 @@ export interface Room {
   media?: MediaMember[];
   outlets?: Outlet[];
   diffuser?: Diffuser;
+  timers?: TimerId[];
+  schedules?: ScheduleId[];
   batteries?: SensorId[];
   leaks?: BinarySensorId[];
   firmware?: UpdateId[];
@@ -498,28 +504,6 @@ export interface Security {
   smoke?: BinarySensorId[];
 }
 
-export type Card = CustomCard;
-
-export interface Section {
-  type: 'grid';
-  column_span: number;
-  cards: Card[];
-}
-
-export interface View {
-  title: string;
-  path: string;
-  icon: MdiIcon;
-  type: 'sections';
-  max_columns: number;
-  sections: Section[];
-}
-
-export interface Dashboard {
-  title: string;
-  views: View[];
-}
-
 export type SectionTitles = Readonly<Record<SectionKey, string>>;
 
 export interface Home {
@@ -527,6 +511,8 @@ export interface Home {
   sections: SectionTitles;
   order?: readonly SectionKey[];
   popupOpen?: PopupOpen;
+  idleClose?: number;
+  alerts?: readonly PopupAlert[];
   outside?: WeatherId;
   vacation?: InputBooleanId;
   security?: Security;
@@ -542,6 +528,8 @@ export const HOME_KEYS: Record<keyof Home, true> = {
   sections: true,
   order: true,
   popupOpen: true,
+  idleClose: true,
+  alerts: true,
   outside: true,
   vacation: true,
   security: true,
@@ -583,6 +571,8 @@ export const ROOM_KEYS: Record<keyof Room, true> = {
   media: true,
   outlets: true,
   diffuser: true,
+  timers: true,
+  schedules: true,
   batteries: true,
   leaks: true,
   firmware: true,

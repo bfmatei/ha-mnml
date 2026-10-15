@@ -1,6 +1,7 @@
+import { requireStructure } from '../contract/required.ts';
 import { chooseVariant } from '../contract/structure.ts';
 import type { Key, Structure } from '../contract/structure.ts';
-import { PART_KEY } from '../contract/templates.ts';
+import { LAYOUT_KEYS, PART_KEY } from '../contract/templates.ts';
 
 export interface KeySchema {
   keys: ReadonlySet<string>;
@@ -8,14 +9,7 @@ export interface KeySchema {
   pick?: (value: ReadonlyMap<string, unknown>) => KeySchema | undefined;
 }
 
-export const LAYOUT: ReadonlySet<string> = new Set([
-  'type',
-  'grid_options',
-  'visibility',
-  'view_layout',
-  'layout_options',
-  'card_mod',
-]);
+export const TYPE_AND_LAYOUT: ReadonlySet<string> = new Set(['type', ...LAYOUT_KEYS]);
 
 function plainKeys(keys: Readonly<Record<string, Key>>, own: readonly string[]): KeySchema {
   const known = new Set([...own, ...Object.keys(keys)]);
@@ -81,7 +75,7 @@ export function unknownKeys(value: unknown, of: KeySchema, path = ''): string[] 
   const found: string[] = [];
   for (const [key, child] of entries) {
     const where = path === '' ? key : `${path}.${key}`;
-    if (!chosen.keys.has(key) && key !== PART_KEY && !(path === '' && LAYOUT.has(key))) {
+    if (!chosen.keys.has(key) && key !== PART_KEY && !(path === '' && TYPE_AND_LAYOUT.has(key))) {
       found.push(where);
     }
     const inner = chosen.nested?.[key];
@@ -97,4 +91,9 @@ export function requireKnownKeys(config: unknown, of: KeySchema): void {
   if (found.length > 0) {
     throw new Error(`unknown ${found.length === 1 ? 'key' : 'keys'}: ${found.join(', ')}`);
   }
+}
+
+export function requireCard(config: unknown, structure: Structure): void {
+  requireKnownKeys(config, cardKeysOf(structure));
+  requireStructure(structure, config);
 }

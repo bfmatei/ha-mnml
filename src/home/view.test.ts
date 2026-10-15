@@ -99,6 +99,35 @@ test('the untitled outlook comes first, the titled sections in the order the hom
   ]);
 });
 
+function announced(home: Home): unknown[] {
+  const hashes: unknown[] = [];
+  walk(drawn(home), (node) => {
+    if (node['type'] === 'custom:mnml-popups-card' && Array.isArray(node['popups'])) {
+      hashes.push(...node['popups'].filter(isJson).map((popup) => popup['hash']));
+    }
+  });
+  return hashes;
+}
+
+test('no pop-up hash is announced twice in the demo home, and each room brings its heating, AC, vacuum and printer pop-ups', () => {
+  const hashes = announced(DEMO);
+  assert.deepEqual(
+    hashes.filter((hash, at) => hashes.indexOf(hash) !== at),
+    [],
+  );
+  const wanted = DEMO.rooms.flatMap((room) => [
+    ...(room.heating === undefined ? [] : [`#${room.key}-heating`]),
+    ...(room.ac === undefined ? [] : [`#${room.key}-ac`]),
+    ...(room.vacuum === undefined ? [] : [`#${room.key}-vacuum`]),
+    ...(room.printer3d === undefined ? [] : [`#${room.key}-3d-printer`]),
+  ]);
+  assert.ok(wanted.includes('#living-vacuum') && wanted.includes('#office-3d-printer'));
+  assert.deepEqual(
+    wanted.filter((hash) => !hashes.includes(hash)),
+    [],
+  );
+});
+
 function popupCards(home: Home, hash: string): Json[] {
   let cards: Json[] = [];
   walk(drawn(home), (node) => {
@@ -163,12 +192,14 @@ test('without actions the Checks card keeps the icons and draws no run or stop',
   );
 });
 
-test('the checks pop-up keeps the list and the details, and has run and stop in its header', () => {
+test("the checks pop-up keeps the list and the details, and its header has the Checks card's controls, what failed and warns, run and stop, with the last run left to the list", () => {
   const cards = popupCards(DEMO, '#checks');
   const header = cards.find((card) => card['type'] === 'custom:mnml-header-card');
+  assert.equal(header?.['entity'], 'sensor.infrastructure_server_checks_last_run');
+  assert.equal(header?.['state'], undefined);
   assert.deepEqual(
     controlsOf(header).map((control) => control['name']),
-    ['Run checks', 'Stop checks'],
+    ['Failed', 'Warnings', 'Run checks', 'Stop checks'],
   );
   assert.equal(header?.['back'], true);
   assert.ok(cards.some((card) => card['type'] === 'custom:mnml-list-card'));
@@ -177,7 +208,10 @@ test('the checks pop-up keeps the list and the details, and has run and stop in 
   const bare = popupCards(withoutActions(), '#checks').find(
     (card) => card['type'] === 'custom:mnml-header-card',
   );
-  assert.deepEqual(bare?.['controls'] ?? [], []);
+  assert.deepEqual(
+    controlsOf(bare).map((control) => control['type']),
+    ['status', 'status'],
+  );
 });
 
 function under(home: Home, key: string): Json[] {
@@ -225,12 +259,22 @@ test("a room tile's window and door icons show only while the sensor is not off,
   );
 });
 
-test("the server tile's notifications icon is hidden while there are none", () => {
+test("the notifications' icon on the server tile and their glance are drawn and amber while there are alerts, warnings or errors, whatever the notices", () => {
+  const alerts = { attribute: 'alerts', not: ['0'] };
   const nav = under(DEMO, 'chips').filter(
     (chip) => chip['type'] === 'nav' && chip['popup'] === '#proxmox-notifications',
   );
   assert.equal(nav.length, 1);
-  assert.deepEqual(nav[0]?.['show'], { not: ['0'] });
+  assert.deepEqual([nav[0]?.['when'], nav[0]?.['show']], [alerts, alerts]);
+  const glance = glanceItems(DEMO).find((item) => item['name'] === 'Notifications');
+  assert.deepEqual(
+    [glance?.['color'], glance?.['when'], glance?.['show'], glance?.['state']],
+    ['amber', alerts, alerts, [{ attribute: 'alerts' }]],
+  );
+  const notifications = DEMO.system.proxmox?.notifications?.messages;
+  const row = popupCards(DEMO, '#proxmox').find((card) => card['entity'] === notifications);
+  const [header] = popupCards(DEMO, '#proxmox-notifications');
+  assert.deepEqual([row?.['when'], header?.['when']], [alerts, alerts], 'and so are its pop-ups');
 });
 
 test("the car's alarm icon is red while the alarm sounds, the car is unarmed or the state is unavailable, and has no rule for an armed state", () => {
@@ -358,22 +402,25 @@ test("the Tailscale tile's Update counts only the essential devices, and the pop
   );
 });
 
-test("AdGuard's protection chip is neutral while on and orange while off, as its pop-up's header", () => {
+test("AdGuard's protection chip is neutral while on, orange while off and asks before turning off, as its pop-up's header and power button", () => {
+  const toggle = {
+    type: 'toggle',
+    entity: DEMO.system.adguard?.protection,
+    confirm: { is: ['on'] },
+    color: 'orange',
+    when: { is: ['off'] },
+  };
   const tile = tiles(DEMO).find((card) => card['entity'] === DEMO.system.adguard?.protection);
   const chips = tile?.['chips'];
   assert.ok(Array.isArray(chips));
   assert.deepEqual(
     chips.filter(isJson).find((chip) => chip['type'] === 'toggle'),
-    {
-      type: 'toggle',
-      entity: DEMO.system.adguard?.protection,
-      color: 'orange',
-      when: { is: ['off'] },
-    },
+    toggle,
   );
   const [header] = popupCards(DEMO, '#adguard');
   assert.equal(header?.['color'], 'orange');
   assert.deepEqual(header?.['when'], { is: ['off'] });
+  assert.deepEqual(controlsOf(header), [{ ...toggle, icon: 'mdi:power', primary: true }]);
 });
 
 test('the Tailscale pop-up is a card per device: the essential two under Infrastructure, the other four under Devices', () => {
@@ -434,7 +481,7 @@ test('a device has one connection icon: Connected while it is, and its last seen
   });
 });
 
-test('a device card has icons for a pending update, a key that expires soon, and for the router and exit node how they connect', () => {
+test('a device card has icons for a pending update in amber, a key that expires soon, and for the router and exit node how they connect', () => {
   const [router, , phone] = cardsOf();
   const kinds = (card: Json | undefined): string[] =>
     controlsOf(card).map((control) => String(control['name'] ?? control['type']));
@@ -449,7 +496,7 @@ test('a device card has icons for a pending update, a key that expires soon, and
   const [update, key, connection] = controlsOf(router);
   assert.deepEqual(
     rulesOf(update).map((rule) => [rule['color'], rule['is']]),
-    [['red', ['on']]],
+    [['amber', ['on']]],
   );
   assert.deepEqual(
     rulesOf(key).map((rule) => [rule['color'], rule['within_days']]),
@@ -493,26 +540,19 @@ function glanceItems(home: Home): Json[] {
   return found;
 }
 
-test('the Glances count every lock, car, network device, essential Tailscale device, guest and media health problem, each opening its pop-up', () => {
-  const counts = glanceItems(DEMO)
+test('the Glances count every network device, essential Tailscale device, guest and media health problem, each opening its pop-up, and leave locks and cars to their tiles', () => {
+  const items = glanceItems(DEMO);
+  const counts = items
     .filter((item) => Array.isArray(item['entities']))
     .map(({ entities, is, not, popup }) => ({ entities, is, not, popup }));
-  const room = DEMO.rooms.find((one) => one.lock !== undefined);
-  assert.ok(room);
-  const [sedan, suv] = DEMO.cars;
-  assert.ok(sedan && suv);
   const { proxmox, network, tailscale, media } = DEMO.system;
   assert.ok(proxmox && network && tailscale && media?.movies?.health);
-  const words = ['unlocked', 'selectivelocked', 'unarmed'];
+  assert.ok(DEMO.rooms.some((room) => room.lock !== undefined) && DEMO.cars.length > 0);
+  const names = new Set(items.map((item) => item['name']));
+  for (const name of ['Unlocked', 'Car security']) {
+    assert.equal(names.has(name), false, name);
+  }
   for (const expected of [
-    {
-      entities: [room.lock],
-      is: ['unlocked', 'open', 'jammed'],
-      not: undefined,
-      popup: `#${room.key}`,
-    },
-    { entities: [sedan.lock, sedan.alarm], is: words, not: undefined, popup: `#car-${sedan.key}` },
-    { entities: [suv.lock, suv.alarm], is: words, not: undefined, popup: `#car-${suv.key}` },
     {
       entities: network.devices,
       is: undefined,
@@ -542,7 +582,7 @@ test('the Glances count every lock, car, network device, essential Tailscale dev
   }
 });
 
-test('a home without locks, cars or systems has none of their counts', () => {
+test('a home without systems has none of their counts', () => {
   const {
     proxmox: _proxmox,
     network: _network,
@@ -550,16 +590,9 @@ test('a home without locks, cars or systems has none of their counts', () => {
     media: _media,
     ...system
   } = DEMO.system;
-  const bare: Home = {
-    ...DEMO,
-    rooms: DEMO.rooms.map(({ lock: _lock, ...room }) => room),
-    cars: [],
-    system,
-  };
+  const bare: Home = { ...DEMO, system };
   const named = new Set(glanceItems(bare).map((item) => item['name']));
   for (const name of [
-    'Unlocked',
-    'Car security',
     'Network devices down',
     'Tailscale offline',
     'Stopped guests',
@@ -586,4 +619,495 @@ test('a speaker with only its key and its player draws its pop-up with the volum
     ['custom:mnml-header-card', 'custom:mnml-heading-card', 'custom:mnml-slider-card'],
   );
   assert.ok(!JSON.stringify(cards).includes('[['));
+});
+
+function listOf(value: unknown): Json[] {
+  assert.ok(Array.isArray(value));
+  return value.filter(isJson);
+}
+
+function roomOf(test: (room: Home['rooms'][number]) => boolean): Home['rooms'][number] {
+  const room = DEMO.rooms.find(test);
+  assert.ok(room);
+  return room;
+}
+
+test("a room's lights pop-up has the room's name alone as its header's line, its scenes before the power button, and no scenes in a card under it", () => {
+  const room = roomOf(
+    (one) => (one.lights?.scenes?.length ?? 0) > 0 && one.lights?.activeScene !== undefined,
+  );
+  const [header, ...rest] = popupCards(DEMO, `#${room.key}-lights`);
+  assert.deepEqual(header?.['state'], [{ text: room.name }]);
+  const [scenes, power] = controlsOf(header);
+  assert.deepEqual(scenes, {
+    type: 'scenes',
+    scenes: room.lights?.scenes,
+    active_scene: room.lights?.activeScene,
+    name: 'Scenes',
+    icon: 'mdi:palette-swatch',
+  });
+  assert.equal(power?.['type'], 'toggle');
+  assert.ok(rest.length > 0);
+  assert.ok(rest.every((card) => card['scenes'] === undefined));
+});
+
+test("a room's pop-up shows a leak sensor as a red row, and its header a red Leak icon, only while it is wet", () => {
+  const room = roomOf((one) => one.leaks !== undefined);
+  const leaks = room.leaks ?? [];
+  const cards = popupCards(DEMO, `#${room.key}`);
+  const leak = controlsOf(cards[0]).find((control) => control['name'] === 'Leak');
+  assert.equal(leak?.['silent'], true);
+  assert.deepEqual(
+    rulesOf(leak).map((rule) => [rule['color'], rule['is'], rule['entities']]),
+    [['red', ['on'], leaks]],
+  );
+  assert.deepEqual(
+    cards
+      .filter((card) => leaks.some((id) => id === card['entity']))
+      .map((card) => [card['color'], card['state'], card['visibility']]),
+    leaks.map((id) => [
+      'red',
+      [{}, { since: true }],
+      [{ condition: 'state', entity: id, state: 'on' }],
+    ]),
+  );
+});
+
+test("the Glances count each room's leaks while wet, each opening its room", () => {
+  const counts = glanceItems(DEMO)
+    .filter((item) => item['name'] === 'Leaks')
+    .map(({ entities, is, popup }) => JSON.stringify({ entities, is, popup }));
+  const rooms = DEMO.rooms.filter((room) => room.leaks !== undefined);
+  assert.ok(rooms.length > 0);
+  assert.deepEqual(
+    new Set(counts),
+    new Set(
+      rooms.map((room) =>
+        JSON.stringify({ entities: room.leaks, is: ['on'], popup: `#${room.key}` }),
+      ),
+    ),
+  );
+});
+
+test('the batteries pop-up lists the low ones under a heading per room, then one per person named by Home Assistant, each lowest first', () => {
+  const lists = popupCards(DEMO, '#batteries').filter(
+    (card) => card['type'] === 'custom:mnml-list-card',
+  );
+  const rooms = DEMO.rooms.flatMap((room) => {
+    const batteries = [
+      ...(room.batteries ?? []),
+      ...(room.heating?.thermostats ?? []).map((thermostat) => thermostat.battery),
+    ].toSorted();
+    return batteries.length === 0
+      ? []
+      : [
+          {
+            title: room.name,
+            entity: undefined,
+            icon: room.icon ?? 'mdi:battery-low',
+            batteries,
+          },
+        ];
+  });
+  const people = DEMO.people.map((person) => ({
+    title: undefined,
+    entity: person.entity,
+    icon: 'mdi:account',
+    batteries: person.devices.map((device) => device.battery),
+  }));
+  assert.ok(people.length > 1);
+  assert.deepEqual(
+    lists.map((list) => ({
+      title: list['title'],
+      entity: list['entity'],
+      icon: list['icon'],
+      batteries: listOf(list['rows']).map((row) => row['entity']),
+    })),
+    [...rooms, ...people],
+  );
+  assert.ok(lists.every((list) => list['lowest_first'] === true));
+  assert.ok(lists.every((list) => listOf(list['rows']).every((row) => row['low_only'] === true)));
+});
+
+const DEMO_METERS = [
+  ...DEMO.rooms.flatMap((room) => [
+    ...(room.outlets ?? []).map((outlet) => outlet.energy),
+    room.ac?.energy,
+    room.printer3d?.outlet?.energy,
+  ]),
+  DEMO.system.proxmox?.outlet.energy,
+].flatMap((meter) => (meter === undefined ? [] : [meter]));
+
+const METERS = DEMO_METERS.map((meter) => meter.power);
+
+function meterTables(home: Home): Json[] {
+  return popupCards(home, '#energy').filter((card) => card['title'] === 'Meters');
+}
+
+test("the energy pop-up lists every meter of the home, its outlets', ACs', 3D printer's and server's, highest power first, in one Meters table of now, today, in total and the share of the home's usage, with their power now summed in its heading", () => {
+  const tables = meterTables(DEMO);
+  assert.equal(tables.length, 1);
+  const [meters] = tables;
+  assert.ok(meters);
+  assert.equal(meters['highest_first'], true);
+  assert.deepEqual(meters['summary'], { sum: 0 });
+  assert.deepEqual(meters['headers'], ['Item', 'Now', 'Today', 'Total', 'Share']);
+  assert.ok(DEMO_METERS.length >= 5);
+  assert.deepEqual(
+    listOf(meters['rows']).map((row) => [row['entity'], row['values'], row['of']]),
+    DEMO_METERS.map((meter) => [
+      meter.power,
+      [meter.power, meter.today, meter.total, meter.power],
+      DEMO.energy?.usage,
+    ]),
+  );
+  assert.equal(
+    popupCards(DEMO, '#energy').find((card) => card['title'] === 'Devices'),
+    undefined,
+  );
+});
+
+test("a room's timer is drawn in its pop-up with the room's other devices, and as a calm glance while it runs, opening the room, never as an issue", () => {
+  const room = roomOf((one) => one.timers !== undefined);
+  const [timer] = room.timers ?? [];
+  assert.ok(timer);
+  const cards = popupCards(DEMO, `#${room.key}`);
+  const other = cards.findIndex((card) => card['title'] === 'Other');
+  const drawnTimer = cards.findIndex((card) => card['entity'] === timer);
+  assert.ok(other !== -1 && drawnTimer > other);
+  assert.deepEqual(cards[drawnTimer]?.['state'], [{ remaining: true }]);
+  assert.deepEqual(
+    controlsOf(cards[drawnTimer]).map((control) => control['service'] ?? control['type']),
+    ['timer.start', 'timer.pause', 'timer.cancel', 'timer.finish', 'select'],
+  );
+  assert.deepEqual(
+    glanceItems(DEMO).filter((item) => item['entity'] === timer),
+    [
+      {
+        entity: timer,
+        color: 'amber',
+        when: { is: ['active'] },
+        show: { is: ['active'] },
+        calm: true,
+        state: [{ remaining: true }],
+        popup: `#${room.key}`,
+      },
+    ],
+  );
+});
+
+test("Home Assistant's messages follow the server's notifications: a chip, a glance and a row open their own pop-up, its header counting them with a Clear all", () => {
+  const hash = '#system-messages';
+  const tile = tiles(DEMO).find((one) => one['name'] === 'Home Assistant');
+  const chip = listOf(tile?.['chips']).find((one) => one['type'] === 'messages');
+  assert.deepEqual([chip?.['popup'], chip?.['name'], chip?.['color']], [hash, 'Messages', 'amber']);
+  const glance = glanceItems(DEMO).find((item) => item['messages'] === true);
+  assert.deepEqual([glance?.['popup'], glance?.['name']], [hash, 'Messages']);
+  const [header, row] = popupCards(DEMO, '#system');
+  assert.equal(header?.['type'], 'custom:mnml-header-card');
+  assert.deepEqual(
+    [row?.['type'], row?.['popup'], row?.['name']],
+    ['custom:mnml-messages-card', hash, 'Messages'],
+  );
+  const cards = popupCards(DEMO, hash);
+  assert.deepEqual(
+    cards.map((card) => [card['type'], card['notifications'], card['repairs']]),
+    [
+      ['custom:mnml-header-card', undefined, undefined],
+      ['custom:mnml-messages-card', true, undefined],
+      ['custom:mnml-messages-card', undefined, true],
+    ],
+  );
+  const [top] = cards;
+  assert.deepEqual(
+    [top?.['messages'], top?.['color'], top?.['back'], top?.['state']],
+    [true, 'amber', true, [{ text: 'Home Assistant' }]],
+  );
+  assert.deepEqual(controlsOf(top), [
+    { type: 'dismiss', name: 'Clear all', icon: 'mdi:notification-clear-all' },
+  ]);
+});
+
+test('without a usage sensor, the Meters table has no Share column', () => {
+  const { energy: _energy, ...home } = DEMO;
+  const [meters, more] = meterTables(home);
+  assert.ok(meters);
+  assert.equal(more, undefined);
+  assert.deepEqual(meters['headers'], ['Item', 'Now', 'Today', 'Total']);
+  assert.deepEqual(
+    listOf(meters['rows']).map((row) => [row['values'], row['of']]),
+    DEMO_METERS.map((meter) => [[meter.power, meter.today, meter.total], undefined]),
+  );
+});
+
+function energyGlances(home: Home): Json[] {
+  return glanceItems(home).filter((item) => item['name'] === 'Energy');
+}
+
+test('a home without energy sensors still has the energy pop-up, its meters alone, and an Energy glance, their power summed', () => {
+  const { energy: _energy, ...home } = DEMO;
+  const cards = popupCards(home, '#energy');
+  assert.deepEqual(
+    cards.map((card) => card['title'] ?? card['name']),
+    ['Energy', 'Meters'],
+  );
+  assert.equal(cards[0]?.['state'], undefined);
+  assert.deepEqual(energyGlances(home), [
+    {
+      entities: METERS,
+      name: 'Energy',
+      icon: 'mdi:lightning-bolt',
+      total: true,
+      popup: '#energy',
+    },
+  ]);
+  assert.deepEqual(
+    energyGlances(DEMO).map((item) => item['entity']),
+    [DEMO.energy?.usage],
+    'with them, the glance is the home usage',
+  );
+});
+
+test("a heating's pop-up shows its schedule and a slider per preset temperature; the room's pop-up lists the heating's schedule, then the room's own", () => {
+  const room = roomOf((one) => one.heating?.schedule !== undefined && one.schedules !== undefined);
+  const schedule = room.heating?.schedule;
+  const presets = room.heating?.presetTemperatures ?? [];
+  assert.ok(schedule !== undefined && presets.length > 0);
+  const heating = popupCards(DEMO, `#${room.key}-heating`);
+  const card = heating.find((one) => one['entity'] === schedule);
+  assert.equal(card?.['color'], 'amber');
+  assert.deepEqual(card?.['state'], [{}, { attribute: 'next_event', relative: true }]);
+  assert.deepEqual(
+    heating.filter((one) => presets.some((id) => id === one['entity'])).map((one) => one['type']),
+    presets.map(() => 'custom:mnml-slider-card'),
+  );
+  const cards = popupCards(DEMO, `#${room.key}`);
+  const at = cards.findIndex((one) => one['title'] === 'Schedules');
+  const own = room.schedules ?? [];
+  assert.ok(at > 0);
+  assert.deepEqual(
+    cards.slice(at + 1, at + 2 + own.length).map((one) => one['entity']),
+    [schedule, ...own],
+  );
+});
+
+test('a tap that costs asks first: the lock while locked, the garage door while closed, the alarm while armed, vacation while off, cancelling a print, clearing the notifications', () => {
+  const chips = under(DEMO, 'chips');
+  const lock = chips.find(
+    (chip) => chip['type'] === 'toggle' && String(chip['entity']).startsWith('lock.'),
+  );
+  assert.deepEqual(lock?.['confirm'], { is: ['locked'] });
+  const garage = chips.find(
+    (chip) => chip['type'] === 'toggle' && String(chip['entity']).startsWith('cover.'),
+  );
+  assert.deepEqual(garage?.['confirm'], { is: ['closed'] });
+  const glances = glanceItems(DEMO);
+  assert.deepEqual(glances.find((item) => item['name'] === 'Alarm')?.['confirm'], {
+    not: ['disarmed'],
+  });
+  assert.deepEqual(glances.find((item) => item['name'] === 'Vacation')?.['confirm'], {
+    is: ['off'],
+  });
+  const controls = under(DEMO, 'controls');
+  const cancel = controls.find(
+    (control) =>
+      control['entity'] === roomOf((one) => one.printer3d !== undefined).printer3d?.actions.cancel,
+  );
+  assert.deepEqual(cancel?.['confirm'], {});
+  const clear = controls.find((control) => control['name'] === 'Clear all');
+  assert.deepEqual(clear?.['confirm'], {});
+});
+
+test("a heating is amber while it runs, on its tile's chip, its item and its pop-up's header, whose line is the room's name alone; its target slider is uncoloured while it is off", () => {
+  const room = roomOf((one) => one.heating !== undefined);
+  const entity = room.heating?.entity;
+  const running = ['amber', { not: ['off'] }];
+  const nav = under(DEMO, 'chips').find(
+    (chip) => chip['type'] === 'nav' && chip['entity'] === entity,
+  );
+  assert.deepEqual([nav?.['color'], nav?.['when']], running);
+  const item = popupCards(DEMO, `#${room.key}`).find((card) => card['entity'] === entity);
+  assert.deepEqual([item?.['color'], item?.['when']], running);
+  const cards = popupCards(DEMO, `#${room.key}-heating`);
+  const [header] = cards;
+  assert.deepEqual([header?.['color'], header?.['when']], running);
+  assert.equal(header?.['entity'], entity);
+  assert.equal(header?.['icon'], undefined, "the header has the entity's icon, as the item");
+  assert.deepEqual(header?.['state'], [{ text: room.name }]);
+  assert.deepEqual(
+    cards
+      .filter((card) => card['type'] === 'custom:mnml-slider-card' && card['entity'] === entity)
+      .map((card) => card['color']),
+    ['amber', undefined],
+  );
+});
+
+function controlled(node: Json): string | undefined {
+  const { type, scenes } = node;
+  if (Array.isArray(scenes)) {
+    return `scenes ${scenes.join(' ')}`;
+  }
+  if (type === 'slider' || type === 'custom:mnml-slider-card') {
+    return `${String(node['entity'])} ${String(node['slider'])}`;
+  }
+  if (type === 'select' || type === 'custom:mnml-select-card') {
+    const attribute = typeof node['attribute'] === 'string' ? node['attribute'] : 'option';
+    return `${String(node['entity'])} ${attribute}`;
+  }
+  return undefined;
+}
+
+test('no pop-up has a slider, a menu or scenes both in its header and in a card under it', () => {
+  let popups = 0;
+  walk(dashboard, (node) => {
+    const cards = Array.isArray(node['cards']) ? node['cards'].filter(isJson) : [];
+    const [header, ...body] = cards;
+    if (typeof node['hash'] !== 'string' || header?.['type'] !== 'custom:mnml-header-card') {
+      return;
+    }
+    popups += 1;
+    const below = new Set<string>();
+    walk(body, (one) => {
+      const what = controlled(one);
+      if (what !== undefined) {
+        below.add(what);
+      }
+    });
+    const above = Array.isArray(header['controls']) ? header['controls'].filter(isJson) : [];
+    assert.deepEqual(
+      above.map(controlled).filter((what) => what !== undefined && below.has(what)),
+      [],
+      node['hash'],
+    );
+  });
+  assert.ok(popups > 10);
+});
+
+function shownBy(item: Json, owner: unknown): string | undefined {
+  if (item['text'] !== undefined || item['name'] === true) {
+    return undefined;
+  }
+  const entity = item['entity'] ?? owner;
+  const attribute = typeof item['attribute'] === 'string' ? item['attribute'] : 'state';
+  return typeof entity === 'string' ? `${entity} ${attribute}` : undefined;
+}
+
+test('no pop-up header shows a value that a row or a card under it shows', () => {
+  let popups = 0;
+  const twice: string[] = [];
+  walk(dashboard, (node) => {
+    const cards = Array.isArray(node['cards']) ? node['cards'].filter(isJson) : [];
+    const [header, ...body] = cards;
+    if (typeof node['hash'] !== 'string' || header?.['type'] !== 'custom:mnml-header-card') {
+      return;
+    }
+    popups += 1;
+    const below = new Set<string>();
+    walk(body, (one, parentKey) => {
+      const items = [
+        ...(parentKey === 'rows' ? [shownBy(one, undefined)] : []),
+        ...(Array.isArray(one['state'])
+          ? one['state'].filter(isJson).map((item) => shownBy(item, one['entity']))
+          : []),
+      ];
+      for (const what of items) {
+        if (what !== undefined) {
+          below.add(what);
+        }
+      }
+    });
+    const line = Array.isArray(header['state']) ? header['state'].filter(isJson) : [];
+    for (const what of line.map((item) => shownBy(item, header['entity']))) {
+      if (what !== undefined && below.has(what)) {
+        twice.push(`${node['hash']} ${what}`);
+      }
+    }
+  });
+  assert.ok(popups > 10);
+  assert.deepEqual(twice, []);
+});
+
+test("a heating's pop-up header has its preset menu and power, an AC's its mode menu, and the target is the slider under them", () => {
+  const room = roomOf((one) => one.heating?.preset === true && one.ac !== undefined);
+  for (const [hash, entity, controls] of [
+    [`#${room.key}-heating`, room.heating?.entity, ['select preset_modes', 'toggle']],
+    [`#${room.key}-ac`, room.ac?.entity, ['select hvac_modes']],
+  ] as const) {
+    const [header, ...body] = popupCards(DEMO, hash);
+    assert.deepEqual(
+      controlsOf(header).map((one) =>
+        [one['type'], one['attribute']].filter((part) => typeof part === 'string').join(' '),
+      ),
+      controls,
+      hash,
+    );
+    assert.ok(
+      body.some((card) => card['type'] === 'custom:mnml-slider-card' && card['entity'] === entity),
+      hash,
+    );
+  }
+});
+
+function comes(chip: Json): boolean {
+  return chip['show'] !== undefined || chip['type'] === 'status';
+}
+
+test("a room's chips that come and go are before the ones always there, on its tile and in its pop-up's header, so one appearing moves none of them", () => {
+  for (const room of DEMO.rooms) {
+    const tile = tiles(DEMO).find((card) => card['popup'] === `#${room.key}`);
+    const [header] = popupCards(DEMO, `#${room.key}`);
+    for (const chips of [tile?.['chips'], header?.['controls']]) {
+      const order = (Array.isArray(chips) ? chips.filter(isJson) : []).map(comes);
+      assert.deepEqual(
+        order,
+        order.toSorted((a, b) => Number(b) - Number(a)),
+        room.key,
+      );
+    }
+  }
+});
+
+test("the vacuum's pop-up header carries its item's state line and controls; the 3D printer's has its job buttons, its outlet's power only under it", () => {
+  const living = roomOf((one) => one.vacuum !== undefined);
+  const item = popupCards(DEMO, `#${living.key}`).find(
+    (card) => card['entity'] === living.vacuum?.entity,
+  );
+  const [header] = popupCards(DEMO, `#${living.key}-vacuum`);
+  const line = listOf(item?.['state']);
+  assert.ok(line.length > 0);
+  assert.deepEqual(listOf(header?.['state']).slice(-line.length), line);
+  assert.deepEqual(controlsOf(header), controlsOf(item));
+  const office = roomOf((one) => one.printer3d?.outlet !== undefined);
+  const outlet = office.printer3d?.outlet?.entity;
+  const [printer, ...body] = popupCards(DEMO, `#${office.key}-3d-printer`);
+  const controls = controlsOf(printer);
+  assert.ok(controls.length > 0);
+  assert.ok(controls.every((control) => control['entity'] !== outlet));
+  assert.ok(body.some((card) => card['entity'] === outlet));
+});
+
+test("what is normal reads neutral: the server's outlet is orange only while off, a car's alarm row red only while disarmed", () => {
+  const outlet = DEMO.system.proxmox?.outlet.entity;
+  const host = popupCards(DEMO, '#proxmox').find((card) => card['title'] === 'Host');
+  const row = listOf(host?.['rows']).find((one) => one['entity'] === outlet);
+  assert.deepEqual([row?.['color'], row?.['when']], ['orange', { is: ['off'] }]);
+  for (const car of DEMO.cars) {
+    const security = popupCards(DEMO, `#car-${car.key}`).find(
+      (card) => card['title'] === 'Security',
+    );
+    const alarm = listOf(security?.['rows']).find((one) => one['entity'] === car.alarm);
+    assert.deepEqual([alarm?.['color'], alarm?.['when']], ['red', { is: ['unarmed'] }], car.key);
+  }
+});
+
+test("a person's pop-up header has the tile's driving, focus and battery icons", () => {
+  const [person] = DEMO.people;
+  assert.ok(person);
+  const tile = tiles(DEMO).find((card) => card['entity'] === person.entity);
+  const [header] = popupCards(DEMO, `#person-${person.key}`);
+  assert.deepEqual(
+    listOf(tile?.['chips']).map((chip) => chip['name']),
+    ['Driving', 'Do not disturb', 'Batteries'],
+  );
+  assert.deepEqual(controlsOf(header), listOf(tile?.['chips']));
 });

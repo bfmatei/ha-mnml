@@ -4,20 +4,32 @@ import { classMap } from 'lit/directives/class-map.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
 import type { Color, Glance, GlancesCard } from '../contract/cards.ts';
-import type { EntityId, MdiIcon, PopupHash } from '../contract/entities.ts';
-import { formatState, stateLine } from '../ha/format.ts';
-import { hasValue, isUnavailable, numericState, run, stateOf, toggleEntity } from '../ha/hass.ts';
+import type { MdiIcon, PopupHash } from '../contract/entities.ts';
+import { CARD_STRUCTURES } from '../contract/structure.ts';
+import type { Structure } from '../contract/structure.ts';
+import { decimals, formatState, stateLine } from '../ha/format.ts';
+import {
+  haptic,
+  hasValue,
+  isUnavailable,
+  numericState,
+  run,
+  stateOf,
+  toggleAction,
+  toggleEntity,
+} from '../ha/hass.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
-import { nameOf } from '../ha/names.ts';
+import { messageCount } from '../ha/message-count.ts';
+import { distinctNames, nameOf } from '../ha/names.ts';
 import { navigate, prebuild } from '../ha/navigation.ts';
 import { partOf } from '../ha/part.ts';
-import { active, matches, shown, tint } from '../ha/rules.ts';
+import { active, holds, matches, shown, tint } from '../ha/rules.ts';
 import { colorStyle, icon, onPress, stateIcon } from '../ha/templates.ts';
+import { wordsFor } from '../words/words.ts';
 
-import { MnmlCard, requireList, requireString } from './base.ts';
-import type { KeySchema } from './keys.ts';
+import { MnmlCard } from './base.ts';
+import { asks, confirmed, isArmed } from './parts/confirm.ts';
 import { tip } from './parts/tooltip.ts';
-import { GLANCES_CARD } from './schemas.ts';
 import { BASE_STYLE } from './styles.ts';
 
 const GLANCES_STYLE = css`
@@ -44,7 +56,7 @@ const GLANCES_STYLE = css`
     gap: 4px 6px;
   }
   .group.problems {
-    margin-left: auto;
+    margin-inline-start: auto;
   }
   .glance {
     display: flex;
@@ -52,7 +64,8 @@ const GLANCES_STYLE = css`
     flex: none;
     gap: 8px;
     height: 28px;
-    padding: 0 10px 0 8px;
+    padding-block: 0;
+    padding-inline: 8px 10px;
     border-radius: 10px;
     background: var(--m-pill);
     box-shadow: var(--m-well);
@@ -79,7 +92,7 @@ const GLANCES_STYLE = css`
     box-shadow: var(--m-well);
   }
   .glance.quiet {
-    padding-right: 8px;
+    padding-inline-end: 8px;
   }
   .glance.quiet > ha-icon,
   .glance.quiet > ha-state-icon {
@@ -87,6 +100,10 @@ const GLANCES_STYLE = css`
   }
   .glance.link {
     cursor: pointer;
+  }
+  .glance.armed {
+    color: var(--primary-text-color);
+    font-weight: 600;
   }
   .glance > ha-icon,
   .glance > ha-state-icon {
@@ -135,11 +152,11 @@ const GLANCES_STYLE = css`
       justify-content: center;
     }
     .group.problems {
-      margin-left: 0;
+      margin-inline-start: 0;
     }
     .glance {
       gap: 6px;
-      padding: 0 8px 0 7px;
+      padding-inline: 7px 8px;
     }
   }
   .glance.link:active::before {
@@ -151,6 +168,8 @@ const COUNT_ICON: MdiIcon = 'mdi:alert-circle-outline';
 
 const COUNT_COLOR: Color = 'orange';
 
+const NOT_WITH_TOTAL = ['color', 'is', 'not', 'below', 'sum', 'critical'] as const;
+
 interface Press {
   acts: boolean;
   click?: (event: Event) => void;
@@ -161,14 +180,21 @@ interface Look {
   color: Color | undefined;
   quiet?: true;
   critical?: true;
+  armed?: true;
 }
+
+type One = Extract<Glance, { entity: string }>;
+
+type Count = Extract<Glance, { entities: string[] }>;
+
+type Messages = Extract<Glance, { messages: true }>;
 
 interface Drawn {
   problem: boolean;
   well: TemplateResult;
 }
 
-function matching(hass: HomeAssistant, item: Extract<Glance, { entities: string[] }>): string[] {
+function matching(hass: HomeAssistant, item: Count): string[] {
   return item.entities.filter((id) => {
     const stateObj = stateOf(hass, id);
     if (stateObj === undefined || isUnavailable(stateObj)) {
@@ -182,35 +208,50 @@ function matching(hass: HomeAssistant, item: Extract<Glance, { entities: string[
   });
 }
 
+function deviceNames(hass: HomeAssistant, ids: readonly string[]): Map<string, string> {
+  const names = distinctNames(
+    hass,
+    ids.map((entity) => ({ entity, label: 'device' })),
+  );
+  return new Map(ids.map((id, index) => [id, names[index] ?? id]));
+}
+
+function warning(item: Count, critical: boolean): Look {
+  return {
+    color: critical ? 'red' : (item.color ?? COUNT_COLOR),
+    ...(critical ? { critical } : {}),
+  };
+}
+
 export class MnmlGlancesCard extends MnmlCard<GlancesCard> {
   static override styles = [BASE_STYLE, GLANCES_STYLE];
 
-  protected schema(): KeySchema {
-    return GLANCES_CARD;
+  protected structure(): Structure {
+    return CARD_STRUCTURES['custom:mnml-glances-card'];
   }
 
   protected override validate(config: GlancesCard): void {
-    requireList('items', config.items);
     for (const [index, item] of config.items.entries()) {
-      if (item.entities === undefined) {
-        requireString(`items[${index}].entity`, item.entity);
-      } else {
-        requireList(`items[${index}].entities`, item.entities);
-        requireString(`items[${index}].name`, item.name);
+      if (item.confirm !== undefined && item.toggle !== true) {
+        throw new Error(`items[${index}].confirm needs toggle: true`);
+      }
+      const clash = NOT_WITH_TOTAL.find((key) => item.total === true && item[key] !== undefined);
+      if (clash !== undefined) {
+        throw new Error(`items[${index}].${clash} does not go with total`);
       }
     }
   }
 
-  private press(
-    hass: HomeAssistant,
-    popup: PopupHash | undefined,
-    toggle: EntityId | undefined,
-  ): Press {
+  private press(hass: HomeAssistant, popup: PopupHash | undefined, toggle: One | undefined): Press {
     if (toggle !== undefined) {
       return {
         acts: true,
         click: () => {
-          run(this, toggleEntity(this.hass ?? hass, toggle));
+          const now = this.hass ?? hass;
+          confirmed(this, toggle, asks(now, toggle.confirm, toggle.entity), () => {
+            haptic('light');
+            run(this, toggleEntity(now, toggle.entity));
+          });
         },
       };
     }
@@ -243,6 +284,7 @@ export class MnmlGlancesCard extends MnmlCard<GlancesCard> {
         colored: look.color !== undefined,
         quiet: look.quiet === true,
         critical: look.critical === true,
+        armed: look.armed === true,
         link: acts,
       })}
       style=${styleMap(colorStyle(look.color))}
@@ -267,7 +309,7 @@ export class MnmlGlancesCard extends MnmlCard<GlancesCard> {
     </div>`;
   }
 
-  private one(hass: HomeAssistant, item: Extract<Glance, { entity: string }>): Drawn {
+  private one(hass: HomeAssistant, item: One): Drawn {
     const stateObj = stateOf(hass, item.entity);
     const on = active(item.when, stateObj);
     const somebody = item.people?.some((id) => stateOf(hass, id)?.state === 'home');
@@ -276,39 +318,67 @@ export class MnmlGlancesCard extends MnmlCard<GlancesCard> {
         ? (somebody === true && on) || (somebody !== true && !on)
         : false;
     const alerting =
-      item.alert !== undefined && stateObj !== undefined && matches(item.alert, stateObj.state);
+      item.alert !== undefined && stateObj !== undefined && holds(item.alert, stateObj);
     const color: Color | undefined =
       conflict || alerting ? 'red' : tint(item.color, item.when, stateObj);
-    const quiet = item.quiet === true && !on && !conflict;
+    const toggles = item.toggle === true;
+    const armed = toggles && isArmed(this, item) && asks(hass, item.confirm, item.entity);
+    const quiet = item.quiet === true && !on && !conflict && !armed;
     const name = item.name ?? nameOf(hass, item.entity, {});
     const value = stateObj === undefined ? undefined : formatState(hass, stateObj);
-    const why = conflict
-      ? somebody === true
-        ? ' with somebody home'
-        : ' with everybody away'
-      : '';
-    const said = value === undefined ? name : `${name}: ${value}${why}`;
+    const words = wordsFor(hass.locale.language);
+    const line = `${name}: ${value ?? ''}`;
+    const said =
+      value === undefined
+        ? name
+        : !conflict
+          ? line
+          : somebody === true
+            ? words.glances.somebodyHome(line)
+            : words.glances.everybodyAway(line);
+    const action = toggleAction(hass, item.entity);
+    const look: Look = { color, ...(quiet ? { quiet } : {}), ...(armed ? { armed } : {}) };
     return {
-      problem: item.show !== undefined,
+      problem: item.show !== undefined && item.calm !== true,
       well: this.well(
-        { color, ...(quiet ? { quiet } : {}) },
-        item.name === undefined ? name : said,
-        said,
-        this.press(hass, item.popup, item.toggle === true ? item.entity : undefined),
+        look,
+        armed ? '' : item.name === undefined ? name : said,
+        armed ? words.askAbout(action, name) : said,
+        this.press(hass, item.popup, toggles ? item : undefined),
         html`${stateIcon(hass, stateObj, item.icon)}${
-          quiet || item.bare === true
-            ? nothing
-            : html`<span class="state">${stateLine(hass, item.entity, item.state ?? [{}])}</span>`
+          armed
+            ? html`<span class="state">${words.ask(action)}</span>`
+            : quiet || item.bare === true
+              ? nothing
+              : html`<span class="state">${stateLine(hass, item.entity, item.state ?? [{}])}</span>`
         }`,
         partOf(item),
       ),
     };
   }
 
-  private tally(
+  private counter(
     hass: HomeAssistant,
-    item: Extract<Glance, { entities: string[] }>,
-  ): Drawn | undefined {
+    item: Count,
+    look: Look,
+    lines: string[],
+    value: string | number,
+    symbol: TemplateResult,
+  ): Drawn {
+    return {
+      problem: item.total !== true,
+      well: this.well(
+        look,
+        [item.name, ...lines].join('\n'),
+        [item.name, ...lines].join('. '),
+        this.press(hass, item.popup, undefined),
+        html`${symbol}<span class="state">${value}</span>`,
+        partOf(item),
+      ),
+    };
+  }
+
+  private tally(hass: HomeAssistant, item: Count): Drawn | undefined {
     const levels = item.entities.map((id) => numericState(stateOf(hass, id)) ?? 0);
     const total = levels.reduce((sum, level) => sum + level, 0);
     if (total <= 0) {
@@ -316,34 +386,48 @@ export class MnmlGlancesCard extends MnmlCard<GlancesCard> {
     }
     const limit = item.critical;
     const critical = limit !== undefined && (levels[0] ?? 0) >= limit;
+    const names = deviceNames(hass, item.entities);
     const lines = item.entities.flatMap((id, index) => {
       const stateObj = stateOf(hass, id);
       return stateObj === undefined || (levels[index] ?? 0) <= 0
         ? []
-        : [`${nameOf(hass, id, { label: 'device' })}: ${formatState(hass, stateObj)}`];
+        : [`${names.get(id) ?? id}: ${formatState(hass, stateObj)}`];
     });
-    return {
-      problem: true,
-      well: this.well(
-        {
-          color: critical ? 'red' : (item.color ?? COUNT_COLOR),
-          ...(critical ? { critical } : {}),
-        },
-        [item.name, ...lines].join('\n'),
-        [item.name, ...lines].join('. '),
-        this.press(hass, item.popup, undefined),
-        html`${icon(item.icon ?? COUNT_ICON)}<span class="state">${total}</span>`,
-        partOf(item),
-      ),
-    };
+    const symbol = icon(item.icon ?? COUNT_ICON);
+    return this.counter(hass, item, warning(item, critical), lines, total, symbol);
   }
 
-  private count(
-    hass: HomeAssistant,
-    item: Extract<Glance, { entities: string[] }>,
-  ): Drawn | undefined {
+  private total(hass: HomeAssistant, item: Count): Drawn | undefined {
+    const read = item.entities.flatMap((id) => {
+      const stateObj = stateOf(hass, id);
+      const level = numericState(stateObj);
+      return stateObj === undefined || level === undefined ? [] : [{ id, stateObj, level }];
+    });
+    const [first] = read;
+    if (first === undefined) {
+      return undefined;
+    }
+    const unit = 'unit_of_measurement';
+    const counted = read.filter(
+      ({ stateObj }) => stateObj.attributes[unit] === first.stateObj.attributes[unit],
+    );
+    const sum = counted.reduce((acc, { level }) => acc + level, 0);
+    const places = Math.max(...counted.map(({ stateObj }) => decimals(stateObj.state)));
+    const value = hass.formatEntityState(first.stateObj, sum.toFixed(places));
+    const names = deviceNames(hass, item.entities);
+    const lines = counted.map(
+      ({ id, stateObj }) => `${names.get(id) ?? id}: ${formatState(hass, stateObj)}`,
+    );
+    const symbol = stateIcon(hass, first.stateObj, item.icon);
+    return this.counter(hass, item, { color: undefined }, lines, value, symbol);
+  }
+
+  private count(hass: HomeAssistant, item: Count): Drawn | undefined {
     if (item.sum === true) {
       return this.tally(hass, item);
+    }
+    if (item.total === true) {
+      return this.total(hass, item);
     }
     const found = matching(hass, item);
     if (found.length === 0) {
@@ -356,23 +440,30 @@ export class MnmlGlancesCard extends MnmlCard<GlancesCard> {
         const level = numericState(stateOf(hass, id));
         return level !== undefined && level < limit;
       });
+    const names = deviceNames(hass, item.entities);
     const lines = found.flatMap((id) => {
       const stateObj = stateOf(hass, id);
       return stateObj === undefined
         ? []
-        : [`${nameOf(hass, id, { label: 'device' })}: ${formatState(hass, stateObj)}`];
+        : [`${names.get(id) ?? id}: ${formatState(hass, stateObj)}`];
     });
+    const symbol = icon(item.icon ?? COUNT_ICON);
+    return this.counter(hass, item, warning(item, critical), lines, found.length, symbol);
+  }
+
+  private messages(hass: HomeAssistant, item: Messages): Drawn | undefined {
+    const all = messageCount(this, hass)?.all ?? 0;
+    if (all === 0) {
+      return undefined;
+    }
     return {
       problem: true,
       well: this.well(
-        {
-          color: critical ? 'red' : (item.color ?? COUNT_COLOR),
-          ...(critical ? { critical } : {}),
-        },
-        [item.name, ...lines].join('\n'),
-        [item.name, ...lines].join('. '),
+        { color: item.color ?? COUNT_COLOR },
+        item.name,
+        `${item.name}: ${all}`,
         this.press(hass, item.popup, undefined),
-        html`${icon(item.icon ?? COUNT_ICON)}<span class="state">${found.length}</span>`,
+        html`${icon(item.icon ?? COUNT_ICON)}<span class="state">${all}</span>`,
         partOf(item),
       ),
     };
@@ -380,8 +471,11 @@ export class MnmlGlancesCard extends MnmlCard<GlancesCard> {
 
   protected draw(hass: HomeAssistant, config: GlancesCard): TemplateResult | undefined {
     const drawn = config.items.flatMap((item) => {
+      if (item.messages === true) {
+        return this.messages(hass, item) ?? [];
+      }
       if (item.entities !== undefined) {
-        return this.count(hass, item) ?? [];
+        return shown(hass, item.show, item.entities[0]) ? (this.count(hass, item) ?? []) : [];
       }
       return shown(hass, item.show, item.entity) ? this.one(hass, item) : [];
     });

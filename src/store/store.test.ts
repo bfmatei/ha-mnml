@@ -5,13 +5,19 @@ import { test, vi } from 'vitest';
 import type { HassConnection } from '../ha/hass.ts';
 import { nodeHash } from '../templates/changes.ts';
 import { expand } from '../templates/expand.ts';
-import { fakeStore } from '../test/fake-hass.ts';
+import { fakeStore } from '../test/hass.ts';
+import { until } from '../test/until.ts';
 
-import { knownShared, onShared, resolvedTemplates, sharedTemplates } from './store.ts';
+import { createStore, resolvedTemplates } from './store.ts';
+import type { SharedState } from './store.ts';
 
-const settle = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
-const on = (store: { hass: { connection: unknown } }): HassConnection =>
-  store.hass.connection as HassConnection;
+const on = (store: ReturnType<typeof fakeStore>): HassConnection => store.hass.connection;
+const loaded = (
+  read: (connection: HassConnection) => SharedState,
+  store: ReturnType<typeof fakeStore>,
+): Promise<void> => until(() => read(on(store)).status !== 'waiting', 'the store');
+const ownOf = (state: SharedState): string[] =>
+  state.status === 'ready' ? Object.keys(state.own) : [];
 const GARDEN = { card: { type: 'custom:mnml-heading-card', title: 'Garden', icon: 'mdi:flower' } };
 const TERRACE = { card: { type: 'custom:mnml-heading-card', title: 'Terrace', icon: 'mdi:table' } };
 const ROOM = {
@@ -27,10 +33,12 @@ const lock = ['card', 'chips?', '#lock'];
 const removeLock = { op: 'remove', path: lock, base: nodeHash(ROOM.card['chips?'][1]) } as const;
 
 test('before any connection the store is waiting', () => {
+  const { knownShared } = createStore();
   assert.deepEqual(knownShared(), { status: 'waiting' });
 });
 
 test('the store is subscribed once per connection, and its templates come with each save', async () => {
+  const { sharedTemplates, knownShared, onShared } = createStore();
   const store = fakeStore();
   store.kept = {
     hall: { kind: 'own', template: GARDEN },
@@ -38,12 +46,12 @@ test('the store is subscribed once per connection, and its templates come with e
   };
   assert.deepEqual(sharedTemplates(on(store)), { status: 'waiting' });
   sharedTemplates(on(store));
-  await settle();
+  await loaded(sharedTemplates, store);
   assert.equal(store.subscribed.length, 1);
-  const ready = sharedTemplates(on(store));
-  assert.deepEqual(ready.status === 'ready' ? Object.keys(ready.own) : [], ['hall']);
-  assert.deepEqual(ready.status === 'ready' ? Object.keys(ready.changes) : [], ['room']);
-  assert.equal(knownShared(), ready);
+  const shared = sharedTemplates(on(store));
+  assert.deepEqual(ownOf(shared), ['hall']);
+  assert.deepEqual(shared.status === 'ready' ? Object.keys(shared.changes) : [], ['room']);
+  assert.equal(knownShared(), shared);
   let told = 0;
   const stop = onShared(() => {
     told += 1;
@@ -59,23 +67,45 @@ test('the store is subscribed once per connection, and its templates come with e
   });
 });
 
-test("a home without MNML's store has an empty one, not a failure", async () => {
+test('a save that changes nothing tells no one, and the state stays the one the cards hold', async () => {
+  const { sharedTemplates, onShared } = createStore();
   const store = fakeStore();
-  sharedTemplates(on(store));
-  await settle();
-  assert.deepEqual(sharedTemplates(on(store)), {
-    status: 'ready',
-    own: {},
-    written: {},
-    changes: {},
+  store.kept = { hall: { kind: 'own', template: GARDEN } };
+  await loaded(sharedTemplates, store);
+  const before = sharedTemplates(on(store));
+  let told = 0;
+  const stop = onShared(() => {
+    told += 1;
   });
+  store.keep({ hall: { kind: 'own', template: structuredClone(GARDEN) } });
+  store.keep({ hall: { kind: 'own', template: GARDEN } });
+  stop();
+  assert.equal(told, 0);
+  assert.equal(sharedTemplates(on(store)), before);
+  const shipped = { garden: GARDEN };
+  assert.equal(
+    resolvedTemplates(before, shipped),
+    resolvedTemplates(sharedTemplates(on(store)), shipped),
+  );
+});
+
+test("a home without MNML's store, or one where MNML has not loaded, has an empty one, not a failure", async () => {
+  const { sharedTemplates } = createStore();
+  const store = fakeStore();
+  const unloaded = fakeStore();
+  unloaded.refuse = { code: 'not_loaded', message: 'MNML is not loaded' };
+  await loaded(sharedTemplates, store);
+  await loaded(sharedTemplates, unloaded);
+  const empty = { status: 'ready', own: {}, written: {}, changes: {} };
+  assert.deepEqual(sharedTemplates(on(store)), empty);
+  assert.deepEqual(sharedTemplates(on(unloaded)), empty);
 });
 
 test('a subscription refused for another reason is a failure in words', async () => {
+  const { sharedTemplates } = createStore();
   const store = fakeStore();
   store.refuse = { code: 'unauthorized', message: 'Unauthorized' };
-  sharedTemplates(on(store));
-  await settle();
+  await loaded(sharedTemplates, store);
   assert.deepEqual(sharedTemplates(on(store)), {
     status: 'failed',
     error: 'mnml: the templates MNML keeps could not be read: Unauthorized',
@@ -83,24 +113,24 @@ test('a subscription refused for another reason is a failure in words', async ()
 });
 
 test('two connections keep their own store', async () => {
+  const { sharedTemplates } = createStore();
   const one = fakeStore();
   const two = fakeStore();
   one.kept = { hall: { kind: 'own', template: GARDEN } };
   two.kept = { patio: { kind: 'own', template: TERRACE } };
   sharedTemplates(on(one));
   sharedTemplates(on(two));
-  await settle();
-  const first = sharedTemplates(on(one));
-  const second = sharedTemplates(on(two));
-  assert.deepEqual(first.status === 'ready' ? Object.keys(first.own) : [], ['hall']);
-  assert.deepEqual(second.status === 'ready' ? Object.keys(second.own) : [], ['patio']);
+  await loaded(sharedTemplates, one);
+  await loaded(sharedTemplates, two);
+  assert.deepEqual(ownOf(sharedTemplates(on(one))), ['hall']);
+  assert.deepEqual(ownOf(sharedTemplates(on(two))), ['patio']);
 });
 
 test('a listener that throws does not keep the others from hearing, and is reported on the console', async () => {
+  const { sharedTemplates, onShared } = createStore();
   const store = fakeStore();
   store.kept = {};
-  sharedTemplates(on(store));
-  await settle();
+  await loaded(sharedTemplates, store);
   const reported: unknown[] = [];
   const original = console.error;
   console.error = (...args: unknown[]): void => {
@@ -126,6 +156,7 @@ test('a listener that throws does not keep the others from hearing, and is repor
 });
 
 test('a store entry with one change of the wrong shape is left out whole, and is reported; the rest still draws', async () => {
+  const { sharedTemplates } = createStore();
   const store = fakeStore();
   store.kept = {
     hall: { kind: 'own', template: GARDEN },
@@ -137,8 +168,7 @@ test('a store entry with one change of the wrong shape is left out whole, and is
     reported.push(args[0]);
   };
   try {
-    sharedTemplates(on(store));
-    await settle();
+    await loaded(sharedTemplates, store);
   } finally {
     console.error = original;
   }
@@ -151,6 +181,7 @@ test('a store entry with one change of the wrong shape is left out whole, and is
 });
 
 test("a template of the home's own that names a shipped shape is read with it resolved, and kept as written for the panel; one naming an unknown shape is kept as written, and reported", async () => {
+  const { sharedTemplates } = createStore();
   const store = fakeStore();
   const card = { type: 'custom:mnml-heading-card', title: 'Yard', icon: 'mdi:barn' };
   store.kept = {
@@ -163,8 +194,7 @@ test("a template of the home's own that names a shipped shape is read with it re
     reported.push(args[0]);
   };
   try {
-    sharedTemplates(on(store));
-    await settle();
+    await loaded(sharedTemplates, store);
   } finally {
     console.error = original;
   }
@@ -181,6 +211,7 @@ test("a template of the home's own that names a shipped shape is read with it re
 });
 
 test("one malformed template of the home's own leaves the others served, and only an expansion of it fails, naming it", async () => {
+  const { sharedTemplates } = createStore();
   const store = fakeStore();
   const card = { type: 'custom:mnml-heading-card', title: 'Yard', icon: 'mdi:barn' };
   let deep: unknown = { shape: 'meter' };
@@ -199,8 +230,7 @@ test("one malformed template of the home's own leaves the others served, and onl
     reported.push(args[0]);
   };
   try {
-    sharedTemplates(on(store));
-    await settle();
+    await loaded(sharedTemplates, store);
   } finally {
     console.error = original;
   }
@@ -222,50 +252,44 @@ test("one malformed template of the home's own leaves the others served, and onl
 });
 
 test('the store is subscribed without the automatic resubscribe, and again after each reconnect', async () => {
+  const { sharedTemplates } = createStore();
   const store = fakeStore();
   store.kept = { hall: { kind: 'own', template: GARDEN } };
-  sharedTemplates(on(store));
-  await settle();
+  await loaded(sharedTemplates, store);
   store.kept = { patio: { kind: 'own', template: TERRACE } };
   store.reconnect();
-  await settle();
-  const after = sharedTemplates(on(store));
-  assert.deepEqual(after.status === 'ready' ? Object.keys(after.own) : [], ['patio']);
+  await until(() => ownOf(sharedTemplates(on(store))).includes('patio'), 'the new set');
+  assert.deepEqual(ownOf(sharedTemplates(on(store))), ['patio']);
   assert.deepEqual(store.subscribed, [{ resubscribe: false }, { resubscribe: false }]);
 });
 
 test('after a reconnect that comes before MNML has loaded again, the last set stays and the subscription is tried again', async () => {
+  const { sharedTemplates } = createStore();
   vi.useFakeTimers({ toFake: ['setTimeout'] });
   try {
     const store = fakeStore();
     store.kept = { hall: { kind: 'own', template: GARDEN } };
-    sharedTemplates(on(store));
-    await settle();
+    await loaded(sharedTemplates, store);
     store.kept = undefined;
     store.reconnect();
-    await settle();
-    const waiting = sharedTemplates(on(store));
-    assert.deepEqual(waiting.status === 'ready' ? Object.keys(waiting.own) : [], ['hall']);
+    await until(() => vi.getTimerCount() === 1, 'the retry');
+    assert.deepEqual(ownOf(sharedTemplates(on(store))), ['hall']);
     store.kept = { patio: { kind: 'own', template: TERRACE } };
     vi.advanceTimersByTime(5000);
-    await settle();
-    const back = sharedTemplates(on(store));
-    assert.deepEqual(back.status === 'ready' ? Object.keys(back.own) : [], ['patio']);
+    await until(() => ownOf(sharedTemplates(on(store))).includes('patio'), 'the new set');
   } finally {
     vi.useRealTimers();
   }
 });
 
 test('a home that never had the store does not try it again after a reconnect', async () => {
+  const { sharedTemplates } = createStore();
   vi.useFakeTimers({ toFake: ['setTimeout'] });
   try {
     const store = fakeStore();
-    sharedTemplates(on(store));
-    await settle();
+    await loaded(sharedTemplates, store);
     store.reconnect();
-    await settle();
-    vi.advanceTimersByTime(60_000);
-    await settle();
+    await vi.advanceTimersByTimeAsync(60_000);
     assert.equal(store.subscribed.length, 2);
   } finally {
     vi.useRealTimers();
@@ -289,4 +313,16 @@ test("a template of the home wins, then a shipped one with the home's changes, t
     card: { type: 'custom:mnml-tile-card', 'chips?': [{ id: 'window', type: 'indicator' }] },
   });
   assert.equal(resolvedTemplates({ status: 'waiting' }, { garden: GARDEN })['garden'], GARDEN);
+});
+
+test('the templates are worked out once for the same store and shipped templates', () => {
+  const shared = {
+    status: 'ready' as const,
+    own: { garden: GARDEN },
+    written: { garden: GARDEN },
+    changes: {},
+  };
+  const shipped = { garden: GARDEN };
+  assert.equal(resolvedTemplates(shared, shipped), resolvedTemplates(shared, shipped));
+  assert.notEqual(resolvedTemplates(shared, shipped), resolvedTemplates(shared, { ...shipped }));
 });

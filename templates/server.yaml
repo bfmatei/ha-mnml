@@ -1,5 +1,7 @@
 proxmox-server:
   description: A Proxmox VE server's tile, its CPU and memory, and its guests, checks, backups and notifications chips; it brings the server's and the notifications' pop-ups. The checks, backups and notifications read sensors that the server's own jobs keep.
+  title: Proxmox VE server
+  icon: mdi:server
   slots:
     outlet:
       shape: outlet
@@ -86,7 +88,7 @@ proxmox-server:
   retired: [guest_statuses]
   card:
     type: custom:mnml-tile-card
-    name: Server
+    name: '[[words.server]]'
     icon: mdi:server
     popup: '#proxmox'
     state:
@@ -102,7 +104,7 @@ proxmox-server:
       - id: status
         if: guests.*.status
         type: status
-        name: Guests
+        name: '[[words.guests]]'
         icon: mdi:server-network
         silent: true
         rules:
@@ -119,7 +121,7 @@ proxmox-server:
       - id: checks
         if: checks
         type: status
-        name: Checks
+        name: '[[words.checks]]'
         icon: mdi:clipboard-check-outline
         silent: true
         rules:
@@ -139,7 +141,7 @@ proxmox-server:
       - id: backups
         if: backups
         type: status
-        name: Backups
+        name: '[[words.backups]]'
         icon: mdi:cloud-upload-outline
         silent: true
         rules: [{ id: backups-problem, entities: ['[[backups.problem]]'], color: red, is: ['on'] }]
@@ -149,8 +151,8 @@ proxmox-server:
         entity: '[[notifications.messages]]'
         popup: '#proxmox-notifications'
         color: amber
-        when: { not: ['0'] }
-        show: { not: ['0'] }
+        when: { attribute: alerts, not: ['0'] }
+        show: { attribute: alerts, not: ['0'] }
     grid_options: { columns: 12 }
   popups:
     - id: proxmox-popup
@@ -195,6 +197,8 @@ proxmox-server:
 
 proxmox-popup:
   description: The server's pop-up, its notifications, stopped guests, checks, host, disks, storage, energy, guests and backups.
+  title: Proxmox VE pop-up
+  icon: mdi:server
   slots:
     outlet: { shape: outlet, fields: { energy: { fields: { power: { required: true } } } } }
     cpu: { kind: entity }
@@ -225,33 +229,24 @@ proxmox-popup:
     cards:
       - id: header
         type: custom:mnml-header-card
-        name: Server
+        name: '[[words.server]]'
         icon: mdi:server
-        state:
-          - id: cpu
-            if: cpu
-            entity: '[[cpu]]'
-            icon: true
-          - id: memory
-            if: memory
-            entity: '[[memory]]'
-            icon: true
       - id: notifications
         if: notifications
         type: custom:mnml-entity-card
         entity: '[[notifications.messages]]'
         color: amber
-        when: { not: ['0'] }
+        when: { attribute: alerts, not: ['0'] }
         state:
           - id: none
-            text: None
+            text: '[[words.none]]'
             when: { is: ['0'] }
           - id: part-2
             when: { not: ['0'] }
         popup: '#proxmox-notifications'
       - id: stopped
         type: custom:mnml-list-card
-        title: Stopped
+        title: '[[words.stopped]]'
         icon: mdi:stop-circle-outline
         rows:
           - id: each-guests
@@ -263,48 +258,26 @@ proxmox-popup:
         if: checks
         type: custom:mnml-entity-card
         entity: '[[checks.last_run]]'
-        name: Checks
+        name: '[[words.checks]]'
         icon: mdi:clipboard-check-outline
         state:
           - id: last-run
             relative: true
-        controls:
-          - id: failed
-            type: status
-            name: Failed
-            icon: mdi:alert-circle-outline
-            silent: true
-            rules:
-              - id: failed
-                entities: ['[[checks.failed]]']
-                color: red
-                not: ['0']
-          - id: warnings
-            if: checks.warnings
-            type: status
-            name: Warnings
-            icon: mdi:alert-outline
-            silent: true
-            rules:
-              - id: warnings
-                entities: ['[[checks.warnings]]']
-                color: orange
-                not: ['0']
-          - id: checks-actions
-            if: checks.actions
-            template: checks-actions
-            slots: { actions: '[[checks.actions]]' }
         popup: '#checks'
+        controls:
+          - id: checks-controls
+            template: checks-controls
+            slots: { checks: '[[checks]]' }
       - id: host
         type: custom:mnml-list-card
-        title: Host
+        title: '[[words.host]]'
         icon: mdi:harddisk
         rows:
           - id: outlet-entity
             if: outlet.entity
             entity: '[[outlet.entity]]'
-            color: amber
-            when: { is: ['on'] }
+            color: orange
+            when: { is: ['off'] }
           - id: cpu
             if: cpu
             entity: '[[cpu]]'
@@ -333,7 +306,7 @@ proxmox-popup:
       - id: disks
         if: disks
         type: custom:mnml-list-card
-        title: Disks
+        title: '[[words.disks]]'
         icon: mdi:harddisk
         rows:
           - id: disks-pool
@@ -353,7 +326,7 @@ proxmox-popup:
         type: custom:mnml-list-card
         fold: true
         summary: highest
-        title: Storage
+        title: '[[words.storage]]'
         icon: mdi:database
         rows:
           - id: each-storage
@@ -368,23 +341,23 @@ proxmox-popup:
         slots: { meters: ['[[outlet.energy]]'] }
       - id: guests
         type: custom:mnml-list-card
-        title: Guests
+        title: '[[words.guests]]'
         icon: mdi:server-network
-        headers: [Guest, CPU, Memory, Disk]
+        headers: ['[[words.guest]]', '[[words.cpu]]', '[[words.memory]]', '[[words.disk]]']
         rows:
           - id: each-guests
             each: guests
             as: guest
             entity: '[[guest.status]]'
             label: device
-            values: ['[[guest.cpu]]', '[[guest.memory]]', '[[guest.disk.used]]']
+            values!: ['[[guest.cpu]]', '[[guest.memory]]', '[[guest.disk.used]]']
             of: '[[guest.disk.size]]'
             high: '[[disk_high]]'
             critical_high: '[[disk_full]]'
       - id: backups
         if: backups
         type: custom:mnml-list-card
-        title: Backups
+        title: '[[words.backups]]'
         icon: mdi:cloud-upload-outline
         rows:
           - id: backups-last
@@ -402,7 +375,9 @@ proxmox-popup:
   example: *server
 
 notifications-popup:
-  description: The server's notifications pop-up, every message and a button that clears them all.
+  description: "The server's notifications pop-up: how many are kept in its header, every message and a button that clears them all, which asks first."
+  title: Notifications pop-up
+  icon: mdi:bell-outline
   slots:
     notifications: { shape: notifications, required: true, fields: { clear: { required: true } } }
     message_sources: { shape: message_source, kind: objects }
@@ -412,13 +387,19 @@ notifications-popup:
       - id: header
         type: custom:mnml-header-card
         entity: '[[notifications.messages]]'
-        state: [{ id: server, text: Server }]
+        color: amber
+        when: { attribute: alerts, not: ['0'] }
+        state:
+          - { id: server, text: '[[words.server]]' }
+          - { id: none, text: '[[words.none]]', when: { is: ['0'] } }
+          - { id: part, when: { not: ['0'] } }
         controls:
           - id: service
             type: service
             entity: '[[notifications.clear]]'
             service: script.turn_on
-            name: Clear all
+            confirm: {}
+            name: '[[words.clear_all]]'
             icon: mdi:notification-clear-all
             show: { entity: '[[notifications.messages]]', not: ['0'] }
         back: true

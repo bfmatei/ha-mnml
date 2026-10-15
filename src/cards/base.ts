@@ -1,20 +1,17 @@
 import { LitElement, nothing } from 'lit';
 import type { CSSResultGroup, TemplateResult } from 'lit';
 
-import { PART_KEY } from '../contract/templates.ts';
+import { isEntityId } from '../contract/entities.ts';
+import type { Structure } from '../contract/structure.ts';
 import type { HomeAssistant } from '../ha/hass.ts';
+import { partName } from '../ha/part.ts';
 
-import { requireKnownKeys } from './keys.ts';
-import type { KeySchema } from './keys.ts';
+import { requireCard } from './keys.ts';
 import { BASE_STYLE } from './styles.ts';
 
-const ENTITY_ID = /^[a-z_]+\.[a-z0-9_]+$/;
-
 function collectEntityIds(value: unknown, into: Set<string>): void {
-  if (typeof value === 'string') {
-    if (ENTITY_ID.test(value)) {
-      into.add(value);
-    }
+  if (isEntityId(value)) {
+    into.add(value);
   } else if (Array.isArray(value)) {
     for (const item of value) {
       collectEntityIds(item, into);
@@ -68,6 +65,7 @@ export abstract class MnmlCard<C extends { type: string }> extends LitElement im
       previous.locale !== hass.locale ||
       previous.localize !== hass.localize ||
       previous.formatEntityState !== hass.formatEntityState ||
+      previous.formatEntityAttributeName !== hass.formatEntityAttributeName ||
       previous.formatEntityAttributeValue !== hass.formatEntityAttributeValue ||
       previous.config !== hass.config ||
       next.some((stateObj, index) => stateObj !== this.snapshot[index]);
@@ -78,12 +76,12 @@ export abstract class MnmlCard<C extends { type: string }> extends LitElement im
   }
 
   setConfig(config: C): void {
-    requireKnownKeys(config, this.schema());
+    requireCard(config, this.structure());
     this.validate(config);
     this.releaseAll();
     this.config = config;
-    const part: unknown = Reflect.get(config, PART_KEY);
-    if (typeof part === 'string') {
+    const part = partName(config);
+    if (part !== undefined) {
       this.dataset['part'] = part;
     } else {
       delete this.dataset['part'];
@@ -149,7 +147,7 @@ export abstract class MnmlCard<C extends { type: string }> extends LitElement im
 
   protected validate(_config: C): void {}
 
-  protected abstract schema(): KeySchema;
+  protected abstract structure(): Structure;
 
   protected abstract draw(hass: HomeAssistant, config: C): TemplateResult | undefined;
 
@@ -186,31 +184,5 @@ export abstract class MnmlCard<C extends { type: string }> extends LitElement im
     this.holds = 0;
     this.snapshot = [];
     this.requestUpdate();
-  }
-}
-
-export function requireList(name: string, value: unknown, length?: number): void {
-  if (!Array.isArray(value) || (length !== undefined && value.length !== length)) {
-    throw new Error(
-      length === undefined ? `${name} must be a list` : `${name} must list ${length} entities`,
-    );
-  }
-}
-
-export function requireString(name: string, value: unknown): void {
-  if (typeof value !== 'string' || value === '') {
-    throw new Error(`${name} is required`);
-  }
-}
-
-export function requireNumber(name: string, value: unknown): void {
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    throw new Error(`${name} must be a number`);
-  }
-}
-
-export function requireOneOf(name: string, value: unknown, allowed: readonly string[]): void {
-  if (typeof value !== 'string' || !allowed.includes(value)) {
-    throw new Error(`${name} must be one of ${allowed.join(', ')}`);
   }
 }

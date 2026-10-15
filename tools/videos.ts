@@ -278,6 +278,8 @@ async function dashboards(browser: Browser): Promise<void> {
   await r.say('The MNML panel: build a whole dashboard from your home in one click', 3500);
   await r.say('Choose Quick start', 1800);
   await r.click(boards.getByRole('button', { name: 'Quick start' }), 1500);
+  await r.say('Most of this home is in no area: build anyway, or sort it first', 3200);
+  await r.click(dialogButton(page, 'Build anyway'), 1500);
   await r.say('MNML looks at your areas, people, cars and devices', 3200);
   await r.click(dialogButton(page, 'Make it'), 2500);
   await r.say('Done. Open it to see the result', 2500);
@@ -294,7 +296,7 @@ async function dashboards(browser: Browser): Promise<void> {
   await r.say('Give it a title, and choose its sections and rooms', 3200);
   await r.type(plan.locator('input.fact-input').first(), 'Our flat');
   await r.say('Untick a room to leave it out', 2200);
-  await r.click(plan.getByRole('checkbox', { name: 'Show Kitchen' }), 1500);
+  await r.click(plan.getByRole('checkbox', { name: 'Show Kitchen', exact: true }), 1500);
   await r.say('Customize changes how a single room looks', 2400);
   await r.click(plan.getByRole('button', { name: 'Customize Living' }), 3500);
   await r.say('The same editor as the dashboard card editor', 2800);

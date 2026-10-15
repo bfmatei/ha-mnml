@@ -64,7 +64,32 @@
           "spelled": true
         }
       }
-    }
+    },
+    {
+      "why": "pop-ups that close when idle, and an alert that opens one",
+      "with": {
+        "idle_close": 120,
+        "alerts": [
+          {
+            "entity": "lock.front_door",
+            "is": ["jammed"],
+            "popup": "#hall",
+            "screens": ["tablet"],
+            "users": ["abc123"]
+          }
+        ]
+      }
+    },
+    { "why": "no alerts", "with": { "alerts": [] } },
+    {
+      "why": "devices on cards of their own, with their section's look and place",
+      "with": {
+        "devices": [{ "device": "roborock_s8", "template": "vacuum-card" }],
+        "sections": { "devices": { "title": "Things", "icon": "mdi:robot-vacuum" } },
+        "order": ["devices", "rooms"]
+      }
+    },
+    { "why": "no devices", "with": { "devices": [] } }
   ],
   "invalid": [
     { "why": "no title", "with": { "title": "" } },
@@ -104,6 +129,10 @@
     { "why": "a car without slots", "with": { "cars": [{ "key": "sedan" }] } },
     { "why": "a car whose key is no name", "with": { "cars": [{ "key": "My car", "slots": {} }] } },
     {
+      "why": "a car with a key it does not have",
+      "with": { "cars": [{ "key": "sedan", "slots": {}, "icon": "mdi:car" }] }
+    },
+    {
       "why": "a system template whose name is no name",
       "with": { "system": [{ "template": "Home Assistant" }] }
     },
@@ -142,6 +171,48 @@
     { "why": "a spelled Glances strip without slots", "with": { "glances": { "spelled": true } } },
     { "why": "Glances slots that are a list", "with": { "glances": { "slots": [] } } },
     { "why": "a Glances strip with a template", "with": { "glances": { "template": "glances" } } },
-    { "why": "a Glances strip that is a flag", "with": { "glances": true } }
+    { "why": "a Glances strip that is a flag", "with": { "glances": true } },
+    { "why": "an idle close of no seconds", "with": { "idle_close": 0 } },
+    { "why": "an idle close that is a flag", "with": { "idle_close": true } },
+    { "why": "an idle close written as text", "with": { "idle_close": "120" } },
+    { "why": "an alert without a pop-up", "with": { "alerts": [{ "entity": "lock.front_door" }] } },
+    {
+      "why": "an alert whose pop-up is no hash",
+      "with": { "alerts": [{ "entity": "lock.front_door", "popup": "hall" }] }
+    },
+    {
+      "why": "an alert on a screen there is none of",
+      "with": {
+        "alerts": [{ "entity": "lock.front_door", "popup": "#hall", "screens": ["watch"] }]
+      }
+    },
+    {
+      "why": "an alert with a key alerts lack",
+      "with": { "alerts": [{ "entity": "lock.front_door", "popup": "#hall", "colour": "red" }] }
+    },
+    {
+      "why": "a device without its template",
+      "with": { "devices": [{ "device": "roborock_s8" }] }
+    },
+    {
+      "why": "a device with no id",
+      "with": { "devices": [{ "device": "", "template": "vacuum-card" }] }
+    },
+    {
+      "why": "a device template that is no name",
+      "with": { "devices": [{ "device": "roborock_s8", "template": "Vacuum card" }] }
+    },
+    {
+      "why": "a device with a key it does not have",
+      "with": { "devices": [{ "device": "roborock_s8", "template": "vacuum-card", "slots": {} }] }
+    },
+    {
+      "why": "devices that are a mapping",
+      "with": { "devices": { "device": "roborock_s8", "template": "vacuum-card" } }
+    },
+    {
+      "why": "a template for the devices section",
+      "with": { "sections": { "devices": { "template": "vacuum-card" } } }
+    }
   ]
 }

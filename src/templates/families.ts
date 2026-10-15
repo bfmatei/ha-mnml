@@ -1,6 +1,6 @@
 import type { Shapes, Templates, Value } from '../contract/templates.ts';
 
-import { familyNames, readFamily, readShapes, shapeOf } from './shipped.ts';
+import { familyNames, readFamily, readShapes, sizeOf } from './shipped.ts';
 
 export const COMMON_FAMILY = 'common';
 
@@ -12,13 +12,13 @@ export const OWNER: Readonly<Record<string, string>> = Object.fromEntries(
     .flatMap((family) => Object.keys(readFamily(family)).map((name) => [name, family])),
 );
 
-export const SHAPES: Readonly<Record<string, Value>> = Object.fromEntries(
+export const SIZES: Readonly<Record<string, Value>> = Object.fromEntries(
   familyNames()
     .filter((family) => family !== COMMON_FAMILY)
     .flatMap((family) =>
       Object.entries(readFamily(family)).flatMap(([name, template]) => {
-        const shape = shapeOf(template);
-        return shape === undefined ? [] : [[name, shape]];
+        const size = sizeOf(template);
+        return size === undefined ? [] : [[name, size]];
       }),
     ),
 );

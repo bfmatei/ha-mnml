@@ -142,63 +142,168 @@ test('a view is unfolded while it has a place and its tile is in the page', () =
   anchor.remove();
 });
 
-test('the follower moves the panel each frame its tile moves, and stops once the view is not unfolded', async () => {
-  vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame'] });
+const FRAME = 16;
+
+interface Followed {
+  anchor: HTMLElement;
+  moves: Place[];
+  move: (box: DOMRect) => void;
+  view: () => { place: Place; anchor: Element } | undefined;
+  close: () => void;
+}
+
+function followed(parent: Node = document.body): Followed {
   const anchor = document.createElement('div');
-  document.body.append(anchor);
+  parent.appendChild(anchor);
   let box = tile(400, 200, 360, 64);
   anchor.getBoundingClientRect = () => box;
   let view: { place: Place; anchor: Element } | undefined = { place: placed(box, DIALOG), anchor };
   const moves: Place[] = [];
-  const follower = following(
-    () => view,
+  return {
+    anchor,
+    moves,
+    move: (next) => {
+      box = next;
+    },
+    view: () => view,
+    close: () => {
+      view = undefined;
+    },
+  };
+}
+
+function follow(on: Followed): ReturnType<typeof following> {
+  return following(
+    on.view,
     () => DIALOG,
     (place) => {
-      moves.push(place);
-      if (view !== undefined) {
-        view = { ...view, place };
+      on.moves.push(place);
+      const now = on.view();
+      if (now !== undefined) {
+        Object.assign(now, { place });
       }
     },
   );
+}
+
+test('the follower runs no frame while its tile keeps still, and wakes when the window resizes', async () => {
+  vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame'] });
+  const on = followed();
+  const follower = follow(on);
   follower.start();
   follower.start();
-  await vi.advanceTimersByTimeAsync(50);
-  assert.equal(moves.length, 0, 'a tile that keeps still moves nothing');
-  assert.equal(vi.getTimerCount(), 1, 'and one start is one loop');
-  box = tile(120, 260, 420, 64);
-  await vi.advanceTimersByTimeAsync(20);
-  assert.deepEqual(moves.map(where), [[120, 560, 260, false, 532]]);
-  view = undefined;
-  await vi.advanceTimersByTimeAsync(20);
-  assert.equal(vi.getTimerCount(), 0, 'the loop ends with the view');
-  view = { place: placed(box, DIALOG), anchor };
+  assert.equal(vi.getTimerCount(), 1, 'one start is one loop');
+  await vi.advanceTimersByTimeAsync(FRAME * 10);
+  assert.equal(on.moves.length, 0, 'a tile that keeps still moves nothing');
+  assert.equal(vi.getTimerCount(), 0, 'and once it has kept still, no frame runs');
+  await vi.advanceTimersByTimeAsync(5000);
+  assert.equal(vi.getTimerCount(), 0, 'however long the pop-up stays open');
+  on.move(tile(120, 260, 420, 64));
+  window.dispatchEvent(new Event('resize'));
+  await vi.advanceTimersByTimeAsync(FRAME * 10);
+  assert.deepEqual(on.moves.map(where), [[120, 560, 260, false, 532]]);
+  assert.equal(vi.getTimerCount(), 0, 'and it rests again');
+  follower.stop();
+  on.anchor.remove();
+});
+
+test('a scroll of the page, or of a scroller in a shadow root around the tile, wakes the follower', async () => {
+  vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame'] });
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = host.attachShadow({ mode: 'open' });
+  const scroller = document.createElement('div');
+  root.append(scroller);
+  const on = followed(scroller);
+  const follower = follow(on);
+  follower.start();
+  await vi.advanceTimersByTimeAsync(FRAME * 10);
+  on.move(tile(400, 120, 360, 64));
+  scroller.dispatchEvent(new Event('scroll'));
+  await vi.advanceTimersByTimeAsync(FRAME * 10);
+  assert.deepEqual(
+    on.moves.map(where),
+    [[200, 560, 120, false, 672]],
+    'a scroller in a shadow root',
+  );
+  on.move(tile(400, 80, 360, 64));
+  document.dispatchEvent(new Event('scroll'));
+  await vi.advanceTimersByTimeAsync(FRAME * 10);
+  assert.equal(on.moves.length, 2, 'the page');
+  follower.stop();
+  host.remove();
+});
+
+test('a change of size of the tile or of anything around it wakes the follower, and stop lets go of it', async () => {
+  vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame'] });
+  const observers: { wake: () => void; watched: Element[]; done: boolean }[] = [];
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      private readonly made: { wake: () => void; watched: Element[]; done: boolean };
+      constructor(wake: () => void) {
+        this.made = { wake, watched: [], done: false };
+        observers.push(this.made);
+      }
+      observe(element: Element): void {
+        this.made.watched.push(element);
+      }
+      disconnect(): void {
+        this.made.done = true;
+      }
+    },
+  );
+  const host = document.createElement('section');
+  document.body.append(host);
+  const root = host.attachShadow({ mode: 'open' });
+  const on = followed(root);
+  const follower = follow(on);
+  follower.start();
+  await vi.advanceTimersByTimeAsync(FRAME * 10);
+  assert.equal(observers.length, 1, 'one observer');
+  const [observer] = observers;
+  assert.ok(observer);
+  assert.deepEqual(observer.watched, [on.anchor, host, document.body, document.documentElement]);
+  on.move(tile(400, 300, 360, 64));
+  observer.wake();
+  await vi.advanceTimersByTimeAsync(FRAME * 10);
+  assert.deepEqual(on.moves.map(where), [[200, 560, 300, false, 492]]);
+  follower.stop();
+  assert.equal(observer.done, true);
+  host.remove();
+});
+
+test('the follower lets go once the view is not unfolded, and stop cancels the next frame', async () => {
+  vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame'] });
+  const on = followed();
+  const follower = follow(on);
+  follower.start();
+  await vi.advanceTimersByTimeAsync(FRAME * 10);
+  on.close();
+  on.move(tile(120, 260, 420, 64));
+  window.dispatchEvent(new Event('resize'));
+  await vi.advanceTimersByTimeAsync(FRAME * 2);
+  assert.deepEqual(on.moves, [], 'a closed view is not followed');
+  window.dispatchEvent(new Event('resize'));
+  assert.equal(vi.getTimerCount(), 0, 'and nothing wakes it any more');
   follower.start();
   follower.stop();
-  assert.equal(vi.getTimerCount(), 0, 'and stop cancels the next frame');
-  anchor.remove();
+  assert.equal(vi.getTimerCount(), 0);
+  on.anchor.remove();
 });
 
 test('the follower stops once its tile leaves the page, and moves the panel no more', async () => {
   vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame'] });
-  const anchor = document.createElement('div');
-  document.body.append(anchor);
-  let box = tile(400, 200, 360, 64);
-  anchor.getBoundingClientRect = () => box;
-  const view = { place: placed(box, DIALOG), anchor };
-  const moves: Place[] = [];
-  const follower = following(
-    () => view,
-    () => DIALOG,
-    (place) => {
-      moves.push(place);
-    },
-  );
+  const on = followed();
+  const follower = follow(on);
   follower.start();
-  await vi.advanceTimersByTimeAsync(50);
-  assert.equal(vi.getTimerCount(), 1, 'it follows while the tile is in the page');
-  anchor.remove();
-  box = tile(120, 260, 420, 64);
-  await vi.advanceTimersByTimeAsync(50);
-  assert.deepEqual(moves, [], 'a tile out of the page is not followed');
+  await vi.advanceTimersByTimeAsync(FRAME * 2);
+  assert.equal(vi.getTimerCount(), 1, 'it follows while the tile settles');
+  on.anchor.remove();
+  on.move(tile(120, 260, 420, 64));
+  await vi.advanceTimersByTimeAsync(FRAME * 2);
+  assert.deepEqual(on.moves, [], 'a tile out of the page is not followed');
   assert.equal(vi.getTimerCount(), 0, 'and the loop ends');
+  window.dispatchEvent(new Event('resize'));
+  assert.equal(vi.getTimerCount(), 0, 'for good');
 });

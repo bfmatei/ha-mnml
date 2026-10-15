@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'vitest';
 
 import type { HassEntity, HomeAssistant } from '../../ha/hass.ts';
+import { fakeHass } from '../../test/hass.ts';
 
 import { sliderSpec } from './slider-spec.ts';
 
@@ -13,19 +14,12 @@ interface Call {
 
 function recorder(): { hass: HomeAssistant; calls: Call[] } {
   const calls: Call[] = [];
-  const hass = {
-    states: {},
-    entities: {},
-    devices: {},
-    locale: { language: 'en' },
-    formatEntityState: (stateObj: HassEntity): string => stateObj.state,
-    formatEntityAttributeValue: (_stateObj: HassEntity, _name: string, value: unknown): string =>
-      String(value),
-    callService: (domain: string, service: string, data: unknown): Promise<unknown> => {
+  const hass = fakeHass({
+    callService: (domain, service, data) => {
       calls.push({ service: `${domain}.${service}`, data });
       return Promise.resolve();
     },
-  } as unknown as HomeAssistant;
+  });
   return { hass, calls };
 }
 

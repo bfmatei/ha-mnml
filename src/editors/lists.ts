@@ -32,18 +32,19 @@ export const SERVICES: readonly string[] = Object.keys({
   'media_player.media_previous_track': true,
   'media_player.volume_set': true,
   'number.set_value': true,
+  'persistent_notification.dismiss': true,
+  'persistent_notification.dismiss_all': true,
   'scene.turn_on': true,
   'script.turn_on': true,
   'select.select_option': true,
+  'timer.cancel': true,
+  'timer.finish': true,
+  'timer.pause': true,
+  'timer.start': true,
   'vacuum.locate': true,
   'vacuum.return_to_base': true,
   'vacuum.start': true,
   'vacuum.stop': true,
 } satisfies Record<ServiceName, true>);
 
-export const CORNER_NAMES: readonly string[] = [
-  'front left',
-  'front right',
-  'rear left',
-  'rear right',
-];
+export const CORNERS: readonly number[] = [0, 1, 2, 3];

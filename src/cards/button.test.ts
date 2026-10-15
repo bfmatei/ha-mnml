@@ -2,18 +2,13 @@ import assert from 'node:assert/strict';
 
 import { test } from 'vitest';
 
+import { fakeHass } from '../test/hass.ts';
+import type { ServiceCall } from '../test/hass.ts';
 import { define, mounted } from '../test/render.ts';
 
 import { MnmlButtonCard } from './button.ts';
 
 define('mnml-button-card', MnmlButtonCard);
-
-interface Call {
-  domain: string;
-  service: string;
-  data: unknown;
-  target: unknown;
-}
 
 const STATES = {
   'button.restart': {
@@ -23,28 +18,9 @@ const STATES = {
   },
 };
 
-function recorder(calls: Call[]): unknown {
-  return {
-    states: STATES,
-    entities: {},
-    devices: {},
-    locale: { language: 'en' },
-    formatEntityState: (stateObj: { state: string }): string => stateObj.state,
-    callService: (
-      domain: string,
-      service: string,
-      data: unknown,
-      target: unknown,
-    ): Promise<unknown> => {
-      calls.push({ domain, service, data, target });
-      return Promise.resolve();
-    },
-  };
-}
-
 test('a press calls the service on the entity, through the hass of the moment', async () => {
-  const drawn: Call[] = [];
-  const now: Call[] = [];
+  const drawn: ServiceCall[] = [];
+  const now: ServiceCall[] = [];
   const made = document.createElement('mnml-button-card');
   assert.ok(made instanceof MnmlButtonCard);
   made.setConfig({
@@ -52,9 +28,9 @@ test('a press calls the service on the entity, through the hass of the moment', 
     entity: 'button.restart',
     service: 'button.press',
   });
-  made.hass = recorder(drawn) as never;
+  made.hass = fakeHass({ states: STATES, calls: drawn });
   const root = await mounted(made);
-  made.hass = recorder(now) as never;
+  made.hass = fakeHass({ states: STATES, calls: now });
   const button = root.querySelector('[role="button"]');
   assert.ok(button instanceof HTMLElement);
   assert.equal(button.getAttribute('aria-label'), 'Restart');

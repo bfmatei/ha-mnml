@@ -1,5 +1,7 @@
 section-heading:
   description: A section's heading, the full width of the section.
+  title: Section heading
+  icon: mdi:format-title
   slots:
     title: { kind: text, required: true, help: "The heading's text." }
     icon: { kind: icon, required: true, help: "The heading's icon." }
@@ -17,14 +19,18 @@ section-heading:
     icon: mdi:floor-plan
 
 power:
-  description: A filled power toggle for an entity, lit while the entity is on.
+  description: A filled power toggle for an entity, lit while the entity is on, and armed by a first press while its state matches confirm.
+  title: Power button
+  icon: mdi:power
   slots:
     entity: { kind: entity, required: true }
+    confirm: { kind: object, help: 'The states in which a first press only arms the toggle.' }
     color: { kind: text, default: amber }
     when: { kind: object }
   card:
     type: toggle
     entity: '[[entity]]'
+    confirm: '[[confirm]]'
     icon: mdi:power
     color: '[[color]]'
     when: '[[when]]'
@@ -34,6 +40,8 @@ power:
 
 nav-chip:
   description: A coloured chip that opens a pop-up.
+  title: Pop-up chip
+  icon: mdi:open-in-app
   slots:
     entity: { kind: entity, required: true }
     popup: { kind: text, required: true }
@@ -48,10 +56,12 @@ nav-chip:
   example:
     entity: climate.living
     popup: '#living-heating'
-    color: orange
+    color: amber
 
 checks-actions:
   description: The daily checks' Run and Stop controls, Run shown while they are not running and Stop while they are.
+  title: Checks run and stop
+  icon: mdi:clipboard-play-outline
   slots:
     actions: { shape: checks_actions, required: true }
   card:
@@ -59,22 +69,55 @@ checks-actions:
       type: service
       entity: '[[actions.run]]'
       service: button.press
-      name: Run checks
+      name: '[[words.run_checks]]'
       icon: mdi:play
       show: { entity: '[[actions.running]]', not: ['on'] }
     - id: stop
       type: service
       entity: '[[actions.stop]]'
       service: button.press
-      name: Stop checks
+      name: '[[words.stop_checks]]'
       icon: mdi:stop
       show: { entity: '[[actions.running]]', is: ['on'] }
   example:
     actions:
       { run: button.checks_run, stop: button.checks_stop, running: binary_sensor.checks_running }
 
+checks-controls:
+  description: "The daily checks' Failed and Warnings icons, each drawn while it is not 0, then their Run and Stop controls."
+  title: Checks controls
+  icon: mdi:clipboard-check-outline
+  slots:
+    checks: { shape: checks, required: true }
+  card:
+    - id: failed
+      type: status
+      name: '[[words.failed]]'
+      icon: mdi:alert-circle-outline
+      silent: true
+      rules: [{ id: failed, entities: ['[[checks.failed]]'], color: red, not: ['0'] }]
+    - id: warnings
+      if: checks.warnings
+      type: status
+      name: '[[words.warnings]]'
+      icon: mdi:alert-outline
+      silent: true
+      rules: [{ id: warnings, entities: ['[[checks.warnings]]'], color: orange, not: ['0'] }]
+    - id: checks-actions
+      if: checks.actions
+      template: checks-actions
+      slots: { actions: '[[checks.actions]]' }
+  example:
+    checks:
+      failed: sensor.checks_failed
+      warnings: sensor.checks_warnings
+      last_run: sensor.checks_last_run
+      overdue: binary_sensor.checks_overdue
+
 while-not-off:
   description: The visibility that shows a card while its entity is not off.
+  title: While not off
+  icon: mdi:eye-outline
   slots:
     entity: { kind: entity }
   card:
@@ -88,6 +131,8 @@ while-not-off:
 
 batteries:
   description: A folding list of batteries, lowest first, orange under 20 % and red under 5 %.
+  title: Battery list
+  icon: mdi:battery-low
   slots:
     batteries: { kind: entities }
     low: { kind: number, default: 20 }
@@ -99,7 +144,7 @@ batteries:
       lowest_first: true
       fold: true
       summary: lowest
-      title: Batteries
+      title: '[[words.batteries]]'
       icon: mdi:battery-charging-medium
       rows:
         - id: each-batteries
@@ -115,28 +160,32 @@ batteries:
 
 energy-table:
   description: A folding table of meters, now, today and in total, the heading summing what they used today.
+  title: Energy table
+  icon: mdi:table
   slots:
     meters: { shape: meter, kind: objects, fields: { power: { required: true } } }
   card:
     type: custom:mnml-list-card
     fold: true
     summary: { sum: 1 }
-    title: Energy
+    title: '[[words.energy]]'
     icon: mdi:lightning-bolt
-    headers: [Item, Now, Today, Total]
+    headers: ['[[words.item]]', '[[words.now]]', '[[words.today]]', '[[words.total]]']
     rows:
       - id: each-meters
         each: meters
         as: meter
         entity: '[[meter.power]]'
         label: device
-        values: ['[[meter.power]]', '[[meter.today]]', '[[meter.total]]']
+        values!: ['[[meter.power]]', '[[meter.today]]', '[[meter.total]]']
   example:
     meters:
       - { power: sensor.plug_power, today: sensor.plug_energy_today, total: sensor.plug_energy }
 
 pending-row:
   description: A list row that flags an update while it is pending.
+  title: Pending update row
+  icon: mdi:update
   slots:
     entity: { kind: entity, required: true }
   card:
@@ -149,6 +198,8 @@ pending-row:
 
 stopped-row:
   description: A list row, red, shown while a service or guest is off.
+  title: Stopped row
+  icon: mdi:stop-circle-outline
   slots:
     entity: { kind: entity, required: true }
   card:
@@ -161,6 +212,8 @@ stopped-row:
 
 link-row:
   description: A list row for a link speed, orange while it is not the full speed.
+  title: Link speed row
+  icon: mdi:speedometer
   slots:
     entity: { kind: entity, required: true }
     speed: { kind: text, default: '10000' }

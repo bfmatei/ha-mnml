@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 
 import { test } from 'vitest';
 
+import { isEntityId } from '../src/contract/entities.ts';
 import { drawn } from '../src/home/view.ts';
 
 import {
@@ -15,8 +16,6 @@ import {
 } from './entities.ts';
 import { DEMO } from './home.ts';
 import { AWAY, STATES } from './states.ts';
-
-const ID = /^[a-z_]+\.[a-z0-9_]+$/;
 
 function withoutCards(value: unknown, type: string): unknown {
   if (Array.isArray(value)) {
@@ -34,7 +33,7 @@ function withoutCards(value: unknown, type: string): unknown {
 }
 
 function ids(value: unknown, into = new Set<string>()): Set<string> {
-  if (typeof value === 'string' && ID.test(value) && value !== 'button.press') {
+  if (isEntityId(value) && value !== 'button.press') {
     into.add(value);
   } else if (Array.isArray(value)) {
     for (const item of value) {

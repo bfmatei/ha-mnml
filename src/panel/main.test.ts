@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 
 import { test, vi } from 'vitest';
 
+import { fakeHass } from '../test/hass.ts';
+import { until } from '../test/until.ts';
+
 const listening = vi.hoisted(() => ({ added: 0, removed: 0, read: 0 }));
 
 vi.mock('../store/store.ts', () => ({
@@ -29,7 +32,7 @@ vi.mock('../store/shipped.ts', () => ({
 
 vi.mock(import('../editors/ha-form.ts'), async (original) => ({
   ...(await original()),
-  loadHaForm: () => Promise.resolve(),
+  loadHaForm: () => Promise.resolve(undefined),
 }));
 
 const { MnmlPanel } = await import('./main.ts');
@@ -49,9 +52,9 @@ test('the panel listens to the store while it is on the page, and stops when it 
 test('a panel put back on the page reads the store again, so it shows what changed meanwhile', async () => {
   const panel = document.createElement('mnml-panel');
   assert.ok(panel instanceof MnmlPanel);
-  panel.hass = { connection: { sendMessagePromise: () => Promise.resolve([]) } } as never;
+  panel.hass = fakeHass();
   document.body.append(panel);
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await until(() => listening.read > 0, 'the first read');
   panel.remove();
   const before = listening.read;
   document.body.append(panel);

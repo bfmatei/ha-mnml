@@ -1,4 +1,4 @@
-import { SECTION_ORDER } from '../contract/builder.ts';
+import { SECTION_ORDER } from '../contract/plan.ts';
 import { subnetRange } from '../contract/subnet.ts';
 import type { Value } from '../contract/templates.ts';
 import { TemplateError, expand } from '../templates/expand.ts';

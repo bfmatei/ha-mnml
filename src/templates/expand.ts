@@ -1,4 +1,13 @@
-import { PART_KEY, isMapping } from '../contract/templates.ts';
+import { isLooseEntityId } from '../contract/entities.ts';
+import {
+  PART_KEY,
+  TEMPLATE_KEYS,
+  isMapping,
+  plainKey,
+  lookProblem,
+  slotLabel,
+  templateTitle,
+} from '../contract/templates.ts';
 import type {
   Instance,
   Kind,
@@ -7,6 +16,7 @@ import type {
   Templates,
   Value,
 } from '../contract/templates.ts';
+import { EN } from '../words/en.ts';
 
 export interface Expanded {
   card: Value;
@@ -14,9 +24,17 @@ export interface Expanded {
   missing?: string[];
 }
 
-export class TemplateError extends Error {}
+export class TemplateError extends Error {
+  readonly said: string;
+
+  constructor(message: string, said: string = message) {
+    super(message);
+    this.said = said;
+  }
+}
 
 type Mapping = Record<string, Value>;
+type WordTable = Readonly<Record<string, string>>;
 
 export const PATH = '[a-z_][a-z0-9_]*(?:\\.(?:[a-z0-9_]+|\\*|[?!][a-z_][a-z0-9_]*))*';
 export const OVER = /^(?:\*|([?!])([a-z_][a-z0-9_]*))$/;
@@ -36,8 +54,9 @@ const BRACKETS = /\[\[([^[\]]*)\]\]/g;
 const SLOT_PATH = new RegExp(`^${PATH}$`);
 const SLOT_NAME = /^[a-z_][a-z0-9_]*$/;
 const RETIRED_PATH = /^[a-z_][a-z0-9_]*(?:\.[a-z_][a-z0-9_]*)*$/;
-const CONTROL = new Set(['if', 'unless', 'template', 'slots']);
 const DROP = Symbol('drop');
+export const WORDS = 'words';
+const RESERVED = `is reserved for the words of the card's language`;
 
 type Out = Value | typeof DROP;
 
@@ -45,6 +64,7 @@ interface Scope {
   template: string;
   values: ReadonlyMap<string, Value | undefined>;
   specs: ReadonlyMap<string, SlotSpec | undefined>;
+  words: WordTable;
 }
 
 export interface Marking {
@@ -59,6 +79,7 @@ interface Context {
   popups: Value[];
   marking?: Marking | undefined;
   trail: readonly string[];
+  words: WordTable;
 }
 
 export function filled(value: Value | undefined): boolean {
@@ -71,9 +92,22 @@ export function filled(value: Value | undefined): boolean {
   return !isMapping(value) || Object.keys(value).length > 0;
 }
 
-function fail(template: string, where: string, problem: string): never {
-  throw new TemplateError(`${template}${where === '' ? '' : ` at ${where}`}: ${problem}`);
+function fail(template: string, where: string, problem: string, said?: string): never {
+  const message = `${template}${where === '' ? '' : ` at ${where}`}: ${problem}`;
+  throw new TemplateError(message, said ?? message);
 }
+
+const KIND_WORDS: Readonly<Record<Kind, string>> = {
+  text: 'a text',
+  texts: 'a list of texts',
+  number: 'a number',
+  icon: 'an icon',
+  flag: 'true, or nothing',
+  entity: 'an entity',
+  entities: 'a list of entities',
+  object: 'its fields',
+  objects: 'a list of items',
+};
 
 const KINDS: Record<Kind, (value: Value) => boolean> = {
   text: (value) => typeof value === 'string',
@@ -81,9 +115,8 @@ const KINDS: Record<Kind, (value: Value) => boolean> = {
   number: (value) => typeof value === 'number',
   icon: (value) => typeof value === 'string',
   flag: (value) => value === true,
-  entity: (value) => typeof value === 'string' && value.includes('.'),
-  entities: (value) =>
-    Array.isArray(value) && value.every((item) => typeof item === 'string' && item.includes('.')),
+  entity: isLooseEntityId,
+  entities: (value) => Array.isArray(value) && value.every(isLooseEntityId),
   object: isMapping,
   objects: (value) => Array.isArray(value) && value.every(isMapping),
 };
@@ -207,8 +240,50 @@ function follow(
   return { value: found, spec: shape };
 }
 
+function word(path: readonly string[], words: WordTable, template: string, where: string): string {
+  const [name = '', ...more] = path;
+  if (more.length > 0 || !SLOT_NAME.test(name)) {
+    return fail(template, where, `${WORDS} takes the name of one word, as [[${WORDS}.lights]]`);
+  }
+  return (
+    (Object.hasOwn(words, name) ? words[name] : undefined) ??
+    fail(template, where, `no word named ${name}`)
+  );
+}
+
+function checkWords(who: string, node: Value | undefined, where: string, words: WordTable): void {
+  if (typeof node === 'string') {
+    for (const [, path = ''] of node.matchAll(PART)) {
+      const [head, ...rest] = path.split('.');
+      if (head === WORDS) {
+        word(rest, words, who, where);
+      }
+    }
+    return;
+  }
+  if (Array.isArray(node)) {
+    for (const [index, item] of node.entries()) {
+      checkWords(who, item, `${where}[${index}]`, words);
+    }
+    return;
+  }
+  if (!isMapping(node)) {
+    return;
+  }
+  if (node['as'] === WORDS) {
+    fail(who, where, `as: ${WORDS} ${RESERVED}`);
+  }
+  for (const [written, value] of Object.entries(node)) {
+    const key = plainKey(written);
+    checkWords(who, value, `${where}.${key}`, words);
+  }
+}
+
 function walk(path: string, scope: Scope, where: string): Walked {
   const [head = '', ...rest] = path.split('.');
+  if (head === WORDS) {
+    return { value: word(rest, scope.words, scope.template, where), spec: { kind: 'text' } };
+  }
   if (!scope.values.has(head)) {
     fail(scope.template, where, `no slot named ${head}`);
   }
@@ -325,11 +400,22 @@ function renderList(
         template: scope.template,
         values: new Map([...scope.values, [alias, element]]),
         specs: new Map([...scope.specs, [alias, member(spec)]]),
+        words: scope.words,
       };
       push(out, renderMapping(body, inner, entered(context, item), at, true));
     }
   }
   return out;
+}
+
+function renderPlaces(node: Value, scope: Scope, context: Context, where: string): Value[] {
+  if (!Array.isArray(node)) {
+    return fail(scope.template, where, 'a key ending in ! takes a list written out');
+  }
+  return node.map((item, index) => {
+    const out = render(item, scope, context, `${where}[${index}]`);
+    return out === DROP ? null : out;
+  });
 }
 
 function marked(context: Context, node: Mapping, item: boolean): boolean {
@@ -357,17 +443,18 @@ function renderMapping(
   }
   const own: Mapping = {};
   for (const [written, value] of Object.entries(node)) {
-    if (CONTROL.has(written) || (item && written === 'id')) {
+    if (TEMPLATE_KEYS.has(written) && (item || written !== 'id')) {
       continue;
     }
     const optional = written.endsWith('?');
-    const key = optional ? written.slice(0, -1) : written;
-    const rendered = render(
-      value,
-      scope,
-      context.marking === undefined ? context : { ...context, trail: [...context.trail, written] },
-      where === '' ? key : `${where}.${key}`,
-    );
+    const placed = written.endsWith('!');
+    const key = plainKey(written);
+    const inner =
+      context.marking === undefined ? context : { ...context, trail: [...context.trail, written] };
+    const at = where === '' ? key : `${where}.${key}`;
+    const rendered = placed
+      ? renderPlaces(value, scope, inner, at)
+      : render(value, scope, inner, at);
     if (rendered === DROP || (optional && !filled(rendered))) {
       continue;
     }
@@ -447,11 +534,12 @@ function settle(
   spec: SlotSpec,
   at: string,
   path: string,
+  label: string,
   retired: ReadonlySet<string>,
   who: string,
 ): Value | undefined {
   if (spec.required && !filled(value)) {
-    fail(who, '', `the slot ${at} is required`);
+    fail(who, '', `the slot ${at} is required`, `${label} is needed`);
   }
   if (value === undefined || value === null || value === false) {
     return undefined;
@@ -460,7 +548,12 @@ function settle(
     return value;
   }
   if (!KINDS[spec.kind](value)) {
-    fail(who, '', `${at} is not ${spec.kind === 'number' ? 'a number' : `of kind ${spec.kind}`}`);
+    fail(
+      who,
+      '',
+      `${at} is not ${spec.kind === 'number' ? 'a number' : `of kind ${spec.kind}`}`,
+      `${label} takes ${KIND_WORDS[spec.kind]}`,
+    );
   }
   const fields = spec.fields;
   if (fields === undefined) {
@@ -479,6 +572,7 @@ function settle(
         inner,
         `${prefix}.${key}`,
         `${path}.${key}`,
+        `${label}: ${slotLabel(key, inner)}`,
         retired,
         who,
       );
@@ -508,6 +602,9 @@ function checkSlots(who: string, slots: unknown, prefix: string): void {
     const at = prefix === '' ? name : `${prefix}.${name}`;
     if (!SLOT_NAME.test(name)) {
       fail(who, '', `the slot name ${at} is not lower case letters, digits and _`);
+    }
+    if (prefix === '' && name === WORDS) {
+      fail(who, '', `the slot name ${WORDS} ${RESERVED}`);
     }
     const shape = isMapping(spec) ? spec['shape'] : undefined;
     if (shape !== undefined) {
@@ -559,13 +656,21 @@ function checkRetired(who: string, template: Template): void {
 function resolve(
   name: string,
   who: string,
+  voice: string,
   template: Template,
   given: Mapping,
   discovered: Mapping,
+  words: WordTable,
 ): Scope {
   if (!CHECKED.has(template)) {
     checkSlots(who, template.slots, '');
     checkRetired(who, template);
+    const look = lookProblem(template);
+    if (look !== undefined) {
+      fail(who, '', look);
+    }
+    checkWords(who, template.card, 'card', words);
+    checkWords(who, template.popups ?? [], 'popups', words);
     CHECKED.add(template);
   }
   const specs: Record<string, SlotSpec> = template.slots ?? {};
@@ -582,10 +687,10 @@ function resolve(
       slot,
       value === null && spec.required !== true
         ? null
-        : settle(value, spec, slot, slot, retired, who),
+        : settle(value, spec, slot, slot, `${voice}${slotLabel(slot, spec)}`, retired, who),
     );
   }
-  return { template: name, values, specs: new Map(Object.entries(specs)) };
+  return { template: name, values, specs: new Map(Object.entries(specs)), words };
 }
 
 function expandNamed(
@@ -609,11 +714,17 @@ function expandNamed(
   }
   const inner: Context = { ...context, stack: [...context.stack, name], trail: [] };
   const who = where === '' ? name : `${caller} at ${where}: ${name}`;
-  const scope = resolve(name, who, template, given, discovered);
+  const voice = where === '' ? '' : `${templateTitle(template, name)}: `;
+  const scope = resolve(name, who, voice, template, given, discovered, context.words);
   const card = render(template.card, scope, { ...inner, trail: ['card'] }, 'card');
-  context.popups.push(
-    ...renderList(template.popups ?? [], scope, { ...inner, trail: ['popups'] }, 'popups'),
+  const nested: Value[] = [];
+  const own = renderList(
+    template.popups ?? [],
+    scope,
+    { ...inner, popups: nested, trail: ['popups'] },
+    'popups',
   );
+  context.popups.push(...own, ...nested);
   return card;
 }
 
@@ -645,6 +756,7 @@ export function expand(
   discovered: Record<string, Value> = {},
   later: ReadonlySet<string> = new Set(),
   marking?: Marking,
+  words: WordTable = EN.templates,
 ): Expanded {
   const context: Context = {
     templates,
@@ -654,6 +766,7 @@ export function expand(
     popups: [],
     marking,
     trail: [],
+    words,
   };
   const waiting = (): Expanded => ({
     card: null,

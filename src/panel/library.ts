@@ -6,7 +6,11 @@ import { live } from 'lit/directives/live.js';
 
 import { rowMenu } from '../editors/row-menu.ts';
 import { field } from '../ha/field.ts';
+import { SEPARATOR } from '../ha/format.ts';
 import { icon } from '../ha/templates.ts';
+import { familyTitle } from '../templates/family-titles.ts';
+import { PANEL_EN } from '../words/panel/en.ts';
+import type { PanelWords } from '../words/panel/en.ts';
 
 import { describe } from './data.ts';
 import type { Row, Status } from './data.ts';
@@ -41,23 +45,7 @@ function remembered(): boolean {
   }
 }
 
-const FILTERS: readonly { filter: Filter; label: string }[] = [
-  { filter: 'all', label: 'All' },
-  { filter: 'shipped', label: 'Shipped' },
-  { filter: 'customised', label: 'Customised' },
-  { filter: 'own', label: 'Yours' },
-  { filter: 'conflict', label: 'Conflicts' },
-];
-
-const STATUS_ICON = {
-  shipped: 'mdi:package-variant-closed',
-  customised: 'mdi:pencil-circle-outline',
-  own: 'mdi:account-circle-outline',
-  conflict: 'mdi:alert-circle-outline',
-} as const;
-
-const offerText = (offer: Offer): string =>
-  `${offer.dashboards === 1 ? 'A dashboard holds' : `${offer.dashboards} dashboards hold`} ${offer.templates} ${offer.templates === 1 ? 'template' : 'templates'} under mnml_templates: that MNML does not keep. The cards do not read them there.`;
+const FILTERS: readonly Filter[] = ['all', 'shipped', 'customised', 'own', 'conflict'];
 
 const LIBRARY_STYLE = css`
   .switch {
@@ -65,7 +53,8 @@ const LIBRARY_STYLE = css`
     align-items: center;
     gap: 6px;
     height: 32px;
-    padding: 0 8px 0 0;
+    padding-block: 0;
+    padding-inline: 0 8px;
     color: var(--secondary-text-color);
     font-size: 13px;
     cursor: pointer;
@@ -118,8 +107,8 @@ const LIBRARY_STYLE = css`
     color: var(--warning-color, var(--error-color));
   }
   .library-name {
-    font-family: var(--ha-font-family-code, monospace);
-    font-size: 14px;
+    font-size: 15px;
+    font-weight: 500;
   }
   .library-status {
     color: var(--secondary-text-color);
@@ -136,6 +125,7 @@ export class MnmlLibrary extends LitElement {
   @property({ attribute: false }) rows: readonly Row[] = [];
   @property({ attribute: false }) offer: Offer | undefined;
   @property({ attribute: false }) actions: LibraryActions | undefined;
+  @property({ attribute: false }) words: PanelWords = PANEL_EN;
   @state() private text = '';
   @state() private filter: Filter = 'all';
   @state() private everything = remembered();
@@ -146,7 +136,9 @@ export class MnmlLibrary extends LitElement {
       (row) =>
         (this.filter === 'all' || row.status === this.filter) &&
         words.every((word) =>
-          `${row.name} ${row.description} ${row.family ?? ''}`.toLowerCase().includes(word),
+          `${row.title} ${row.name} ${row.description} ${row.family === undefined ? '' : `${row.family} ${familyTitle(row.family)}`}`
+            .toLowerCase()
+            .includes(word),
         ),
     );
   }
@@ -174,9 +166,10 @@ export class MnmlLibrary extends LitElement {
     if (hidden === 0) {
       return '';
     }
+    const said = this.words.library;
     return rows.length === 0
       ? html`<p class="muted">
-          Only pop-ups and parts match.
+          ${said.onlyParts}
           <button
             type="button"
             class="action"
@@ -184,65 +177,73 @@ export class MnmlLibrary extends LitElement {
               this.show(true);
             }}
           >
-            Show them
+            ${said.showThem}
           </button>
         </p>`
-      : html`<p class="muted">and ${hidden} pop-ups and parts</p>`;
+      : html`<p class="muted">${said.hidden(hidden)}</p>`;
   }
 
   private drawRow(row: Row, actions: LibraryActions): TemplateResult {
-    const status = describe(row);
+    const status = describe(row, this.words);
+    const said = this.words.library;
+    const family = row.family === undefined ? undefined : familyTitle(row.family);
     return html`<div class=${`library-row status-${row.status}`}>
       <button
         type="button"
         class="library-open"
-        aria-label=${`Edit ${row.name}`}
-        title=${`Edit ${row.name}`}
+        aria-label=${said.edit(row.title)}
+        title=${said.edit(row.title)}
         @click=${() => {
           actions.open(row.name);
         }}
       >
-        <ha-icon class="library-icon" .icon=${STATUS_ICON[row.status]}></ha-icon>
+        <ha-icon class="library-icon" .icon=${row.icon}></ha-icon>
         <div class="library-words">
           <div class="library-title">
-            <span class="library-name">${row.name}</span>
-            ${row.family === undefined ? '' : html`<span class="badge">${row.family}</span>`}
+            <span class="library-name">${row.title}</span>
           </div>
           <div class="library-description">${row.description}</div>
-          ${status === '' ? '' : html`<div class="library-status">${status}</div>`}
+          <div class="library-status">
+            <code class="code-name">${row.name}</code>${[
+              family === undefined || family === row.title ? '' : family,
+              status,
+            ]
+              .filter((part) => part !== '')
+              .map((part) => `${SEPARATOR}${part}`)}
+          </div>
         </div>
       </button>
-      ${rowMenu(row.name, [
+      ${rowMenu(said.more(row.title), [
         {
-          label: 'Edit',
+          label: said.editIt,
           icon: 'mdi:pencil-outline',
           run: () => {
             actions.open(row.name);
           },
         },
         {
-          label: 'Duplicate',
+          label: said.duplicate,
           icon: 'mdi:content-copy',
           run: () => {
             actions.duplicate(row);
           },
         },
         {
-          label: 'History',
+          label: said.history,
           icon: 'mdi:history',
           run: () => {
             actions.history(row);
           },
         },
         {
-          label: 'Export',
+          label: said.export,
           icon: 'mdi:export-variant',
           run: () => {
             actions.exportAll([row.name]);
           },
         },
         {
-          label: 'Rename',
+          label: said.rename,
           icon: 'mdi:rename-outline',
           disabled: row.status === 'own' ? undefined : true,
           run: () => {
@@ -250,7 +251,7 @@ export class MnmlLibrary extends LitElement {
           },
         },
         {
-          label: row.status === 'own' ? 'Delete' : 'Reset to shipped',
+          label: row.status === 'own' ? said.delete : said.reset,
           icon: 'mdi:delete-outline',
           disabled: row.status === 'shipped' ? true : undefined,
           run: () => {
@@ -265,51 +266,52 @@ export class MnmlLibrary extends LitElement {
     const actions = this.actions;
     const rows = this.visible();
     const offer = this.offer;
+    const said = this.words.library;
     return html`<div class="library">
       <div class="library-head">
-        <h1>Templates</h1>
+        <h1>${said.heading}</h1>
         <div class="library-tools">
           <button
             type="button"
             class="action primary"
-            aria-label="New template"
-            title="New template"
+            aria-label=${said.newTemplate}
+            title=${said.newTemplate}
             @click=${() => actions?.create()}
           >
-            ${icon('mdi:plus')}<span>New</span>
+            ${icon('mdi:plus')}<span>${said.new}</span>
           </button>
           <button
             type="button"
             class="action"
-            aria-label="Import templates"
-            title="Import templates"
+            aria-label=${said.importTemplates}
+            title=${said.importTemplates}
             @click=${() => actions?.importFile()}
           >
-            ${icon('mdi:import')}<span>Import</span>
+            ${icon('mdi:import')}<span>${said.import}</span>
           </button>
           <button
             type="button"
             class="action"
-            aria-label="Export the templates shown"
-            title="Export the templates shown"
+            aria-label=${said.exportShown}
+            title=${said.exportShown}
             @click=${() => actions?.exportAll(this.visible().map((row) => row.name))}
           >
-            ${icon('mdi:export-variant')}<span>Export</span>
+            ${icon('mdi:export-variant')}<span>${said.export}</span>
           </button>
         </div>
       </div>
       ${
         offer !== undefined && offer.templates > 0
           ? html`<div class="offer">
-              ${icon('mdi:import')}<span>${offerText(offer)}</span>
+              ${icon('mdi:import')}<span>${said.offer(offer.dashboards, offer.templates)}</span>
               <button
                 type="button"
                 class="action primary"
-                aria-label="Import them"
-                title="Import them"
+                aria-label=${said.importThem}
+                title=${said.importThem}
                 @click=${() => actions?.importDashboards()}
               >
-                Import them
+                ${said.importThem}
               </button>
             </div>`
           : ''
@@ -317,8 +319,8 @@ export class MnmlLibrary extends LitElement {
       <input
         class="search"
         type="search"
-        placeholder="Search templates"
-        aria-label="Search templates"
+        placeholder=${said.search}
+        aria-label=${said.search}
         .value=${this.text}
         @input=${(event: Event) => {
           const value = field(event.target, 'value');
@@ -329,15 +331,16 @@ export class MnmlLibrary extends LitElement {
         <label class="switch">
           <input
             type="checkbox"
-            aria-label="Pop-ups and parts"
+            aria-label=${said.parts}
             .checked=${live(this.everything)}
             @change=${(event: Event) => {
               this.show(field(event.target, 'checked') === true);
             }}
           />
-          <span>Pop-ups and parts</span>
+          <span>${said.parts}</span>
         </label>
-        ${FILTERS.map(({ filter, label }) => {
+        ${FILTERS.map((filter) => {
+          const label = said.filters[filter];
           const listed = this.rows.filter((row) => this.listed(row));
           const count =
             filter === 'all' ? listed.length : listed.filter((row) => row.status === filter).length;
@@ -363,7 +366,7 @@ export class MnmlLibrary extends LitElement {
             ? ''
             : rows.length === 0
               ? this.matching().length === 0
-                ? html`<p class="muted">No template matches.</p>`
+                ? html`<p class="muted">${said.noMatch}</p>`
                 : ''
               : rows.map((row) => this.drawRow(row, actions))
         }

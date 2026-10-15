@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 
 import { afterAll, test, vi } from 'vitest';
 
-import { define, mounted, text } from '../test/render.ts';
+import type { HomeAssistant } from '../ha/hass.ts';
+import { fakeHass } from '../test/hass.ts';
+import { configure, countCalls, created, define, mounted, text } from '../test/render.ts';
+import { until } from '../test/until.ts';
 
 import { MnmlAgendaCard } from './agenda.ts';
 
@@ -56,7 +59,7 @@ const MOVIES: Event[] = [
   { summary: 'Very Far', start: { date: '2027-12-01' } },
 ];
 
-function until(days: number): string {
+function nothingUntil(days: number): string {
   const date = new Date(2026, 9, 5 + days - 1);
   return `Nothing until ${new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(date)}`;
 }
@@ -76,12 +79,14 @@ function inRange(path: string, event: Event): boolean {
   return when < end && when >= new Date(start.getFullYear(), start.getMonth(), start.getDate() - 7);
 }
 
-function hassOf(fake: Fake, events: Record<string, Event[]>): unknown {
-  return {
+let open = 0;
+
+function hassOf(fake: Fake, events: Record<string, Event[]>): HomeAssistant {
+  return fakeHass({
     states: Object.fromEntries(
       Object.entries(fake.states).map(([id, state]) => [
         id,
-        { entity_id: id, state, attributes: {}, last_changed: state, last_updated: state },
+        { state, last_changed: state, last_updated: state },
       ]),
     ),
     entities: {
@@ -89,35 +94,41 @@ function hassOf(fake: Fake, events: Record<string, Event[]>): unknown {
       [RADARR]: { entity_id: RADARR, device_id: 'r' },
     },
     devices: { s: { id: 's', name: 'Sonarr' }, r: { id: 'r', name: 'Radarr' } },
-    locale: { language: 'en-GB' },
-    formatEntityState: (stateObj: { state: string }): string => stateObj.state,
-    callApi: (_method: string, path: string): Promise<unknown> => {
+    language: 'en-GB',
+    callApi: (_method, path) => {
       fake.calls.push(path);
       const entity = path.slice('calendars/'.length).split('?')[0] ?? '';
-      if (entity === fake.failing) {
-        return Promise.reject(new Error('500'));
-      }
-      return Promise.resolve((events[entity] ?? []).filter((event) => inRange(path, event)));
+      open += 1;
+      const answer =
+        entity === fake.failing
+          ? Promise.reject(new Error('500'))
+          : Promise.resolve((events[entity] ?? []).filter((event) => inRange(path, event)));
+      return answer.finally(() => {
+        open -= 1;
+      });
     },
-  };
-}
-
-function settled(): Promise<void> {
-  return new Promise((resolve) => {
-    setImmediate(resolve);
   });
 }
+
+const settled = (card: MnmlAgendaCard): Promise<void> =>
+  until(
+    () =>
+      open === 0 &&
+      !card.isUpdatePending &&
+      lines(card).length > 0 &&
+      !lines(card).includes('Loading'),
+    'the agenda',
+  );
 
 async function mount(
   fake: Fake,
   events: Record<string, Event[]> = { [SONARR]: EPISODES, [RADARR]: MOVIES },
 ): Promise<MnmlAgendaCard> {
-  const card = document.createElement('mnml-agenda-card');
-  assert.ok(card instanceof MnmlAgendaCard);
-  card.setConfig(CONFIG as never);
-  card.hass = hassOf(fake, events) as never;
+  const card = created('mnml-agenda-card', MnmlAgendaCard);
+  configure(card, CONFIG);
+  card.hass = hassOf(fake, events);
   await mounted(card);
-  await settled();
+  await settled(card);
   return card;
 }
 
@@ -182,7 +193,7 @@ test('it starts with the first week that has something, episodes split into seri
 test('Next adds the next week with something, skipping empty ones however far, and Back to now returns', async () => {
   const card = await mount({ calls: [], states: LIVE });
   await press(card, 'Next');
-  await settled();
+  await settled(card);
   assert.deepEqual(lines(card).slice(3), [
     'Next week',
     'Slow HorsesS03E01-E03 • 3 episodes | Mon 12',
@@ -190,7 +201,7 @@ test('Next adds the next week with something, skipping empty ones however far, a
     '[Next] [Back to now]',
   ]);
   await press(card, 'Next');
-  await settled();
+  await settled(card);
   assert.deepEqual(lines(card).slice(-4), [
     'Week of 19 Oct',
     'South ParkS29E03 • TBA | Thu 22',
@@ -198,22 +209,22 @@ test('Next adds the next week with something, skipping empty ones however far, a
     '[Next] [Back to now]',
   ]);
   await press(card, 'Next');
-  await settled();
+  await settled(card);
   assert.deepEqual(lines(card).slice(-3), [
     'Week of 7 Dec',
     'Far Away | Thu 10',
     '[Next] [Back to now]',
   ]);
   await press(card, 'Next');
-  await settled();
+  await settled(card);
   assert.deepEqual(lines(card).slice(-3), [
     'Week of 29 Nov',
     'Very Far | Wed 1',
     '[Next] [Back to now]',
   ]);
   await press(card, 'Next');
-  await settled();
-  assert.deepEqual(lines(card).slice(-2), [until(7 * 13 * 9), '[Next] [Back to now]']);
+  await settled(card);
+  assert.deepEqual(lines(card).slice(-2), [nothingUntil(7 * 13 * 9), '[Next] [Back to now]']);
   await press(card, 'Back to now');
   assert.deepEqual(lines(card), [
     'This week',
@@ -232,7 +243,7 @@ test('Next scrolls the buttons under the week it adds into view, so the week is 
   });
   const card = await mount({ calls: [], states: LIVE });
   await press(card, 'Next');
-  await settled();
+  await settled(card);
   await vi.runAllTimersAsync();
   const mine = shown.filter((node) => node.getRootNode() === card.shadowRoot);
   assert.equal(mine.length, 1);
@@ -249,7 +260,7 @@ test('a Next that finds nothing scrolls the buttons into view under the Nothing 
   });
   const card = await mount({ calls: [], states: LIVE }, {});
   await press(card, 'Next');
-  await settled();
+  await settled(card);
   await vi.runAllTimersAsync();
   assert.equal(shown.filter((node) => node.getRootNode() === card.shadowRoot).length, 1);
   assert.ok(shown.at(-1)?.classList.contains('more'));
@@ -261,9 +272,9 @@ test('nothing in a year says until when, and Next searches the year after', asyn
   const card = await mount(fake, {
     [RADARR]: [{ summary: 'Years Away', start: { date: '2027-11-03' } }],
   });
-  assert.deepEqual(lines(card), [until(7 * 13 * 4), '[Next]']);
+  assert.deepEqual(lines(card), [nothingUntil(7 * 13 * 4), '[Next]']);
   await press(card, 'Next');
-  await settled();
+  await settled(card);
   assert.deepEqual(lines(card), ['Week of 1 Nov', 'Years Away | Wed 3', '[Next] [Back to now]']);
 });
 
@@ -272,13 +283,13 @@ test('a search through empty weeks redraws once when tapped and once when it end
   const card = await mount(fake, {
     [RADARR]: [{ summary: 'Much Later', start: { date: '2028-09-01' } }],
   });
-  const draws = vi.spyOn(card as unknown as { draw: (...args: unknown[]) => unknown }, 'draw');
+  const draws = countCalls(card, 'draw');
   const asked = fake.calls.length;
   await press(card, 'Next');
-  await settled();
+  await settled(card);
   assert.equal(fake.calls.length - asked, 8, 'four stretches, two calendars each');
   assert.deepEqual(lines(card).slice(0, 2), ['Week of 28 Aug', 'Much Later | Fri 1']);
-  assert.equal(draws.mock.calls.length, 2);
+  assert.equal(draws.count, 2);
 });
 
 test('a calendar that fails to answer is named in orange, and the other still lists', async () => {
@@ -306,12 +317,12 @@ test('a change of a calendar state fetches again; another update does not', asyn
   const fake: Fake = { calls: [], states: LIVE };
   const card = await mount(fake);
   const first = fake.calls.length;
-  card.hass = hassOf(fake, { [SONARR]: EPISODES, [RADARR]: MOVIES }) as never;
-  await settled();
+  card.hass = hassOf(fake, { [SONARR]: EPISODES, [RADARR]: MOVIES });
+  await settled(card);
   assert.equal(fake.calls.length, first, 'the same states, no new request');
   fake.states = { [SONARR]: 'on', [RADARR]: 'off' };
-  card.hass = hassOf(fake, { [SONARR]: EPISODES, [RADARR]: MOVIES }) as never;
-  await settled();
+  card.hass = hassOf(fake, { [SONARR]: EPISODES, [RADARR]: MOVIES });
+  await settled(card);
   assert.equal(fake.calls.length, first * 2);
 });
 
@@ -319,6 +330,6 @@ test('a calendar of a kind other than episodes or movies is refused', () => {
   const made = document.createElement('mnml-agenda-card');
   assert.ok(made instanceof MnmlAgendaCard);
   assert.throws(() => {
-    made.setConfig({ ...CONFIG, sources: [{ entity: SONARR, kind: 'books' }] } as never);
-  }, /sources kind must be one of episodes, movies/);
+    configure(made, { ...CONFIG, sources: [{ entity: SONARR, kind: 'books' }] });
+  }, /sources\[0\]\.kind must be one of episodes, movies/);
 });

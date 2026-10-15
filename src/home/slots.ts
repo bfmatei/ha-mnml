@@ -1,11 +1,10 @@
+import type { MdiIcon, SensorId } from '../contract/entities.ts';
 import type { Value } from '../contract/templates.ts';
 import { toValue } from '../templates/expand.ts';
 
-import type { Ac, Home, Lights, Proxmox, Room, System } from './types.ts';
+import type { Ac, Home, Lights, Meter, Proxmox, Room, System } from './types.ts';
 
-export function headingSlots(title: string, icon: string): Record<string, Value> {
-  return { title, icon };
-}
+const PERSON_ICON: MdiIcon = 'mdi:account';
 
 function record(input: Record<string, unknown>): Record<string, Value> {
   const value = toValue(input);
@@ -94,12 +93,43 @@ export function roomSlots(room: Room): Record<string, Value> {
     speakers: members.flatMap((member) => (typeof member === 'string' ? [] : [snake(member)])),
     outlets: (room.outlets ?? []).map((outlet) => snake(outlet)),
     diffuser: room.diffuser && snake(room.diffuser),
-    batteries: [
-      ...(room.batteries ?? []),
-      ...(room.heating?.thermostats ?? []).map((thermostat) => thermostat.battery),
-    ].toSorted(),
+    timers: room.timers,
+    schedules: room.schedules,
+    batteries: batteriesOf(room),
     leaks: room.leaks,
   });
+}
+
+function batteriesOf(room: Room): SensorId[] {
+  return [
+    ...(room.batteries ?? []),
+    ...(room.heating?.thermostats ?? []).map((thermostat) => thermostat.battery),
+  ].toSorted();
+}
+
+function batteryGroups(home: Home): Record<string, unknown>[] {
+  return [
+    ...home.rooms.flatMap((room) => {
+      const batteries = batteriesOf(room);
+      return batteries.length === 0 ? [] : [{ name: room.name, icon: room.icon, batteries }];
+    }),
+    ...home.people.map((person) => ({
+      entity: person.entity,
+      icon: PERSON_ICON,
+      batteries: person.devices.map((device) => device.battery),
+    })),
+  ];
+}
+
+function metersOf(home: Home): Meter[] {
+  return [
+    ...home.rooms.flatMap((room) => [
+      ...(room.outlets ?? []).map((outlet) => outlet.energy),
+      room.ac?.energy,
+      room.printer3d?.outlet?.energy,
+    ]),
+    home.system.proxmox?.outlet.energy,
+  ].flatMap((meter) => meter ?? []);
 }
 
 export function proxmoxSlots(proxmox: Proxmox): Record<string, Value> {
@@ -140,18 +170,23 @@ export function glancesSlots(home: Home): Record<string, Value> {
     alarm: home.security?.alarm,
     vacation: home.vacation,
     energy: home.energy && snake(home.energy),
+    meters: metersOf(home),
+    timers: home.rooms.flatMap((room) =>
+      (room.timers ?? []).map((entity) => ({ entity, room: room.key })),
+    ),
     people: home.people.map((person) => person.entity),
     checks: checks && snake(checks),
     batteries: [
-      ...home.rooms.flatMap((room) => [
-        ...(room.batteries ?? []),
-        ...(room.heating?.thermostats ?? []).map((thermostat) => thermostat.battery),
-      ]),
+      ...home.rooms.flatMap((room) => batteriesOf(room)),
       ...home.people.flatMap((person) => person.devices.map((device) => device.battery)),
     ].toSorted(),
-    leaks: home.rooms.flatMap((room) => room.leaks ?? []),
+    battery_groups: batteryGroups(home),
+    room_leaks: home.rooms.flatMap((room) =>
+      room.leaks === undefined ? [] : [{ room: room.key, sensors: room.leaks }],
+    ),
     smoke: home.security?.smoke,
     notifications: home.system.proxmox?.notifications?.messages,
+    messages: true,
     updates: [
       ...home.system.updates,
       ...home.system.firmware,
@@ -166,9 +201,5 @@ export function glancesSlots(home: Home): Record<string, Value> {
       device.essential === true ? [device.connected] : [],
     ),
     media_health: home.system.media?.movies?.health,
-    locks: home.rooms.flatMap((room) =>
-      room.lock === undefined ? [] : [{ entity: room.lock, room: room.key }],
-    ),
-    cars: home.cars.map((car) => ({ key: car.key, lock: car.lock, alarm: car.alarm })),
   });
 }

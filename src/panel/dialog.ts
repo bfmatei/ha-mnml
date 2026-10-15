@@ -2,10 +2,14 @@ import { html, nothing, render } from 'lit';
 import type { TemplateResult } from 'lit';
 
 import { field } from '../ha/field.ts';
+import { PANEL_EN } from '../words/panel/en.ts';
+import type { PanelWords } from '../words/panel/en.ts';
 
 import { messageOf } from './message.ts';
 
 let asked = 0;
+
+const LONGEST_NAME = 64;
 
 export interface Choice<T> {
   label: string;
@@ -30,11 +34,24 @@ export interface Dialogs {
   ) => Promise<T | undefined>;
   confirm: (title: string, text: string, label: string) => Promise<boolean>;
   name: (title: string, initial: string, taken: ReadonlySet<string>) => Promise<string | undefined>;
+  titled: (
+    title: string,
+    initial: string,
+    taken: ReadonlySet<string>,
+  ) => Promise<Titled | undefined>;
   yaml: <T>(title: string, words: YamlWords, read: (text: string) => T) => Promise<T | undefined>;
 }
 
+interface Titled {
+  title: string;
+  name: string;
+}
+
+type Said = PanelWords['dialog'];
+
 function ask<T>(
   root: ParentNode,
+  said: Said,
   title: string,
   body: Body,
   choices: readonly Choice<T>[],
@@ -64,7 +81,7 @@ function ask<T>(
               close(undefined);
             }}
           >
-            Cancel
+            ${said.cancel}
           </button>
           ${choices.map(
             (choice) =>
@@ -97,8 +114,19 @@ function ask<T>(
   return promise;
 }
 
+const slugOf = (typed: string): string =>
+  typed
+    .normalize('NFKD')
+    .replaceAll(/\p{M}/gu, '')
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9_-]+/g, '-')
+    .replace(/^[-_]+/, '')
+    .slice(0, LONGEST_NAME)
+    .replace(/-+$/, '');
+
 async function askName(
   root: ParentNode,
+  said: Said,
   title: string,
   initial: string,
   taken: ReadonlySet<string>,
@@ -106,42 +134,120 @@ async function askName(
   let name = initial;
   const chosen = await ask(
     root,
+    said,
     title,
-    html`<input
-        class="fact-input wide"
-        aria-label="Name"
-        .value=${initial}
-        @input=${(event: Event) => {
-          const value = field(event.target, 'value');
-          name = typeof value === 'string' ? value : '';
-        }}
-      />
-      <p class="muted">Lower case letters, digits, - and _, starting with a letter or a digit.</p>`,
-    [{ label: 'OK', value: true, primary: true }],
+    (redraw) => {
+      const slug = slugOf(name);
+      return html`<input
+          class="fact-input wide"
+          aria-label=${said.name}
+          .value=${initial}
+          @input=${(event: Event) => {
+            const value = field(event.target, 'value');
+            name = typeof value === 'string' ? value : '';
+            redraw();
+          }}
+        />
+        <p class="muted">
+          ${slug === '' || slug === name.trim() ? said.nameRule : said.savedAs(slug)}
+        </p>`;
+    },
+    [{ label: said.ok, value: true, primary: true }],
     () => {
-      const wanted = name.trim();
-      if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(wanted)) {
-        return 'That name has letters MNML does not take.';
+      const wanted = slugOf(name);
+      if (wanted === '') {
+        return said.nameNeeds;
       }
-      return taken.has(wanted) ? `${wanted} is taken.` : undefined;
+      return taken.has(wanted) ? said.taken(wanted) : undefined;
     },
   );
-  return chosen === true ? name.trim() : undefined;
+  return chosen === true ? slugOf(name) : undefined;
+}
+
+function freeName(title: string, taken: ReadonlySet<string>): string {
+  const slug = slugOf(title);
+  let name = slug;
+  for (let count = 2; name !== '' && taken.has(name); count += 1) {
+    name = `${slug.slice(0, LONGEST_NAME - `-${count}`.length).replace(/-+$/, '')}-${count}`;
+  }
+  return name;
+}
+
+async function askTitled(
+  root: ParentNode,
+  said: Said,
+  heading: string,
+  initial: string,
+  taken: ReadonlySet<string>,
+): Promise<Titled | undefined> {
+  let title = initial;
+  let typed: string | undefined;
+  const nameOf = (): string => (typed === undefined ? freeName(title, taken) : slugOf(typed));
+  const chosen = await ask(
+    root,
+    said,
+    heading,
+    (redraw) =>
+      html`<input
+          class="fact-input wide"
+          aria-label=${said.title}
+          .value=${initial}
+          @input=${(event: Event) => {
+            const value = field(event.target, 'value');
+            title = typeof value === 'string' ? value : '';
+            redraw();
+          }}
+        />
+        <p class="muted name-line">
+          ${said.nameInYaml}
+          <input
+            class="fact-input"
+            aria-label=${said.nameInYamlLabel}
+            .value=${typed ?? nameOf()}
+            @input=${(event: Event) => {
+              const value = field(event.target, 'value');
+              typed = typeof value === 'string' ? value : '';
+              redraw();
+            }}
+          />
+          ${
+            typed === undefined || slugOf(typed) === typed.trim()
+              ? nothing
+              : html`<span>${said.savedAs(slugOf(typed))}</span>`
+          }
+        </p>`,
+    [{ label: said.ok, value: true, primary: true }],
+    () => {
+      if (title.trim() === '') {
+        return said.titleNeeds;
+      }
+      const wanted = nameOf();
+      if (wanted === '') {
+        return said.nameNeeds;
+      }
+      return taken.has(wanted) ? said.taken(wanted) : undefined;
+    },
+  );
+  return chosen === true ? { title: title.trim(), name: nameOf() } : undefined;
 }
 
 async function confirmIt(
   root: ParentNode,
+  said: Said,
   title: string,
   text: string,
   label: string,
 ): Promise<boolean> {
   return (
-    (await ask(root, title, html`<p>${text}</p>`, [{ label, value: true, primary: true }])) === true
+    (await ask(root, said, title, html`<p>${text}</p>`, [
+      { label, value: true, primary: true },
+    ])) === true
   );
 }
 
 async function askYaml<T>(
   root: ParentNode,
+  said: Said,
   title: string,
   words: YamlWords,
   read: (text: string) => T,
@@ -150,6 +256,7 @@ async function askYaml<T>(
   let found: { value: T } | undefined;
   const next = await ask(
     root,
+    said,
     title,
     html`<input
         type="file"
@@ -173,7 +280,7 @@ async function askYaml<T>(
           text = typeof value === 'string' ? value : '';
         }}
       ></textarea>`,
-    [{ label: 'Next', value: true, primary: true }],
+    [{ label: said.next, value: true, primary: true }],
     () => {
       try {
         found = { value: read(text) };
@@ -186,11 +293,13 @@ async function askYaml<T>(
   return next === true ? found?.value : undefined;
 }
 
-export function dialogsOn(root: ParentNode): Dialogs {
+export function dialogsOn(root: ParentNode, words: PanelWords = PANEL_EN): Dialogs {
+  const said = words.dialog;
   return {
-    ask: (title, body, choices, check) => ask(root, title, body, choices, check),
-    confirm: (title, text, label) => confirmIt(root, title, text, label),
-    name: (title, initial, taken) => askName(root, title, initial, taken),
-    yaml: (title, words, read) => askYaml(root, title, words, read),
+    ask: (title, body, choices, check) => ask(root, said, title, body, choices, check),
+    confirm: (title, text, label) => confirmIt(root, said, title, text, label),
+    name: (title, initial, taken) => askName(root, said, title, initial, taken),
+    titled: (title, initial, taken) => askTitled(root, said, title, initial, taken),
+    yaml: (title, yaml, read) => askYaml(root, said, title, yaml, read),
   };
 }

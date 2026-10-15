@@ -3,19 +3,21 @@ import assert from 'node:assert/strict';
 import { test, vi } from 'vitest';
 
 import { HOME } from '../builder/fixture.ts';
-import type { Plan } from '../contract/builder.ts';
+import type { Plan } from '../contract/plan.ts';
 import type { Template, Templates, WrittenTemplate } from '../contract/templates.ts';
+import type { HomeAssistant } from '../ha/hass.ts';
 import { changesOf } from '../templates/changes.ts';
 import type { Change } from '../templates/changes.ts';
 import { SLOT_SHAPES } from '../templates/families.ts';
 import { readTemplates } from '../templates/shipped.ts';
 import { withShapes } from '../templates/slot-shapes.ts';
-import { text } from '../test/render.ts';
+import { fakeConnection, fakeHass } from '../test/hass.ts';
+import { press, text, updated } from '../test/render.ts';
 
-import { MnmlBuilder } from './builder.ts';
 import type { Entry } from './data.ts';
 import { MnmlLibrary } from './library.ts';
 import { MnmlPlanEditor } from './plan-editor.ts';
+import { MnmlBuilder } from './template-builder.ts';
 
 interface Given {
   own: Templates;
@@ -58,22 +60,15 @@ vi.mock('../store/shipped.ts', () => ({
 
 vi.mock(import('../editors/ha-form.ts'), async (original) => ({
   ...(await original()),
-  loadHaForm: () => Promise.resolve(),
+  loadHaForm: () => Promise.resolve(undefined),
 }));
 
 const { MnmlPanel } = await import('./main.ts');
 
-HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement): void {
-  this.open = true;
-};
-HTMLDialogElement.prototype.close = function close(this: HTMLDialogElement): void {
-  this.open = false;
-};
-
 type Message = { type: string } & Record<string, unknown>;
 
 interface Home {
-  hass: object;
+  hass: HomeAssistant;
   sent: Message[];
   configs: Map<string | null, unknown>;
   refuse: Set<string>;
@@ -90,6 +85,15 @@ const PLAN: Plan = {
 };
 const BEFORE: Plan = { ...PLAN, system: [], sections: { rooms: { template: 'garden' } } };
 const GARDEN_CARD = { type: 'custom:mnml-template-card', template: 'garden' };
+
+let open = 0;
+
+function answered(answer: Promise<unknown>): Promise<unknown> {
+  open += 1;
+  return answer.finally(() => {
+    open -= 1;
+  });
+}
 
 function home(): Home {
   const sent: Message[] = [];
@@ -119,38 +123,30 @@ function home(): Home {
     sent,
     configs,
     refuse,
-    hass: {
+    hass: fakeHass({
       ...HOME,
-      locale: { language: 'en' },
-      connection: {
+      connection: fakeConnection({
         sendMessagePromise: (message: Message) => {
           sent.push(message);
-          return refuse.has(message.type)
-            ? Promise.reject({ code: 'home_assistant_error', message: 'Cannot save' })
-            : Promise.resolve(answer(message));
+          return answered(
+            refuse.has(message.type)
+              ? Promise.reject({ code: 'home_assistant_error', message: 'Cannot save' })
+              : Promise.resolve(answer(message)),
+          );
         },
-      },
-    },
+      }),
+    }),
   };
 }
 
-async function settled(
-  panel: HTMLElement & { updateComplete: Promise<boolean> },
-  rounds = 5,
-): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  await panel.updateComplete;
-  if (rounds > 1) {
-    await settled(panel, rounds - 1);
-  }
-}
+const settled = (): Promise<void> => updated(document, () => open === 0);
 
 async function opened(path: string, at: Home): Promise<InstanceType<typeof MnmlPanel>> {
   const panel = new MnmlPanel();
-  panel.hass = at.hass as never;
+  panel.hass = at.hass;
   panel.route = { path };
   document.body.append(panel);
-  await settled(panel);
+  await settled();
   return panel;
 }
 
@@ -158,12 +154,6 @@ function dialogOf(panel: InstanceType<typeof MnmlPanel>): HTMLDialogElement {
   const dialog = panel.shadowRoot?.querySelector('dialog');
   assert.ok(dialog instanceof HTMLDialogElement, 'a dialog');
   return dialog;
-}
-
-function press(root: ParentNode, label: string): void {
-  const button = [...root.querySelectorAll('button')].find((each) => text(each) === label);
-  assert.ok(button, label);
-  button.click();
 }
 
 function named(panel: InstanceType<typeof MnmlPanel>, name: string): void {
@@ -196,7 +186,7 @@ test('Edit it for everyone, from a template with changes not saved, asks before 
   vi.spyOn(builder, 'dirty').mockReturnValue(true);
   const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
   builder.host?.open('person');
-  await settled(panel);
+  await settled();
   assert.equal(confirm.mock.calls.length, 1);
   const still = panel.shadowRoot?.querySelector('mnml-builder');
   assert.ok(still instanceof MnmlBuilder);
@@ -231,9 +221,9 @@ async function renamed(at: Home): Promise<InstanceType<typeof MnmlPanel>> {
   const row = library.rows.find((each) => each.name === 'garden');
   assert.ok(row);
   library.actions?.rename(row);
-  await settled(panel);
+  await settled();
   named(panel, 'patio');
-  await settled(panel);
+  await settled();
   return panel;
 }
 
@@ -273,7 +263,7 @@ test("a rename reads the dashboards again, and renames the piece in other templa
       (message) => message.type === 'mnml/templates/delete' && message['name'] === 'garden',
     ),
   );
-  assert.match(text(dialogOf(panel)), /garden is now patio/);
+  assert.match(text(dialogOf(panel)), /Garden is now patio in YAML/);
   press(dialogOf(panel), 'OK');
   panel.remove();
 });
@@ -315,14 +305,17 @@ test('while a family of shipped templates is missing, the panel says so, its nam
   const panel = await opened('/templates', at);
   assert.match(text(panel.shadowRoot), /the shipped templates could not be loaded: offline/);
   libraryOf(panel).actions?.create();
-  await settled(panel);
-  named(panel, 'person');
-  await settled(panel);
-  assert.match(text(dialogOf(panel)), /person is taken/);
+  await settled();
+  const title = dialogOf(panel).querySelector<HTMLInputElement>('input[aria-label="Title"]');
+  assert.ok(title);
+  title.value = 'Person';
+  title.dispatchEvent(new Event('input'));
+  const name = dialogOf(panel).querySelector<HTMLInputElement>('input[aria-label="Name in YAML"]');
+  assert.equal(name?.value, 'person-2');
   press(dialogOf(panel), 'Cancel');
-  await settled(panel);
+  await settled();
   libraryOf(panel).actions?.importFile();
-  await settled(panel);
+  await settled();
   assert.match(text(dialogOf(panel)), /That did not work/);
   assert.match(text(dialogOf(panel)), /could not be loaded: offline/);
   press(dialogOf(panel), 'OK');
@@ -364,7 +357,7 @@ test("a template of the home's own written with shapes opens as written, and a t
   title.dispatchEvent(new Event('change'));
   await builder.updateComplete;
   press(root, 'Save');
-  await settled(panel);
+  await settled();
   const entry = at.sent.find(
     (message) => message.type === 'mnml/templates/save' && message['name'] === 'yard',
   )?.['entry'] as Entry | undefined;

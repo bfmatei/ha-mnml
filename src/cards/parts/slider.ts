@@ -6,11 +6,13 @@ import { styleMap } from 'lit/directives/style-map.js';
 
 import type { Color } from '../../contract/cards.ts';
 import type { MdiIcon } from '../../contract/entities.ts';
+import { rightToLeft } from '../../ha/direction.ts';
 import { unavailableValue } from '../../ha/format.ts';
-import { run, settled } from '../../ha/hass.ts';
+import { haptic, run, settled } from '../../ha/hass.ts';
 import type { HassEntity, HomeAssistant } from '../../ha/hass.ts';
 import { UNAVAILABLE } from '../../ha/rules.ts';
 import { colorStyle, colorVar, icon } from '../../ha/templates.ts';
+import { wordsFor } from '../../words/words.ts';
 import type { Host } from '../base.ts';
 import { BASE_STYLE } from '../styles.ts';
 
@@ -41,9 +43,10 @@ const SLIDER_STYLE = css`
   }
   .slider .fill {
     position: absolute;
-    inset: 0 auto 0 0;
+    inset-block: 0;
+    inset-inline: 0 auto;
     width: var(--fill);
-    border-right: 2px solid var(--m-color, var(--accent-color));
+    border-inline-end: 2px solid var(--m-color, var(--accent-color));
     background: color-mix(in srgb, var(--m-color, var(--accent-color)) 38%, transparent);
   }
   .slider.gradient {
@@ -66,7 +69,7 @@ const SLIDER_STYLE = css`
     position: absolute;
     top: 5px;
     bottom: 5px;
-    left: clamp(4px, calc(var(--fill) - 2px), calc(100% - 8px));
+    inset-inline-start: clamp(4px, calc(var(--fill) - 2px), calc(100% - 8px));
     width: 4px;
     border-radius: 2px;
     background: #fff;
@@ -89,7 +92,7 @@ const SLIDER_STYLE = css`
     flex: none;
   }
   .slider .label .label-value {
-    margin-left: auto;
+    margin-inline-start: auto;
     font-weight: 500;
     font-variant-numeric: tabular-nums;
   }
@@ -128,7 +131,7 @@ const SLIDER_STYLE = css`
   }
   @media (prefers-contrast: more) {
     .slider .fill {
-      border-right-width: 3px;
+      border-inline-end-width: 3px;
     }
   }
   @media (forced-colors: active) {
@@ -137,7 +140,7 @@ const SLIDER_STYLE = css`
     }
     .slider .fill {
       background: Highlight;
-      border-right-color: CanvasText;
+      border-inline-end-color: CanvasText;
     }
     .slider.gradient .fill {
       display: block;
@@ -236,6 +239,7 @@ export class MnmlSlider extends LitElement {
       this.owner !== undefined &&
       this.value !== undefined
     ) {
+      haptic('selection');
       run(this.owner, this.spec.commit(this.value));
     }
     this.keyed = false;
@@ -276,16 +280,18 @@ export class MnmlSlider extends LitElement {
     const span = spec.max - spec.min;
     const percent = span > 0 ? ((current - spec.min) / span) * 100 : 0;
     const text = spec.format(current);
+    const toward = rightToLeft(this) ? 'left' : 'right';
     return html`<div
       class=${classMap({
         slider: true,
-        gradient: spec.gradient !== undefined,
+        gradient: spec.stops !== undefined,
         dimmed: spec.dimmed === true,
         full: this.full,
       })}
       style=${styleMap({
         '--fill': `${Math.max(0, Math.min(100, percent))}%`,
-        '--gradient': spec.gradient,
+        '--gradient':
+          spec.stops === undefined ? undefined : `linear-gradient(to ${toward}, ${spec.stops})`,
         '--m-color': colorVar(this.color),
       })}
       role="slider"
@@ -332,7 +338,8 @@ export class MnmlSlider extends LitElement {
       return 0;
     }
     const rect = track.getBoundingClientRect();
-    const ratio = rect.width > 0 ? Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)) : 0;
+    const along = rightToLeft(track) ? rect.right - clientX : clientX - rect.left;
+    const ratio = rect.width > 0 ? Math.max(0, Math.min(1, along / rect.width)) : 0;
     return this.quantise(spec.min + ratio * (spec.max - spec.min));
   }
 
@@ -356,6 +363,7 @@ export class MnmlSlider extends LitElement {
     };
     clearTimeout(this.letGo);
     this.letGo = setTimeout(landed, COMMIT_CEILING);
+    haptic('selection');
     void settled(owner, spec.commit(this.value ?? spec.value)).then(landed);
   }
 
@@ -400,14 +408,17 @@ export class MnmlSlider extends LitElement {
     }
     const step = spec.step > 0 ? spec.step : 1;
     const current = this.value ?? spec.value;
+    const [forward, backward] = rightToLeft(this)
+      ? ['ArrowLeft', 'ArrowRight']
+      : ['ArrowRight', 'ArrowLeft'];
     const next =
       event.key === 'Home'
         ? spec.min
         : event.key === 'End'
           ? spec.max
-          : event.key === 'ArrowRight' || event.key === 'ArrowUp'
+          : event.key === forward || event.key === 'ArrowUp'
             ? this.quantise(current + step)
-            : event.key === 'ArrowLeft' || event.key === 'ArrowDown'
+            : event.key === backward || event.key === 'ArrowDown'
               ? this.quantise(current - step)
               : undefined;
     if (next === undefined) {
@@ -439,6 +450,7 @@ export function openSliderOverlay(
   const root = surface.getRootNode();
   const focusedIn = (): Element | null => (root instanceof ShadowRoot ? root.activeElement : null);
   const opener = focusedIn();
+  const closing = wordsFor(host.hass?.locale.language ?? '').close;
   const overlay = document.createElement('div');
   overlay.className = 'overlay';
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -471,8 +483,8 @@ export function openSliderOverlay(
       <button
         type="button"
         class="control"
-        aria-label="Close"
-        ${tip('Close')}
+        aria-label=${closing}
+        ${tip(closing)}
         @click=${() => {
           close(true);
         }}

@@ -1,5 +1,7 @@
 home-assistant:
-  description: Home Assistant's tile, its memory and free disk, and its services, updates and firmware chips; it brings its pop-up, with each room's firmware.
+  description: Home Assistant's tile, its memory and free disk, and its services, updates, firmware and messages chips; it brings its pop-up, with each room's firmware, and its messages' pop-up.
+  title: Home Assistant
+  icon: mdi:home-assistant
   slots:
     cpu:
       help: "Home Assistant's processor use."
@@ -57,7 +59,7 @@ home-assistant:
         }
   card:
     type: custom:mnml-tile-card
-    name: Home Assistant
+    name: '[[words.home_assistant]]'
     icon: mdi:home-assistant
     popup: '#system'
     state:
@@ -73,7 +75,7 @@ home-assistant:
       - id: services
         if: services
         type: status
-        name: Services
+        name: '[[words.services]]'
         icon: mdi:lan-connect
         silent: true
         rules:
@@ -90,7 +92,7 @@ home-assistant:
       - id: updates
         if: updates
         type: status
-        name: Updates
+        name: '[[words.updates]]'
         icon: mdi:package-up
         silent: true
         rules:
@@ -107,7 +109,7 @@ home-assistant:
       - id: firmware
         if: [all_firmware, firmware, room_firmware]
         type: status
-        name: Firmware
+        name: '[[words.firmware]]'
         icon: mdi:memory
         silent: true
         rules:
@@ -133,8 +135,16 @@ home-assistant:
             label: device
             color: amber
             is: ['on']
+      - id: messages
+        type: messages
+        popup: '#system-messages'
+        name: '[[words.messages]]'
+        icon: mdi:bell-badge-outline
+        color: amber
     grid_options: { columns: 12 }
   popups:
+    - id: system-messages-popup
+      template: system-messages-popup
     - id: system-popup
       template: system-popup
       slots:
@@ -164,7 +174,9 @@ home-assistant:
     room_firmware: [{ name: Kitchen, firmware: [update.kitchen_plug_firmware] }]
 
 system-popup:
-  description: Home Assistant's pop-up, its resources, backups, services, updates, its own firmware and each room's.
+  description: "Home Assistant's pop-up: how many messages it has, opening their pop-up, then its resources, backups, services, updates, its own firmware and each room's."
+  title: Home Assistant pop-up
+  icon: mdi:home-assistant
   slots:
     cpu: { kind: entity }
     memory: { kind: entity }
@@ -190,20 +202,17 @@ system-popup:
     cards:
       - id: header
         type: custom:mnml-header-card
-        name: Home Assistant
+        name: '[[words.home_assistant]]'
         icon: mdi:home-assistant
-        state:
-          - id: memory
-            if: memory
-            entity: '[[memory]]'
-            icon: true
-          - id: disk_free
-            if: disk_free
-            entity: '[[disk_free]]'
-            icon: true
+      - id: messages-row
+        type: custom:mnml-messages-card
+        popup: '#system-messages'
+        name: '[[words.messages]]'
+        icon: mdi:bell-outline
+        color: amber
       - id: resources
         type: custom:mnml-list-card
-        title: Resources
+        title: '[[words.resources]]'
         icon: mdi:chip
         rows:
           - id: cpu
@@ -222,7 +231,7 @@ system-popup:
       - id: backups
         if: backups
         type: custom:mnml-list-card
-        title: Backups
+        title: '[[words.backups]]'
         icon: mdi:cloud-upload-outline
         rows:
           - id: backups-last
@@ -239,7 +248,7 @@ system-popup:
             show: { is: ['on'] }
       - id: services
         type: custom:mnml-list-card
-        title: Services
+        title: '[[words.services]]'
         icon: mdi:lan-connect
         rows:
           - id: each-services
@@ -249,7 +258,7 @@ system-popup:
             slots: { entity: '[[service]]' }
       - id: updates
         type: custom:mnml-list-card
-        title: Updates
+        title: '[[words.updates]]'
         icon: mdi:package-up
         rows:
           - id: each-updates
@@ -259,7 +268,7 @@ system-popup:
             slots: { entity: '[[update]]' }
       - id: firmware
         type: custom:mnml-list-card
-        title: Firmware
+        title: '[[words.firmware]]'
         icon: mdi:memory
         rows:
           - id: each-firmware
@@ -271,7 +280,7 @@ system-popup:
         each: room_firmware
         as: room
         type: custom:mnml-list-card
-        title: '[[room.name]] firmware'
+        title: '[[room.name]] • [[words.firmware]]'
         icon: mdi:memory
         rows:
           - id: each-room-firmware
@@ -280,3 +289,31 @@ system-popup:
             template: pending-row
             slots: { entity: '[[update]]' }
   example: *home_assistant
+
+system-messages-popup:
+  description: "Home Assistant's messages pop-up: how many there are in its header, with a button that dismisses every notification, which asks first, then the notifications and, for an administrator, the repairs."
+  title: Home Assistant messages pop-up
+  icon: mdi:bell-outline
+  card:
+    hash: '#system-messages'
+    cards:
+      - id: header
+        type: custom:mnml-header-card
+        name: '[[words.messages]]'
+        icon: mdi:bell-outline
+        messages: true
+        color: amber
+        state: [{ id: home-assistant, text: '[[words.home_assistant]]' }]
+        controls:
+          - id: dismiss
+            type: dismiss
+            name: '[[words.clear_all]]'
+            icon: mdi:notification-clear-all
+        back: true
+      - id: notifications
+        type: custom:mnml-messages-card
+        notifications: true
+      - id: repairs
+        type: custom:mnml-messages-card
+        repairs: true
+  example: {}

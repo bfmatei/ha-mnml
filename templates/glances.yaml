@@ -1,5 +1,7 @@
 glances:
-  description: "The strip of the home's overall statuses, one line across the section: the weather, the alarm, the vacation toggle, and whatever needs you: failed checks, stopped guests, devices down or offline, low batteries, a lock or a car left open, a leak, smoke. What does not need you is not drawn."
+  description: "The strip of the home's overall statuses, one line across the section: the weather, the alarm, the vacation toggle, the power the home uses, each timer while it runs, and whatever needs you: failed checks, Home Assistant's messages, stopped guests, devices down or offline, low batteries, a leak, smoke. What does not need you is not drawn."
+  title: Glances
+  icon: mdi:view-dashboard-outline
   slots:
     weather:
       {
@@ -26,16 +28,41 @@ glances:
     energy:
       kind: object
       group: Status
-      help: What the home uses, makes and stores; the item shows the power it uses and opens the energy pop-up.
+      help: What the home uses, makes and stores, found in Home Assistant's energy settings; with a usage sensor, the item shows the power the home uses and opens the energy pop-up.
       fields:
-        usage: { kind: entity, required: true, label: Home usage }
-        grid: { kind: entity, required: true }
+        usage: { kind: entity, label: Home usage }
+        grid: { kind: entity }
         solar: { kind: entity }
         battery: { kind: entity }
+        battery_power: { kind: entity, label: Battery power }
         ev: { kind: entity, label: EV charger }
         grid_today: { kind: entity, label: Grid today }
         solar_today: { kind: entity, label: Solar today }
         export_today: { kind: entity, label: Export today }
+      discover:
+        fields:
+          grid: energy.grid_power
+          solar: energy.solar_power
+          battery: energy.battery_charge
+          battery_power: energy.battery_power
+    meters:
+      shape: meter
+      kind: objects
+      group: Status
+      help: "The meters of the home's outlets and appliances; the energy pop-up lists them, highest power first, with their power now summed, and without a usage sensor, the item shows that sum."
+      fields: { power: { required: true } }
+      discover: energy.devices
+    timers:
+      kind: objects
+      group: Status
+      help: 'Each timer, and the key of the room whose pop-up shows it; drawn while it runs, counting down, among the statuses, since a running timer is not a problem.'
+      fields:
+        entity: { kind: entity, required: true }
+        room: { kind: text, label: Room key }
+      discover:
+        device: { domain: timer }
+        scope: all
+        fields: { entity: { domain: timer }, room: area.id }
     checks:
       shape: checks
       group: Problems
@@ -47,13 +74,30 @@ glances:
         help: Counted while low.,
         group: Problems,
       }
+    battery_groups:
+      shape: battery_group
+      kind: objects
+      label: Battery groups
+      help: "The batteries' pop-up lists the low ones under a heading per group, such as a room or a person's devices, rather than in one list."
+      group: Problems
     leaks:
       {
         kind: entities,
         discover: { domain: binary_sensor, device_class: moisture, scope: all },
         label: Leak sensors,
+        help: 'Counted while wet, when no leak sensor is given by room.',
         group: Problems,
       }
+    room_leaks:
+      shape: room_leaks
+      kind: objects
+      label: Leak sensors by room
+      help: "Each room's leak sensors and the room's key; an item for each room, counted while wet, opening the room's pop-up."
+      group: Problems
+      discover:
+        per: area
+        scope: all
+        fields: { room: area.id, sensors: { domain: binary_sensor, device_class: moisture } }
     smoke:
       {
         kind: entities,
@@ -64,7 +108,14 @@ glances:
     notifications:
       {
         kind: entity,
-        help: A sensor counting the notifications; shown while it is not 0.,
+        help: 'A sensor of the notifications, its alerts attribute counting the warnings and errors; shown while that is not 0.',
+        group: Problems,
+      }
+    messages:
+      {
+        kind: flag,
+        label: Home Assistant messages,
+        help: "Home Assistant's notifications and, for an administrator, its repairs, counted while there are any; it opens their pop-up, which the Home Assistant template brings.",
         group: Problems,
       }
     updates:
@@ -134,27 +185,6 @@ glances:
         help: 'A binary sensor that is on while the media server reports a problem.',
         group: Problems,
       }
-    locks:
-      kind: objects
-      group: Problems
-      help: 'Each lock, and the key of the room whose pop-up deals with it; counted while unlocked, open or jammed.'
-      fields:
-        entity: { kind: entity, required: true }
-        room: { kind: text, label: Room key }
-      discover:
-        device: { domain: lock }
-        scope: all
-        fields: { entity: { domain: lock }, room: area.id }
-    cars:
-      kind: objects
-      group: Problems
-      help: "Each car's key, lock state and arming state; counted while unlocked or unarmed, in the car template's words."
-      fields:
-        key: { kind: text, required: true }
-        lock: { kind: entity }
-        alarm: { kind: entity }
-        unlocked: { kind: texts, default: [unlocked, selectivelocked] }
-        disarmed: { kind: texts, default: [unarmed] }
     low: { kind: number, default: 20 }
     critical: { kind: number, default: 5 }
   card:
@@ -168,174 +198,95 @@ glances:
       - id: alarm
         if: alarm
         entity: '[[alarm]]'
-        name: Alarm
+        name: '[[words.alarm]]'
         bare: true
         toggle: true
+        confirm: { not: [disarmed] }
         when: { not: [disarmed] }
         alert: { is: [triggered] }
         people: '[[people]]'
       - id: vacation
         if: vacation
         entity: '[[vacation]]'
-        name: Vacation
-        icon: mdi:palm-tree
+        name: '[[words.vacation]]'
+        icon: mdi:airplane
         color: amber
         toggle: true
+        confirm: { is: ['off'] }
         quiet: true
         people: '[[people]]'
       - id: energy
-        if: energy
+        if: energy.usage
         entity: '[[energy.usage]]'
-        name: Energy
+        name: '[[words.energy]]'
         icon: mdi:lightning-bolt
         popup: '#energy'
-      - id: checks
-        if: checks
-        entities: ['[[checks.failed]]', '[[checks.warnings]]']
-        name: Checks
-        icon: mdi:clipboard-alert-outline
-        sum: true
-        critical: 1
-        popup: '#checks'
-      - id: notifications
-        if: notifications
-        entity: '[[notifications]]'
-        name: Notifications
-        icon: mdi:bell-badge-outline
+      - id: meters
+        if: meters
+        unless: energy.usage
+        entities: '[[meters.*.power]]'
+        name: '[[words.energy]]'
+        icon: mdi:lightning-bolt
+        total: true
+        popup: '#energy'
+      - id: each-timers
+        each: timers
+        as: timer
+        if: timer.room
+        entity: '[[timer.entity]]'
         color: amber
-        when: { not: ['0'] }
-        show: { not: ['0'] }
-        popup: '#proxmox-notifications'
-      - id: disks
-        if: disks
-        entity: '[[disks]]'
-        name: Failing disks
-        icon: mdi:harddisk-remove
-        color: red
-        when: { not: ['0'] }
-        show: { not: ['0'] }
-        popup: '#proxmox'
-      - id: backup
-        if: backup
-        entity: '[[backup]]'
-        name: Backups
-        icon: mdi:backup-restore
-        color: orange
-        show: { is: ['on'] }
-        popup: '#proxmox'
-      - id: guests
-        if: guests
-        entities: '[[guests]]'
-        name: Stopped guests
-        icon: mdi:server-network-off
-        color: red
-        is: ['off']
-        popup: '#proxmox'
-      - id: network-devices
-        if: network_devices
-        entities: '[[network_devices]]'
-        name: Network devices down
-        icon: mdi:access-point-network-off
-        color: red
-        not: '[[device_up]]'
-        popup: '#network'
-      - id: tailscale
-        if: tailscale
-        entities: '[[tailscale]]'
-        name: Tailscale offline
-        icon: mdi:lan-disconnect
-        color: red
-        is: ['off']
-        popup: '#tailscale'
-      - id: media-health
-        if: media_health
-        entities: ['[[media_health]]']
-        name: Media health
-        icon: mdi:heart-pulse
-        color: red
-        is: ['on']
-        popup: '#media'
-      - id: batteries
-        if: batteries
-        entities: '[[batteries]]'
-        name: Low batteries
-        icon: mdi:battery-alert-variant-outline
-        below: '[[low]]'
-        critical: '[[critical]]'
-        popup: '#batteries'
-      - id: services
-        if: services
-        entities: '[[services]]'
-        name: Services down
-        icon: mdi:server-off
-        color: red
-        is: ['off']
-        popup: '#system'
-      - id: updates
-        if: updates
-        entities: '[[updates]]'
-        name: Updates
-        icon: mdi:package-up
+        when: { is: [active] }
+        show: { is: [active] }
+        calm: true
+        state: [{ id: remaining, remaining: true }]
+        popup: '#[[timer.room]]'
+      - id: each-timers-2
+        each: timers
+        as: timer
+        unless: timer.room
+        entity: '[[timer.entity]]'
         color: amber
-        is: ['on']
-        popup: '#system'
-      - id: each-locks
-        each: locks
-        as: lock
-        if: lock.room
-        entities: ['[[lock.entity]]']
-        name: Unlocked
-        icon: mdi:lock-open-variant-outline
-        color: red
-        is: [unlocked, open, jammed]
-        popup: '#[[lock.room]]'
-      - id: each-locks-2
-        each: locks
-        as: lock
-        unless: lock.room
-        entities: ['[[lock.entity]]']
-        name: Unlocked
-        icon: mdi:lock-open-variant-outline
-        color: red
-        is: [unlocked, open, jammed]
-      - id: each-cars
-        each: cars
-        as: car
-        if: [car.lock, car.alarm]
-        entities: ['[[car.lock]]', '[[car.alarm]]']
-        name: Car security
-        icon: mdi:car-key
-        color: red
-        is: ['[[car.unlocked]]', '[[car.disarmed]]']
-        popup: '#car-[[car.key]]'
-      - id: leaks
-        if: leaks
-        entities: '[[leaks]]'
-        name: Leaks
-        icon: mdi:water-alert-outline
-        color: red
-        is: ['on']
-      - id: smoke
-        if: smoke
-        entities: '[[smoke]]'
-        name: Smoke
-        icon: mdi:smoke-detector-variant-alert
-        color: red
-        is: ['on']
+        when: { is: [active] }
+        show: { is: [active] }
+        calm: true
+        state: [{ id: remaining, remaining: true }]
+      - id: problems
+        template: glance-problems
+        slots:
+          checks: '[[checks]]'
+          notifications: '[[notifications]]'
+          messages: '[[messages]]'
+          disks: '[[disks]]'
+          backup: '[[backup]]'
+          guests: '[[guests]]'
+          network_devices: '[[network_devices]]'
+          device_up: '[[device_up]]'
+          tailscale: '[[tailscale]]'
+          media_health: '[[media_health]]'
+          batteries: '[[batteries]]'
+          low: '[[low]]'
+          critical: '[[critical]]'
+          services: '[[services]]'
+          updates: '[[updates]]'
+          leaks: '[[leaks]]'
+          room_leaks: '[[room_leaks]]'
+          smoke: '[[smoke]]'
     grid_options: { columns: full }
   popups:
     - id: energy-popup
-      if: energy
+      if: [energy, meters]
       template: energy-popup
       slots:
         usage: '[[energy.usage]]'
         grid: '[[energy.grid]]'
         solar: '[[energy.solar]]'
         battery: '[[energy.battery]]'
+        battery_power: '[[energy.battery_power]]'
         ev: '[[energy.ev]]'
         grid_today: '[[energy.grid_today]]'
         solar_today: '[[energy.solar_today]]'
         export_today: '[[energy.export_today]]'
+        meters: '[[meters]]'
     - id: weather-popup
       if: weather
       template: weather-popup
@@ -347,14 +298,170 @@ glances:
     - id: batteries-popup
       if: batteries
       template: batteries-popup
-      slots: { batteries: '[[batteries]]', low: '[[low]]', critical: '[[critical]]' }
+      slots:
+        batteries: '[[batteries]]'
+        groups: '[[battery_groups]]'
+        low: '[[low]]'
+        critical: '[[critical]]'
   example:
     weather: weather.home
     vacation: input_boolean.vacation
     batteries: [sensor.window_battery]
 
+glance-problems:
+  description: "The items of the strip that need you, each drawn only while it does: failed checks, notifications, Home Assistant's messages, failing disks, a backup problem, stopped guests, devices down or offline, the media server's health, low batteries, services down, updates, a leak, smoke."
+  title: What needs you
+  icon: mdi:alert-circle-outline
+  slots:
+    checks: { shape: checks }
+    notifications: { kind: entity }
+    messages: { kind: flag }
+    disks: { kind: entity }
+    backup: { kind: entity }
+    guests: { kind: entities }
+    network_devices: { kind: entities }
+    device_up: { kind: texts, default: [connected, upgrading, provisioning] }
+    tailscale: { kind: entities }
+    media_health: { kind: entity }
+    batteries: { kind: entities }
+    low: { kind: number, default: 20 }
+    critical: { kind: number, default: 5 }
+    services: { kind: entities }
+    updates: { kind: entities }
+    leaks: { kind: entities }
+    room_leaks: { shape: room_leaks, kind: objects }
+    smoke: { kind: entities }
+  card:
+    - id: checks
+      if: checks
+      entities: ['[[checks.failed]]', '[[checks.warnings]]']
+      name: '[[words.checks]]'
+      icon: mdi:clipboard-alert-outline
+      sum: true
+      critical: 1
+      popup: '#checks'
+    - id: notifications
+      if: notifications
+      entity: '[[notifications]]'
+      name: '[[words.notifications]]'
+      icon: mdi:bell-badge-outline
+      color: amber
+      when: { attribute: alerts, not: ['0'] }
+      show: { attribute: alerts, not: ['0'] }
+      state: [{ id: alerts, attribute: alerts }]
+      popup: '#proxmox-notifications'
+    - id: messages
+      if: messages
+      messages: true
+      name: '[[words.messages]]'
+      icon: mdi:home-assistant
+      color: amber
+      popup: '#system-messages'
+    - id: disks
+      if: disks
+      entity: '[[disks]]'
+      name: '[[words.failing_disks]]'
+      icon: mdi:harddisk-remove
+      color: red
+      when: { not: ['0'] }
+      show: { not: ['0'] }
+      popup: '#proxmox'
+    - id: backup
+      if: backup
+      entity: '[[backup]]'
+      name: '[[words.backups]]'
+      icon: mdi:backup-restore
+      color: orange
+      show: { is: ['on'] }
+      popup: '#proxmox'
+    - id: guests
+      if: guests
+      entities: '[[guests]]'
+      name: '[[words.stopped_guests]]'
+      icon: mdi:server-network-off
+      color: red
+      is: ['off']
+      popup: '#proxmox'
+    - id: network-devices
+      if: network_devices
+      entities: '[[network_devices]]'
+      name: '[[words.network_devices_down]]'
+      icon: mdi:access-point-network-off
+      color: red
+      not: '[[device_up]]'
+      popup: '#network'
+    - id: tailscale
+      if: tailscale
+      entities: '[[tailscale]]'
+      name: '[[words.tailscale_offline]]'
+      icon: mdi:lan-disconnect
+      color: red
+      is: ['off']
+      popup: '#tailscale'
+    - id: media-health
+      if: media_health
+      entities: ['[[media_health]]']
+      name: '[[words.media_health]]'
+      icon: mdi:heart-pulse
+      color: red
+      is: ['on']
+      popup: '#media'
+    - id: batteries
+      if: batteries
+      entities: '[[batteries]]'
+      name: '[[words.low_batteries]]'
+      icon: mdi:battery-alert-variant-outline
+      below: '[[low]]'
+      critical: '[[critical]]'
+      popup: '#batteries'
+    - id: services
+      if: services
+      entities: '[[services]]'
+      name: '[[words.services_down]]'
+      icon: mdi:server-off
+      color: red
+      is: ['off']
+      popup: '#system'
+    - id: updates
+      if: updates
+      entities: '[[updates]]'
+      name: '[[words.updates]]'
+      icon: mdi:package-up
+      color: amber
+      is: ['on']
+      popup: '#system'
+    - id: each-room_leaks
+      each: room_leaks
+      as: room
+      entities: '[[room.sensors]]'
+      name: '[[words.leaks]]'
+      icon: mdi:water-alert-outline
+      color: red
+      is: ['on']
+      popup: '#[[room.room]]'
+    - id: leaks
+      if: leaks
+      unless: room_leaks
+      entities: '[[leaks]]'
+      name: '[[words.leaks]]'
+      icon: mdi:water-alert-outline
+      color: red
+      is: ['on']
+    - id: smoke
+      if: smoke
+      entities: '[[smoke]]'
+      name: '[[words.smoke]]'
+      icon: mdi:smoke-detector-variant-alert
+      color: red
+      is: ['on']
+  example:
+    batteries: [sensor.window_battery]
+    room_leaks: [{ room: laundry, sensors: [binary_sensor.laundry_leak] }]
+
 weather-popup:
   description: The weather now, its conditions and its forecast.
+  title: Weather pop-up
+  icon: mdi:weather-partly-cloudy
   slots:
     weather: { kind: entity, required: true }
   card:
@@ -362,17 +469,19 @@ weather-popup:
     cards:
       - id: header
         type: custom:mnml-header-card
-        name: Weather
+        name: '[[words.weather]]'
         icon: mdi:weather-partly-cloudy
       - id: forecast
         type: custom:mnml-weather-card
         entity: '[[weather]]'
-        title: Now and next
+        title: '[[words.now_and_next]]'
   example:
     weather: weather.home
 
 checks-popup:
   description: 'The daily checks: what failed, the warnings, when they last ran, and the details.'
+  title: Checks pop-up
+  icon: mdi:clipboard-check-outline
   slots:
     checks: { shape: checks, required: true }
   card:
@@ -380,17 +489,17 @@ checks-popup:
     cards:
       - id: header
         type: custom:mnml-header-card
-        name: Checks
+        entity: '[[checks.last_run]]'
+        name: '[[words.checks]]'
         icon: mdi:clipboard-check-outline
         controls:
-          - id: checks-actions
-            if: checks.actions
-            template: checks-actions
-            slots: { actions: '[[checks.actions]]' }
+          - id: checks-controls
+            template: checks-controls
+            slots: { checks: '[[checks]]' }
         back: true
       - id: checks
         type: custom:mnml-list-card
-        title: Daily checks
+        title: '[[words.daily_checks]]'
         icon: mdi:clipboard-check-outline
         rows:
           - id: checks-failed
@@ -413,7 +522,7 @@ checks-popup:
       - id: failures
         type: custom:mnml-report-card
         entity: '[[checks.failed]]'
-        title: Check details
+        title: '[[words.check_details]]'
         icon: mdi:clipboard-alert-outline
         colors: { warnings: orange }
   example:
@@ -423,9 +532,12 @@ checks-popup:
       overdue: binary_sensor.checks_overdue
 
 batteries-popup:
-  description: The batteries that are running low, lowest first, with their level as a bar.
+  description: The batteries that are running low, lowest first, with their level as a bar, under a heading per group when the home gives groups.
+  title: Batteries pop-up
+  icon: mdi:battery-low
   slots:
     batteries: { kind: entities }
+    groups: { shape: battery_group, kind: objects }
     low: { kind: number, default: 20 }
     critical: { kind: number, default: 5 }
   card:
@@ -433,12 +545,13 @@ batteries-popup:
     cards:
       - id: header
         type: custom:mnml-header-card
-        name: Batteries
+        name: '[[words.batteries]]'
         icon: mdi:battery-alert-variant-outline
       - id: batteries
+        unless: groups
         type: custom:mnml-list-card
         lowest_first: true
-        title: Running low
+        title: '[[words.running_low]]'
         icon: mdi:battery-low
         rows:
           - id: each-batteries
@@ -450,5 +563,26 @@ batteries-popup:
             low: '[[low]]'
             low_only: true
             critical: '[[critical]]'
+      - id: each-groups
+        each: groups
+        as: group
+        type: custom:mnml-list-card
+        lowest_first: true
+        title: '[[group.name]]'
+        entity: '[[group.entity]]'
+        icon: '[[group.icon]]'
+        rows:
+          - id: each-group-batteries
+            each: group.batteries
+            as: battery
+            entity: '[[battery]]'
+            label: device
+            bar: true
+            low: '[[low]]'
+            low_only: true
+            critical: '[[critical]]'
   example:
     batteries: [sensor.window_battery, sensor.door_battery]
+    groups:
+      - { name: Kitchen, icon: mdi:fridge, batteries: [sensor.window_battery] }
+      - { entity: person.alex, icon: mdi:account, batteries: [sensor.door_battery] }

@@ -55,6 +55,23 @@ views:
               - entity: sensor.carbon_dioxide
               - entity: sensor.fixture_steps
                 zero_when_empty: true
+          - type: custom:mnml-list-card
+            entity: weather.demo_weather_south
+            icon: mdi:weather-partly-cloudy
+            rows:
+              - entity: sensor.outside_temperature
+              - entity: sensor.outside_humidity
+          - type: custom:mnml-list-card
+            highest_first: true
+            summary: { sum: 0 }
+            title: Power
+            icon: mdi:meter-electric
+            headers: [Item, Now]
+            rows:
+              - entity: sensor.fixture_power_a
+                values: [sensor.fixture_power_a]
+              - entity: sensor.fixture_power_b
+                values: [sensor.fixture_power_b]
           - type: custom:mnml-media-card
             entity: media_player.living_room
           - type: custom:mnml-agenda-card
@@ -85,12 +102,29 @@ views:
                   - { attribute: temperature, icon: true }
               - entity: input_boolean.fixture_toggle
                 name: Vacation
-                icon: mdi:palm-tree
+                icon: mdi:airplane
                 color: amber
                 toggle: true
+              - entities: [sensor.fixture_power_a, sensor.fixture_power_b]
+                name: Power
+                icon: mdi:lightning-bolt
+                total: true
               - entities: [sensor.fixture_battery_a, sensor.fixture_battery_b]
                 name: Low batteries
                 below: 20
+              - entity: sensor.messages
+                name: Notifications
+                icon: mdi:bell-badge-outline
+                color: amber
+                when: { attribute: alerts, not: ['0'] }
+                show: { attribute: alerts, not: ['0'] }
+                state: [{ attribute: alerts }]
+                popup: '#issues'
+              - entities: [climate.hvac]
+                name: Heating while away
+                icon: mdi:thermometer-alert
+                not: ['off']
+                show: { entity: input_boolean.fixture_toggle, is: ['on'] }
           - type: custom:mnml-weather-card
             entity: weather.demo_weather_south
           - type: custom:mnml-report-card
@@ -136,3 +170,12 @@ views:
                     rows:
                       - entity: light.living_room_rgbww_lights
                       - entity: sensor.outside_temperature
+              - hash: '#issues'
+                cards:
+                  - type: custom:mnml-header-card
+                    name: Issues
+                    icon: mdi:alert-circle-outline
+                  - type: custom:mnml-entity-card
+                    entity: binary_sensor.fixture_door_front_right
+                    color: orange
+                    state: [{}, { since: true }]

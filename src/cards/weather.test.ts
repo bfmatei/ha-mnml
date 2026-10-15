@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 
 import { test } from 'vitest';
 
-import { define, mounted, text } from '../test/render.ts';
+import type { HomeAssistant } from '../ha/hass.ts';
+import { fakeConnection, fakeHass } from '../test/hass.ts';
+import { configure, define, mounted, text } from '../test/render.ts';
 
 import { MnmlWeatherCard } from './weather.ts';
 
@@ -10,19 +12,20 @@ define('mnml-weather-card', MnmlWeatherCard);
 
 const CONFIG = { type: 'custom:mnml-weather-card', entity: 'weather.home' };
 
-type Listener = (message: { forecast: unknown[] | null }) => void;
-
 interface Asked {
   message: Record<string, unknown>;
-  push: Listener;
+  push: (message: { forecast: unknown[] | null }) => void;
   stopped: boolean;
 }
 
-function hassWith(asked: Asked[], features = 3, attributes: Record<string, unknown> = {}): unknown {
-  return {
+function hassWith(
+  asked: Asked[],
+  features = 3,
+  attributes: Record<string, unknown> = {},
+): HomeAssistant {
+  return fakeHass({
     states: {
       'weather.home': {
-        entity_id: 'weather.home',
         state: 'partlycloudy',
         attributes: {
           temperature: 21,
@@ -32,14 +35,12 @@ function hassWith(asked: Asked[], features = 3, attributes: Record<string, unkno
         },
       },
     },
-    entities: {},
-    devices: {},
-    locale: { language: 'en' },
-    formatEntityState: (): string => 'Partly cloudy',
-    formatEntityAttributeValue: (_stateObj: unknown, name: string, value: unknown): string =>
+    formatEntityState: () => 'Partly cloudy',
+    formatEntityAttributeName: (_stateObj, name) => (name === 'humidity' ? 'Humidity' : name),
+    formatEntityAttributeValue: (_stateObj, name, value) =>
       name === 'humidity' ? `${String(value)} %` : `${String(value)} °C`,
-    connection: {
-      subscribeMessage: (push: Listener, message: Record<string, unknown>) => {
+    connection: fakeConnection({
+      subscribeMessage: (push, message) => {
         const entry: Asked = { message, push, stopped: false };
         asked.push(entry);
         return Promise.resolve(() => {
@@ -47,8 +48,8 @@ function hassWith(asked: Asked[], features = 3, attributes: Record<string, unkno
           return Promise.resolve();
         });
       },
-    },
-  };
+    }),
+  });
 }
 
 const day = (offset: number, high: number, low: number) => ({
@@ -59,11 +60,11 @@ const day = (offset: number, high: number, low: number) => ({
   precipitation_probability: 60,
 });
 
-async function paint(asked: Asked[], hass: unknown = hassWith(asked)) {
+async function paint(asked: Asked[], hass: HomeAssistant = hassWith(asked)) {
   const made = document.createElement('mnml-weather-card');
   assert.ok(made instanceof MnmlWeatherCard);
-  made.setConfig(CONFIG as never);
-  made.hass = hass as never;
+  configure(made, CONFIG);
+  made.hass = hass;
   const root = await mounted(made);
   return { made, root };
 }
@@ -120,7 +121,7 @@ test('the subscription is let go when the card leaves the page, and taken again 
 test('a forecast kind that changes lets the old subscription go before it takes the new one', async () => {
   const asked: Asked[] = [];
   const { made, root } = await paint(asked, hassWith(asked, 1));
-  made.hass = hassWith(asked, 2) as never;
+  made.hass = hassWith(asked, 2);
   await made.updateComplete;
   await Promise.resolve();
   assert.deepEqual(

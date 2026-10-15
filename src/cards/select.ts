@@ -3,20 +3,20 @@ import type { TemplateResult } from 'lit';
 import { styleMap } from 'lit/directives/style-map.js';
 
 import type { SelectCard } from '../contract/cards.ts';
-import { MODE_ATTRIBUTES } from '../contract/structure.ts';
+import { CARD_STRUCTURES } from '../contract/structure.ts';
+import type { Structure } from '../contract/structure.ts';
 import { formatState, unavailableValue } from '../ha/format.ts';
 import { hasValue, isUnavailable, stateOf } from '../ha/hass.ts';
 import type { HassEntity, HomeAssistant } from '../ha/hass.ts';
 import { entityName } from '../ha/names.ts';
 import { UNAVAILABLE } from '../ha/rules.ts';
 import { colorStyle, icon, quietly, stateIcon } from '../ha/templates.ts';
+import { wordsFor } from '../words/words.ts';
 
-import { MnmlCard, requireList, requireOneOf, requireString } from './base.ts';
-import type { KeySchema } from './keys.ts';
+import { MnmlCard } from './base.ts';
 import { MENU_STYLE, modeChoice, openMenu, optionChoice, sceneChoice } from './parts/menu.ts';
 import type { Choice } from './parts/menu.ts';
 import { tip } from './parts/tooltip.ts';
-import { SELECT_CARD } from './schemas.ts';
 import { BASE_STYLE, CONTROL_STYLE, ROW_STYLE } from './styles.ts';
 
 const SELECT_STYLE = css`
@@ -49,29 +49,18 @@ export class MnmlSelectCard extends MnmlCard<SelectCard> {
 
   protected override readonly columns = 6;
 
-  protected schema(): KeySchema {
-    return SELECT_CARD;
-  }
-
-  protected override validate(config: SelectCard): void {
-    if (config.scenes !== undefined) {
-      requireList('scenes', config.scenes);
-      requireString('name', config.name);
-      return;
-    }
-    requireString('entity', config.entity);
-    if (config.attribute !== undefined) {
-      requireOneOf('attribute', config.attribute, MODE_ATTRIBUTES);
-    }
+  protected structure(): Structure {
+    return CARD_STRUCTURES['custom:mnml-select-card'];
   }
 
   private shell(
+    hass: HomeAssistant,
     choice: Choice,
     name: string,
     pillIcon: TemplateResult,
     line: string | undefined,
   ): TemplateResult {
-    const label = `${name}: choose`;
+    const label = wordsFor(hass.locale.language).choose(name);
     const fromCard = (event: Event): void => {
       const card = event.currentTarget;
       const arrow = card instanceof HTMLElement ? card.querySelector('button.control') : null;
@@ -113,7 +102,7 @@ export class MnmlSelectCard extends MnmlCard<SelectCard> {
         return undefined;
       }
       const active = choice.options.find((option) => option.value === choice.current);
-      return this.shell(choice, config.name, icon(config.icon), active?.label);
+      return this.shell(hass, choice, config.name, icon(config.icon), active?.label);
     }
     const stateObj = stateOf(hass, config.entity);
     if (isUnavailable(stateObj)) {
@@ -136,6 +125,7 @@ export class MnmlSelectCard extends MnmlCard<SelectCard> {
     }
     const current = choice.options.find((option) => option.value === choice.current);
     return this.shell(
+      hass,
       choice,
       config.name ?? entityName(hass, config.entity),
       config.icon === undefined

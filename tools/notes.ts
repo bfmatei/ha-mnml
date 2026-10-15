@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
-import { FORMAT, INTERFACE_FILE, notes, readSurface } from '../src/contract/interface.ts';
+import { FORMAT, INTERFACE_FILE, notes, readSurface } from '../src/interface/interface.ts';
 
 const ROOT = dirname(INTERFACE_FILE);
 

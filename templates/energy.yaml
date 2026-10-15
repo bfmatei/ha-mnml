@@ -1,42 +1,107 @@
 energy-popup:
-  description: 'The energy pop-up: the power now and the energy today, from the grid, the sun, the battery and the EV charger.'
+  description: "The energy pop-up: the power now and the energy today, from the grid, the sun, the battery and the EV charger, and a table of the home's metered devices, highest power first: each one's power now, its energy today and in total, and with a usage sensor its share of the home's usage. Home Assistant's energy settings fill the grid, solar and battery power, the battery's charge and the devices."
+  title: Energy pop-up
+  icon: mdi:lightning-bolt
   slots:
-    usage: { kind: entity, required: true }
-    grid: { kind: entity, required: true }
-    solar: { kind: entity }
-    battery: { kind: entity }
+    usage: { kind: entity }
+    grid: { kind: entity, discover: energy.grid_power }
+    solar: { kind: entity, discover: energy.solar_power }
+    battery: { kind: entity, discover: energy.battery_charge }
+    battery_power: { kind: entity, discover: energy.battery_power }
     ev: { kind: entity }
     grid_today: { kind: entity }
     solar_today: { kind: entity }
     export_today: { kind: entity }
+    meters:
+      shape: meter
+      kind: objects
+      fields: { power: { required: true } }
+      discover: energy.devices
     popup: { kind: text, default: '#energy' }
   card:
     hash: '[[popup]]'
     cards:
       - id: header
         type: custom:mnml-header-card
-        name: Energy
+        name: '[[words.energy]]'
         icon: mdi:lightning-bolt
-        state: [{ id: usage, entity: '[[usage]]', icon: true }]
       - id: now
+        if: [usage, grid, solar, ev, battery_power, battery]
         type: custom:mnml-list-card
-        title: Now
+        title: '[[words.now]]'
         icon: mdi:flash
         rows:
-          - { id: usage, entity: '[[usage]]' }
+          - { id: usage, if: usage, entity: '[[usage]]' }
           - { id: solar, if: solar, entity: '[[solar]]' }
-          - { id: grid, entity: '[[grid]]' }
+          - { id: grid, if: grid, entity: '[[grid]]' }
           - { id: ev, if: ev, entity: '[[ev]]' }
+          - { id: battery-power, if: battery_power, entity: '[[battery_power]]' }
           - { id: battery, if: battery, entity: '[[battery]]', bar: true, low: 20, critical: 5 }
       - id: today
         if: [grid_today, solar_today, export_today]
         type: custom:mnml-list-card
-        title: Today
+        title: '[[words.today]]'
         icon: mdi:calendar-today
         rows:
           - { id: grid-today, if: grid_today, entity: '[[grid_today]]' }
           - { id: solar-today, if: solar_today, entity: '[[solar_today]]' }
           - { id: export-today, if: export_today, entity: '[[export_today]]' }
+      - id: meters
+        if: meters
+        template: meter-table
+        slots: { meters: '[[meters]]', usage: '[[usage]]' }
   example:
     usage: sensor.home_power
     grid: sensor.grid_power
+    meters:
+      - { power: sensor.plug_power, today: sensor.plug_energy_today, total: sensor.plug_energy }
+
+meter-table:
+  description: "A table of meters, highest power first, the heading summing their power now: each one's power now, its energy today and in total, and with a usage sensor a Share column, each one's power as a share of the usage."
+  title: Meter table
+  icon: mdi:meter-electric
+  slots:
+    meters:
+      shape: meter
+      kind: objects
+      required: true
+      fields: { power: { required: true } }
+      discover: energy.devices
+    usage: { kind: entity }
+  card:
+    - id: meters
+      unless: usage
+      type: custom:mnml-list-card
+      highest_first: true
+      summary: { sum: 0 }
+      title: '[[words.meters]]'
+      icon: mdi:meter-electric
+      headers: ['[[words.item]]', '[[words.now]]', '[[words.today]]', '[[words.total]]']
+      rows:
+        - id: each-meters
+          each: meters
+          as: meter
+          entity: '[[meter.power]]'
+          label: device
+          values!: ['[[meter.power]]', '[[meter.today]]', '[[meter.total]]']
+    - id: meters-share
+      if: usage
+      type: custom:mnml-list-card
+      highest_first: true
+      summary: { sum: 0 }
+      title: '[[words.meters]]'
+      icon: mdi:meter-electric
+      headers:
+        ['[[words.item]]', '[[words.now]]', '[[words.today]]', '[[words.total]]', '[[words.share]]']
+      rows:
+        - id: each-meters
+          each: meters
+          as: meter
+          entity: '[[meter.power]]'
+          label: device
+          of: '[[usage]]'
+          values!: ['[[meter.power]]', '[[meter.today]]', '[[meter.total]]', '[[meter.power]]']
+  example:
+    meters:
+      - { power: sensor.plug_power, today: sensor.plug_energy_today, total: sensor.plug_energy }
+    usage: sensor.home_power

@@ -3,10 +3,9 @@ import { existsSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const ZIP = resolve('mnml.zip');
+const SERVED = ['mnml-cards-loader.js', 'mnml-cards.js', 'mnml-cards-panel.js'];
 const BUILT = [
-  'mnml-cards-loader.js',
-  'mnml-cards.js',
-  'mnml-cards-panel.js',
+  ...SERVED.flatMap((name) => [name, `${name}.br`, `${name}.gz`]),
   'mnml.yaml',
   'mnml-flat.yaml',
 ];

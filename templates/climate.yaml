@@ -1,5 +1,7 @@
 ac-controls:
   description: An AC's target temperature slider and its mode menu, blue while it runs.
+  title: AC controls
+  icon: mdi:air-conditioner
   slots:
     entity: { kind: entity }
   card:
@@ -8,7 +10,7 @@ ac-controls:
       type: slider
       entity: '[[entity]]'
       slider: temperature
-      name: Target temperature
+      name: '[[words.target_temperature]]'
       icon: mdi:thermometer
       color: blue
       show: { not: ['off'] }
@@ -24,7 +26,9 @@ ac-controls:
     entity: climate.bedroom_ac
 
 heating-controls:
-  description: A heating's target temperature slider, its preset menu when it has presets, and its power toggle, orange while it runs.
+  description: A heating's target temperature slider, its preset menu when it has presets, and its power toggle, amber while it runs.
+  title: Heating controls
+  icon: mdi:radiator
   slots:
     entity: { kind: entity, required: true }
     preset: { kind: flag }
@@ -34,9 +38,9 @@ heating-controls:
       type: slider
       entity: '[[entity]]'
       slider: temperature
-      name: Target temperature
+      name: '[[words.target_temperature]]'
       icon: mdi:thermometer
-      color: orange
+      color: amber
       show: { not: ['off'] }
     - id: preset
       if: preset
@@ -46,15 +50,45 @@ heating-controls:
       show: { not: ['off'] }
     - id: power
       template: power
-      slots: { entity: '[[entity]]', color: orange, when: { not: ['off'] } }
+      slots: { entity: '[[entity]]', when: { not: ['off'] } }
   example:
     entity: climate.bedroom_heating
 
 ac-item:
-  description: An AC as an item that opens its pop-up.
+  description: An AC as an item that opens its pop-up; it brings the pop-up.
+  title: AC item
+  icon: mdi:air-conditioner
   slots:
-    key: { kind: text, required: true }
-    entity: { kind: entity, required: true }
+    key: { kind: text, required: true, discover: area.id }
+    name: { kind: text, required: true, discover: area.name }
+    entity:
+      {
+        kind: entity,
+        required: true,
+        discover: { domain: climate, attribute: { hvac_modes: cool } },
+      }
+    fan: { kind: flag }
+    swing: { kind: flag }
+    horizontal_swing: { kind: flag }
+    power_saving:
+      kind: entity
+      discover:
+        - { domain: select, translation_key: power_saving_mode }
+        - { domain: select, name: power saving }
+    dehumidifier:
+      kind: entity
+      discover:
+        - { domain: number, translation_key: dehumidifier_level }
+        - { domain: number, name: dehumidifier }
+    energy:
+      shape: meter
+      fields: { power: { required: true } }
+      discover:
+        device: { domain: climate, attribute: { hvac_modes: cool } }
+        fields:
+          power: { domain: sensor, device_class: power }
+          today: { domain: sensor, device_class: energy, platform: utility_meter }
+          total: { domain: sensor, device_class: energy, exclude: { platform: utility_meter } }
   card:
     type: custom:mnml-entity-card
     entity: '[[entity]]'
@@ -74,20 +108,66 @@ ac-item:
       - id: ac-controls
         template: ac-controls
         slots: { entity: '[[entity]]' }
+  popups:
+    - id: ac-popup
+      template: ac-popup
+      slots:
+        key: '[[key]]'
+        name: '[[name]]'
+        entity: '[[entity]]'
+        fan: '[[fan]]'
+        swing: '[[swing]]'
+        horizontal_swing: '[[horizontal_swing]]'
+        power_saving: '[[power_saving]]'
+        dehumidifier: '[[dehumidifier]]'
+        energy: '[[energy]]'
   example:
     key: bedroom
+    name: Bedroom
     entity: climate.bedroom_ac
+    fan: true
 
 heating-item:
-  description: A heating as an item that opens its pop-up.
+  description: A heating as an item that opens its pop-up, amber while it runs; it brings the pop-up.
+  title: Heating item
+  icon: mdi:radiator
   slots:
-    key: { kind: text, required: true }
-    entity: { kind: entity, required: true }
+    key: { kind: text, required: true, discover: area.id }
+    name: { kind: text, required: true, discover: area.name }
+    entity:
+      {
+        kind: entity,
+        required: true,
+        discover: { domain: climate, exclude: { attribute: { hvac_modes: cool } } },
+      }
     preset: { kind: flag }
+    preset_temperatures:
+      kind: entities
+      discover: { domain: number, platform: better_thermostat }
+    schedule: { kind: entity, discover: { domain: schedule, name: heating, scope: area } }
+    thermostats:
+      shape: thermostat
+      kind: objects
+      fields: { valve: { required: true } }
+      discover:
+        - per: device
+          scope: area
+          where: { domain: sensor, translation_key: valve_position }
+          fields:
+            valve: { domain: sensor, translation_key: valve_position }
+            battery: { domain: sensor, device_class: battery }
+        - per: device
+          scope: area
+          where: { domain: sensor, name: valve position }
+          fields:
+            valve: { domain: sensor, name: valve position }
+            battery: { domain: sensor, device_class: battery }
+    low: { kind: number, default: 20 }
+    critical: { kind: number, default: 5 }
   card:
     type: custom:mnml-entity-card
     entity: '[[entity]]'
-    color: orange
+    color: amber
     when: { not: ['off'] }
     state:
       - id: part
@@ -103,17 +183,39 @@ heating-item:
       - id: heating-controls
         template: heating-controls
         slots: { entity: '[[entity]]', preset: '[[preset]]' }
+  popups:
+    - id: heating-popup
+      template: heating-popup
+      slots:
+        key: '[[key]]'
+        name: '[[name]]'
+        entity: '[[entity]]'
+        preset: '[[preset]]'
+        preset_temperatures: '[[preset_temperatures]]'
+        schedule: '[[schedule]]'
+        thermostats: '[[thermostats]]'
+        low: '[[low]]'
+        critical: '[[critical]]'
   example:
     key: bedroom
+    name: Bedroom
     entity: climate.bedroom_heating
+    preset: true
+    preset_temperatures: [number.bedroom_heating_comfort, number.bedroom_heating_eco]
+    schedule: schedule.bedroom_heating
+    thermostats: [{ valve: sensor.radiator_valve, battery: sensor.radiator_battery }]
 
 heating-popup:
-  description: A room's heating pop-up, its target, its preset, its valves and their batteries.
+  description: "A heating's pop-up, which its item brings: the preset and power in its header, the target, the preset temperatures, the schedule, the valves and their batteries."
+  title: Heating pop-up
+  icon: mdi:radiator
   slots:
     key: { kind: text, required: true }
     name: { kind: text, required: true }
     entity: { kind: entity, required: true }
     preset: { kind: flag }
+    preset_temperatures: { kind: entities }
+    schedule: { kind: entity }
     thermostats: { shape: thermostat, kind: objects, fields: { valve: { required: true } } }
     low: { kind: number, default: 20 }
     critical: { kind: number, default: 5 }
@@ -123,40 +225,60 @@ heating-popup:
     cards:
       - id: header
         type: custom:mnml-header-card
-        name: Heating
-        icon: mdi:radiator
         entity: '[[entity]]'
-        color: orange
+        color: amber
         when: { not: ['off'] }
-        state: [{ id: name, text: '[[name]]' }]
+        state:
+          - { id: name, text: '[[name]]' }
         controls:
-          - id: heating-controls
-            template: heating-controls
-            slots: { entity: '[[entity]]', preset: '[[preset]]' }
+          - id: preset
+            if: preset
+            type: select
+            entity: '[[entity]]'
+            attribute: preset_modes
+            show: { not: ['off'] }
+          - id: power
+            template: power
+            slots: { entity: '[[entity]]', when: { not: ['off'] } }
         back: true
       - id: heading
         type: custom:mnml-heading-card
-        title: Settings
+        title: '[[words.settings]]'
         icon: mdi:tune
       - id: slider
         type: custom:mnml-slider-card
         entity: '[[entity]]'
         slider: temperature
-        name: Target temperature
+        name: '[[words.target_temperature]]'
         icon: mdi:thermometer
-        color: orange
+        color: amber
         turn_on: true
-      - id: preset
-        if: preset
-        type: custom:mnml-select-card
-        entity: '[[entity]]'
-        attribute: preset_modes
-        name: Preset
-        icon: mdi:tune-variant
         visibility: { template: while-not-off, slots: { entity: '[[entity]]' } }
+      - id: slider-off
+        type: custom:mnml-slider-card
+        entity: '[[entity]]'
+        slider: temperature
+        name: '[[words.target_temperature]]'
+        icon: mdi:thermometer
+        turn_on: true
+        visibility: [{ id: while-off, condition: state, entity: '[[entity]]', state: 'off' }]
+      - id: schedule
+        if: schedule
+        template: schedule-card
+        slots: { entity: '[[schedule]]' }
+      - id: preset-temperatures
+        if: preset_temperatures
+        type: custom:mnml-heading-card
+        title: '[[words.preset_temperatures]]'
+        icon: mdi:thermometer-lines
+      - id: each-preset_temperatures
+        each: preset_temperatures
+        as: temperature
+        template: number-slider
+        slots: { entity: '[[temperature]]' }
       - id: valves
         type: custom:mnml-list-card
-        title: Valves
+        title: '[[words.valves]]'
         icon: mdi:valve
         rows:
           - id: each-thermostats
@@ -172,10 +294,15 @@ heating-popup:
     key: bedroom
     name: Bedroom
     entity: climate.bedroom_heating
+    preset: true
+    preset_temperatures: [number.bedroom_heating_comfort, number.bedroom_heating_eco]
+    schedule: schedule.bedroom_heating
     thermostats: [{ valve: sensor.radiator_valve, battery: sensor.radiator_battery }]
 
 ac-popup:
-  description: A room's AC pop-up, its target, its fan, swing and other settings, and its energy.
+  description: "An AC's pop-up, which its item brings: its mode in its header, its target, its fan, swing and other settings, and its energy."
+  title: AC pop-up
+  icon: mdi:air-conditioner
   slots:
     key: { kind: text, required: true }
     name: { kind: text, required: true }
@@ -191,55 +318,58 @@ ac-popup:
     cards:
       - id: header
         type: custom:mnml-header-card
-        name: AC
-        icon: mdi:air-conditioner
         entity: '[[entity]]'
         color: blue
         when: { not: ['off'] }
-        state: [{ id: name, text: '[[name]]' }]
+        state:
+          - { id: name, text: '[[name]]' }
         controls:
-          - id: ac-controls
-            template: ac-controls
-            slots: { entity: '[[entity]]' }
+          - id: mode
+            type: select
+            entity: '[[entity]]'
+            attribute: hvac_modes
+            color: blue
+            when: { not: ['off'] }
+            primary: true
         back: true
       - id: heading
         type: custom:mnml-heading-card
-        title: Temperature
+        title: '[[words.temperature]]'
         icon: mdi:thermometer
         visibility: { template: while-not-off, slots: { entity: '[[entity]]' } }
       - id: slider
         type: custom:mnml-slider-card
         entity: '[[entity]]'
         slider: temperature
-        name: Target temperature
+        name: '[[words.target_temperature]]'
         icon: mdi:thermometer
         color: blue
         visibility: { template: while-not-off, slots: { entity: '[[entity]]' } }
       - id: fan-swing-horizontal_swing-power_saving-dehumidifier
         if: [fan, swing, horizontal_swing, power_saving, dehumidifier]
         type: custom:mnml-heading-card
-        title: Settings
+        title: '[[words.settings]]'
         icon: mdi:tune
       - id: fan
         if: fan
         type: custom:mnml-select-card
         entity: '[[entity]]'
         attribute: fan_modes
-        name: Fan
+        name: '[[words.fan]]'
         icon: mdi:fan
       - id: swing
         if: swing
         type: custom:mnml-select-card
         entity: '[[entity]]'
         attribute: swing_modes
-        name: Swing
+        name: '[[words.swing]]'
         icon: mdi:arrow-oscillating
       - id: horizontal_swing
         if: horizontal_swing
         type: custom:mnml-select-card
         entity: '[[entity]]'
         attribute: swing_horizontal_modes
-        name: Horizontal swing
+        name: '[[words.horizontal_swing]]'
         icon: mdi:arrow-left-right
       - id: power_saving
         if: power_saving

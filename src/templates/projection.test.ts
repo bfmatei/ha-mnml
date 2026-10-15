@@ -144,9 +144,9 @@ test('a projection over what is not a list, a field the elements lack, or inside
 
 test('keeping the elements of a list of entities or texts by a field is an error naming the path, filled or not', () => {
   const templates: Templates = {
-    words: {
-      slots: { words: { kind: 'texts' } },
-      card: { type: 'x', kept: '[[words.?big]]' },
+    states: {
+      slots: { states: { kind: 'texts' } },
+      card: { type: 'x', kept: '[[states.?big]]' },
     },
     loose: {
       slots: { loose: { kind: 'object' } },
@@ -171,8 +171,8 @@ test('keeping the elements of a list of entities or texts by a field is an error
     'net at card.entity: devices.*.firmware is of kind entities, whose elements have no field vital',
   );
   assert.equal(
-    message('words', { words: ['a', 'b'] }),
-    'words at card.kept: words is of kind texts, whose elements have no field big',
+    message('states', { states: ['a', 'b'] }),
+    'states at card.kept: states is of kind texts, whose elements have no field big',
   );
   assert.equal(
     message('loose', { loose: { names: ['a', { big: true }] } }),

@@ -5,7 +5,7 @@ import { styleMap } from 'lit/directives/style-map.js';
 
 import type { Item } from '../../contract/cards.ts';
 import type { PopupHash } from '../../contract/entities.ts';
-import { SEPARATOR, stateLine } from '../../ha/format.ts';
+import { stateLine } from '../../ha/format.ts';
 import { stateOf } from '../../ha/hass.ts';
 import type { HomeAssistant } from '../../ha/hass.ts';
 import { nameOf } from '../../ha/names.ts';
@@ -31,7 +31,7 @@ export const ITEM_STYLE = [
       flex-direction: column;
     }
     .children > .row {
-      padding-left: 60px;
+      padding-inline-start: 60px;
     }
     .row .control.primary {
       background: transparent;
@@ -120,6 +120,12 @@ export function itemRow(
   );
 }
 
+function between(event: Event): void {
+  if (event.target === event.currentTarget) {
+    event.stopPropagation();
+  }
+}
+
 export function itemLine(hass: HomeAssistant, item: Item, host: Host): TemplateResult {
   const name = nameOf(hass, item.entity, item);
   const link = item.popup === undefined ? undefined : linkTo(item.popup);
@@ -129,11 +135,7 @@ export function itemLine(hass: HomeAssistant, item: Item, host: Host): TemplateR
     item,
     link,
     html`${pill(hass, item, name, link)}
-      <div class="line">
-        <span class="name">${name}</span>${
-          line.length === 0 ? nothing : html`<span class="state">${SEPARATOR}${line}</span>`
-        }
-      </div>
-      ${lane.length === 0 ? nothing : html`<div class="lane">${lane}</div>`}`,
+      <div class="line"><span class="state">${line}</span></div>
+      ${lane.length === 0 ? nothing : html`<div class="lane" @click=${between}>${lane}</div>`}`,
   );
 }

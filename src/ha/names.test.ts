@@ -2,10 +2,11 @@ import assert from 'node:assert/strict';
 
 import { test } from 'vitest';
 
-import type { HomeAssistant } from './hass.ts';
-import { cardName, entityName, nameOf } from './names.ts';
+import { fakeHass } from '../test/hass.ts';
 
-const hass = {
+import { cardName, distinctNames, entityName, nameOf } from './names.ts';
+
+const hass = fakeHass({
   states: {
     'light.top': {
       entity_id: 'light.top',
@@ -49,7 +50,7 @@ const hass = {
     'sensor.renamed': { entity_id: 'sensor.renamed', name: 'Short', device_id: 'car' },
   },
   devices: { car: { id: 'car', name: 'Family sedan', name_by_user: 'Sedan' } },
-} as unknown as HomeAssistant;
+});
 
 test('a registry name wins, and a friendly name loses its device prefix', () => {
   assert.equal(entityName(hass, 'sensor.renamed'), 'Short');
@@ -91,4 +92,47 @@ test('a card without an entity keeps its own name; with one, the entity names it
   assert.equal(cardName(hass, undefined, { name: 'Kitchen' }), 'Kitchen');
   assert.equal(cardName(hass, 'sensor.sedan_metadata', { label: 'device' }), 'Sedan');
   assert.equal(cardName(hass, 'sensor.sedan_metadata', {}), 'Metadata');
+});
+
+test('names that would read the same take their area first, and only those', () => {
+  const rooms = fakeHass({
+    states: {},
+    areas: {
+      bedroom: { area_id: 'bedroom', name: 'Bedroom' },
+      entry: { area_id: 'entry', name: 'Entry' },
+      kitchen: { area_id: 'kitchen', name: 'Kitchen' },
+    },
+    entities: {
+      'sensor.bedroom_ac': { entity_id: 'sensor.bedroom_ac', device_id: 'bedroom_ac' },
+      'sensor.entry_ac': { entity_id: 'sensor.entry_ac', device_id: 'entry_ac' },
+      'sensor.kettle': { entity_id: 'sensor.kettle', device_id: 'kettle' },
+      'sensor.kitchen_ac': { entity_id: 'sensor.kitchen_ac', device_id: 'kitchen_ac' },
+      'sensor.spare_ac': { entity_id: 'sensor.spare_ac', device_id: 'spare_ac' },
+    },
+    devices: {
+      bedroom_ac: { id: 'bedroom_ac', name: 'AC', area_id: 'bedroom' },
+      entry_ac: { id: 'entry_ac', name_by_user: 'AC', area_id: 'entry' },
+      kettle: { id: 'kettle', name: 'Kettle', area_id: 'kitchen' },
+      kitchen_ac: { id: 'kitchen_ac', name: 'Kitchen AC', area_id: 'kitchen' },
+      spare_ac: { id: 'spare_ac', name: 'Kitchen AC' },
+    },
+  });
+  assert.deepEqual(
+    distinctNames(rooms, [
+      { entity: 'sensor.bedroom_ac', label: 'device' },
+      { entity: 'sensor.entry_ac', label: 'device' },
+      { entity: 'sensor.kettle', label: 'device' },
+    ]),
+    ['Bedroom AC', 'Entry AC', 'Kettle'],
+  );
+  assert.deepEqual(
+    distinctNames(rooms, [
+      { entity: 'sensor.kitchen_ac', label: 'device' },
+      { entity: 'sensor.spare_ac', label: 'device' },
+      { entity: 'sensor.bedroom_ac', name: 'AC' },
+      { entity: 'sensor.entry_ac', name: 'AC' },
+    ]),
+    ['Kitchen AC', 'Kitchen AC', 'AC', 'AC'],
+    'a name that already starts with its area, no area, or a given name stays as it is',
+  );
 });

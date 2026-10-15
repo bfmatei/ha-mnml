@@ -9,15 +9,15 @@ export interface SliderSpec {
   max: number;
   step: number;
   value: number;
-  gradient?: string;
+  stops?: string;
   dimmed?: true;
   format(value: number): string;
   commit(value: number): Promise<unknown>;
 }
 
-const WHITE_GRADIENT = 'linear-gradient(90deg, #ffb057 0%, #fff1dc 55%, #cfe1ff 100%)';
-const HUE_GRADIENT =
-  'linear-gradient(90deg, hsl(0 100% 50%), hsl(60 100% 50%), hsl(120 100% 50%), hsl(180 100% 50%), hsl(240 100% 50%), hsl(300 100% 50%), hsl(360 100% 50%))';
+const WHITE_STOPS = '#ffb057 0%, #fff1dc 55%, #cfe1ff 100%';
+const HUE_STOPS =
+  'hsl(0 100% 50%), hsl(60 100% 50%), hsl(120 100% 50%), hsl(180 100% 50%), hsl(240 100% 50%), hsl(300 100% 50%), hsl(360 100% 50%)';
 
 interface SpecOptions {
   turn_on?: true;
@@ -53,7 +53,7 @@ export function sliderSpec(
         max: numberAttribute(stateObj, 'max_color_temp_kelvin') ?? 6500,
         step: 50,
         value: kelvin ?? min,
-        gradient: WHITE_GRADIENT,
+        stops: WHITE_STOPS,
         dimmed: stateObj.state === 'on' && kelvin !== undefined ? undefined : true,
         format: (value) => formatAttribute(hass, stateObj, 'color_temp_kelvin', value),
         commit: (value) => callService(hass, id, 'light.turn_on', { color_temp_kelvin: value }),
@@ -67,7 +67,7 @@ export function sliderSpec(
         max: 360,
         step: 1,
         value: Math.round(hue ?? 0),
-        gradient: HUE_GRADIENT,
+        stops: HUE_STOPS,
         dimmed: stateObj.state === 'on' && hue !== undefined ? undefined : true,
         format: (value) => `${value}°`,
         commit: (value) => callService(hass, id, 'light.turn_on', { hs_color: [value, 100] }),

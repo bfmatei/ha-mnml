@@ -25,6 +25,8 @@ const ACTIONS: LibraryActions = {
 function row(name: string, role: Row['role']): Row {
   return {
     name,
+    title: `The ${name.replaceAll('-', ' ')}`,
+    icon: 'mdi:sofa',
     description: `The ${name}.`,
     family: 'common',
     status: 'shipped',
@@ -47,7 +49,33 @@ async function library(): Promise<{ element: MnmlLibrary; root: ShadowRoot }> {
 }
 
 const names = (root: ShadowRoot): string[] =>
-  [...root.querySelectorAll('.library-row .library-name')].map((each) => text(each));
+  [...root.querySelectorAll('.library-row .code-name')].map((each) => text(each));
+
+test("a row is named by the template's title and icon; its code name shows once, small, in the details line", async () => {
+  const element = new MnmlLibrary();
+  element.rows = [
+    { ...row('adguard', 'tile'), title: 'AdGuard Home', family: 'adguard' },
+    { ...row('adguard-popup', 'popup'), title: 'AdGuard Home pop-up', family: 'adguard' },
+  ];
+  element.actions = ACTIONS;
+  const root = await mounted(element);
+  const [tile] = root.querySelectorAll('.library-row');
+  assert.ok(tile);
+  assert.equal(text(tile.querySelector('.library-name') ?? tile), 'AdGuard Home');
+  assert.equal(Reflect.get(tile.querySelector('ha-icon.library-icon') ?? {}, 'icon'), 'mdi:sofa');
+  assert.equal(text(tile.querySelector('.library-status') ?? tile), 'adguard');
+  assert.equal(
+    tile.querySelector('.library-open')?.getAttribute('aria-label'),
+    'Edit AdGuard Home',
+  );
+  const search = root.querySelector<HTMLInputElement>('input.search');
+  assert.ok(search);
+  search.value = 'guard home';
+  search.dispatchEvent(new Event('input'));
+  await element.updateComplete;
+  assert.deepEqual(names(root), ['adguard']);
+  element.remove();
+});
 
 test('the library lists the tiles, and says how many pop-ups and parts it leaves out', async () => {
   const { element, root } = await library();

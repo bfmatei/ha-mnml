@@ -6,7 +6,6 @@ import type { Templates } from '../contract/templates.ts';
 
 import { createShipped } from './shipped.ts';
 
-const settle = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
 const card = (title: string): Templates[string] => ({
   card: { type: 'custom:mnml-heading-card', title, icon: 'mdi:home' },
 });
@@ -62,7 +61,6 @@ test('a family that fails stays failed, says why, and is not fetched again', asy
   );
   assert.equal(shipped.failure(['room']), undefined);
   await shipped.need(['car']);
-  await settle();
   assert.deepEqual(calls, ['car']);
   assert.ok(shipped.later().has('car'), 'a failed family is still not loaded');
 });

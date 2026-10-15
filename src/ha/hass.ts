@@ -1,5 +1,7 @@
 import type { EntityId, ServiceName } from '../contract/entities.ts';
-import type { AreaEntry } from '../templates/discover.ts';
+import { wordsFor } from '../words/words.ts';
+
+import type { AreaEntry, DeviceEntry, EntityEntry } from './registries.ts';
 
 export interface HassEntity {
   entity_id: string;
@@ -7,32 +9,7 @@ export interface HassEntity {
   attributes: Readonly<Record<string, unknown>>;
   last_changed: string;
   last_updated: string;
-}
-
-interface EntityRegistryEntry {
-  entity_id: string;
-  name?: string | null;
-  device_id?: string | null;
-  area_id?: string | null;
-  platform?: string;
-  translation_key?: string | null;
-  entity_category?: string | null;
-  hidden?: boolean;
-  labels?: string[];
-  display_precision?: number;
-}
-
-interface DeviceRegistryEntry {
-  id: string;
-  area_id?: string | null;
-  name?: string | null;
-  name_by_user?: string | null;
-  serial_number?: string | null;
-  manufacturer?: string | null;
-  model?: string | null;
-  entry_type?: string | null;
-  via_device_id?: string | null;
-  labels?: string[];
+  context?: { id: string; user_id: string | null; parent_id: string | null };
 }
 
 interface ServiceTarget {
@@ -56,12 +33,14 @@ export interface HassConnection {
 export interface HomeAssistant {
   states: Readonly<Record<string, HassEntity>>;
   areas: Readonly<Record<string, AreaEntry>>;
-  entities: Readonly<Record<string, EntityRegistryEntry>>;
-  devices: Readonly<Record<string, DeviceRegistryEntry>>;
+  entities: Readonly<Record<string, EntityEntry>>;
+  devices: Readonly<Record<string, DeviceEntry>>;
   locale: { language: string };
   config: { state: string };
   localize(key: string, values?: Record<string, unknown>): string;
+  loadBackendTranslation?(category: string, integrations?: string[]): Promise<unknown>;
   formatEntityState(stateObj: HassEntity, state?: string): string;
+  formatEntityAttributeName(stateObj: HassEntity, attribute: string): string;
   formatEntityAttributeValue(stateObj: HassEntity, attribute: string, value?: unknown): string;
   callApi(method: 'GET', path: string): Promise<unknown>;
   callService(
@@ -71,7 +50,7 @@ export interface HomeAssistant {
     target?: ServiceTarget,
   ): Promise<unknown>;
   connection: HassConnection;
-  user?: { is_admin: boolean };
+  user?: { id: string; is_admin: boolean };
   panels?: Readonly<Record<string, unknown>>;
 }
 
@@ -85,8 +64,12 @@ function domainOf(entityId: string): string {
   return entityId.split('.')[0] ?? '';
 }
 
+export function isValue(state: string | undefined): state is string {
+  return state !== undefined && !NO_VALUE.has(state);
+}
+
 export function hasValue(stateObj: HassEntity | undefined): stateObj is HassEntity {
-  return stateObj !== undefined && !NO_VALUE.has(stateObj.state);
+  return stateObj !== undefined && isValue(stateObj.state);
 }
 
 export function isUnavailable(
@@ -134,14 +117,28 @@ export function callService(
   return hass.callService(domain ?? '', name ?? '', data, { entity_id: entityId });
 }
 
+export function callAction(
+  hass: HomeAssistant,
+  service: ServiceName,
+  data: Record<string, unknown>,
+): Promise<unknown> {
+  const [domain, name] = service.split('.');
+  return hass.callService(domain ?? '', name ?? '', data);
+}
+
 interface Notifier {
   notify(message: string): void;
+}
+
+export function haptic(type: 'light' | 'selection' | 'failure'): void {
+  window.dispatchEvent(new CustomEvent('haptic', { detail: type }));
 }
 
 export function settled(host: Notifier, action: Promise<unknown>): Promise<void> {
   return action.then(
     () => undefined,
     (error: unknown) => {
+      haptic('failure');
       host.notify(error instanceof Error ? error.message : String(error));
     },
   );
@@ -149,6 +146,21 @@ export function settled(host: Notifier, action: Promise<unknown>): Promise<void>
 
 export function run(host: Notifier, action: Promise<unknown>): void {
   void settled(host, action);
+}
+
+export function toggleAction(hass: HomeAssistant, entityId: EntityId): string {
+  const state = stateOf(hass, entityId)?.state;
+  const { actions } = wordsFor(hass.locale.language);
+  switch (domainOf(entityId)) {
+    case 'lock':
+      return state === 'locked' ? actions.unlock : actions.lock;
+    case 'alarm_control_panel':
+      return state === 'disarmed' ? actions.arm : actions.disarm;
+    case 'cover':
+      return state === 'closed' ? actions.open : actions.close;
+    default:
+      return state === 'off' ? actions.turnOn : actions.turnOff;
+  }
 }
 
 export function toggleEntity(hass: HomeAssistant, entityId: EntityId): Promise<unknown> {

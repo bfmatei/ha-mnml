@@ -1,4 +1,5 @@
 import json
+import math
 from typing import Any
 
 import probatio as vol
@@ -88,15 +89,16 @@ CHANGES = vol.Schema({vol.Required("kind"): "changes", vol.Required("changes"): 
 URL_PATH = vol.All(str, vol.Match(r"\A[a-z0-9]+(?:-[a-z0-9]+)+\Z"), vol.Length(max=64))
 TEXT = vol.All(str, vol.Length(min=1))
 OPENING = vol.In(["sheet", "dialog", "unfold"])
-SECTION_KEYS = ("rooms", "people", "garage", "system")
+SECTION_KEYS = ("rooms", "devices", "people", "garage", "system")
 ICON = vol.All(str, vol.Match(r"\Amdi:[a-z0-9-]+\Z"))
 LOOK = {vol.Optional("title"): TEXT, vol.Optional("icon"): ICON}
 SECTIONS = vol.Schema(
     {
         **{
             vol.Optional(key): vol.Schema({**LOOK, vol.Optional("template"): NAME})
-            for key in SECTION_KEYS[:3]
+            for key in ("rooms", "people", "garage")
         },
+        vol.Optional("devices"): vol.Schema(LOOK),
         vol.Optional("system"): vol.Schema(LOOK),
     }
 )
@@ -120,6 +122,34 @@ def found_or_spelled(subject: dict[Any, Any]) -> vol.Any:
     return vol.Any(vol.Schema({**subject, **FOUND}), vol.Schema({**subject, **SPELLED}))
 
 
+SCREENS = ("phone", "tablet", "desktop")
+ENTITY = vol.All(str, vol.Match(r"\A[a-z_]+\.[a-z0-9_]+\Z"))
+HASH = vol.All(str, vol.Match(r"\A#"))
+ALERT = vol.Schema(
+    {
+        vol.Required("entity"): ENTITY,
+        vol.Optional("attribute"): str,
+        vol.Optional("is"): [str],
+        vol.Optional("not"): [str],
+        vol.Required("popup"): HASH,
+        vol.Optional("screens"): [vol.In(SCREENS)],
+        vol.Optional("users"): [str],
+    }
+)
+
+
+def seconds(value: object) -> float:
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, int | float)
+        or not math.isfinite(value)
+        or value <= 0
+    ):
+        msg = "idle_close is a number of seconds above zero"
+        raise vol.Invalid(msg)
+    return value
+
+
 PLAN = vol.Schema(
     {
         vol.Required("title"): TEXT,
@@ -131,14 +161,17 @@ PLAN = vol.Schema(
                 vol.Schema(SPELLED),
             )
         ],
+        vol.Optional("devices"): [
+            vol.Schema({vol.Required("device"): TEXT, vol.Required("template"): NAME})
+        ],
         vol.Required("people"): [found_or_spelled({vol.Required("entity"): PERSON})],
         vol.Required("cars"): [
             vol.Schema({vol.Required("key"): NAME, vol.Required("slots"): dict})
         ],
         vol.Required("system"): [found_or_spelled({vol.Required("template"): NAME})],
-        vol.Required("open"): vol.Schema(
-            {vol.Optional(device): OPENING for device in ("phone", "tablet", "desktop")}
-        ),
+        vol.Required("open"): vol.Schema({vol.Optional(device): OPENING for device in SCREENS}),
+        vol.Optional("idle_close"): seconds,
+        vol.Optional("alerts"): [ALERT],
         vol.Optional("sections"): SECTIONS,
         vol.Optional("order"): ORDER,
     }

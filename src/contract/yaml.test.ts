@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-import { test } from 'vitest';
+import { test, vi } from 'vitest';
 import { parse } from 'yaml';
 
 import { toYaml } from './yaml.ts';
@@ -46,6 +46,16 @@ test('every other string is written plainly, and the text reads back as it was',
   const text = toYaml(value);
   assert.match(text, /entity: sensor\.kitchen_window_battery/);
   assert.deepEqual(parse(text), value);
+});
+
+test('a Jinja template is single-quoted without a warning, and reads back as it was', () => {
+  const warned = vi.spyOn(process, 'emitWarning');
+  const value = { state: '{{ true }}', position: "{{ 'open' }}" };
+  const text = toYaml(value);
+  assert.match(text, /^state: '\{\{ true \}\}'$/m);
+  assert.deepEqual(parse(text), value);
+  assert.equal(warned.mock.calls.length, 0);
+  warned.mockRestore();
 });
 
 test('an undefined key is dropped, so an optional key reads as intent', () => {

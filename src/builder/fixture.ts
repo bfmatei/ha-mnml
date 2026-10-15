@@ -1,4 +1,4 @@
-import type { Registries } from '../templates/discover.ts';
+import type { Registries } from '../ha/registries.ts';
 
 const PHONE = [
   'sensor.jane_phone_battery_level',
@@ -162,5 +162,19 @@ export const HOME: Registries = {
       },
     },
     'person.bob': { attributes: {} },
+  },
+};
+
+export const SCATTERED: Registries = {
+  ...HOUSE,
+  entities: {
+    ...HOUSE.entities,
+    'light.office_desk': { entity_id: 'light.office_desk', platform: 'template' },
+    'sensor.office_temperature': { entity_id: 'sensor.office_temperature', platform: 'template' },
+  },
+  states: {
+    ...HOUSE.states,
+    'light.office_desk': { attributes: { friendly_name: 'Office desk' } },
+    'sensor.office_temperature': { attributes: { friendly_name: 'Office temperature' } },
   },
 };

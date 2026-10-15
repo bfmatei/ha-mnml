@@ -2,46 +2,33 @@ import assert from 'node:assert/strict';
 
 import { test } from 'vitest';
 
+import { fakeHass } from '../test/hass.ts';
+import type { ServiceCall } from '../test/hass.ts';
 import { define, mounted } from '../test/render.ts';
 
 import { MnmlMediaCard } from './media.ts';
 
 define('mnml-media-card', MnmlMediaCard);
 
-interface Call {
-  domain: string;
-  service: string;
-  data: unknown;
-  target: unknown;
-}
-
 const TRANSPORT = 1 | 16 | 32 | 16_384;
 
-function hassWith(state: string, calls: Call[]): unknown {
-  return {
+function hassWith(state: string, calls: ServiceCall[]) {
+  return fakeHass({
     states: {
       'media_player.living_room': {
-        entity_id: 'media_player.living_room',
         state,
         attributes: { friendly_name: 'Living room', supported_features: TRANSPORT },
       },
     },
-    entities: {},
-    devices: {},
-    locale: { language: 'en' },
-    formatEntityState: (stateObj: { state: string }): string => stateObj.state,
-    callService: (domain: string, service: string, data: unknown, target: unknown) => {
-      calls.push({ domain, service, data, target });
-      return Promise.resolve();
-    },
-  };
+    calls,
+  });
 }
 
-async function transport(state: string, calls: Call[]): Promise<ShadowRoot> {
+async function transport(state: string, calls: ServiceCall[]): Promise<ShadowRoot> {
   const made = document.createElement('mnml-media-card');
   assert.ok(made instanceof MnmlMediaCard);
   made.setConfig({ type: 'custom:mnml-media-card', entity: 'media_player.living_room' });
-  made.hass = hassWith(state, calls) as never;
+  made.hass = hassWith(state, calls);
   return mounted(made);
 }
 
@@ -52,7 +39,7 @@ function press(root: ShadowRoot, label: string): void {
 }
 
 test('the transport buttons skip back, play or pause, and skip on, on the player', async () => {
-  const calls: Call[] = [];
+  const calls: ServiceCall[] = [];
   const playing = await transport('playing', calls);
   press(playing, 'Previous');
   press(playing, 'Pause');

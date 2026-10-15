@@ -1,5 +1,7 @@
 person:
   description: A person's tile, whether they are driving or in a focus, and their devices' batteries; it brings the person's and each device's pop-up.
+  title: Person
+  icon: mdi:account
   slots:
     key:
       {
@@ -25,67 +27,21 @@ person:
     entity: '[[entity]]'
     popup: '#person-[[key]]'
     state: [{ id: part }]
-    chips:
-      - id: driving
-        if: devices.*.activity
-        type: status
-        name: Driving
-        icon: mdi:steering
-        silent: true
-        rules:
-          [
-            {
-              id: activities,
-              if: devices.*.activity,
-              entities: ['[[devices.*.activity]]'],
-              color: amber,
-              is: [automotive],
-            },
-          ]
-      - id: do-not-disturb
-        if: devices.*.focus
-        type: status
-        name: Do not disturb
-        icon: mdi:moon-waning-crescent
-        silent: true
-        rules:
-          [
-            {
-              id: focuses,
-              if: devices.*.focus,
-              entities: ['[[devices.*.focus]]'],
-              color: amber,
-              is: ['on'],
-            },
-          ]
-      - id: batteries
-        if: devices.*.battery
-        type: status
-        name: Batteries
-        icon: mdi:battery-alert-variant-outline
-        silent: true
-        rules:
-          - {
-              id: critical,
-              if: critical,
-              entities: '[[devices.*.battery]]',
-              below: '[[critical]]',
-              color: red,
-              label: device,
-            }
-          - {
-              id: low,
-              if: low,
-              entities: '[[devices.*.battery]]',
-              below: '[[low]]',
-              color: orange,
-              label: device,
-            }
+    chips?:
+      - id: person-status
+        template: person-status
+        slots: { devices: '[[devices]]', low: '[[low]]', critical: '[[critical]]' }
     grid_options: { columns: 12 }
   popups:
     - id: person-popup
       template: person-popup
-      slots: { key: '[[key]]', entity: '[[entity]]', health: '[[health]]', devices: '[[devices]]' }
+      slots:
+        key: '[[key]]'
+        entity: '[[entity]]'
+        health: '[[health]]'
+        devices: '[[devices]]'
+        low: '[[low]]'
+        critical: '[[critical]]'
     - id: each-devices
       each: devices
       as: device
@@ -117,8 +73,81 @@ person:
         },
       ]
 
+person-status:
+  description: "A person's Driving and Do not disturb icons, and their devices' Batteries icon, each drawn only while it holds."
+  title: Person status
+  icon: mdi:account-outline
+  slots:
+    devices: { shape: person_device, kind: objects }
+    low: { kind: number, default: 20 }
+    critical: { kind: number, default: 5 }
+  card:
+    - id: driving
+      if: devices.*.activity
+      type: status
+      name: '[[words.driving]]'
+      icon: mdi:steering
+      silent: true
+      rules:
+        [
+          {
+            id: activities,
+            if: devices.*.activity,
+            entities: ['[[devices.*.activity]]'],
+            color: amber,
+            is: [automotive],
+          },
+        ]
+    - id: do-not-disturb
+      if: devices.*.focus
+      type: status
+      name: '[[words.do_not_disturb]]'
+      icon: mdi:moon-waning-crescent
+      silent: true
+      rules:
+        [
+          {
+            id: focuses,
+            if: devices.*.focus,
+            entities: ['[[devices.*.focus]]'],
+            color: amber,
+            is: ['on'],
+          },
+        ]
+    - id: batteries
+      if: devices.*.battery
+      type: status
+      name: '[[words.batteries]]'
+      icon: mdi:battery-alert-variant-outline
+      silent: true
+      rules:
+        - {
+            id: critical,
+            if: critical,
+            entities: '[[devices.*.battery]]',
+            below: '[[critical]]',
+            color: red,
+            label: device,
+          }
+        - {
+            id: low,
+            if: low,
+            entities: '[[devices.*.battery]]',
+            below: '[[low]]',
+            color: orange,
+            label: device,
+          }
+  example:
+    devices:
+      - key: phone
+        activity: sensor.alex_phone_activity
+        focus: binary_sensor.alex_phone_focus
+        battery: sensor.alex_phone_battery
+
 device-card:
   description: A person's device as an item, its place and battery, opening its pop-up.
+  title: Personal device
+  icon: mdi:cellphone
   slots:
     key: { kind: text, required: true }
     device: { shape: person_device, required: true, fields: { tracker: { required: true } } }
@@ -145,7 +174,9 @@ device-card:
       }
 
 person-popup:
-  description: A person's pop-up, their devices, their location access and their health.
+  description: "A person's pop-up: the tile's driving, focus and battery icons in its header, their devices, their location access and their health."
+  title: Person pop-up
+  icon: mdi:account
   slots:
     key: { kind: text, required: true }
     entity: { kind: entity, required: true }
@@ -154,6 +185,8 @@ person-popup:
       shape: person_device
       kind: objects
       fields: { tracker: { required: true }, permission: { required: true } }
+    low: { kind: number, default: 20 }
+    critical: { kind: number, default: 5 }
   card:
     hash: '#person-[[key]]'
     cards:
@@ -161,10 +194,14 @@ person-popup:
         type: custom:mnml-header-card
         entity: '[[entity]]'
         state: [{ id: part }]
+        controls?:
+          - id: person-status
+            template: person-status
+            slots: { devices: '[[devices]]', low: '[[low]]', critical: '[[critical]]' }
       - id: heading
         if: devices
         type: custom:mnml-heading-card
-        title: Devices
+        title: '[[words.devices]]'
         icon: mdi:cellphone-link
       - id: each-devices
         each: devices
@@ -174,7 +211,7 @@ person-popup:
       - id: location-access
         if: devices
         type: custom:mnml-list-card
-        title: Location access
+        title: '[[words.location_access]]'
         icon: mdi:map-marker-alert
         rows:
           - id: each-devices
@@ -187,7 +224,7 @@ person-popup:
       - id: health
         if: health
         type: custom:mnml-list-card
-        title: Health
+        title: '[[words.health]]'
         icon: mdi:heart-pulse
         rows:
           - id: health-steps
@@ -221,7 +258,9 @@ person-popup:
       ]
 
 device-popup:
-  description: A person's device pop-up, its battery and its details.
+  description: "A person's device pop-up: its place and battery in its header, its battery and its details."
+  title: Personal device pop-up
+  icon: mdi:cellphone
   slots:
     key: { kind: text, required: true }
     entity: { kind: entity }
@@ -236,11 +275,13 @@ device-popup:
         name: '[[device.name]]'
         icon: '[[device.icon]]'
         entity: '[[device.tracker]]'
-        state: [{ id: entity, if: entity, entity: '[[entity]]', name: true }]
+        state:
+          - { id: entity, if: entity, entity: '[[entity]]', name: true }
+          - { id: part }
         back: true
       - id: battery
         type: custom:mnml-list-card
-        title: Battery
+        title: '[[words.battery]]'
         icon: mdi:battery-charging-medium
         rows:
           - id: device-battery
@@ -252,7 +293,7 @@ device-popup:
             entity: '[[device.battery_state]]'
       - id: details
         type: custom:mnml-list-card
-        title: Details
+        title: '[[words.details]]'
         icon: mdi:information-outline
         rows:
           - id: device-storage
