@@ -6,7 +6,7 @@ A slot without a rule is set by hand. A field's row reads `slot.field`, and for 
 
 ## Shapes
 
-From `templates/shapes.yaml`. Every shape is an `object`; a slot takes a list of one with `kind: objects`. A field that names a shape is listed by that shape. A shape written over another names it, then what it changes.
+From `templates/shapes.yaml`. A shape is an `object`, listed by its fields, or a single value, listed by its kind. A slot takes a list of an object shape with `kind: objects`. A field that names a shape is listed by that shape. A shape written over another names it, then what it changes.
 
 - `meter`: `power`, `today`, `total`
 - `outlet`: `entity` (required), `energy` (`meter`)
@@ -103,6 +103,7 @@ From `templates/shapes.yaml`. Every shape is an `object`; a slot takes a list of
 - `shows`: `queue` (required), `count` (required), `wanted`, `upcoming`, `calendar`
 - `lock_words`: `secured`, `selectivelocked`; by default `{ secured: 'Locked', selectivelocked: 'Partly locked' }`
 - `alarm_words`: `doorsonly`, `doorstiltcabin`; by default `{ doorsonly: 'Doors only', doorstiltcabin: 'Armed' }`
+- `square`: of kind `text`
 
 ## Common parts
 
@@ -412,6 +413,7 @@ From `templates/adguard.yaml`.
 | `speed`      | entity |                     |
 | `rules`      | entity |                     |
 | `update`     | entity |                     |
+| `square`     | text   |                     |
 
 Found by:
 
@@ -481,6 +483,7 @@ From `templates/car.yaml`.
 | `open_states`                | texts    | `['open', 'intermediate']`                                |
 | `tyre_low_share`             | number   | `0.9`                                                     |
 | `tyre_warn_share`            | number   | `0.95`                                                    |
+| `square`                     | text     |                                                           |
 
 Brings `car-popup`.
 
@@ -1069,6 +1072,7 @@ From `templates/home-assistant.yaml`.
 | `room_firmware`          | objects  |                     |
 | `room_firmware.name`     | text     | required            |
 | `room_firmware.firmware` | entities |                     |
+| `square`                 | text     |                     |
 
 Found by:
 
@@ -1217,6 +1221,7 @@ From `templates/media.yaml`.
 | `shows.upcoming`      | entity   |                                   |
 | `shows.calendar`      | entity   |                                   |
 | `none`                | texts    | `['0', 'unknown', 'unavailable']` |
+| `square`              | text     |                                   |
 
 Found by:
 
@@ -1294,6 +1299,7 @@ From `templates/network.yaml`.
 | `router.temperature`      | entity   | required                                     |
 | `firmware`                | entities |                                              |
 | `device_up`               | texts    | `['connected', 'upgrading', 'provisioning']` |
+| `square`                  | text     |                                              |
 
 Found by:
 
@@ -1391,6 +1397,7 @@ From `templates/people.yaml`.
 | `devices.permission`     | entity  | required            |
 | `low`                    | number  | `20`                |
 | `critical`               | number  | `5`                 |
+| `square`                 | text    |                     |
 
 Found by:
 
@@ -1667,6 +1674,7 @@ From `templates/room.yaml`.
 | `leaks`                               | entities |                     |
 | `low`                                 | number   | `20`                |
 | `critical`                            | number   | `5`                 |
+| `square`                              | text     |                     |
 
 Found by:
 
@@ -1988,6 +1996,7 @@ From `templates/server.yaml`.
 | `root_disk_critical`           | number   | `80`                |
 | `bucket_high`                  | number   | `18`                |
 | `bucket_full`                  | number   | `19`                |
+| `square`                       | text     |                     |
 
 Found by:
 
@@ -2143,6 +2152,7 @@ From `templates/tailscale.yaml`.
 | `devices.update`     | entity  |                     |
 | `devices.udp`        | entity  |                     |
 | `soon_days`          | number  | `14`                |
+| `square`             | text    |                     |
 
 Found by:
 

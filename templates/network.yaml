@@ -44,12 +44,14 @@ unifi-network:
         label: Up states,
         group: Devices,
       }
+    square: { shape: square }
   card:
     type: custom:mnml-tile-card
     name: '[[words.network]]'
     icon: mdi:router-network
     popup: '#network'
     state: [{ id: latency-0, if: latency, entity: '[[latency.0]]', icon: true }]
+    square: '[[square]]'
     chips:
       - id: devices
         if: devices

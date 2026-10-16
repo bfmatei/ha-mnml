@@ -557,6 +557,20 @@ export class MnmlPlanEditor extends LitElement {
             </label>`
           : nothing
       }
+      <div class="plan-row">
+        <input
+          type="checkbox"
+          aria-label=${said.showSquares}
+          .checked=${live(plan.squares === true)}
+          @change=${() => {
+            this.change({ squares: plan.squares === true ? undefined : true });
+          }}
+        />
+        <span class="plan-words">
+          <span>${said.squares}</span>
+          <span class="muted">${said.squaresAbout}</span>
+        </span>
+      </div>
     </section>`;
   }
 

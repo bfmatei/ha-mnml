@@ -513,6 +513,7 @@ export interface Home {
   popupOpen?: PopupOpen;
   idleClose?: number;
   alerts?: readonly PopupAlert[];
+  squares?: true;
   outside?: WeatherId;
   vacation?: InputBooleanId;
   security?: Security;
@@ -530,6 +531,7 @@ export const HOME_KEYS: Record<keyof Home, true> = {
   popupOpen: true,
   idleClose: true,
   alerts: true,
+  squares: true,
   outside: true,
   vacation: true,
   security: true,

@@ -21,12 +21,14 @@ person:
       fields: { tracker: { required: true } }
     low: { kind: number, default: 20, label: Low battery, group: Devices }
     critical: { kind: number, default: 5, label: Critical battery, group: Devices }
+    square: { shape: square }
   retired: [activities, focuses, batteries]
   card:
     type: custom:mnml-tile-card
     entity: '[[entity]]'
     popup: '#person-[[key]]'
     state: [{ id: part }]
+    square: '[[square]]'
     chips?:
       - id: person-status
         template: person-status

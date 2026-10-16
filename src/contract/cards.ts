@@ -276,12 +276,15 @@ export interface ServiceControl extends ControlBase {
   confirm?: StateRule;
 }
 
+export type SquareControl = ToggleControl | SliderControl | SelectControl | ScenesControl;
+
 export interface NavControl extends ControlBase {
   type: 'nav';
   entity: EntityId;
   popup: PopupHash;
   color?: Color;
   when?: StateRule;
+  controls?: SquareControl[];
 }
 
 export interface IndicatorControl extends ControlBase {
@@ -672,10 +675,18 @@ export type HeaderCard = {
   back?: true;
 } & Subject;
 
+export interface TileTrend {
+  entity: SensorId;
+  color?: Color;
+  when?: EntityRule;
+}
+
 export type TileCard = {
   type: 'custom:mnml-tile-card';
   popup: PopupHash;
   state?: StateItem[];
+  trend?: TileTrend;
+  square?: 'large' | 'small';
   chips?: Control[];
   item?: Item;
 } & Subject;

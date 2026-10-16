@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 
+import { render } from 'lit';
 import { test, vi } from 'vitest';
 
 import type { StateRule } from '../../contract/cards.ts';
@@ -12,7 +13,7 @@ import { notified, wire } from '../../test/wire.ts';
 import type { Wire } from '../../test/wire.ts';
 import type { Host } from '../base.ts';
 
-import { renderControls } from './controls.ts';
+import { chipsOf, renderControls } from './controls.ts';
 import { tipOf } from './tooltip.ts';
 
 type Controls = Parameters<typeof renderControls>[0];
@@ -566,4 +567,42 @@ test('a toggle says the action its press takes: on or off, open or close, arm or
   assert.equal(said('alarm_control_panel.a', 'armed_away'), 'Disarm? Tap again');
   assert.equal(said('alarm_control_panel.a', 'disarmed'), 'Arm? Tap again');
   assert.equal(said('lock.door', 'unlocked'), 'Lock? Tap again');
+});
+
+test('each chip says its kind, its title and its colour, and gives an inert cell beside the control it draws', () => {
+  const hass = fakeHass({
+    states: {
+      'lock.front': { state: 'unlocked', attributes: { friendly_name: 'Front door' } },
+      'binary_sensor.window': { state: 'on', attributes: { friendly_name: 'Window' } },
+    },
+  });
+  const chips = chipsOf(
+    [
+      { type: 'toggle', entity: 'lock.front', color: 'red', when: { is: ['unlocked'] } },
+      { type: 'indicator', entity: 'binary_sensor.window', color: 'orange' },
+      { type: 'nav', entity: 'binary_sensor.window', popup: '#window' },
+    ],
+    { hass, host: fakeHost() },
+  );
+  assert.deepEqual(
+    chips.map(({ control, title, color }) => [control.type, title, color]),
+    [
+      ['toggle', 'Front door', 'red'],
+      ['indicator', 'Window: on', 'orange'],
+      ['nav', 'Window', undefined],
+    ],
+  );
+  const root = document.createElement('div');
+  render(
+    chips.map((chip) => chip.cell),
+    root,
+  );
+  assert.equal(root.querySelector('button'), null, 'no cell is a button');
+  assert.deepEqual(
+    [...root.querySelectorAll('[role="img"]')].map((cell) => cell.getAttribute('aria-label')),
+    ['Front door', 'Window: on', 'Window'],
+  );
+  const [lock] = chips;
+  assert.ok(lock);
+  assert.equal(drawn(lock.drawn).querySelector('button')?.getAttribute('aria-pressed'), 'true');
 });

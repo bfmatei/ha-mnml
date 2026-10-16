@@ -134,3 +134,13 @@ test('the system cards, the Glances strip and how pop-ups open are chosen too', 
   await pick(element, labelled(root, 'Show the Glances strip'));
   assert.equal(Object.hasOwn(sent.at(-1) ?? {}, 'glances'), false);
 });
+
+test('the tiles are drawn as squares once the box is ticked, and as rows once it is not', async () => {
+  const { element, root, sent } = await editor({});
+  const squares = labelled<HTMLInputElement>(root, 'Draw the tiles as squares');
+  assert.equal(squares.checked, false);
+  await pick(element, squares);
+  assert.equal(sent.at(-1)?.['squares'], true);
+  await pick(element, labelled(root, 'Draw the tiles as squares'));
+  assert.equal(Object.hasOwn(sent.at(-1) ?? {}, 'squares'), false);
+});

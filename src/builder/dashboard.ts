@@ -1,4 +1,4 @@
-import type { TemplateCard } from '../contract/cards.ts';
+import type { TemplateCard, TileCard } from '../contract/cards.ts';
 import type { Card, Dashboard, Section } from '../contract/dashboard.ts';
 import { lookOf, orderOf } from '../contract/plan.ts';
 import type {
@@ -121,8 +121,63 @@ function heading(plan: Plan, key: PlanSection, templates: Templates): TemplateCa
   return card('section-heading', templates, headingSlots(title, icon));
 }
 
-function grid(cards: Card[]): Section {
-  return { type: 'grid', column_span: 3, cards };
+function grid(cards: Card[], span = 3): Section {
+  return { type: 'grid', column_span: span, cards };
+}
+
+const HALF = 6;
+
+function fillsHalf(cards: readonly Card[]): boolean {
+  return cards.reduce((sum, each) => sum + (each.grid_options?.columns ?? 12), 0) === HALF;
+}
+
+function sideBySide(
+  keys: readonly PlanSection[],
+  drawn: (key: PlanSection) => Card[],
+  titled: (key: PlanSection) => TemplateCard,
+): Card[] {
+  const [first, second] = keys;
+  if (first === undefined) {
+    return [];
+  }
+  if (second !== undefined && fillsHalf(drawn(first)) && fillsHalf(drawn(second))) {
+    return [
+      { ...titled(first), grid_options: { columns: HALF } },
+      { ...titled(second), grid_options: { columns: HALF } },
+      ...drawn(first),
+      ...drawn(second),
+      ...sideBySide(keys.slice(2), drawn, titled),
+    ];
+  }
+  return [titled(first), ...drawn(first), ...sideBySide(keys.slice(1), drawn, titled)];
+}
+
+interface Square {
+  square: NonNullable<TileCard['square']>;
+  columns: number;
+}
+
+const SQUARES: Readonly<Record<PlanSection, Square>> = {
+  rooms: { square: 'large', columns: 6 },
+  devices: { square: 'small', columns: 3 },
+  people: { square: 'small', columns: 3 },
+  garage: { square: 'small', columns: 3 },
+  system: { square: 'small', columns: 3 },
+};
+
+function squared(
+  card: TemplateCard,
+  { square, columns }: Square,
+  registries: Registries,
+  templates: Templates,
+): Card {
+  const template = templates[card.template];
+  if (template === undefined || !Object.hasOwn(template.slots ?? {}, 'square')) {
+    return card;
+  }
+  const live = card.slots === undefined && card.area === undefined && card.device === undefined;
+  const found = live ? discover(template, undefined, registries) : {};
+  return { ...card, slots: { ...found, ...card.slots, square }, grid_options: { columns } };
 }
 
 export function dashboardOf(plan: Plan, registries: Registries, templates: Templates): Dashboard {
@@ -144,6 +199,15 @@ export function dashboardOf(plan: Plan, registries: Registries, templates: Templ
     garage: plan.cars.map((car) => carCard(car, cars, templates)),
     system: plan.system.map((choice) => systemCard(choice, registries, templates)),
   };
+  const keys = orderOf(plan).filter((key) => parts[key].length > 0);
+  const titled = (key: PlanSection): TemplateCard => heading(plan, key, templates);
+  const squares = plan.squares === true;
+  const drawn = (key: PlanSection): Card[] =>
+    squares
+      ? parts[key].map((each) => squared(each, SQUARES[key], registries, templates))
+      : parts[key];
+  const across = squares ? 4 : 3;
+  const side = keys.filter((key) => key !== 'rooms');
   return {
     title: plan.title,
     views: [
@@ -152,23 +216,30 @@ export function dashboardOf(plan: Plan, registries: Registries, templates: Templ
         path: 'home',
         icon: plan.icon,
         type: 'sections',
-        max_columns: 3,
+        max_columns: across,
         sections: [
           ...(plan.glances === undefined
             ? []
-            : [grid([glancesCard(plan.glances, registries, templates)])]),
-          ...orderOf(plan)
-            .filter((key) => parts[key].length > 0)
-            .map((key) => grid([heading(plan, key, templates), ...parts[key]])),
-          grid([
-            {
-              type: 'custom:mnml-popups-card',
-              width: '560px',
-              open: Object.keys(plan.open).length > 0 ? plan.open : undefined,
-              idle_close: plan.idle_close,
-              alerts: plan.alerts !== undefined && plan.alerts.length > 0 ? plan.alerts : undefined,
-            },
-          ]),
+            : [grid([glancesCard(plan.glances, registries, templates)], across)]),
+          ...(squares
+            ? [
+                ...(keys.includes('rooms') ? [grid([titled('rooms'), ...drawn('rooms')], 3)] : []),
+                ...(side.length > 0 ? [grid(sideBySide(side, drawn, titled), 1)] : []),
+              ]
+            : keys.map((key) => grid([titled(key), ...drawn(key)]))),
+          grid(
+            [
+              {
+                type: 'custom:mnml-popups-card',
+                width: '560px',
+                open: Object.keys(plan.open).length > 0 ? plan.open : undefined,
+                idle_close: plan.idle_close,
+                alerts:
+                  plan.alerts !== undefined && plan.alerts.length > 0 ? plan.alerts : undefined,
+              },
+            ],
+            across,
+          ),
         ],
       },
     ],

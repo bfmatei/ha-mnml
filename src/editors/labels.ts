@@ -79,12 +79,14 @@ const LAYOUTS = {
   namedTile: [
     ['subject', ['entity', 'name', 'icon', 'popup']],
     ['state', ['state']],
+    ['look', ['square', 'trend']],
     ['chips', ['chips']],
     ['item', ['item']],
   ],
   entityTile: [
     ['subject', ['entity', 'label', 'icon', 'popup']],
     ['state', ['state']],
+    ['look', ['square', 'trend']],
     ['chips', ['chips']],
     ['item', ['item']],
   ],
@@ -130,6 +132,15 @@ export function labelsOf(words: EditorWords): Readonly<Record<string, Labels>> {
         Object.entries(kinds.control).map(([kind, label]) => [kind, { label }]),
       ),
     },
+    'square-control': {
+      label: cards['square-control'],
+      kinds: {
+        toggle: { label: kinds.control.toggle },
+        slider: { label: kinds.control.slider },
+        select: { label: kinds.control.select },
+        scenes: { label: kinds.control.scenes },
+      },
+    },
     'status-rule': { label: cards['status-rule'] },
     item: { label: cards.item },
     glance: {
@@ -141,6 +152,7 @@ export function labelsOf(words: EditorWords): Readonly<Record<string, Labels>> {
       otherwise: { label: kinds.glance.otherwise },
     },
     row: { label: cards.row },
+    trend: { label: cards.trend },
     'agenda-source': { label: cards['agenda-source'] },
     'message-source': {
       label: cards['message-source'],

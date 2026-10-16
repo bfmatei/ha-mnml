@@ -267,6 +267,7 @@ room:
       }
     low: { kind: number, default: 20, label: Low battery, group: Problems }
     critical: { kind: number, default: 5, label: Critical battery, group: Problems }
+    square: { shape: square }
   retired: [meters, heating.batteries]
   card:
     type: custom:mnml-tile-card
@@ -282,6 +283,12 @@ room:
         if: humidity
         entity: '[[humidity]]'
         icon: true
+    trend:
+      if: temperature
+      entity: '[[temperature]]'
+      color: amber
+      when: { if: heating, entity: '[[heating.entity]]', attribute: hvac_action, is: [heating] }
+    square: '[[square]]'
     chips?:
       - id: window
         if: window
@@ -364,6 +371,11 @@ room:
         template: nav-chip
         slots:
           { entity: '[[ac.entity]]', popup: '#[[key]]-ac', color: blue, when: { not: ['off'] } }
+        controls?:
+          - id: ac-controls
+            if: square
+            template: ac-controls
+            slots: { entity: '[[ac.entity]]' }
       - id: heating
         if: heating
         template: nav-chip
@@ -374,6 +386,11 @@ room:
             color: amber,
             when: { not: ['off'] },
           }
+        controls?:
+          - id: heating-controls
+            if: square
+            template: heating-controls
+            slots: { entity: '[[heating.entity]]', preset: '[[heating.preset]]' }
     item:
       if: lights.group
       template: light-item

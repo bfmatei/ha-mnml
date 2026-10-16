@@ -42,6 +42,7 @@ const ICONS: Readonly<Record<string, MdiIcon>> = {
   Button: 'mdi:gesture-tap',
   Chips: 'mdi:chip',
   Item: 'mdi:card-outline',
+  Trend: 'mdi:chart-line',
   Player: 'mdi:play-circle-outline',
   'More entities': 'mdi:playlist-plus',
 };

@@ -44,6 +44,7 @@ media-server:
           upcoming: { domain: sensor, platform: sonarr, translation_key: upcoming, scope: all }
           calendar: { domain: calendar, platform: sonarr, scope: all }
     none: { kind: texts, default: ['0', unknown, unavailable] }
+    square: { shape: square }
   card:
     type: custom:mnml-tile-card
     name: '[[words.media]]'
@@ -52,6 +53,7 @@ media-server:
     state:
       - { id: streams, entity: '[[streams]]', icon: true }
       - { id: each-more_streams, each: more_streams, as: server, entity: '[[server]]', icon: true }
+    square: '[[square]]'
     chips:
       - id: requests
         if: requests

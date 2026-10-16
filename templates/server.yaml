@@ -85,6 +85,7 @@ proxmox-server:
       { kind: number, default: 80, group: Thresholds, label: 'Root disk critical' }
     bucket_high: { kind: number, default: 18, group: Thresholds, label: 'Bucket high' }
     bucket_full: { kind: number, default: 19, group: Thresholds, label: 'Bucket full' }
+    square: { shape: square }
   retired: [guest_statuses]
   card:
     type: custom:mnml-tile-card
@@ -100,6 +101,7 @@ proxmox-server:
         if: memory
         entity: '[[memory]]'
         icon: true
+    square: '[[square]]'
     chips:
       - id: status
         if: guests.*.status

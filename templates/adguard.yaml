@@ -46,6 +46,7 @@ adguard:
       kind: entity
       group: Status
       discover: { domain: update, platform: adguard, scope: all }
+    square: { shape: square }
   card:
     type: custom:mnml-tile-card
     entity: '[[protection]]'
@@ -60,6 +61,7 @@ adguard:
         if: speed
         entity: '[[speed]]'
         icon: true
+    square: '[[square]]'
     chips:
       - id: status
         if: update

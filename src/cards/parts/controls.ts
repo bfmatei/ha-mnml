@@ -57,6 +57,16 @@ export interface ControlContext {
 
 type Action = ToggleControl | SliderControl | SelectControl | ServiceControl;
 
+export interface Chip {
+  control: Control;
+  title: string;
+  color: Color | undefined;
+  drawn: TemplateResult;
+  cell: TemplateResult;
+}
+
+type Drawn = Omit<Chip, 'control'>;
+
 interface Look {
   title: string;
   part?: string | typeof nothing;
@@ -81,24 +91,29 @@ function pressed(
   glyph: TemplateResult,
   run: (event: Event) => void,
   extra: { pressed?: boolean; menu?: true } = {},
-): TemplateResult {
-  return html`<button
-    type="button"
-    class=${classes(look, false)}
-    style=${styleMap(colorStyle(look.color))}
-    data-part=${look.part ?? nothing}
-    aria-label=${look.spoken ?? look.title}
-    ${tip(look.armed === undefined ? look.title : undefined)}
-    aria-pressed=${extra.pressed === undefined ? nothing : String(extra.pressed)}
-    aria-haspopup=${extra.menu ? 'menu' : nothing}
-    aria-expanded=${extra.menu ? 'false' : nothing}
-    @click=${quietly(run)}
-  >
-    ${glyph}${look.armed === undefined ? nothing : html`<span class="ask">${look.armed}</span>`}
-  </button>`;
+): Drawn {
+  return {
+    title: look.title,
+    color: look.color,
+    drawn: html`<button
+      type="button"
+      class=${classes(look, false)}
+      style=${styleMap(colorStyle(look.color))}
+      data-part=${look.part ?? nothing}
+      aria-label=${look.spoken ?? look.title}
+      ${tip(look.armed === undefined ? look.title : undefined)}
+      aria-pressed=${extra.pressed === undefined ? nothing : String(extra.pressed)}
+      aria-haspopup=${extra.menu ? 'menu' : nothing}
+      aria-expanded=${extra.menu ? 'false' : nothing}
+      @click=${quietly(run)}
+    >
+      ${glyph}${look.armed === undefined ? nothing : html`<span class="ask">${look.armed}</span>`}
+    </button>`,
+    cell: still(look, glyph),
+  };
 }
 
-function inert(look: Look, glyph: TemplateResult): TemplateResult {
+function still(look: Look, glyph: TemplateResult): TemplateResult {
   return html`<div
     class=${classes(look, true)}
     style=${styleMap(colorStyle(look.color))}
@@ -109,6 +124,11 @@ function inert(look: Look, glyph: TemplateResult): TemplateResult {
   >
     ${glyph}
   </div>`;
+}
+
+function inert(look: Look, glyph: TemplateResult): Drawn {
+  const cell = still(look, glyph);
+  return { title: look.title, color: look.color, drawn: cell, cell };
 }
 
 function anchorOf(event: Event): HTMLElement | undefined {
@@ -138,7 +158,7 @@ function isOn(entityId: EntityId, stateObj: HassEntity | undefined): boolean {
   return stateObj.state !== AT_REST[entityId.split('.')[0] ?? ''];
 }
 
-function toggle(control: ToggleControl, ctx: ControlContext): TemplateResult {
+function toggle(control: ToggleControl, ctx: ControlContext): Drawn {
   const stateObj = stateOf(ctx.hass, control.entity);
   const name = entityName(ctx.hass, control.entity);
   const action = toggleAction(ctx.hass, control.entity);
@@ -165,7 +185,7 @@ function toggle(control: ToggleControl, ctx: ControlContext): TemplateResult {
   );
 }
 
-function slider(control: SliderControl, ctx: ControlContext): TemplateResult {
+function slider(control: SliderControl, ctx: ControlContext): Drawn {
   return pressed({ title: control.name, part: partOf(control) }, icon(control.icon), (event) => {
     const hass = ctx.host.hass ?? ctx.hass;
     const stateObj = stateOf(hass, control.entity);
@@ -180,7 +200,7 @@ function slider(control: SliderControl, ctx: ControlContext): TemplateResult {
   });
 }
 
-function select(control: SelectControl, ctx: ControlContext): TemplateResult | undefined {
+function select(control: SelectControl, ctx: ControlContext): Drawn | undefined {
   const stateObj = stateOf(ctx.hass, control.entity);
   if (stateObj === undefined) {
     return undefined;
@@ -213,7 +233,7 @@ function select(control: SelectControl, ctx: ControlContext): TemplateResult | u
   );
 }
 
-function service(control: ServiceControl, ctx: ControlContext): TemplateResult {
+function service(control: ServiceControl, ctx: ControlContext): Drawn {
   const armed = isArmed(ctx.host, control) && asks(ctx.hass, control.confirm, control.entity);
   const asked = armed ? wordsFor(ctx.hass.locale.language).ask(control.name) : undefined;
   return pressed(
@@ -234,26 +254,31 @@ function service(control: ServiceControl, ctx: ControlContext): TemplateResult {
   );
 }
 
-function linked(look: Look, glyph: TemplateResult, popup: PopupHash): TemplateResult {
-  return html`<button
-    type="button"
-    class=${classes(look, false)}
-    style=${styleMap(colorStyle(look.color))}
-    data-part=${look.part ?? nothing}
-    aria-label=${look.spoken ?? look.title}
-    ${tip(look.title)}
-    @pointerdown=${quietly(() => {
-      prebuild(popup);
-    })}
-    @click=${quietly((event) => {
-      navigate(popup, anchorOf(event));
-    })}
-  >
-    ${glyph}
-  </button>`;
+function linked(look: Look, glyph: TemplateResult, popup: PopupHash): Drawn {
+  return {
+    title: look.title,
+    color: look.color,
+    drawn: html`<button
+      type="button"
+      class=${classes(look, false)}
+      style=${styleMap(colorStyle(look.color))}
+      data-part=${look.part ?? nothing}
+      aria-label=${look.spoken ?? look.title}
+      ${tip(look.title)}
+      @pointerdown=${quietly(() => {
+        prebuild(popup);
+      })}
+      @click=${quietly((event) => {
+        navigate(popup, anchorOf(event));
+      })}
+    >
+      ${glyph}
+    </button>`,
+    cell: still(look, glyph),
+  };
 }
 
-function nav(control: NavControl, ctx: ControlContext): TemplateResult {
+function nav(control: NavControl, ctx: ControlContext): Drawn {
   const stateObj = stateOf(ctx.hass, control.entity);
   return linked(
     {
@@ -266,7 +291,7 @@ function nav(control: NavControl, ctx: ControlContext): TemplateResult {
   );
 }
 
-function messages(control: MessagesControl, ctx: ControlContext): TemplateResult | undefined {
+function messages(control: MessagesControl, ctx: ControlContext): Drawn | undefined {
   const all = messageCount(ctx.host, ctx.hass)?.all ?? 0;
   if (all === 0) {
     return undefined;
@@ -278,7 +303,7 @@ function messages(control: MessagesControl, ctx: ControlContext): TemplateResult
   );
 }
 
-function dismiss(control: DismissControl, ctx: ControlContext): TemplateResult | undefined {
+function dismiss(control: DismissControl, ctx: ControlContext): Drawn | undefined {
   if ((messageCount(ctx.host, ctx.hass)?.notifications ?? 0) === 0) {
     return undefined;
   }
@@ -299,7 +324,7 @@ function dismiss(control: DismissControl, ctx: ControlContext): TemplateResult |
   );
 }
 
-function indicator(control: IndicatorControl, ctx: ControlContext): TemplateResult {
+function indicator(control: IndicatorControl, ctx: ControlContext): Drawn {
   const stateObj = stateOf(ctx.hass, control.entity);
   const name = entityName(ctx.hass, control.entity);
   const title =
@@ -366,7 +391,7 @@ function holds(rule: StatusControl['rules'][number], stateObj: HassEntity, host:
   return matches(rule, stateObj.state);
 }
 
-function status(control: StatusControl, ctx: ControlContext): TemplateResult | undefined {
+function status(control: StatusControl, ctx: ControlContext): Drawn | undefined {
   const down = new Map<EntityId, string>();
   for (const rule of control.rules) {
     const lines: string[] = [];
@@ -416,7 +441,7 @@ function status(control: StatusControl, ctx: ControlContext): TemplateResult | u
     : inert({ title: control.name, part: partOf(control) }, icon(control.icon));
 }
 
-function tyres(control: TyresControl, ctx: ControlContext): TemplateResult | undefined {
+function tyres(control: TyresControl, ctx: ControlContext): Drawn | undefined {
   const bands = new Set(
     control.tyres.map((tyre, index) =>
       tyreBand(
@@ -445,7 +470,7 @@ function tyres(control: TyresControl, ctx: ControlContext): TemplateResult | und
   );
 }
 
-function unavailable(control: Action, ctx: ControlContext, stateObj: HassEntity): TemplateResult {
+function unavailable(control: Action, ctx: ControlContext, stateObj: HassEntity): Drawn {
   const own = control.type === 'toggle' || control.type === 'select';
   const name = own ? entityName(ctx.hass, control.entity) : control.name;
   const primary = control.type !== 'slider' && control.primary;
@@ -461,7 +486,7 @@ function unavailable(control: Action, ctx: ControlContext, stateObj: HassEntity)
   );
 }
 
-function scenes(control: ScenesControl, ctx: ControlContext): TemplateResult | undefined {
+function scenes(control: ScenesControl, ctx: ControlContext): Drawn | undefined {
   const choice = sceneChoice(ctx.hass, control.scenes, control.active_scene);
   if (choice.options.length === 0) {
     return undefined;
@@ -507,7 +532,7 @@ function pressable(control: Control, stateObj: HassEntity | undefined): boolean 
   );
 }
 
-function renderControl(control: Control, ctx: ControlContext): TemplateResult | undefined {
+function drawControl(control: Control, ctx: ControlContext): Drawn | undefined {
   const entityId = controlEntity(control);
   if (!shown(ctx.hass, control.show, entityId)) {
     return undefined;
@@ -544,8 +569,17 @@ function renderControl(control: Control, ctx: ControlContext): TemplateResult | 
   }
 }
 
+function chipOf(control: Control, ctx: ControlContext): Chip | undefined {
+  const drawn = drawControl(control, ctx);
+  return drawn === undefined ? undefined : { control, ...drawn };
+}
+
+export function chipsOf(controls: Control[] | undefined, ctx: ControlContext): Chip[] {
+  return (controls ?? []).flatMap((control) => chipOf(control, ctx) ?? []);
+}
+
 export function controlsOf(controls: Control[] | undefined, ctx: ControlContext): TemplateResult[] {
-  return (controls ?? []).flatMap((control) => renderControl(control, ctx) ?? []);
+  return chipsOf(controls, ctx).map((chip) => chip.drawn);
 }
 
 export function renderControls(

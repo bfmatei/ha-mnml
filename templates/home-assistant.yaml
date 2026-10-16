@@ -57,6 +57,7 @@ home-assistant:
           scope: all,
           fields: { name: area.name, firmware: { domain: update, device_class: firmware } },
         }
+    square: { shape: square }
   card:
     type: custom:mnml-tile-card
     name: '[[words.home_assistant]]'
@@ -71,6 +72,7 @@ home-assistant:
         if: disk_free
         entity: '[[disk_free]]'
         icon: true
+    square: '[[square]]'
     chips:
       - id: services
         if: services

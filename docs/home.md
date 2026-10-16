@@ -66,25 +66,27 @@ What the generator writes: one `sections` view with the Glances strip, four sect
 
 **Wall tablets.** The home's `idleClose` (seconds) closes an open pop-up after that long without a touch, and its `alerts` open a pop-up by themselves while an entity holds a state, such as `{ entity: 'lock.front_door', is: ['jammed'], popup: '#hall', screens: ['tablet'] }`. Both are written on the pop-ups card as its [`idle_close` and `alerts`](keys.md#mnml-popups-card), which say how they behave; a home without them has neither.
 
+**Squares.** The home's `squares: true` draws the tiles as squares: the rooms as large ones and everything else as small ones ([`square`](keys.md#mnml-tile-card)), each room with its day of temperature across it, amber while its heating heats, in four columns, the rooms across three and the rest in the fourth. It is written as the plan's `squares` ([Layout](#layout)); a home without it has a row for each tile, its sections one under another.
+
 **Colour.**
 
 - Red: water, an unlocked lock or car, a car alarm left disarmed, a low tyre, a critical battery, a full container disk, blocklists that failed to download, a degraded pool or a failing disk, a server running hot, a bucket at its free limit.
 - Orange: an open window or door, a server outlet that is off, a low battery, a tyre that is dropping, a filling container disk, a link below 10 Gbps, a worn disk, a warm server, a bucket nearing the 20 GB it may hold.
 - Amber: on, a heating that runs included, and a pending update. What is on by rule is the exception: AdGuard's protection, the server's outlet and a car's alarm are neutral while on or armed, and orange or red while not, as their pop-ups' headers are.
 
-Every threshold has two stages, so a slow drift and a fault don't look alike. There are no graphs: history lives in HA's more-info dialogs.
+Every threshold has two stages, so a slow drift and a fault don't look alike. There are no graphs but a large square's day of temperature: history lives in HA's more-info dialogs.
 
 ## Stack
 
 - **Almost everything is a custom card.** Everything the dashboard shows comes from `mnml-cards.js`, the pop-up shell included. The few native HA cards are the vacuum map, the 3D printer's camera and the Wi-Fi QR codes (`picture-entity`), the car's location (`map`) and the routine buttons (`grid`).
 - **No other HACS card.** Everything is MNML's or native.
 - **Template instances, every slot spelled.** The dashboard is MNML template cards, one per tile, each with every slot written from the home and no `area`, so nothing is discovered. Repetition is the templates' job (`room` per room); spelling is the generator's. No decluttering card.
-- **One generator.** `homePlan(home)` is the home as a plan of the panel's builder ([Building a dashboard](editors.md#building-a-dashboard)): the Glances strip, each room, person and system tile spelled (`spelled: true`, its slots all of them), each car, the section titles, the order and the openings. `build(home)` is that plan drawn by the builder's `dashboardOf()`, with no registries to discover from, so a home in code and a dashboard the panel builds are drawn by the same code.
+- **One generator.** `homePlan(home)` is the home as a plan of the panel's builder ([Building a dashboard](editors.md#building-a-dashboard)): the Glances strip, each room, person and system tile spelled (`spelled: true`, its slots all of them), each car, the section titles, the order, the openings and the squares. `build(home)` is that plan drawn by the builder's `dashboardOf()`, with no registries to discover from, so a home in code and a dashboard the panel builds are drawn by the same code.
 - **Where new things go:**
   - a read-only value: a row of a list card, or an entry of a state line;
   - a control: a `Control` in a lane;
   - a new kind of thing: a new card, under `src/cards/` with its configuration in `src/contract/cards.ts`, and the template that draws it.
-- **Nothing hides behind more-info.** No graphs, and no more-info dialog behind anything. History lives in HA's more-info dialogs, outside the dashboard.
+- **Nothing hides behind more-info.** No graphs but a large square's day line, and no more-info dialog behind anything. History lives in HA's more-info dialogs, outside the dashboard.
 
 ## The dashboard strategy
 
@@ -95,7 +97,7 @@ strategy:
   type: custom:mnml
 ```
 
-With nothing more, it is the quick start's dashboard ([Building a dashboard](editors.md#building-a-dashboard)): the areas that are rooms where the room template finds something, every person, the system cards whose entities MNML finds, no device on a card of its own, and pop-ups that unfold on a tablet and a computer. It is made again whenever Home Assistant's areas, devices or entities change, so a new room, person or system appears without a rebuild. Each key of a plan written beside `type` takes the place of the quick start's own: `rooms`, `devices`, `people`, `cars`, `system`, `glances`, `open`, `idle_close`, `alerts`, `title`, `icon`, `sections` and `order`, as the panel keeps a plan (`tests/plans.json` has examples). `devices` lists the devices drawn in the Devices section, each `{ device, template }`: its id in Home Assistant's device registry and the template its card is drawn with. `idle_close` and `alerts` are the pop-ups card's own ([`mnml-popups-card`](keys.md#mnml-popups-card)), for a wall tablet:
+With nothing more, it is the quick start's dashboard ([Building a dashboard](editors.md#building-a-dashboard)): the areas that are rooms where the room template finds something, every person, the system cards whose entities MNML finds, no device on a card of its own, and pop-ups that unfold on a tablet and a computer. It is made again whenever Home Assistant's areas, devices or entities change, so a new room, person or system appears without a rebuild. Each key of a plan written beside `type` takes the place of the quick start's own: `rooms`, `devices`, `people`, `cars`, `system`, `glances`, `open`, `idle_close`, `alerts`, `squares`, `title`, `icon`, `sections` and `order`, as the panel keeps a plan (`tests/plans.json` has examples). `devices` lists the devices drawn in the Devices section, each `{ device, template }`: its id in Home Assistant's device registry and the template its card is drawn with. `idle_close` and `alerts` are the pop-ups card's own ([`mnml-popups-card`](keys.md#mnml-popups-card)), for a wall tablet:
 
 ```yaml
 strategy:
@@ -111,15 +113,18 @@ strategy:
     - { entity: lock.front_door, is: [jammed], popup: '#hall', screens: [tablet] }
 ```
 
-A key that is not a plan's, or a choice that is not well formed, is named where the dashboard would be. The dashboard's settings choose the rooms, the people and the system cards (what MNML finds, or a list of one's own in its order), the Glances strip, and how pop-ups open; the rest is written in YAML. Home Assistant's energy settings fill the Energy pop-up and the Glances strip's energy: the grid, solar and battery power, the battery's charge, and each metered device ([`energy-popup`](catalog.md#energy-popup)). **Take control**, in the dashboard's menu, keeps the dashboard as it was last made, which then no longer follows the home.
+A key that is not a plan's, or a choice that is not well formed, is named where the dashboard would be. The dashboard's settings choose the rooms, the people and the system cards (what MNML finds, or a list of one's own in its order), the Glances strip, whether the tiles are squares, and how pop-ups open; the rest is written in YAML. Home Assistant's energy settings fill the Energy pop-up and the Glances strip's energy: the grid, solar and battery power, the battery's charge, and each metered device ([`energy-popup`](catalog.md#energy-popup)). **Take control**, in the dashboard's menu, keeps the dashboard as it was last made, which then no longer follows the home.
 
 ## Layout
 
-- **One view.** It is a `sections` view with `max_columns: 3`. The Glances strip comes first, across the whole width. Then four titled sections, each `column_span: 3`: Rooms, People, Garage, Infrastructure, or in the order of the home's `order` (a list of `rooms`, `people`, `garage` and `system`, each once), which `problems()` checks. The titles are `mnml-heading-card`s with `grid_options.columns: full`, from the home's `sections`. A section with no tiles, the Garage of a home with no car, is left out with its heading. Last comes an untitled section holding the pop-up shell.
+- **One view.** It is a `sections` view with `max_columns: 3`, or four with squares ([Squares](#layout), below). The Glances strip comes first, across the whole width. Then four titled sections, each `column_span: 3`: Rooms, People, Garage, Infrastructure, or in the order of the home's `order` (a list of `rooms`, `people`, `garage` and `system`, each once), which `problems()` checks. The titles are `mnml-heading-card`s with `grid_options.columns: full`, from the home's `sections`. A section with no tiles, the Garage of a home with no car, is left out with its heading. Last comes an untitled section holding the pop-up shell.
 - **Section headings.** A heading has its title and icon at the left, and a trailing group (`.trail`) at the right with a state line, controls, or both. A folding list's heading ends in a chevron after its summary, and the whole heading is the tap target; folded, the heading stands alone, with no surface under it.
 - **Tile width.** Every tile writes `grid_options: { columns: 12 }` over MNML's default of half a section, so each takes 12 grid columns. The Garage and the Infrastructure keep the rhythm of the Rooms: at three columns, three infrastructure tiles fill a row and the other two take the next.
   - Each view column is twelve grid columns, so a section is 36 wide when three columns fit and 24 when two do.
   - Two tiles share a row only while twice the width fits, so 12 is a third of a row at three columns and half a row at two. No single value can be half at three columns and full at two.
+- **Squares.** With `squares`, the builder writes a `square` slot and `grid_options` on each template card whose template takes the slot: a room is `large` across 6 grid columns, every other tile `small` across 3. In a dashboard the panel or the strategy builds, a system card that would discover live holds what discovery found instead, beside its square.
+  - The view is then `max_columns: 4`: the Glances strip and the pop-up shell's section span all of them, the Rooms are a section of three columns, so a row holds 6 rooms, and the other sections share the fourth, one section of one column, in the `order`, so a row holds 4 small squares. Four columns of at least 320 px need about 1400 px, so a 1440 px window with the sidebar open shows three: the Rooms take the width and the fourth column's section follows under them, as on a phone, which stacks them all.
+  - Two sections next to each other in the `order` that each fill exactly half that column, two small squares each, share a row: their headings are 6 grid columns each, side by side, and their squares follow, so People and Garage read as two short columns. A section of one tile, or of three or more, stands under its heading across the column.
 
 | Window width (sidebar open) | Tiles per row                                                                                   |
 | --------------------------- | ----------------------------------------------------------------------------------------------- |
@@ -234,6 +239,8 @@ A pop-up template's card is its `hash` and its `cards`, a `mnml-header-card` fir
 - **Taps.** Tapping the strip opens `#<room>-lights` and stops there. Its controls stop their own taps. Tapping anything else on the tile opens `#<room>`.
 
 **The tile shows vital state only:** temperature, humidity, a window or door while it is open, lock, climate, lights, and a leak or a low battery while there is one. Every other device lives in the room pop-up.
+
+**As a large square** (the home's `squares`), the room tile is the pill; the window, the door, a doorbell, a camera's person, Leak and Batteries, while each is drawn, as the strip of issues in the corner, worst first; its temperature and its humidity under the name, each on its line; its day of temperature across the square, amber while the heating heats; and a column of the open garage doors, the lock, AC and Heating, in that order: two over the Lights button in a room with a Lights group, and three in a room without one. So the Heating is in the room pop-up alone while two of the others are drawn in a room with lights, such as the lock and the AC, or three in a room without, such as an open garage door, the lock and the AC. AC and Heating open a menu as the Lights button does: the Heating's power, the unit's target temperature while it is on, its mode (AC, Off among them, so the AC has no power button) or its preset (Heating, when it has presets), and Details, which opens its pop-up.
 
 ### The room pop-up, `#<room>`
 

@@ -85,6 +85,7 @@ export function dashboardTemplateOf(
     icon: plan.icon,
     ...(plan.glances === undefined ? {} : { glances: true }),
     open: plan.open,
+    ...(plan.squares === true ? { squares: true } : {}),
     sections,
     ...(plan.order === undefined ? {} : { order: [...plan.order] }),
     templates: bundled,
@@ -222,11 +223,16 @@ export function readDashboardTemplate(text: string, shipped: Templates): Dashboa
   if (glances !== undefined && glances !== true) {
     return refuse("The dashboard template's glances is true, for the Glances strip, or left out.");
   }
+  const squares = inner['squares'];
+  if (squares !== undefined && squares !== true) {
+    return refuse("The dashboard template's squares is true, for square tiles, or left out.");
+  }
   return {
     title,
     icon,
     ...(glances === undefined ? {} : { glances }),
     open: openOf(inner['open']),
+    ...(squares === undefined ? {} : { squares }),
     sections: read,
     ...(order === undefined ? {} : { order }),
     templates: bundled,

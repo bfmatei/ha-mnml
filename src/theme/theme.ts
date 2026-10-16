@@ -193,7 +193,7 @@ function variables(palette: Palette): Variables {
     'mnml-overlay-background-color': tint(material.overlay),
     'mnml-card-shadow': shadow(material),
     'mnml-button-shadow': well(material),
-    'ha-view-sections-column-gap': '12px',
+    'ha-view-sections-column-gap': '24px',
     'ha-view-sections-row-gap': '12px',
     'mnml-card-highlight-color': tint(material.highlight),
     'mnml-popup-background-color': tint(material.card),

@@ -282,6 +282,7 @@ export function planFrom(
             .filter((name) => systemFills(registries, templates, name))
             .map((template) => ({ template })),
     open: { ...dashboardTemplate.open },
+    ...(dashboardTemplate.squares === true ? { squares: true } : {}),
     ...(Object.keys(looks).length === 0 ? {} : { sections: looks }),
     ...(dashboardTemplate.order === undefined ? {} : { order: [...dashboardTemplate.order] }),
   };

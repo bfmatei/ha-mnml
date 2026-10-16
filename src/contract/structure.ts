@@ -29,14 +29,20 @@ import type {
   PopupScreen,
   PopupsCard,
   ReportCard,
+  ScenesControl,
   SelectCard,
+  SelectControl,
   SliderCard,
+  SliderControl,
   SliderKind,
+  SquareControl,
   StateItem,
   StateRule,
   StatusControl,
   TemplateCard,
   TileCard,
+  TileTrend,
+  ToggleControl,
   WeatherCard,
 } from './cards.ts';
 import { isMapping } from './templates.ts';
@@ -262,6 +268,11 @@ export const OPENINGS: readonly string[] = Object.keys({
   unfold: true,
 } satisfies Record<PopupOpening, true>);
 
+const SQUARES: readonly string[] = Object.keys({
+  large: true,
+  small: true,
+} satisfies Record<NonNullable<TileCard['square']>, true>);
+
 export const STATE_ITEM = marked<StateItem>('state')(
   {
     text: { text: need(text()), when: entityRule() },
@@ -298,32 +309,53 @@ const STATUS_RULE = plain<StatusControl['rules'][number]>('status-rule', {
   within_days: number(),
 });
 
+const TOGGLE: Keys<ToggleControl> = {
+  entity: need(entity()),
+  icon: icon(),
+  primary: flag(),
+  color: color(),
+  when: rule(),
+  confirm: rule(),
+  show: entityRule(),
+};
+
+const SLIDER: Keys<SliderControl> = {
+  entity: need(entity()),
+  slider: need(choice(SLIDER_KINDS)),
+  name: need(text()),
+  icon: need(icon()),
+  color: color(),
+  show: entityRule(),
+};
+
+const SELECT: Keys<SelectControl> = {
+  entity: need(entity(['select', 'climate', 'timer'])),
+  attribute: choice(MODE_ATTRIBUTES),
+  primary: flag(),
+  color: color(),
+  when: rule(),
+  show: entityRule(),
+};
+
+const SCENES: Keys<ScenesControl> = {
+  scenes: need(entities(['scene'])),
+  active_scene: entity(['select']),
+  name: need(text()),
+  icon: need(icon()),
+  show: entityRule(),
+};
+
+const SQUARE_CONTROL = tagged<SquareControl>('square-control', {
+  toggle: TOGGLE,
+  slider: SLIDER,
+  select: SELECT,
+  scenes: SCENES,
+});
+
 export const CONTROL = tagged<Control>('control', {
-  toggle: {
-    entity: need(entity()),
-    icon: icon(),
-    primary: flag(),
-    color: color(),
-    when: rule(),
-    confirm: rule(),
-    show: entityRule(),
-  },
-  slider: {
-    entity: need(entity()),
-    slider: need(choice(SLIDER_KINDS)),
-    name: need(text()),
-    icon: need(icon()),
-    color: color(),
-    show: entityRule(),
-  },
-  select: {
-    entity: need(entity(['select', 'climate', 'timer'])),
-    attribute: choice(MODE_ATTRIBUTES),
-    primary: flag(),
-    color: color(),
-    when: rule(),
-    show: entityRule(),
-  },
+  toggle: TOGGLE,
+  slider: SLIDER,
+  select: SELECT,
   service: {
     entity: need(entity()),
     service: need(service()),
@@ -339,6 +371,7 @@ export const CONTROL = tagged<Control>('control', {
     color: color(),
     when: rule(),
     show: entityRule(),
+    controls: parts(SQUARE_CONTROL),
   },
   indicator: { entity: need(entity()), color: need(color()), show: entityRule() },
   status: {
@@ -356,13 +389,7 @@ export const CONTROL = tagged<Control>('control', {
     silent: flag(),
     show: entityRule(),
   },
-  scenes: {
-    scenes: need(entities(['scene'])),
-    active_scene: entity(['select']),
-    name: need(text()),
-    icon: need(icon()),
-    show: entityRule(),
-  },
+  scenes: SCENES,
   messages: {
     popup: need(popup()),
     name: need(text()),
@@ -384,6 +411,12 @@ const ITEM = plain<Item>('item', {
   when: rule(),
   state: parts(STATE_ITEM),
   controls: parts(CONTROL),
+});
+
+const TILE_TREND = plain<TileTrend>('trend', {
+  entity: need(entity(['sensor'])),
+  color: color(),
+  when: entityRule(),
 });
 
 const GLANCE = marked<Glance>('glance')(
@@ -629,6 +662,8 @@ export const CARD_STRUCTURES: Readonly<Record<CustomCard['type'], Structure>> = 
         icon: need(icon()),
         popup: need(popup()),
         state: parts(STATE_ITEM),
+        trend: part(TILE_TREND),
+        square: choice(SQUARES),
         chips: parts(CONTROL),
         item: part(ITEM),
       },
@@ -639,6 +674,8 @@ export const CARD_STRUCTURES: Readonly<Record<CustomCard['type'], Structure>> = 
       icon: icon(),
       popup: need(popup()),
       state: parts(STATE_ITEM),
+      trend: part(TILE_TREND),
+      square: choice(SQUARES),
       chips: parts(CONTROL),
       item: part(ITEM),
     },

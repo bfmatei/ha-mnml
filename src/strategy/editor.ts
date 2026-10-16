@@ -128,7 +128,7 @@ export class MnmlStrategyEditor extends LitElement {
     if (found === undefined) {
       return html`<p class="muted">${this.problem ?? 'Finding what the home has...'}</p>`;
     }
-    return html`${PARTS.map((part) => this.drawPart(part, found))}${this.drawGlances()}${this.drawOpen(found)}`;
+    return html`${PARTS.map((part) => this.drawPart(part, found))}${this.drawGlances()}${this.drawSquares()}${this.drawOpen(found)}`;
   }
 
   private change(next: Config): void {
@@ -277,6 +277,24 @@ export class MnmlStrategyEditor extends LitElement {
           }}
         />
         <span class="name">The Glances strip, on top</span>
+      </label>
+    </section>`;
+  }
+
+  private drawSquares(): TemplateResult {
+    const on = this.config['squares'] === true;
+    return html`<section>
+      <h3>Squares</h3>
+      <label class="row">
+        <input
+          type="checkbox"
+          aria-label="Draw the tiles as squares"
+          .checked=${live(on)}
+          @change=${() => {
+            this.change(on ? without(this.config, 'squares') : { ...this.config, squares: true });
+          }}
+        />
+        <span class="name">Square tiles, large for the rooms</span>
       </label>
     </section>`;
   }

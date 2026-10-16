@@ -258,3 +258,28 @@ test("a dashboard template keeps whether the Glances strip shows, without the st
   const head = 'mnml_dashboard:\n  title: Home\n  icon: mdi:home\n';
   assert.throws(() => readDashboardTemplate(`${head}  glances: yes please\n`, SHIPPED), /Glances/);
 });
+
+test('a dashboard template keeps whether the tiles are squares, and refills it', () => {
+  const plan: Plan = { ...defaultPlan(HOME, SHIPPED), squares: true };
+  const dashboardTemplate = dashboardTemplateOf(plan, SHIPPED, SHIPPED);
+  assert.equal(dashboardTemplate.squares, true);
+  const back = planFrom(
+    readDashboardTemplate(dashboardTemplateText(dashboardTemplate), SHIPPED),
+    HOME,
+    SHIPPED,
+  );
+  assert.equal(back.squares, true);
+  const plain = dashboardTemplateOf(defaultPlan(HOME, SHIPPED), SHIPPED, SHIPPED);
+  assert.equal('squares' in plain, false);
+  const read = planFrom(
+    readDashboardTemplate(dashboardTemplateText(plain), SHIPPED),
+    HOME,
+    SHIPPED,
+  );
+  assert.equal('squares' in read, false);
+  const head = 'mnml_dashboard:\n  title: Home\n  icon: mdi:home\n';
+  assert.throws(
+    () => readDashboardTemplate(`${head}  squares: yes please\n`, SHIPPED),
+    /squares is true, for square tiles, or left out/,
+  );
+});

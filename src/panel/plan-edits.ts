@@ -185,6 +185,7 @@ const FIELDS = [
   'icon',
   'glances',
   'open',
+  'squares',
   'sections',
   'order',
 ] as const satisfies readonly (keyof Plan)[];

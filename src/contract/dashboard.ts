@@ -1,7 +1,7 @@
 import type { CustomCard } from './cards.ts';
 import type { MdiIcon } from './entities.ts';
 
-export type Card = CustomCard;
+export type Card = CustomCard & { grid_options?: { columns: number } };
 
 export interface Section {
   type: 'grid';

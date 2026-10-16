@@ -43,7 +43,8 @@ export const MENU_STYLE = css`
     font-size: 13px;
     animation: mnml-rise 140ms ease-out;
   }
-  .menu button {
+  .menu button,
+  .scenes > .list button {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -60,16 +61,21 @@ export const MENU_STYLE = css`
     white-space: nowrap;
     transition: background-color 120ms ease-out;
   }
-  .menu button:hover {
+  .menu button:hover,
+  .scenes > .list button:hover {
     background: var(--m-pill);
   }
-  .menu button.selected {
+  .menu button.selected,
+  .scenes > .list button.selected {
     color: var(--primary-color);
     font-weight: 600;
   }
   .menu button ha-icon,
   .menu button ha-attribute-icon,
-  .menu button ha-state-icon {
+  .menu button ha-state-icon,
+  .scenes > .list button ha-icon,
+  .scenes > .list button ha-attribute-icon,
+  .scenes > .list button ha-state-icon {
     --mdc-icon-size: 20px;
     flex: none;
   }
@@ -209,7 +215,7 @@ export function sceneChoice(
   };
 }
 
-function step(items: HTMLElement[], from: number, key: string): number | undefined {
+function step(items: readonly HTMLElement[], from: number, key: string): number | undefined {
   const last = items.length - 1;
   switch (key) {
     case 'ArrowDown':
@@ -223,6 +229,49 @@ function step(items: HTMLElement[], from: number, key: string): number | undefin
     default:
       return undefined;
   }
+}
+
+export function menuKeys(
+  event: KeyboardEvent,
+  items: readonly HTMLElement[],
+  close: (refocus?: boolean) => void,
+): void {
+  if (event.key === 'Tab') {
+    close(true);
+    return;
+  }
+  const focused = event.composedPath()[0];
+  const from = items.findIndex((item) => item === focused);
+  const next = step(items, from, event.key);
+  if (next !== undefined) {
+    event.preventDefault();
+    event.stopPropagation();
+    items[next]?.focus();
+  }
+}
+
+export function menuRows<V extends string>(
+  choice: Choice<V>,
+  host: Host,
+  close: (refocus?: boolean) => void,
+): TemplateResult[] {
+  const radio = choice.current !== undefined;
+  return choice.options.map((option) => {
+    const selected = option.value === choice.current;
+    return html`<button
+      type="button"
+      class=${classMap({ selected })}
+      role=${radio ? 'menuitemradio' : 'menuitem'}
+      aria-checked=${radio ? String(selected) : nothing}
+      @click=${(event: Event) => {
+        event.stopPropagation();
+        run(host, choice.select(option.value, host.hass));
+        close(true);
+      }}
+    >
+      ${option.icon ?? nothing}<span>${option.label}</span>
+    </button>`;
+  });
 }
 
 const opened = new WeakMap<HTMLElement, (refocus?: boolean) => void>();
@@ -251,18 +300,7 @@ export function openMenu(
     scroll: true,
     trigger,
     keys: (event) => {
-      if (event.key === 'Tab') {
-        close(true);
-        return;
-      }
-      const focused = event.composedPath()[0];
-      const from = items.findIndex((item) => item === focused);
-      const next = step(items, from, event.key);
-      if (next !== undefined) {
-        event.preventDefault();
-        event.stopPropagation();
-        items[next]?.focus();
-      }
+      menuKeys(event, items, close);
     },
     closed: (refocus) => {
       opened.delete(anchor);
@@ -272,30 +310,8 @@ export function openMenu(
       }
     },
   });
-  const radio = choice.current !== undefined;
   opened.set(anchor, close);
-  const pick = (value: string): void => {
-    run(host, choice.select(value, host.hass));
-    close(true);
-  };
-  render(
-    choice.options.map((option) => {
-      const selected = option.value === choice.current;
-      return html`<button
-        type="button"
-        class=${classMap({ selected })}
-        role=${radio ? 'menuitemradio' : 'menuitem'}
-        aria-checked=${radio ? String(selected) : nothing}
-        @click=${(event: Event) => {
-          event.stopPropagation();
-          pick(option.value);
-        }}
-      >
-        ${option.icon ?? nothing}<span>${option.label}</span>
-      </button>`;
-    }),
-    menu,
-  );
+  render(menuRows(choice, host, close), menu);
   items = [...menu.querySelectorAll('button')];
   container.append(menu);
   menu.showPopover();

@@ -92,6 +92,7 @@ export interface Plan {
   open: PopupOpen;
   idle_close?: number;
   alerts?: PopupAlert[];
+  squares?: true;
   sections?: Partial<Record<PlanSection, SectionLook>>;
   order?: PlanSection[];
 }
@@ -108,6 +109,7 @@ const PLAN_KEYS: Readonly<Record<keyof Plan, true>> = {
   open: true,
   idle_close: true,
   alerts: true,
+  squares: true,
   sections: true,
   order: true,
 };
@@ -147,6 +149,7 @@ export interface DashboardTemplate {
   icon: MdiIcon;
   glances?: true;
   open: PopupOpen;
+  squares?: true;
   sections: Partial<Record<SectionKey, DashboardTemplateSection>>;
   order?: PlanSection[];
   templates: Record<string, Template>;
@@ -278,6 +281,7 @@ export function isPlan(value: unknown): value is Plan {
     (value['order'] === undefined || isOrder(value['order'])) &&
     idleOk(value['idle_close']) &&
     alertsOk(value['alerts']) &&
+    (value['squares'] === undefined || value['squares'] === true) &&
     listOf(value['rooms'], roomOk) &&
     (value['devices'] === undefined ||
       listOf(

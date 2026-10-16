@@ -94,6 +94,7 @@ export const PANEL_RO: PanelWords = {
       icon: 'Pictograma s-a schimbat',
       glances: 'Banda de indicatori s-a schimbat',
       open: 'Felul în care se deschid pop-up-urile s-a schimbat',
+      squares: 'Plăcile și-au schimbat forma',
       sections: 'Titlul, pictograma sau șablonul unei secțiuni s-a schimbat',
       order: 'Secțiunile au o ordine nouă',
     },
@@ -289,6 +290,9 @@ export const PANEL_RO: PanelWords = {
     showGlances: 'Arată banda de indicatori',
     strip: 'Banda de indicatori',
     stripAbout: 'Un rând sus: vremea, alarma și orice are nevoie de tine.',
+    showSquares: 'Desenează plăcile ca pătrate',
+    squares: 'Pătrate',
+    squaresAbout: 'Camerele ca pătrate mari și restul ca pătrate mici, în loc de câte un rând.',
     popups: 'Pop-up-uri',
     popupsAbout:
       'Cum se deschide pop-up-ul unei plăci pe fiecare ecran și când se închide singur pe o tabletă de perete.',

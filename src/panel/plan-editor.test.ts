@@ -602,6 +602,19 @@ test('pop-ups close after the seconds given, and never once the field is emptied
   element.remove();
 });
 
+test('the tiles are drawn as squares once the switch is on, and as rows once it is off', async () => {
+  const { element, root, saved } = await editor();
+  const squares = control<HTMLInputElement>(root, 'input[aria-label="Draw the tiles as squares"]');
+  assert.equal(squares.checked, false);
+  squares.click();
+  await save(element, root);
+  assert.equal(saved.at(-1)?.[0].squares, true);
+  squares.click();
+  await save(element, root);
+  assert.equal(saved.at(-1)?.[0].squares, undefined);
+  element.remove();
+});
+
 function devicesHome(): Registries {
   const home = homes()['devices'];
   assert.ok(home);

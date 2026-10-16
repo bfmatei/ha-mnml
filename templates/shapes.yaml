@@ -580,3 +580,9 @@ alarm_words:
   fields:
     doorsonly: { kind: text }
     doorstiltcabin: { kind: text }
+
+square:
+  kind: text
+  label: Square
+  help: "large or small: the tile drawn as a square of that size. The plan's squares writes it."
+  group: Basics

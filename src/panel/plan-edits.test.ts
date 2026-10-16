@@ -156,6 +156,12 @@ test('the changes from what was built count each field and each row once, and a 
   );
 });
 
+test('the tiles switched to squares are one change since the build, listed by its field', () => {
+  const squares: Plan = { ...PLAN, squares: true };
+  assert.equal(planChanges(PLAN, squares), 1);
+  assert.deepEqual(changesIn(PLAN, squares), [{ field: 'squares' }]);
+});
+
 test("a row's slot is written, set to none, or dropped, and no slot left leaves no slots", () => {
   assert.deepEqual(slotsWith(undefined, 'ac', null), { ac: null });
   assert.deepEqual(slotsWith({ name: 'Cook' }, 'temperature', 'sensor.a'), {

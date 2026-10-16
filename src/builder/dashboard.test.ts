@@ -2,9 +2,10 @@ import assert from 'node:assert/strict';
 
 import { test } from 'vitest';
 
-import type { CustomCard, TemplateCard } from '../contract/cards.ts';
-import type { Dashboard } from '../contract/dashboard.ts';
+import type { TemplateCard } from '../contract/cards.ts';
+import type { Card, Dashboard } from '../contract/dashboard.ts';
 import type { Plan } from '../contract/plan.ts';
+import { isMapping } from '../contract/templates.ts';
 import type { Registries } from '../ha/registries.ts';
 import { homes } from '../templates/corpus.ts';
 import { discover } from '../templates/discover.ts';
@@ -32,7 +33,7 @@ function sent(plan: Plan, registries: Registries = HOME): Dashboard {
   return JSON.parse(wire);
 }
 
-function cardsOf(plan: Plan): CustomCard[] {
+function cardsOf(plan: Plan): Card[] {
   return sent(plan).views.flatMap((view) => view.sections.flatMap((section) => section.cards));
 }
 
@@ -452,4 +453,125 @@ test('without glances there is no strip; with them, the Glances strip comes firs
     glances: { slots: { vacation: 'input_boolean.away' }, spelled: true },
   });
   assert.deepEqual(spelled?.slots, { vacation: 'input_boolean.away' });
+});
+
+function squaresOf(plan: Plan): unknown[] {
+  return cardsOf(plan).flatMap((card) =>
+    card.type === 'custom:mnml-template-card' && card.template !== 'section-heading'
+      ? [[card.template, card.slots?.['square'], card.grid_options?.columns]]
+      : [],
+  );
+}
+
+test('with squares, a room is a large square across 6 columns and every other tile a small one across 3; without, neither is written', () => {
+  const plan: Plan = { ...PLAN, system: [{ template: 'home-assistant' }] };
+  assert.deepEqual(squaresOf({ ...plan, squares: true }), [
+    ['room', 'large', 6],
+    ['room', 'large', 6],
+    ['person', 'small', 3],
+    ['home-assistant', 'small', 3],
+  ]);
+  assert.deepEqual(squaresOf(plan), [
+    ['room', undefined, undefined],
+    ['room', undefined, undefined],
+    ['person', undefined, undefined],
+    ['home-assistant', undefined, undefined],
+  ]);
+});
+
+function laidOut(plan: Plan): unknown[] {
+  const [view] = sent(plan).views;
+  return [
+    view?.max_columns,
+    ...(view?.sections ?? []).map((section) => [
+      section.column_span,
+      section.cards.map((card) => {
+        const name = 'template' in card ? card.template : card.type;
+        const title = 'slots' in card ? card.slots?.['title'] : undefined;
+        const shown = typeof title === 'string' ? title : name;
+        return card.grid_options === undefined ? shown : `${shown} ${card.grid_options.columns}`;
+      }),
+    ]),
+  ];
+}
+
+test('with squares, the view is four columns, the rooms across three and the other sections in the fourth, two that each fill half of it side by side', () => {
+  const people: Plan['people'] = [
+    { entity: 'person.jane', slots: { entity: 'person.jane' }, spelled: true },
+    { entity: 'person.john', slots: { entity: 'person.john' }, spelled: true },
+  ];
+  const plan: Plan = {
+    ...PLAN,
+    glances: {},
+    people,
+    cars: [
+      { key: 'm3', slots: {} },
+      { key: 'x1', slots: {} },
+    ],
+    system: [{ template: 'home-assistant' }],
+    order: ['rooms', 'people', 'garage', 'system'],
+    squares: true,
+  };
+  assert.deepEqual(laidOut(plan), [
+    4,
+    [4, ['glances']],
+    [3, ['Rooms', 'room 6', 'room 6']],
+    [
+      1,
+      [
+        'People 6',
+        'Garage 6',
+        'person 3',
+        'person 3',
+        'car 3',
+        'car 3',
+        'System',
+        'home-assistant 3',
+      ],
+    ],
+    [4, ['custom:mnml-popups-card']],
+  ]);
+  assert.deepEqual(laidOut({ ...plan, people: people.slice(0, 1) })[3], [
+    1,
+    ['People', 'person 3', 'Garage', 'car 3', 'car 3', 'System', 'home-assistant 3'],
+  ]);
+  assert.deepEqual(laidOut({ ...plan, squares: undefined }).slice(0, 2), [3, [3, ['glances']]]);
+});
+
+test('a squared system card that discovered live holds what discovery found, and its square', () => {
+  const [card] = templateCards({
+    ...PLAN,
+    system: [{ template: 'home-assistant' }],
+    squares: true,
+  }).filter((each) => each.template === 'home-assistant');
+  assert.deepEqual(card?.slots, {
+    ...discover(TEMPLATES['home-assistant'] ?? { card: null }, undefined, HOME),
+    square: 'small',
+  });
+});
+
+test('the nine tile templates take a square, and with squares every card of the default plan draws, each tile as its square', () => {
+  const tiles = Object.entries(TEMPLATES)
+    .filter(
+      ([, template]) =>
+        isMapping(template.card) && template.card['type'] === 'custom:mnml-tile-card',
+    )
+    .map(([name]) => name);
+  assert.equal(tiles.length, 9);
+  assert.deepEqual(
+    tiles.filter((name) => !Object.hasOwn(TEMPLATES[name]?.slots ?? {}, 'square')),
+    [],
+  );
+  for (const card of templateCards({ ...defaultPlan(HOME, TEMPLATES), squares: true })) {
+    const template = TEMPLATES[card.template];
+    assert.notEqual(template, undefined, card.template);
+    const found =
+      template === undefined || (card.area === undefined && card.slots !== undefined)
+        ? {}
+        : discover(template, card.area, HOME);
+    const expanded = expand(TEMPLATES, { template: card.template, slots: card.slots ?? {} }, found);
+    assert.equal(expanded.missing, undefined, card.template);
+    const drawn = isMapping(expanded.card) ? expanded.card['square'] : undefined;
+    assert.equal(drawn, card.slots?.['square'], card.template);
+  }
 });

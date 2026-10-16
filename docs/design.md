@@ -14,7 +14,7 @@ The two are the two MNML themes, which set the same variables to other values, a
 ## Principles
 
 - **A card is its pop-up, minified.** An item in a pop-up is a rounded rectangle with a square icon tile and generous padding, its name over its state line, and all its controls. The same item in a tile's Lights strip is one slim line: its icon alone, its name and state line after it, and the same controls, smaller; a slider it opens covers that line alone. Its buttons have no background: the primary one is only brighter.
-- **Cards are raised, what sits in them is recessed.** A pill, a chip, the tile's Lights strip and a slider track are wells (`mnml-button-shadow`); an item's icon tile is a light fill in it, like a segmented control's thumb.
+- **Cards are raised, what sits in them is recessed.** A pill, a chip, the tile's Lights strip, a slider track, a small square's round well and a large square's buttons are wells (`mnml-button-shadow`); an item's icon tile is a light fill in it, like a segmented control's thumb.
 - **A state colours an icon, and tints the pill behind it.** No other surface takes a state colour.
 - **Headings, not separators.** A heading sits above a card, never inside one.
 - **Nothing idle.** Empty space is fine. A pill or text that carries no information is a defect.
@@ -42,7 +42,7 @@ Besides Home Assistant's variables, the cards read eighteen of their own, each w
 
 ## Layout
 
-- **Sizes.** In a sections view, the small cards (button, select, slider, tile) take half a section, 6 of its 12 grid columns, so two share a row; every other card takes the full section, and the pop-up shell one column of a zero-height row. `grid_options` overrides any of them. A card is as tall as its content.
+- **Sizes.** In a sections view, the small cards (button, select, slider, tile) take half a section, 6 of its 12 grid columns, so two share a row; every other card takes the full section, and the pop-up shell one column of a zero-height row. `grid_options` overrides any of them, as the plan's `squares` does: 6 columns for a large square and 3 for a small one ([Sizes](#sizes)). A card is as tall as its content, but for a square.
 - **Section headings.** A heading has its title and icon at the start, and a trailing group (`.trail`) at the end with a state line, controls, or both. A folding list's heading ends in a chevron after its summary, and the whole heading is the tap target; folded, the heading stands alone, with no surface under it.
 
 ## Surfaces and the hairline
@@ -97,6 +97,12 @@ The hairline is on `.card` and on the full-width slider card, except a gradient 
 
 **The state line** is one line. Its items are separated by `•`, each preceded by its entity's state icon when `icon: true`, centred on its value 3 px before it. A line with no item to show takes no space. Only in a tile may it wrap, so that a long line shows whole; in the tile's Lights row it is the row's only text, beside the icon. Text that overflows is cut with an ellipsis, never scrolled.
 
+**Squares.** A square is as tall as it is wide (`aspect-ratio: 1`), so its size is the grid's: a large one, 6 grid columns, half a view column, is about 156 to 246 px across (Home Assistant keeps a view column between 320 and 500 px wide, and narrower on a phone under 336 px), and a small one, 3 grid columns, about 74 to 119 px.
+
+- **A large square** has the 40 px pill 10 px in from its top corner, and the strip of issues hanging from the other: 32 x 36 px cells with square corners and 18 px icons, the strip's free corner rounded 16 px. The name, 18 px, over the first two readings at 15 px, each on its line with its icon, sits 10 px in from the bottom, clear of the column; two readings side by side would not fit beside it. The day's line runs between them, 2 px with round ends and joins: the secondary text colour at 60 % opacity, or its colour at full opacity while its `when` holds. The column is 36 px buttons 6 px from the bottom and end edges, 8 px apart, each with a 44 px target on a touch screen. The square is an inline-size container, and a narrow one tightens: under 180 px across, the name is 17 px, the strip's cells 32 px tall and the column's buttons 4 px apart, so the strip clears a column of three; under 156 px, the name is 16 px, the readings 14 px, the day's line 6 px taller, and the column's buttons 32 px.
+- **Its overlays.** A menu, the lights' or a `nav` chip's, is a column of buttons in the column's place, sized, spaced and drawn as its buttons are (shrinking to 28 px tall when they don't fit), up from the entity's toggle at the column's foot, or from its first option when it has no toggle; its buttons grow out of the button tapped, and the column hides while it is open. A slider or a list fills the square, 6 px in, with the close button at the column's foot.
+- **A small square** is a 42 px round well with a 22 px icon, the name under it at 11 px, and a strip of 22 x 24 px cells with 14 px icons, its free corner rounded 11 px.
+
 ## Controls
 
 **One primary per card.** It is in the primary text colour while the others are secondary, a button in a row has no background, and a tile chip is a well pressed into the card, the pill colour with a soft inner shadow along its top and a light lip along its bottom:
@@ -130,7 +136,7 @@ Every threshold has two stages, so that a slow drift and a fault don't look alik
 - a list row's bar (`.bar > div`, in `currentColor`);
 - the car plan's open parts and low tyres (`.part.open`, `.half`, `.tyre.low`, `.warn`).
 
-Two more fills are colour on purpose: the white temperature and hue gradients (`WHITE_STOPS`, `HUE_STOPS`), which show the colours they set; and the card's hairline, which is an edge rather than a state.
+Three more fills are colour on purpose: the white temperature and hue gradients (`WHITE_STOPS`, `HUE_STOPS`), which show the colours they set; the card's hairline, which is an edge rather than a state; and a large square's glow, amber from the corner of its lights button while its light is on, from 15 % to 40 % with the light's brightness (40 % for a light that has none).
 
 **Four literals remain**, in the slider, the menu and the pop-up shell:
 
@@ -152,7 +158,7 @@ Every colour a card names has a value in both modes of the theme.
 
 ## Sliders and menus
 
-**Sliders.** A slider is a 40 px track in the pill colour with a translucent fill: `--m-color` at 38 %, or the accent. A 2 px solid border in the same colour closes the fill.
+**Sliders.** A slider is a 40 px track in the pill colour with a translucent fill: `--m-color` at 38 %, or the accent. A 2 px solid border in the same colour closes the fill. Its label is the icon, the name and the value; a name too long for the track is cut with an ellipsis, so the value always shows whole.
 
 - **Why the border.** The fill alone sits at 1.5 to 2.7:1 against its track, and a translucent accent over that track cannot reach 3:1 and stay translucent. The border carries the value's position instead, at 3.1 to 3.5:1 in light and 4.2 to 9.6:1 in dark.
 - **Over a heading**, the overlay is the heading's 36 px with no inset, so its slider is as tall as the heading's controls, and its label is in the text colour, without the heading's capitals and tracking.
@@ -162,7 +168,7 @@ Every colour a card names has a value in both modes of the theme.
 
 ## Tooltips
 
-An icon with no text beside it (a chip, a round button, a chevron, a glance) explains itself in a tooltip of the cards' own, not the browser's `title`: one `mnml-tooltip`, drawn in the top layer so it shows over pop-ups. It opens 400 ms after the pointer rests on the element, at once when the pointer moves to a neighbour, and on keyboard focus; it never opens for a touch. It sits above the element, below when there is no room, kept inside the screen, and closes when the pointer leaves, on a press, on a scroll, on Escape, and when a redraw takes its element away. The first line is the name, in bold; the lines after it are the details, such as the batteries a chip counts. Text that a label already shows beside its icon gets none. A tooltip is not a name: a glance that acts is a `button` named with what its tooltip says, its value included (`aria-label`), and the car plan's drawing is an image named with its parts' states.
+An icon with no text beside it (a chip, a round button, a chevron, a glance) explains itself in a tooltip of the cards' own, not the browser's `title`: one `mnml-tooltip`, drawn in the top layer so it shows over pop-ups. It opens 400 ms after the pointer rests on the element, at once when the pointer moves to a neighbour, on keyboard focus, and for a touch held 500 ms, which then does not act; a shorter touch acts and shows no tooltip. It sits above the element, below when there is no room, kept inside the screen, and closes when the pointer leaves, on a press, on a scroll, on Escape, and when a redraw takes its element away. The first line is the name, in bold; the lines after it are the details, such as the batteries a chip counts. Text that a label already shows beside its icon gets none. A tooltip is not a name: a glance that acts is a `button` named with what its tooltip says, its value included (`aria-label`), and the car plan's drawing is an image named with its parts' states.
 
 ## Feedback
 
@@ -199,4 +205,4 @@ The cards follow the page's reading direction, which Home Assistant sets on the 
 
 ## Motion, in one rule
 
-Motion is confined to what the cards own the lifecycle of: a pop-up, a menu and a slider overlay animate in, a pop-up animates out, and press feedback transitions. State that arrives with `hass` never animates. [How the cards work](cards.md#motion) has the timings.
+Motion is confined to what the cards own the lifecycle of: a pop-up, a menu and an overlay animate in, a pop-up animates out, and press feedback transitions. State that arrives with `hass` never animates. [How the cards work](cards.md#motion) has the timings.

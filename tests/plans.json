@@ -81,6 +81,7 @@
       }
     },
     { "why": "no alerts", "with": { "alerts": [] } },
+    { "why": "tiles drawn as squares", "with": { "squares": true } },
     {
       "why": "devices on cards of their own, with their section's look and place",
       "with": {
@@ -175,6 +176,8 @@
     { "why": "an idle close of no seconds", "with": { "idle_close": 0 } },
     { "why": "an idle close that is a flag", "with": { "idle_close": true } },
     { "why": "an idle close written as text", "with": { "idle_close": "120" } },
+    { "why": "squares turned off by a flag", "with": { "squares": false } },
+    { "why": "squares written as text", "with": { "squares": "yes" } },
     { "why": "an alert without a pop-up", "with": { "alerts": [{ "entity": "lock.front_door" }] } },
     {
       "why": "an alert whose pop-up is no hash",

@@ -42,6 +42,7 @@ export function homePlan(home: Home): Plan {
     open: { ...home.popupOpen },
     idle_close: home.idleClose,
     alerts: home.alerts?.map((alert) => ({ ...alert })),
+    squares: home.squares,
     sections: {
       rooms: { title: sections.rooms },
       people: { title: sections.people },

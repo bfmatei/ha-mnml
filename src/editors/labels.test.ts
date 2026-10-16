@@ -117,7 +117,7 @@ test('a panel keeps its icon in every language, and its keys', () => {
   const named = tile.variants[0]?.form;
   assert.deepEqual(
     named?.sections.map((section) => section.title),
-    ['Subiect', 'Stare', 'Cipuri', 'Element'],
+    ['Subiect', 'Stare', 'Aspect', 'Cipuri', 'Element'],
   );
   assert.equal(named?.labels?.['popup'], 'Pop-up');
 });

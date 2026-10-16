@@ -66,6 +66,21 @@ test("a home's idle close and alerts are its plan's, and its pop-ups card's", ()
   assert.equal(plain.alerts, undefined);
 });
 
+test("a home's squares are its plan's, and draw its rooms large and its other tiles small", () => {
+  const plan = homePlan({ ...DEMO, squares: true });
+  assert.equal(isPlan(plan), true);
+  assert.equal(plan.squares, true);
+  const squares = build({ ...DEMO, squares: true })
+    .views.flatMap((view) => view.sections.flatMap((section) => section.cards))
+    .flatMap((card) =>
+      card.type === 'custom:mnml-template-card' && typeof card.slots?.['square'] === 'string'
+        ? [card.slots['square']]
+        : [],
+    );
+  assert.deepEqual([...new Set(squares)].toSorted(), ['large', 'small']);
+  assert.equal(homePlan(DEMO).squares, undefined);
+});
+
 test("a home's order is its plan's", () => {
   assert.equal('order' in homePlan(DEMO), false);
   const ordered = homePlan({ ...DEMO, order: ['system', 'rooms', 'people', 'garage'] });

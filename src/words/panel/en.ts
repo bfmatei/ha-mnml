@@ -82,6 +82,7 @@ export const PANEL_EN = {
       icon: 'The icon changed',
       glances: 'The Glances strip changed',
       open: 'How pop-ups open changed',
+      squares: 'The tiles changed shape',
       sections: "A section's title, icon or template changed",
       order: 'The sections have a new order',
     },
@@ -273,6 +274,10 @@ export const PANEL_EN = {
     showGlances: 'Show the Glances strip',
     strip: 'The Glances strip',
     stripAbout: 'One line across the top: the weather, the alarm, and whatever needs you.',
+    showSquares: 'Draw the tiles as squares',
+    squares: 'Squares',
+    squaresAbout:
+      'Rooms as large squares and everything else as small ones, in place of a row each.',
     popups: 'Pop-ups',
     popupsAbout:
       "How a tile's pop-up opens on each screen, and when one closes by itself on a wall tablet.",

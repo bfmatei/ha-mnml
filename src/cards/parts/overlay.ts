@@ -1,7 +1,16 @@
+import { html, render } from 'lit';
+import type { TemplateResult } from 'lit';
+
+import { icon } from '../../ha/templates.ts';
 import type { Host } from '../base.ts';
+
+import { tip } from './tooltip.ts';
+
+const OVERLAY_TIMEOUT = 3000;
 
 interface DismissOptions {
   scroll?: true;
+  live?: true;
   trigger?: HTMLElement;
   keys?(event: KeyboardEvent): void;
   closed(refocus: boolean): void;
@@ -12,7 +21,7 @@ export function dismissable(
   host: Host,
   options: DismissOptions,
 ): (refocus?: boolean) => void {
-  const release = host.hold();
+  const release = options.live ? () => {} : host.hold();
   let open = true;
   const close = (refocus = false): void => {
     if (!open) {
@@ -54,4 +63,72 @@ export function dismissable(
     window.addEventListener('scroll', outside, true);
   }
   return close;
+}
+
+export interface Overlay {
+  overlay: HTMLElement;
+  close: (refocus?: boolean) => void;
+  schedule: () => void;
+  redraw: () => void;
+}
+
+export function openOverlay(
+  surface: HTMLElement,
+  host: Host,
+  className: string,
+  content: (controls: Pick<Overlay, 'close' | 'schedule'>) => TemplateResult,
+  { closed, live }: { closed?: () => void; live?: true } = {},
+): Overlay {
+  const root = surface.getRootNode();
+  const focusedIn = (): Element | null => (root instanceof ShadowRoot ? root.activeElement : null);
+  const opener = focusedIn();
+  const overlay = document.createElement('div');
+  overlay.className = className;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const close = dismissable(overlay, host, {
+    live,
+    closed: (refocus) => {
+      clearTimeout(timer);
+      closed?.();
+      if (refocus && opener instanceof HTMLElement && opener.isConnected) {
+        opener.focus();
+      }
+    },
+  });
+  const holdsFocus = (): boolean => {
+    const active = focusedIn();
+    return active !== null && overlay.contains(active);
+  };
+  const schedule = (): void => {
+    clearTimeout(timer);
+    if (overlay.isConnected && !holdsFocus()) {
+      timer = setTimeout(close, OVERLAY_TIMEOUT);
+    }
+  };
+  const redraw = (): void => {
+    render(content({ close, schedule }), overlay);
+  };
+  redraw();
+  overlay.addEventListener('click', (event) => {
+    event.stopPropagation();
+  });
+  overlay.addEventListener('focusin', schedule);
+  overlay.addEventListener('focusout', () => setTimeout(schedule, 0));
+  surface.append(overlay);
+  schedule();
+  return { overlay, close, schedule, redraw };
+}
+
+export function closeButton(label: string, close: (refocus?: boolean) => void): TemplateResult {
+  return html`<button
+    type="button"
+    class="control"
+    aria-label=${label}
+    ${tip(label)}
+    @click=${() => {
+      close(true);
+    }}
+  >
+    ${icon('mdi:close')}
+  </button>`;
 }

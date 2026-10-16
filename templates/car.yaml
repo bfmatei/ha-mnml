@@ -71,6 +71,7 @@ car:
         group: Tyres,
         label: 'Warning tyre share',
       }
+    square: { shape: square }
   card:
     type: custom:mnml-tile-card
     entity: '[[metadata]]'
@@ -78,6 +79,7 @@ car:
     icon: '[[icon]]'
     popup: '#car-[[key]]'
     state: [{ id: fuel, if: fuel, entity: '[[fuel]]', icon: true }]
+    square: '[[square]]'
     chips:
       - id: doors
         type: status

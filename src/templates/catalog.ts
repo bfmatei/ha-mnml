@@ -26,7 +26,7 @@ Each shipped template's title, icon and description, its slots, the rules that f
 
 A slot without a rule is set by hand. A field's row reads \`slot.field\`, and for an \`objects\` slot names the field of each element. A slot passed whole to a card's or a control's key takes that key's shape, in [keys.md](keys.md).`;
 
-const SHAPES_INTRO = `From \`templates/shapes.yaml\`. Every shape is an \`object\`; a slot takes a list of one with \`kind: objects\`. A field that names a shape is listed by that shape. A shape written over another names it, then what it changes.`;
+const SHAPES_INTRO = `From \`templates/shapes.yaml\`. A shape is an \`object\`, listed by its fields, or a single value, listed by its kind. A slot takes a list of an object shape with \`kind: objects\`. A field that names a shape is listed by that shape. A shape written over another names it, then what it changes.`;
 
 type Row = readonly string[];
 
@@ -301,13 +301,19 @@ function requiredPaths(fields: Record<string, WrittenSlot>, at: string): string[
   return found;
 }
 
+function shapeContents(shape: WrittenSlot): string {
+  return shape.fields === undefined && shape.kind !== undefined
+    ? `of kind ${code(shape.kind)}`
+    : Object.entries(shape.fields ?? {})
+        .map(([field, slot]) => shapeField(field, slot))
+        .join(', ');
+}
+
 function shapeLines(name: string, shape: WrittenSlot): string[] {
   const fields = shape.fields ?? {};
   const base =
     shape.shape === undefined
-      ? Object.entries(fields)
-          .map(([field, slot]) => shapeField(field, slot))
-          .join(', ')
+      ? shapeContents(shape)
       : `${code(shape.shape)}, with ${listed(requiredPaths(fields, '').map(code))} required`;
   const fallback =
     shape.default === undefined ? '' : `; by default ${code(written(shape.default))}`;

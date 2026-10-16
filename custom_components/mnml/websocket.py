@@ -172,6 +172,7 @@ PLAN = vol.Schema(
         vol.Required("open"): vol.Schema({vol.Optional(device): OPENING for device in SCREENS}),
         vol.Optional("idle_close"): seconds,
         vol.Optional("alerts"): [ALERT],
+        vol.Optional("squares"): TRUE,
         vol.Optional("sections"): SECTIONS,
         vol.Optional("order"): ORDER,
     }

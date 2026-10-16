@@ -1,4 +1,4 @@
-import { LitElement, css, html, nothing, render } from 'lit';
+import { LitElement, css, html, nothing } from 'lit';
 import type { PropertyValues, TemplateResult } from 'lit';
 import { property, state } from 'lit/decorators.js';
 import { classMap } from 'lit/directives/class-map.js';
@@ -16,9 +16,8 @@ import { wordsFor } from '../../words/words.ts';
 import type { Host } from '../base.ts';
 import { BASE_STYLE } from '../styles.ts';
 
-import { dismissable } from './overlay.ts';
+import { closeButton, openOverlay } from './overlay.ts';
 import type { SliderSpec } from './slider-spec.ts';
-import { tip } from './tooltip.ts';
 
 export interface SliderLabel {
   icon: MdiIcon;
@@ -91,7 +90,13 @@ const SLIDER_STYLE = css`
     --mdc-icon-size: 20px;
     flex: none;
   }
+  .slider .label .label-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .slider .label .label-value {
+    flex: none;
     margin-inline-start: auto;
     font-weight: 500;
     font-variant-numeric: tabular-nums;
@@ -155,7 +160,6 @@ const SLIDER_STYLE = css`
 const COMMIT_GRACE = 600;
 const COMMIT_CEILING = 5000;
 const KEY_DEBOUNCE = 500;
-const OVERLAY_TIMEOUT = 3000;
 
 function decimals(step: number): number {
   const text = String(step);
@@ -446,59 +450,24 @@ export function openSliderOverlay(
   color: Color | undefined,
   host: Host,
   keyboard: boolean,
+  closed?: () => void,
 ): void {
-  const root = surface.getRootNode();
-  const focusedIn = (): Element | null => (root instanceof ShadowRoot ? root.activeElement : null);
-  const opener = focusedIn();
   const closing = wordsFor(host.hass?.locale.language ?? '').close;
-  const overlay = document.createElement('div');
-  overlay.className = 'overlay';
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const close = dismissable(overlay, host, {
-    closed: (refocus) => {
-      clearTimeout(timer);
-      if (refocus && opener instanceof HTMLElement && opener.isConnected) {
-        opener.focus();
-      }
-    },
-  });
-  const holdsFocus = (): boolean => {
-    const active = focusedIn();
-    return active !== null && overlay.contains(active);
-  };
-  const schedule = (): void => {
-    clearTimeout(timer);
-    if (overlay.isConnected && !holdsFocus()) {
-      timer = setTimeout(close, OVERLAY_TIMEOUT);
-    }
-  };
-  render(
-    html`<mnml-slider
-        .spec=${spec}
-        .label=${label}
-        .color=${color}
-        .owner=${host}
-        .interacted=${schedule}
-      ></mnml-slider>
-      <button
-        type="button"
-        class="control"
-        aria-label=${closing}
-        ${tip(closing)}
-        @click=${() => {
-          close(true);
-        }}
-      >
-        ${icon('mdi:close')}
-      </button>`,
-    overlay,
+  const { overlay } = openOverlay(
+    surface,
+    host,
+    'overlay',
+    ({ close, schedule }) =>
+      html`<mnml-slider
+          .spec=${spec}
+          .label=${label}
+          .color=${color}
+          .owner=${host}
+          .interacted=${schedule}
+        ></mnml-slider>
+        ${closeButton(closing, close)}`,
+    { closed },
   );
-  overlay.addEventListener('click', (event) => {
-    event.stopPropagation();
-  });
-  overlay.addEventListener('focusin', schedule);
-  overlay.addEventListener('focusout', () => setTimeout(schedule, 0));
-  surface.append(overlay);
   const slider = overlay.querySelector('mnml-slider');
   if (keyboard && slider instanceof MnmlSlider) {
     void slider.updateComplete.then(() => {
@@ -507,5 +476,4 @@ export function openSliderOverlay(
       }
     });
   }
-  schedule();
 }

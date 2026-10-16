@@ -29,12 +29,14 @@ tailscale:
         group: Devices,
         help: 'A key that expires within this many days is flagged red.',
       }
+    square: { shape: square }
   retired: [essential, personal, updates, direct]
   card:
     type: custom:mnml-tile-card
     name: '[[words.tailscale]]'
     icon: mdi:vpn
     popup: '#tailscale'
+    square: '[[square]]'
     chips:
       - id: offline
         if: devices.?essential
