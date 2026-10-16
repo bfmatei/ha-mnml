@@ -43,6 +43,7 @@
     "3d-printer-state/card/#printer3d-outlet",
     "3d-printer-state/card/#printer3d-outlet-2",
     "3d-printer-state/card/#printer3d-progress",
+    "ac-controls/card/#fan",
     "ac-controls/card/#select",
     "ac-controls/card/#slider",
     "ac-item/card/controls/#ac-controls",

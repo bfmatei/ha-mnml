@@ -163,10 +163,22 @@ export function toggleAction(hass: HomeAssistant, entityId: EntityId): string {
   }
 }
 
+const MOVING: Readonly<Record<string, readonly string[]>> = {
+  lock: ['locking', 'unlocking', 'opening'],
+};
+
+export function isMoving(hass: HomeAssistant, entityId: EntityId): boolean {
+  const state = stateOf(hass, entityId)?.state;
+  return state !== undefined && (MOVING[domainOf(entityId)] ?? []).includes(state);
+}
+
 export function toggleEntity(hass: HomeAssistant, entityId: EntityId): Promise<unknown> {
   const stateObj = stateOf(hass, entityId);
   switch (domainOf(entityId)) {
     case 'lock':
+      if (isMoving(hass, entityId)) {
+        return Promise.resolve();
+      }
       return callService(
         hass,
         entityId,

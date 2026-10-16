@@ -4,7 +4,7 @@ import { afterEach, beforeEach, test, vi } from 'vitest';
 
 import { fakeHost } from '../../test/hass.ts';
 
-import { closeButton, openOverlay } from './overlay.ts';
+import { closeButton, dismissable, openOverlay } from './overlay.ts';
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -53,7 +53,7 @@ test('an overlay holds its card while open, and closes after 3 s without a touch
   assert.equal(closed, 1);
 });
 
-test('a live overlay leaves its card drawing', () => {
+test('a live dismissable leaves its card drawing', () => {
   let holds = 0;
   const host = fakeHost({
     hold: () => {
@@ -63,13 +63,7 @@ test('a live overlay leaves its card drawing', () => {
       };
     },
   });
-  const { close } = openOverlay(
-    surface(),
-    host,
-    'options',
-    ({ close: shut }) => closeButton('Close', shut),
-    { live: true },
-  );
+  const close = dismissable(surface(), host, { live: true, closed: () => undefined });
   assert.equal(holds, 0);
   close();
   assert.equal(holds, 0);

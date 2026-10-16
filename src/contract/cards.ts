@@ -261,6 +261,8 @@ export interface SelectControl extends ControlBase {
   type: 'select';
   entity: SelectId | ClimateId | TimerId;
   attribute?: ModeAttribute;
+  name?: string;
+  icon?: MdiIcon;
   color?: Color;
   when?: StateRule;
   primary?: true;

@@ -1,37 +1,46 @@
-import { html, nothing } from 'lit';
+import { html, nothing, render } from 'lit';
 import type { TemplateResult } from 'lit';
 import { classMap } from 'lit/directives/class-map.js';
 import { styleMap } from 'lit/directives/style-map.js';
 
-import type { Color, Control, Item, NavControl, StateRule } from '../../contract/cards.ts';
-import type { EntityId, MdiIcon, PopupHash } from '../../contract/entities.ts';
+import type {
+  Color,
+  Control,
+  Item,
+  NavControl,
+  SelectControl,
+  SliderControl,
+  StateRule,
+} from '../../contract/cards.ts';
+import type { EntityId, MdiIcon } from '../../contract/entities.ts';
+import { rightToLeft } from '../../ha/direction.ts';
 import { haptic, hasValue, run, stateOf, toggleEntity } from '../../ha/hass.ts';
 import type { HomeAssistant } from '../../ha/hass.ts';
 import { reduced } from '../../ha/motion.ts';
 import { entityName, nameOf } from '../../ha/names.ts';
-import { navigate } from '../../ha/navigation.ts';
 import { shown, tint } from '../../ha/rules.ts';
 import { colorStyle, icon, quietly, stateIcon } from '../../ha/templates.ts';
 import { isTimer } from '../../ha/timer.ts';
 import { wordsFor } from '../../words/words.ts';
 import type { Host } from '../base.ts';
 
-import { menuKeys, menuRows, modeChoice, optionChoice, sceneChoice } from './menu.ts';
+import { modeChoice, optionChoice, sceneChoice } from './menu.ts';
 import type { Choice } from './menu.ts';
-import { closeButton, openOverlay } from './overlay.ts';
+import { dismissable } from './overlay.ts';
 import { sliderSpec } from './slider-spec.ts';
-import { openSliderOverlay } from './slider.ts';
+import type { SliderSpec } from './slider-spec.ts';
+import { MnmlSlider } from './slider.ts';
 import { tip } from './tooltip.ts';
 
-const SQUARE_SLIDERS: ReadonlySet<string> = new Set(['brightness', 'color_temp', 'temperature']);
+const SQUARE_SLIDERS: ReadonlySet<string> = new Set([
+  'brightness',
+  'color_temp',
+  'hue',
+  'temperature',
+]);
 
 const EXPAND = 180;
-
-interface SquareOption {
-  name: string;
-  icon: TemplateResult;
-  open: (surface: HTMLElement, keyboard: boolean, closed: () => void) => void;
-}
+const PAD = 4;
 
 interface Subject {
   entity: EntityId;
@@ -40,151 +49,102 @@ interface Subject {
   color?: Color;
   when?: StateRule;
   controls?: readonly Control[];
-  details?: PopupHash;
   lights?: true;
 }
 
+type Part =
+  | {
+      control: SliderControl;
+      name: string;
+      label: string;
+      icon: TemplateResult;
+      spec: SliderSpec;
+      choice?: never;
+      off?: never;
+    }
+  | {
+      control: Control;
+      name: string;
+      label: string;
+      icon: TemplateResult;
+      spec?: never;
+      choice: Choice;
+      off?: never;
+    }
+  | {
+      control: Control;
+      name: string;
+      label: string;
+      icon: TemplateResult;
+      spec?: never;
+      choice?: never;
+      off: true;
+    };
+
 const redraws = new WeakMap<object, (hass: HomeAssistant, subject: Subject) => void>();
+const menus = new WeakMap<object, (refocus?: boolean) => void>();
 
-function words(host: Host): ReturnType<typeof wordsFor> {
-  return wordsFor(host.hass?.locale.language ?? '');
-}
-
-function openList<V extends string>(
-  surface: HTMLElement,
-  choice: Choice<V>,
-  label: string,
-  host: Host,
-  keyboard: boolean,
-  closed: () => void,
-): void {
-  const { overlay } = openOverlay(
-    surface,
-    host,
-    'overlay scenes',
-    ({ close, schedule }) =>
-      html`<div
-          class="list"
-          role="menu"
-          aria-label=${label}
-          @scroll=${schedule}
-          @keydown=${(event: KeyboardEvent) => {
-            const list = event.currentTarget;
-            if (list instanceof HTMLElement) {
-              menuKeys(event, [...list.querySelectorAll('button')], close);
-            }
-          }}
-        >
-          ${menuRows(choice, host, close)}
-        </div>
-        ${closeButton(words(host).close, close)}`,
-    { closed },
-  );
-  const list = overlay.querySelector<HTMLElement>('.list');
-  const rows = [...overlay.querySelectorAll<HTMLElement>('.list button')];
-  const selected = rows.find((row) => row.classList.contains('selected'));
-  if (list !== null && selected !== undefined) {
-    const box = list.getBoundingClientRect();
-    const row = selected.getBoundingClientRect();
-    list.scrollTop += row.top - box.top - (list.clientHeight - row.height) / 2;
+function sliderOf(hass: HomeAssistant, control: SliderControl): Part[] {
+  if (!SQUARE_SLIDERS.has(control.slider)) {
+    return [];
   }
-  if (keyboard) {
-    (selected ?? rows[0])?.focus({ preventScroll: true });
-  }
-}
-
-function controlOption(hass: HomeAssistant, control: Control, host: Host): SquareOption[] {
-  if (control.type === 'scenes' && shown(hass, control.show, undefined)) {
-    const choice = sceneChoice(hass, control.scenes, control.active_scene);
-    return choice.options.length === 0
-      ? []
-      : [
-          {
-            name: control.name,
-            icon: icon(control.icon),
-            open: (surface, keyboard, closed) => {
-              openList(surface, choice, control.name, host, keyboard, closed);
-            },
-          },
-        ];
-  }
-  if (
-    control.type === 'slider' &&
-    SQUARE_SLIDERS.has(control.slider) &&
-    shown(hass, control.show, control.entity)
-  ) {
-    const stateObj = stateOf(hass, control.entity);
-    const spec = hasValue(stateObj)
+  const stateObj = stateOf(hass, control.entity);
+  const spec =
+    hasValue(stateObj) && shown(hass, control.show, control.entity)
       ? sliderSpec(hass, control.entity, stateObj, control.slider)
       : undefined;
-    return spec === undefined
-      ? []
-      : [
-          {
-            name: control.name,
-            icon: icon(control.icon),
-            open: (surface, keyboard, closed) => {
-              openSliderOverlay(surface, spec, control, control.color, host, keyboard, closed);
-            },
-          },
-        ];
+  const look = { control, name: control.name, label: control.name, icon: icon(control.icon) };
+  return [spec === undefined ? { ...look, off: true } : { ...look, spec }];
+}
+
+function selectOf(hass: HomeAssistant, control: SelectControl): Part[] {
+  if (isTimer(control.entity)) {
+    return [];
   }
-  if (control.type === 'select' && shown(hass, control.show, control.entity)) {
-    const entity = control.entity;
-    const stateObj = stateOf(hass, entity);
-    if (isTimer(entity) || !hasValue(stateObj)) {
+  const label = control.name ?? entityName(hass, control.entity);
+  const stateObj = stateOf(hass, control.entity);
+  const own = stateIcon(hass, stateObj, control.icon);
+  if (!hasValue(stateObj)) {
+    return [{ control, name: label, label, icon: own, off: true }];
+  }
+  const choice =
+    control.attribute === undefined
+      ? optionChoice(hass, control.entity, stateObj)
+      : modeChoice(hass, control.entity, stateObj, control.attribute);
+  if (choice.options.length === 0) {
+    return [];
+  }
+  const current = choice.options.find((option) => option.value === choice.current)?.label;
+  const look = {
+    control,
+    name:
+      current === undefined ? label : control.name === undefined ? current : `${label}: ${current}`,
+    label,
+    icon: choice.currentIcon() ?? own,
+  };
+  return [shown(hass, control.show, control.entity) ? { ...look, choice } : { ...look, off: true }];
+}
+
+function partOf(hass: HomeAssistant, control: Control): Part[] {
+  if (control.type === 'slider') {
+    return sliderOf(hass, control);
+  }
+  if (control.type === 'select') {
+    return selectOf(hass, control);
+  }
+  if (control.type === 'scenes') {
+    const choice = sceneChoice(hass, control.scenes, control.active_scene);
+    const look = { control, name: control.name, label: control.name, icon: icon(control.icon) };
+    if (choice.options.length === 0) {
       return [];
     }
-    const choice =
-      control.attribute === undefined
-        ? optionChoice(hass, entity, stateObj)
-        : modeChoice(hass, entity, stateObj, control.attribute);
-    const label = entityName(hass, entity);
-    return choice.options.length === 0
-      ? []
-      : [
-          {
-            name: choice.options.find((option) => option.value === choice.current)?.label ?? label,
-            icon: choice.currentIcon() ?? stateIcon(hass, stateObj),
-            open: (surface, keyboard, closed) => {
-              openList(surface, choice, label, host, keyboard, closed);
-            },
-          },
-        ];
+    return [shown(hass, control.show, undefined) ? { ...look, choice } : { ...look, off: true }];
   }
   return [];
 }
 
-export function squareOptions(
-  hass: HomeAssistant,
-  controls: readonly Control[] | undefined,
-  host: Host,
-  details?: PopupHash,
-): SquareOption[] {
-  return [
-    ...(controls ?? []).flatMap((control) => controlOption(hass, control, host)),
-    ...(details === undefined
-      ? []
-      : [
-          {
-            name: words(host).details,
-            icon: icon('mdi:dots-horizontal'),
-            open: (surface: HTMLElement, _keyboard: boolean, closed: () => void) => {
-              closed();
-              navigate(details, surface);
-            },
-          },
-        ]),
-  ];
-}
-
-function offersOptions(controls: readonly Control[] | undefined): boolean {
-  return (controls ?? []).some(
-    (control) =>
-      control.type === 'scenes' ||
-      (control.type === 'slider' && SQUARE_SLIDERS.has(control.slider)) ||
-      (control.type === 'select' && !isTimer(control.entity)),
-  );
+function partsOf(hass: HomeAssistant, controls: readonly Control[] | undefined): Part[] {
+  return (controls ?? []).flatMap((control) => partOf(hass, control));
 }
 
 function powered(subject: Subject): boolean {
@@ -200,14 +160,13 @@ function powerButton(
   hass: HomeAssistant,
   subject: Subject,
   host: Host,
-  lights: boolean,
-  acted?: () => void,
+  className: string,
 ): TemplateResult {
   const stateObj = stateOf(hass, subject.entity);
   const color = tint(subject.color, subject.when, stateObj);
   return html`<button
     type="button"
-    class=${classMap({ control: true, lights, colored: color !== undefined })}
+    class=${classMap({ control: true, [className]: true, colored: color !== undefined })}
     style=${styleMap(colorStyle(color))}
     aria-label=${subject.name}
     aria-pressed=${String(hasValue(stateObj) && stateObj.state !== 'off')}
@@ -215,28 +174,151 @@ function powerButton(
     @click=${quietly(() => {
       haptic('light');
       run(host, toggleEntity(host.hass ?? hass, subject.entity));
-      acted?.();
     })}
   >
     ${stateIcon(hass, stateObj, subject.icon)}
   </button>`;
 }
 
+function rows(part: Part, choice: Choice, host: Host): TemplateResult {
+  const marks = choice.current !== undefined;
+  return html`<div class="rows" role="group" aria-label=${part.label}>
+    ${choice.options.map((option) => {
+      const selected = option.value === choice.current;
+      return html`<button
+        type="button"
+        class=${classMap({ selected })}
+        aria-pressed=${marks ? String(selected) : nothing}
+        @click=${quietly(() => {
+          haptic('selection');
+          run(host, choice.select(option.value, host.hass));
+        })}
+      >
+        ${option.icon ?? nothing}<span>${option.label}</span>
+      </button>`;
+    })}
+  </div>`;
+}
+
+interface Actions {
+  pick: (part: Part, keyboard: boolean) => void;
+  back: (keyboard: boolean) => void;
+}
+
+function keyed(event: Event): boolean {
+  return event instanceof UIEvent && event.detail === 0;
+}
+
+function arranged(subject: Subject, parts: readonly Part[]): Part[] {
+  if (powered(subject)) {
+    return [...parts];
+  }
+  const lead =
+    parts.find(
+      (part) => part.control.type === 'select' && part.control.entity === subject.entity,
+    ) ?? parts[0];
+  return lead === undefined ? [] : [lead, ...parts.filter((part) => part !== lead)];
+}
+
+function optionButton(
+  hass: HomeAssistant,
+  subject: Subject,
+  part: Part,
+  lead: boolean,
+  actions: Actions,
+): TemplateResult {
+  const stateObj = stateOf(hass, subject.entity);
+  const color = lead ? tint(subject.color, subject.when, stateObj) : undefined;
+  const name = lead ? `${subject.name}: ${part.name}` : part.name;
+  return html`<button
+    type="button"
+    class=${classMap({
+      control: true,
+      option: true,
+      lead,
+      off: part.off === true,
+      colored: color !== undefined,
+    })}
+    style=${styleMap(colorStyle(color))}
+    aria-label=${name}
+    aria-disabled=${part.off ? 'true' : nothing}
+    ${tip(name)}
+    @click=${quietly((event) => {
+      if (part.off) {
+        return;
+      }
+      haptic('selection');
+      actions.pick(part, keyed(event));
+    })}
+  >
+    ${lead ? stateIcon(hass, stateObj, subject.icon) : part.icon}
+  </button>`;
+}
+
+function options(
+  hass: HomeAssistant,
+  subject: Subject,
+  parts: readonly Part[],
+  host: Host,
+  actions: Actions,
+): TemplateResult {
+  const ordered = arranged(subject, parts);
+  const lead = powered(subject) ? undefined : ordered[0];
+  return html`${lead === undefined ? powerButton(hass, subject, host, 'power') : nothing}
+  ${ordered.map((part) => optionButton(hass, subject, part, part === lead, actions))}`;
+}
+
+function whole(
+  subject: Subject,
+  part: Part,
+  host: Host,
+  actions: Actions,
+  arrow: MdiIcon,
+): TemplateResult {
+  const back = wordsFor(host.hass?.locale.language ?? '').back;
+  return html`<div class="head">
+      <button
+        type="button"
+        class="control back"
+        aria-label=${back}
+        ${tip(back)}
+        @click=${quietly((event) => {
+          actions.back(keyed(event));
+        })}
+      >
+        ${icon(arrow)}
+      </button>
+      <span class="title">${part.choice === undefined ? subject.name : part.label}</span>
+    </div>
+    ${
+      part.spec !== undefined
+        ? html`<mnml-slider
+            .spec=${part.spec}
+            .label=${part.control}
+            .color=${part.control.color}
+            .owner=${host}
+          ></mnml-slider>`
+        : part.choice !== undefined
+          ? rows(part, part.choice, host)
+          : nothing
+    }`;
+}
+
 interface Opened {
   key: object;
   subject: Subject;
   anchor: HTMLElement;
+  square: HTMLElement;
   host: Host;
-  closed: () => void;
   keyboard: boolean;
 }
 
-function expandFrom(anchor: HTMLElement, overlay: HTMLElement): void {
+function expandFrom(anchor: HTMLElement, node: HTMLElement): void {
   if (reduced()) {
     return;
   }
   const from = anchor.getBoundingClientRect();
-  for (const button of overlay.querySelectorAll<HTMLElement>(':scope > button')) {
+  for (const button of node.querySelectorAll<HTMLElement>('.option:not(.lead)')) {
     const to = button.getBoundingClientRect();
     const x = from.left + from.width / 2 - (to.left + to.width / 2);
     const y = from.top + from.height / 2 - (to.top + to.height / 2);
@@ -250,51 +332,106 @@ function expandFrom(anchor: HTMLElement, overlay: HTMLElement): void {
   }
 }
 
-function openOptions(surface: HTMLElement, hass: HomeAssistant, opened: Opened): void {
-  const { key, host, closed } = opened;
+function focus(target: HTMLElement | null | undefined): void {
+  if (target instanceof MnmlSlider) {
+    void target.updateComplete.then(() => {
+      if (target.isConnected) {
+        target.focus();
+      }
+    });
+    return;
+  }
+  target?.focus({ preventScroll: true });
+}
+
+function showSelected(node: HTMLElement): void {
+  const list = node.querySelector<HTMLElement>('.rows');
+  const selected = list?.querySelector<HTMLElement>('.selected');
+  if (list !== null && list !== undefined && selected !== null && selected !== undefined) {
+    const box = list.getBoundingClientRect();
+    const row = selected.getBoundingClientRect();
+    list.scrollTop += row.top - box.top - (list.clientHeight - row.height) / 2;
+  }
+}
+
+function openMenu(hass: HomeAssistant, opened: Opened): void {
+  const { key, anchor, square, host } = opened;
   let now = hass;
   let subject = opened.subject;
-  let handed = false;
-  const { overlay, redraw } = openOverlay(
-    surface,
-    host,
-    'options',
-    ({ close, schedule }) =>
-      html`${powered(subject) ? powerButton(now, subject, host, false, schedule) : nothing}
-      ${squareOptions(now, subject.controls, host, subject.details).map(
-        (option) =>
-          html`<button
-            type="button"
-            class="control"
-            aria-label=${option.name}
-            ${tip(option.name)}
-            @click=${(event: Event) => {
-              handed = true;
-              close(true);
-              option.open(surface, event instanceof UIEvent && event.detail === 0, closed);
-            }}
-          >
-            ${option.icon}
-          </button>`,
-      )}`,
-    {
-      closed: () => {
-        redraws.delete(key);
-        if (!handed) {
-          closed();
-        }
-      },
-      live: true,
+  let view: Control | undefined;
+  const arrow: MdiIcon = rightToLeft(anchor) ? 'mdi:arrow-right' : 'mdi:arrow-left';
+  const node = document.createElement('div');
+  node.className = 'square-menu';
+  node.setAttribute('role', 'group');
+  node.setAttribute('aria-label', subject.name);
+  const close = dismissable(node, host, {
+    live: true,
+    closed: (refocus) => {
+      menus.delete(key);
+      redraws.delete(key);
+      anchor.setAttribute('aria-expanded', 'false');
+      if (refocus) {
+        anchor.focus({ preventScroll: true });
+      }
     },
-  );
+  });
+  menus.set(key, close);
+  const draw = (): void => {
+    const parts = partsOf(now, subject.controls);
+    const part = parts.find((each) => each.control === view && each.off === undefined);
+    view = part?.control;
+    node.classList.toggle('whole', part !== undefined);
+    render(
+      part === undefined
+        ? options(now, subject, parts, host, actions)
+        : whole(subject, part, host, actions, arrow),
+      node,
+    );
+  };
+  const actions: Actions = {
+    pick: (part, keyboard) => {
+      view = part.control;
+      draw();
+      showSelected(node);
+      if (keyboard) {
+        focus(
+          node.querySelector<HTMLElement>('mnml-slider') ??
+            node.querySelector<HTMLElement>('.rows > .selected') ??
+            node.querySelector<HTMLElement>('.rows > button') ??
+            node.querySelector<HTMLElement>('.back'),
+        );
+      }
+    },
+    back: (keyboard) => {
+      const from = view;
+      view = undefined;
+      draw();
+      if (keyboard) {
+        const index = arranged(subject, partsOf(now, subject.controls)).findIndex(
+          (each) => each.control === from,
+        );
+        focus(node.querySelectorAll<HTMLElement>('.option')[index] ?? node.querySelector('button'));
+      }
+    },
+  };
   redraws.set(key, (next, again) => {
     now = next;
     subject = again;
-    redraw();
+    draw();
   });
-  expandFrom(opened.anchor, overlay);
+  node.addEventListener('click', (event) => {
+    event.stopPropagation();
+  });
+  const box = square.getBoundingClientRect();
+  const button = anchor.getBoundingClientRect();
+  const foot = button.top + button.height / 2 + anchor.offsetHeight / 2;
+  node.style.setProperty('--m-from', `${box.bottom - foot - PAD}px`);
+  draw();
+  square.append(node);
+  anchor.setAttribute('aria-expanded', 'true');
+  expandFrom(anchor, node);
   if (opened.keyboard) {
-    overlay.querySelector<HTMLElement>('button')?.focus({ preventScroll: true });
+    focus(node.querySelector<HTMLElement>('button'));
   }
 }
 
@@ -307,27 +444,28 @@ function opener(hass: HomeAssistant, key: object, subject: Subject, host: Host):
     class=${classMap({ control: true, lights: subject.lights === true, colored: color !== undefined })}
     style=${styleMap(colorStyle(color))}
     aria-label=${subject.name}
-    aria-haspopup="true"
     aria-expanded="false"
     ${tip(subject.name)}
     @click=${quietly((event) => {
+      const open = menus.get(key);
+      if (open !== undefined) {
+        open(true);
+        return;
+      }
       const anchor = event.currentTarget;
-      const surface = anchor instanceof HTMLElement ? anchor.closest('.square') : null;
-      if (!(anchor instanceof HTMLElement) || !(surface instanceof HTMLElement)) {
+      const square = anchor instanceof HTMLElement ? anchor.closest('.square') : null;
+      if (!(anchor instanceof HTMLElement) || !(square instanceof HTMLElement)) {
         return;
       }
       haptic('light');
-      openOptions(surface, host.hass ?? hass, {
+      openMenu(host.hass ?? hass, {
         key,
         subject,
         anchor,
+        square,
         host,
-        closed: () => {
-          anchor.setAttribute('aria-expanded', 'false');
-        },
-        keyboard: event instanceof UIEvent && event.detail === 0,
+        keyboard: keyed(event),
       });
-      anchor.setAttribute('aria-expanded', 'true');
     })}
   >
     ${stateIcon(hass, stateObj, subject.icon)}
@@ -344,9 +482,9 @@ export function lightsButton(hass: HomeAssistant, item: Item, host: Host): Templ
     controls: item.controls,
     lights: true,
   };
-  return offersOptions(item.controls)
+  return partsOf(hass, item.controls).length > 0
     ? opener(hass, item, subject, host)
-    : powerButton(hass, subject, host, true);
+    : powerButton(hass, subject, host, 'lights');
 }
 
 export function navButton(
@@ -354,7 +492,7 @@ export function navButton(
   control: NavControl,
   host: Host,
 ): TemplateResult | undefined {
-  return offersOptions(control.controls)
+  return partsOf(hass, control.controls).length > 0
     ? opener(
         hass,
         control,
@@ -364,7 +502,6 @@ export function navButton(
           color: control.color,
           when: control.when,
           controls: control.controls,
-          details: control.popup,
         },
         host,
       )

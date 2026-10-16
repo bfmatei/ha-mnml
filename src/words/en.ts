@@ -31,7 +31,6 @@ const WINDOWS: Corners<CarPart> = [
 export const EN = {
   back: 'Back',
   close: 'Close',
-  details: 'Details',
   more: (count: number): string => `${count} more`,
   show: (name: string): string => `Show ${name}`,
   hide: (name: string): string => `Hide ${name}`,

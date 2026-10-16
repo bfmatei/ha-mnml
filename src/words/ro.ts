@@ -34,7 +34,6 @@ const WINDOWS: Corners<CarPart> = [
 export const RO: Words = {
   back: 'Înapoi',
   close: 'Închide',
-  details: 'Detalii',
   more: (count: number): string => `încă ${count}`,
   show: (name: string): string => `Arată ${name}`,
   hide: (name: string): string => `Ascunde ${name}`,

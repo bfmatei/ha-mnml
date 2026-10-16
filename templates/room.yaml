@@ -363,7 +363,6 @@ room:
         if: lock
         type: toggle
         entity: '[[lock]]'
-        confirm: { is: [locked] }
         color: red
         when: { is: [unlocked, open, jammed] }
       - id: ac
@@ -375,7 +374,7 @@ room:
           - id: ac-controls
             if: square
             template: ac-controls
-            slots: { entity: '[[ac.entity]]' }
+            slots: { entity: '[[ac.entity]]', fan: '[[ac.fan]]' }
       - id: heating
         if: heating
         template: nav-chip
@@ -542,7 +541,6 @@ room-popup:
             if: lock
             type: toggle
             entity: '[[lock]]'
-            confirm: { is: [locked] }
             color: red
             when: { is: [unlocked, open, jammed] }
           - id: window

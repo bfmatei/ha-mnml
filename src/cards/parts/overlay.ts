@@ -69,7 +69,6 @@ export interface Overlay {
   overlay: HTMLElement;
   close: (refocus?: boolean) => void;
   schedule: () => void;
-  redraw: () => void;
 }
 
 export function openOverlay(
@@ -77,7 +76,7 @@ export function openOverlay(
   host: Host,
   className: string,
   content: (controls: Pick<Overlay, 'close' | 'schedule'>) => TemplateResult,
-  { closed, live }: { closed?: () => void; live?: true } = {},
+  { closed }: { closed?: () => void } = {},
 ): Overlay {
   const root = surface.getRootNode();
   const focusedIn = (): Element | null => (root instanceof ShadowRoot ? root.activeElement : null);
@@ -86,7 +85,6 @@ export function openOverlay(
   overlay.className = className;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const close = dismissable(overlay, host, {
-    live,
     closed: (refocus) => {
       clearTimeout(timer);
       closed?.();
@@ -105,10 +103,7 @@ export function openOverlay(
       timer = setTimeout(close, OVERLAY_TIMEOUT);
     }
   };
-  const redraw = (): void => {
-    render(content({ close, schedule }), overlay);
-  };
-  redraw();
+  render(content({ close, schedule }), overlay);
   overlay.addEventListener('click', (event) => {
     event.stopPropagation();
   });
@@ -116,7 +111,7 @@ export function openOverlay(
   overlay.addEventListener('focusout', () => setTimeout(schedule, 0));
   surface.append(overlay);
   schedule();
-  return { overlay, close, schedule, redraw };
+  return { overlay, close, schedule };
 }
 
 export function closeButton(label: string, close: (refocus?: boolean) => void): TemplateResult {

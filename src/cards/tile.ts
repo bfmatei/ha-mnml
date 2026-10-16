@@ -198,60 +198,80 @@ const SQUARE_STYLE = css`
     gap: 8px;
   }
   .square.large > .column > .control,
-  .square > .options > .control,
-  .square > .overlay > .control {
+  .square-menu > .control,
+  .square-menu > .head > .control {
     position: relative;
     background: var(--m-pill);
     box-shadow: var(--m-well);
   }
-  .square > .options {
+  .square-menu {
     position: absolute;
+    bottom: var(--m-from, 2px);
+    inset-inline-end: 2px;
     z-index: 1;
-    bottom: 6px;
-    inset-inline-end: 6px;
-    max-height: calc(100% - 12px);
     display: flex;
-    flex-direction: column-reverse;
+    flex-direction: row-reverse;
+    flex-wrap: wrap-reverse;
     gap: 8px;
-    border-radius: 12px;
-    animation: mnml-fade 120ms ease-out;
+    box-sizing: border-box;
+    max-width: calc(100% - 4px);
+    padding: 4px;
+    border-radius: 16px;
+    background: var(--card-background-color);
+    box-shadow: 0 6px 20px rgb(0 0 0 / 0.3);
+    cursor: default;
   }
-  .square > .options > .control {
-    flex: 0 1 36px;
-    min-height: 28px;
+  .square-menu > .option.off {
+    opacity: 0.5;
+    cursor: default;
   }
-  .square:has(> .options) > .column {
+  .square-menu > .option.off:active {
+    transform: none;
+  }
+  .square-menu.whole {
+    inset: 0;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    gap: 6px;
+    max-width: none;
+    padding: 6px;
+    border-radius: inherit;
+    background: none;
+    box-shadow: none;
+  }
+  .square.large:has(> .square-menu.whole) > :not(.glow, .square-menu) {
     visibility: hidden;
   }
-  .square > .overlay {
+  .square-menu > .head {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .square-menu > .head > .title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .square-menu > mnml-slider {
     display: block;
-    padding: 6px;
+    flex: none;
+    margin-top: auto;
   }
-  .square > .overlay > mnml-slider {
-    display: block;
-    height: 100%;
-    --m-slider-height: 100%;
-  }
-  .square > .overlay > .control {
-    position: absolute;
-    z-index: 1;
-    bottom: 6px;
-    inset-inline-end: 6px;
-  }
-  .square > .overlay.scenes {
-    padding: 0;
-  }
-  .square > .overlay.scenes > .list {
-    height: 100%;
-    overflow: auto;
+  .square-menu > .rows {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
     overscroll-behavior: contain;
-    touch-action: pan-y;
-    padding: 6px 6px 48px;
     font-size: 13px;
   }
   @media (pointer: coarse) {
     .square.large > .column > .control::after,
-    .square > .options > .control::after {
+    .square-menu > .control::after {
       content: '';
       position: absolute;
       inset: -4px;
@@ -304,7 +324,7 @@ const SQUARE_STYLE = css`
       height: 32px;
     }
     .square.large > .column,
-    .square.large > .options {
+    .square-menu {
       gap: 4px;
     }
   }
@@ -318,13 +338,10 @@ const SQUARE_STYLE = css`
     .square.large > .trend {
       height: calc(100% - 130px);
     }
-    .square.large > .column > .control {
+    .square.large > .column > .control,
+    .square-menu > .control {
       min-width: 32px;
       height: 32px;
-    }
-    .square.large > .options > .control {
-      min-width: 32px;
-      flex-basis: 32px;
     }
   }
 `;

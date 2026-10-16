@@ -550,11 +550,12 @@ From `templates/climate.yaml`.
 
 ### `ac-controls`
 
-**AC controls**, `mdi:air-conditioner`: An AC's target temperature slider and its mode menu, blue while it runs.
+**AC controls**, `mdi:air-conditioner`: An AC's target temperature slider, its mode menu, blue while it runs, and its fan menu when it has fan modes.
 
 | Slot     | Kind   | Required or default |
 | -------- | ------ | ------------------- |
 | `entity` | entity |                     |
+| `fan`    | flag   |                     |
 
 ### `heating-controls`
 

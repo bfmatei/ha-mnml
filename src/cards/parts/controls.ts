@@ -25,6 +25,7 @@ import {
   callService,
   haptic,
   hasValue,
+  isMoving,
   isUnavailable,
   numericState,
   run,
@@ -161,6 +162,19 @@ function isOn(entityId: EntityId, stateObj: HassEntity | undefined): boolean {
 function toggle(control: ToggleControl, ctx: ControlContext): Drawn {
   const stateObj = stateOf(ctx.hass, control.entity);
   const name = entityName(ctx.hass, control.entity);
+  if (stateObj !== undefined && isMoving(ctx.hass, control.entity)) {
+    return pressed(
+      {
+        title: `${name}: ${formatState(ctx.hass, stateObj)}`,
+        part: partOf(control),
+        primary: control.primary,
+        color: tint(control.color, control.when, stateObj),
+      },
+      stateIcon(ctx.hass, stateObj, control.icon),
+      () => undefined,
+      { pressed: isOn(control.entity, stateObj) },
+    );
+  }
   const action = toggleAction(ctx.hass, control.entity);
   const armed = isArmed(ctx.host, control) && asks(ctx.hass, control.confirm, control.entity);
   const words = wordsFor(ctx.hass.locale.language);
@@ -222,12 +236,12 @@ function select(control: SelectControl, ctx: ControlContext): Drawn | undefined 
   }
   return pressed(
     {
-      title: entityName(ctx.hass, control.entity),
+      title: control.name ?? entityName(ctx.hass, control.entity),
       part: partOf(control),
       primary: control.primary,
       color: tint(control.color, control.when, stateObj),
     },
-    choice.currentIcon() ?? stateIcon(ctx.hass, stateObj),
+    choice.currentIcon() ?? stateIcon(ctx.hass, stateObj, control.icon),
     menuOpener(choice, ctx),
     { menu: true },
   );

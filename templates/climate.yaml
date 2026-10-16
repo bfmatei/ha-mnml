@@ -1,9 +1,10 @@
 ac-controls:
-  description: An AC's target temperature slider and its mode menu, blue while it runs.
+  description: An AC's target temperature slider, its mode menu, blue while it runs, and its fan menu when it has fan modes.
   title: AC controls
   icon: mdi:air-conditioner
   slots:
     entity: { kind: entity }
+    fan: { kind: flag }
   card:
     - id: slider
       if: entity
@@ -22,8 +23,17 @@ ac-controls:
       color: blue
       when: { not: ['off'] }
       primary: true
+    - id: fan
+      if: fan
+      type: select
+      entity: '[[entity]]'
+      attribute: fan_modes
+      name: '[[words.fan]]'
+      icon: mdi:fan
+      show: { not: ['off'] }
   example:
     entity: climate.bedroom_ac
+    fan: true
 
 heating-controls:
   description: A heating's target temperature slider, its preset menu when it has presets, and its power toggle, amber while it runs.

@@ -44,7 +44,7 @@ export const MENU_STYLE = css`
     animation: mnml-rise 140ms ease-out;
   }
   .menu button,
-  .scenes > .list button {
+  .square-menu > .rows > button {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -62,25 +62,26 @@ export const MENU_STYLE = css`
     transition: background-color 120ms ease-out;
   }
   .menu button:hover,
-  .scenes > .list button:hover {
+  .square-menu > .rows > button:hover {
     background: var(--m-pill);
   }
   .menu button.selected,
-  .scenes > .list button.selected {
+  .square-menu > .rows > button.selected {
     color: var(--primary-color);
     font-weight: 600;
   }
   .menu button ha-icon,
   .menu button ha-attribute-icon,
   .menu button ha-state-icon,
-  .scenes > .list button ha-icon,
-  .scenes > .list button ha-attribute-icon,
-  .scenes > .list button ha-state-icon {
+  .square-menu > .rows > button ha-icon,
+  .square-menu > .rows > button ha-attribute-icon,
+  .square-menu > .rows > button ha-state-icon {
     --mdc-icon-size: 20px;
     flex: none;
   }
   @media (forced-colors: active) {
-    .menu {
+    .menu,
+    .square-menu:not(.whole) {
       border: 1px solid CanvasText;
     }
   }
@@ -231,7 +232,7 @@ function step(items: readonly HTMLElement[], from: number, key: string): number 
   }
 }
 
-export function menuKeys(
+function menuKeys(
   event: KeyboardEvent,
   items: readonly HTMLElement[],
   close: (refocus?: boolean) => void,
@@ -250,7 +251,7 @@ export function menuKeys(
   }
 }
 
-export function menuRows<V extends string>(
+function menuRows<V extends string>(
   choice: Choice<V>,
   host: Host,
   close: (refocus?: boolean) => void,

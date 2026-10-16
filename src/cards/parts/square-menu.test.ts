@@ -7,11 +7,16 @@ import type { Item, NavControl } from '../../contract/cards.ts';
 import type { HomeAssistant } from '../../ha/hass.ts';
 import { fakeHass, fakeHost } from '../../test/hass.ts';
 import type { FakeState, ServiceCall } from '../../test/hass.ts';
+import { define } from '../../test/render.ts';
 
-import { lightsButton, navButton, squareOptions } from './square-menu.ts';
+import { MnmlSlider } from './slider.ts';
+import { lightsButton, navButton } from './square-menu.ts';
+
+define('mnml-slider', MnmlSlider);
 
 afterEach(() => {
   vi.useRealTimers();
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
   document.body.replaceChildren();
 });
 
@@ -109,22 +114,30 @@ function hassWith(light: FakeState, calls: ServiceCall[] = []): HomeAssistant {
     calls,
   });
 }
-
 interface Square {
+  root: ShadowRoot;
   surface: HTMLElement;
   button: HTMLElement;
   opened: () => number;
   draw: (hass: HomeAssistant) => void;
 }
 
-function square(hass: HomeAssistant, item: Item = ITEM): Square {
+function mounted(): { root: ShadowRoot; surface: HTMLElement; opened: () => number } {
+  const card = document.createElement('div');
+  document.body.append(card);
+  const root = card.attachShadow({ mode: 'open' });
   const surface = document.createElement('div');
   surface.className = 'square';
+  root.append(surface);
   let opened = 0;
   surface.addEventListener('click', () => {
     opened += 1;
   });
-  document.body.append(surface);
+  return { root, surface, opened: () => opened };
+}
+
+function square(hass: HomeAssistant, item: Item = ITEM): Square {
+  const { root, surface, opened } = mounted();
   const draw = (now: HomeAssistant): void => {
     render(
       html`<div class="name">Room</div>
@@ -135,104 +148,180 @@ function square(hass: HomeAssistant, item: Item = ITEM): Square {
   draw(hass);
   const button = surface.querySelector<HTMLElement>('button.lights');
   assert.ok(button);
-  return { surface, button, opened: () => opened, draw };
+  return { root, surface, button, opened, draw };
 }
 
 function press(element: Element | null | undefined, detail = 1): void {
   element?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail }));
 }
 
-function labels(root: ParentNode, selector: string): (string | null)[] {
-  return [...root.querySelectorAll(selector)].map((each) => each.getAttribute('aria-label'));
-}
-
 function escape(): void {
   document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
 }
 
-function pick(surface: HTMLElement, name: string, detail: number): void {
-  press(surface.querySelector(`.options [aria-label="${name}"]`), detail);
+function menuOf(root: ShadowRoot): HTMLElement | null {
+  return root.querySelector<HTMLElement>('.square-menu');
 }
 
-function power(surface: HTMLElement): HTMLElement | null {
-  return surface.querySelector<HTMLElement>('.options > button:first-child');
+function power(root: ShadowRoot): HTMLElement | null {
+  return root.querySelector<HTMLElement>('.square-menu > .power');
 }
 
-function sceneRows(surface: HTMLElement): HTMLElement[] {
-  return [...surface.querySelectorAll<HTMLElement>('.overlay.scenes [role="menu"] button')];
-}
-
-test('the options of a lights button are its scenes, then its brightness and white sliders, in the order of the item, as their show rules allow', () => {
-  const on = squareOptions(hassWith(LIGHT), ITEM.controls, fakeHost());
-  assert.deepEqual(
-    on.map((option) => option.name),
-    ['Scenes', 'Brightness', 'White'],
+function options(root: ShadowRoot): (string | null)[] {
+  return [...root.querySelectorAll('.square-menu > .option')].map((each) =>
+    each.getAttribute('aria-label'),
   );
-  const off = squareOptions(hassWith({ ...LIGHT, state: 'off' }), ITEM.controls, fakeHost());
-  assert.deepEqual(
-    off.map((option) => option.name),
-    ['Scenes'],
-  );
-});
+}
 
-test('a tap on the lights button opens its options in its place, the light toggle first where the button is, and toggles nothing nor opens the pop-up', () => {
+function dimmed(root: ShadowRoot): (string | null)[] {
+  return [...root.querySelectorAll('.square-menu > .option[aria-disabled="true"]')].map((each) =>
+    each.getAttribute('aria-label'),
+  );
+}
+
+function option(root: ShadowRoot, name: string): HTMLElement | null {
+  return root.querySelector<HTMLElement>(`.square-menu > .option[aria-label="${name}"]`);
+}
+
+function back(root: ShadowRoot): HTMLElement | null {
+  return root.querySelector<HTMLElement>('.square-menu.whole > .head > .back');
+}
+
+function slider(root: ShadowRoot): string | undefined {
+  const each = root.querySelector('.square-menu.whole > mnml-slider');
+  return each instanceof MnmlSlider ? each.label?.name : undefined;
+}
+
+function list(root: ShadowRoot): [string | null, (string | undefined)[]] | undefined {
+  const rows = root.querySelector('.square-menu.whole > .rows');
+  return rows === null
+    ? undefined
+    : [
+        rows.getAttribute('aria-label'),
+        [...rows.querySelectorAll('button')].map((each) => each.textContent?.trim()),
+      ];
+}
+
+function row(root: ShadowRoot, name: string): HTMLElement | undefined {
+  return [...root.querySelectorAll<HTMLElement>('.square-menu > .rows > button')].find(
+    (each) => each.textContent?.trim() === name,
+  );
+}
+
+test("a tap on the lights button opens its options inside the square: the toggle in the button's place, then the scenes, brightness, white and colour; it toggles nothing nor opens the pop-up", () => {
   const calls: ServiceCall[] = [];
-  const { surface, button, opened } = square(hassWith(LIGHT, calls));
-  assert.equal(button.getAttribute('aria-haspopup'), 'true');
+  const { root, surface, button, opened } = square(hassWith(LIGHT, calls));
+  assert.equal(button.getAttribute('aria-expanded'), 'false');
   assert.equal(button.getAttribute('aria-pressed'), null, 'it opens, so it is no toggle');
   press(button);
-  const options = surface.querySelector('.options');
-  assert.ok(options);
-  assert.deepEqual(labels(options, 'button'), ['Lights', 'Scenes', 'Brightness', 'White']);
-  assert.equal(power(surface)?.getAttribute('aria-pressed'), 'true');
+  const menu = menuOf(root);
+  assert.ok(menu);
+  assert.equal(menu.parentElement, surface, 'inside the square');
+  assert.equal(menu.classList.contains('whole'), false);
+  assert.equal(menu.getAttribute('aria-label'), 'Lights');
+  assert.equal(
+    menu.firstElementChild,
+    power(root),
+    "the toggle comes first, in the button's place",
+  );
+  assert.equal(power(root)?.getAttribute('aria-pressed'), 'true');
+  assert.deepEqual(options(root), ['Scenes', 'Brightness', 'White', 'Colour']);
   assert.equal(button.getAttribute('aria-expanded'), 'true');
   assert.equal(opened(), 0, 'the square does not open its pop-up');
   assert.deepEqual(calls, [], 'nor does the light toggle');
 });
 
-test('the toggle in the options toggles the light and keeps them open, and the options follow the light as it changes', () => {
+test('the toggle toggles the light and keeps the options open, and they follow the light as it changes, the sliders dimmed while it is off', () => {
   const calls: ServiceCall[] = [];
-  const { surface, button, opened, draw } = square(hassWith(LIGHT, calls));
+  const { root, button, opened, draw } = square(hassWith(LIGHT, calls));
   press(button);
-  press(power(surface));
+  press(power(root));
   assert.deepEqual(
     calls.map(({ domain, service, target }) => [domain, service, target]),
     [['homeassistant', 'toggle', { entity_id: 'light.room' }]],
   );
   assert.equal(opened(), 0);
-  const options = surface.querySelector('.options');
-  assert.ok(options, 'still open');
+  const menu = menuOf(root);
+  assert.ok(menu, 'still open');
   draw(hassWith({ ...LIGHT, state: 'off' }));
-  assert.equal(surface.querySelector('.options'), options, 'the same options, redrawn');
-  assert.deepEqual(labels(options, 'button'), ['Lights', 'Scenes']);
-  assert.equal(power(surface)?.getAttribute('aria-pressed'), 'false');
+  assert.equal(menuOf(root), menu, 'the same options, redrawn');
+  assert.deepEqual(options(root), ['Scenes', 'Brightness', 'White', 'Colour']);
+  assert.deepEqual(dimmed(root), ['Brightness', 'White', 'Colour']);
+  assert.equal(power(root)?.getAttribute('aria-pressed'), 'false');
   draw(hassWith(LIGHT));
-  assert.deepEqual(labels(options, 'button'), ['Lights', 'Scenes', 'Brightness', 'White']);
+  assert.deepEqual(dimmed(root), []);
   escape();
-  assert.equal(surface.querySelector('.options'), null);
+  assert.equal(menuOf(root), null);
   assert.equal(button.getAttribute('aria-expanded'), 'false');
 });
 
-test('a light whose options its state hides opens the toggle alone, and the options it shows once it is on', () => {
-  const calls: ServiceCall[] = [];
-  const { surface, button, draw } = square(hassWith({ ...LIGHT, state: 'off' }, calls), DIMMED);
+test('a slider option makes the square that slider, under a back button and the name, and back returns to the options', () => {
+  const { root, button } = square(hassWith(LIGHT));
   press(button);
-  assert.deepEqual(labels(surface, '.options > button'), ['Lights']);
-  press(power(surface));
-  assert.equal(calls.length, 1);
-  draw(hassWith(LIGHT));
-  assert.deepEqual(labels(surface, '.options > button'), ['Lights', 'Brightness']);
+  press(option(root, 'Brightness'));
+  assert.equal(menuOf(root)?.classList.contains('whole'), true);
+  assert.equal(slider(root), 'Brightness');
+  assert.equal(menuOf(root)?.querySelector('.head > .title')?.textContent, 'Lights');
+  assert.equal(options(root).length, 0);
+  press(back(root));
+  assert.equal(menuOf(root)?.classList.contains('whole'), false);
+  assert.deepEqual(options(root), ['Scenes', 'Brightness', 'White', 'Colour']);
+  press(option(root, 'Colour'));
+  assert.equal(slider(root), 'Colour');
+  escape();
+  assert.equal(menuOf(root), null, 'Escape closes it all');
+});
+
+test('a list option makes the square that list; a row acts and stays, and a part that goes away returns to the options', () => {
+  const calls: ServiceCall[] = [];
+  const { root, button, draw } = square(hassWith(LIGHT, calls));
+  press(button);
+  press(option(root, 'Scenes'));
+  assert.deepEqual(list(root), ['Scenes', ['Relax', 'Night']]);
+  press(row(root, 'Relax'));
+  assert.deepEqual(
+    calls.map(({ domain, service, target }) => [domain, service, target]),
+    [['scene', 'turn_on', { entity_id: 'scene.relax' }]],
+  );
+  assert.ok(list(root), 'still the list');
+  press(back(root));
+  press(option(root, 'Brightness'));
+  draw(hassWith({ ...LIGHT, state: 'off' }));
+  assert.equal(menuOf(root)?.classList.contains('whole'), false, 'back to the options');
+  assert.deepEqual(dimmed(root), ['Brightness', 'White', 'Colour']);
   escape();
 });
 
-test('a lights button with nothing to offer toggles the light on a tap and claims no pop-up', () => {
+test('a slider its state hides is a dimmed button that does nothing, until the light is on', () => {
   const calls: ServiceCall[] = [];
-  const { surface, button, opened } = square(hassWith(LIGHT, calls), {
+  const { root, button, opened, draw } = square(
+    hassWith({ ...LIGHT, state: 'off' }, calls),
+    DIMMED,
+  );
+  press(button);
+  assert.ok(power(root));
+  assert.deepEqual(options(root), ['Brightness']);
+  assert.deepEqual(dimmed(root), ['Brightness']);
+  press(option(root, 'Brightness'));
+  assert.equal(menuOf(root)?.classList.contains('whole'), false, 'no slider');
+  assert.equal(opened(), 0);
+  assert.deepEqual(calls, []);
+  press(power(root));
+  assert.equal(calls.length, 1);
+  draw(hassWith(LIGHT));
+  assert.deepEqual(dimmed(root), []);
+  press(option(root, 'Brightness'));
+  assert.equal(slider(root), 'Brightness');
+  escape();
+});
+
+test('a lights button with nothing to offer toggles the light on a tap and claims no options', () => {
+  const calls: ServiceCall[] = [];
+  const { root, button, opened } = square(hassWith(LIGHT, calls), {
     entity: 'light.room',
     controls: [{ type: 'toggle', entity: 'light.room' }],
   });
   assert.equal(button.getAttribute('aria-pressed'), 'true');
-  assert.equal(button.getAttribute('aria-haspopup'), null);
   assert.equal(button.getAttribute('aria-expanded'), null);
   press(button);
   assert.deepEqual(
@@ -240,162 +329,69 @@ test('a lights button with nothing to offer toggles the light on a tap and claim
     [['homeassistant', 'toggle', { entity_id: 'light.room' }]],
   );
   assert.equal(opened(), 0);
-  assert.equal(surface.querySelector('.options, .overlay'), null);
+  assert.equal(menuOf(root), null);
 });
 
-test('an option turns the square into its slider, and the scenes into a list that picks one and gives the square back', () => {
-  const calls: ServiceCall[] = [];
-  const { surface, button } = square(hassWith(LIGHT, calls));
-  press(button);
-  pick(surface, 'Brightness', 1);
-  assert.equal(surface.querySelector('.options'), null);
-  assert.ok(surface.querySelector('.overlay mnml-slider'));
-  escape();
-  assert.equal(surface.querySelector('.overlay'), null);
-  press(button);
-  pick(surface, 'Scenes', 1);
-  const list = surface.querySelector('.overlay.scenes [role="menu"]');
-  assert.ok(list);
-  assert.deepEqual(
-    [...list.querySelectorAll('[role="menuitem"]')].map((row) => row.textContent?.trim()),
-    ['Relax', 'Night'],
-  );
-  press(list.querySelector('[role="menuitem"]'));
-  assert.deepEqual(
-    calls.map(({ target }) => target),
-    [{ entity_id: 'scene.relax' }],
-  );
-  assert.equal(surface.querySelector('.overlay'), null);
-  assert.equal(button.getAttribute('aria-expanded'), 'false');
-});
-
-test('the lights button is expanded while anything it opened is open, a slider picked from its options included, and collapses by every way out', () => {
+test('the options stay open until they are dismissed, by Escape or a press outside, and the button is expanded while they are open', () => {
   vi.useFakeTimers();
-  const { surface, button } = square(hassWith(LIGHT));
+  const { root, button } = square(hassWith(LIGHT));
   press(button);
-  vi.advanceTimersByTime(3000);
-  assert.equal(surface.querySelector('.options'), null);
-  assert.equal(button.getAttribute('aria-expanded'), 'false', 'after the idle close');
-  press(button);
-  pick(surface, 'Brightness', 1);
-  assert.ok(surface.querySelector('.overlay mnml-slider'));
-  assert.equal(button.getAttribute('aria-expanded'), 'true', 'handed from the options on');
+  vi.advanceTimersByTime(10_000);
+  assert.ok(menuOf(root), 'no idle close');
   escape();
-  assert.equal(surface.querySelector('.overlay'), null);
-  assert.equal(button.getAttribute('aria-expanded'), 'false');
+  assert.equal(menuOf(root), null);
+  assert.equal(button.getAttribute('aria-expanded'), 'false', 'after Escape');
   press(button);
+  power(root)?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, composed: true }));
+  assert.ok(menuOf(root), 'a press inside is not outside');
   document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
-  assert.equal(surface.querySelector('.options'), null);
+  assert.equal(menuOf(root), null);
   assert.equal(button.getAttribute('aria-expanded'), 'false', 'after a press outside');
 });
 
-test('a tap on the toggle in the options restarts their idle close', () => {
-  vi.useFakeTimers();
-  const { surface, button } = square(hassWith(LIGHT));
-  press(button);
-  vi.advanceTimersByTime(2500);
-  press(power(surface));
-  vi.advanceTimersByTime(2500);
-  assert.ok(surface.querySelector('.options'));
-  vi.advanceTimersByTime(500);
-  assert.equal(surface.querySelector('.options'), null);
-});
-
-test('the scenes list marks the active scene as the scenes menu does, and without an active-scene select its rows are plain menu items', () => {
+test('a scenes list marks the active scene as the scenes menu does, and without an active-scene select its rows mark none', () => {
   const marked = square(hassWith(LIGHT), SCENED);
   press(marked.button);
-  pick(marked.surface, 'Scenes', 1);
+  press(option(marked.root, 'Scenes'));
   assert.deepEqual(
-    sceneRows(marked.surface).map((row) => [
-      row.getAttribute('role'),
-      row.getAttribute('aria-checked'),
-      row.classList.contains('selected'),
+    [...marked.root.querySelectorAll('.rows > button')].map((each) => [
+      each.getAttribute('aria-pressed'),
+      each.classList.contains('selected'),
     ]),
     [
-      ['menuitemradio', 'false', false],
-      ['menuitemradio', 'true', true],
-      ['menuitemradio', 'false', false],
+      ['false', false],
+      ['true', true],
+      ['false', false],
     ],
   );
   escape();
   const plain = square(hassWith(LIGHT));
   press(plain.button);
-  pick(plain.surface, 'Scenes', 1);
+  press(option(plain.root, 'Scenes'));
   assert.deepEqual(
-    sceneRows(plain.surface).map((row) => [
-      row.getAttribute('role'),
-      row.getAttribute('aria-checked'),
-    ]),
-    [
-      ['menuitem', null],
-      ['menuitem', null],
-    ],
+    [...plain.root.querySelectorAll('.rows > button')].map((each) =>
+      each.getAttribute('aria-pressed'),
+    ),
+    [null, null],
   );
   escape();
 });
 
-test('scenes picked from the keyboard open with the focus on the active scene, and the arrows, Home, End and Tab work the list as they work the scenes menu; picked by pointer, the list leaves the focus alone', () => {
-  const { surface, button } = square(hassWith(LIGHT), SCENED);
-  press(button);
-  pick(surface, 'Scenes', 0);
-  const rows = sceneRows(surface);
-  assert.equal(rows.length, 3);
-  const key = (name: string): number => {
-    document.activeElement?.dispatchEvent(
-      new KeyboardEvent('keydown', { key: name, bubbles: true, cancelable: true }),
-    );
-    return rows.findIndex((row) => row === document.activeElement);
-  };
-  assert.equal(document.activeElement, rows[1], 'the active scene has the focus');
-  assert.deepEqual(
-    ['ArrowDown', 'Home', 'End', 'ArrowUp', 'ArrowDown', 'ArrowDown'].map(key),
-    [2, 0, 2, 1, 2, 0],
-  );
-  key('Tab');
-  assert.equal(surface.querySelector('.overlay'), null, 'Tab leaves the list, closing it');
-  assert.equal(button.getAttribute('aria-expanded'), 'false');
-  press(button);
-  pick(surface, 'Scenes', 1);
-  const list = surface.querySelector('.overlay.scenes [role="menu"]');
-  assert.ok(list);
-  assert.equal(list.contains(document.activeElement), false);
-  escape();
-});
-
-test('an option picked from the options hands the focus back to the lights button, so its overlay returns it there', () => {
-  const card = document.createElement('div');
-  document.body.append(card);
-  const root = card.attachShadow({ mode: 'open' });
-  const surface = document.createElement('div');
-  surface.className = 'square';
-  root.append(surface);
-  const hass = hassWith(LIGHT);
-  render(lightsButton(hass, ITEM, fakeHost({ hass })), surface);
-  const button = surface.querySelector<HTMLElement>('button.lights');
-  assert.ok(button);
-  button.focus();
-  press(button);
-  const brightness = surface.querySelector<HTMLElement>('.options [aria-label="Brightness"]');
-  assert.ok(brightness);
-  brightness.focus();
-  pick(surface, 'Brightness', 0);
-  assert.ok(surface.querySelector('.overlay mnml-slider'));
-  assert.equal(root.activeElement, button, 'the options give it back as they close');
-  escape();
-  assert.equal(surface.querySelector('.overlay'), null);
-  assert.equal(root.activeElement, button, 'and so does the slider');
-});
-
-test('the lights button opened from the keyboard puts the focus on the toggle in its place, and opened by a pointer moves no focus', () => {
-  const keyed = square(hassWith(LIGHT));
+test('from the keyboard, the options focus the toggle, a list its current row, back the option it came from, and Escape the button; by a pointer, no focus moves', () => {
+  const keyed = square(hassWith(LIGHT), SCENED);
   keyed.button.focus();
   press(keyed.button, 0);
-  assert.equal(document.activeElement, power(keyed.surface));
+  assert.equal(keyed.root.activeElement, power(keyed.root));
+  press(option(keyed.root, 'Scenes'), 0);
+  assert.equal(keyed.root.activeElement, row(keyed.root, 'Night'));
+  press(back(keyed.root), 0);
+  assert.equal(keyed.root.activeElement, option(keyed.root, 'Scenes'));
   escape();
+  assert.equal(keyed.root.activeElement, keyed.button);
   const pointed = square(hassWith(LIGHT));
   pointed.button.focus();
   press(pointed.button);
-  assert.equal(document.activeElement, pointed.button);
+  assert.equal(pointed.root.activeElement, pointed.button);
   escape();
 });
 
@@ -436,81 +432,104 @@ const POWERED: NavControl = {
 };
 
 function climate(ac: FakeState, calls: ServiceCall[] = [], nav: NavControl = AC_NAV): Square {
-  const surface = document.createElement('div');
-  surface.className = 'square';
-  let opened = 0;
-  surface.addEventListener('click', () => {
-    opened += 1;
-  });
-  document.body.append(surface);
+  const { root, surface, opened } = mounted();
   const draw = (now: HomeAssistant): void => {
     render(navButton(now, nav, fakeHost({ hass: now })) ?? nothing, surface);
   };
-  const hass = fakeHass({ states: { 'climate.room_ac': ac }, calls });
-  draw(hass);
+  draw(fakeHass({ states: { 'climate.room_ac': ac }, calls }));
   const button = surface.querySelector<HTMLElement>('button');
   assert.ok(button);
-  return { surface, button, opened: () => opened, draw };
+  return { root, surface, button, opened, draw };
 }
 
-test("a pop-up chip with controls opens, in its place, its target temperature, its mode under the current mode's name, and Details, with no toggle of its own", () => {
+test("a pop-up chip with controls opens its options with its mode in the button's place, named for the current one, then its target temperature", () => {
   history.replaceState(null, '', location.pathname);
   const calls: ServiceCall[] = [];
-  const { surface, button, opened, draw } = climate(AC, calls);
-  assert.equal(button.getAttribute('aria-haspopup'), 'true');
+  const { root, button, opened, draw } = climate(AC, calls);
   press(button);
-  assert.deepEqual(labels(surface, '.options > button'), ['Target temperature', 'cool', 'Details']);
-  assert.equal(surface.querySelector('.options > [aria-pressed]'), null);
+  assert.equal(power(root), null);
+  const lead = root.querySelector<HTMLElement>('.square-menu > .lead');
+  assert.equal(menuOf(root)?.firstElementChild, lead, "the mode, in the button's place");
+  assert.deepEqual(options(root), ['AC: cool', 'Target temperature']);
+  press(lead);
+  assert.deepEqual(list(root), ['AC', ['off', 'cool', 'heat']]);
+  assert.equal(row(root, 'cool')?.getAttribute('aria-pressed'), 'true');
   assert.equal(button.getAttribute('aria-expanded'), 'true');
   assert.deepEqual(calls, []);
   assert.equal(opened(), 0);
   assert.equal(location.hash, '', 'nor does it open its pop-up');
+  press(back(root));
   draw(fakeHass({ states: { 'climate.room_ac': { ...AC, state: 'off' } }, calls }));
-  assert.deepEqual(labels(surface, '.options > button'), ['off', 'Details']);
+  assert.deepEqual(options(root), ['AC: off', 'Target temperature']);
+  assert.deepEqual(dimmed(root), ['Target temperature']);
   escape();
+  assert.equal(menuOf(root), null);
+  assert.equal(button.getAttribute('aria-expanded'), 'false');
 });
 
-test('a toggle among its controls is the toggle at the foot of its menu, which turns the climate off and stays', () => {
+test("a toggle among its controls takes the button's place, and turns the climate off and stays", () => {
   const calls: ServiceCall[] = [];
-  const { surface, button, draw } = climate(AC, calls, POWERED);
+  const { root, button, draw } = climate(AC, calls, POWERED);
   press(button);
-  assert.deepEqual(labels(surface, '.options > button'), [
-    'AC',
-    'Target temperature',
-    'cool',
-    'Details',
-  ]);
-  assert.equal(power(surface)?.getAttribute('aria-pressed'), 'true');
-  press(power(surface));
+  assert.equal(power(root)?.getAttribute('aria-pressed'), 'true');
+  press(power(root));
   assert.deepEqual(
     calls.map(({ service }) => service),
     ['turn_off'],
   );
   draw(fakeHass({ states: { 'climate.room_ac': { ...AC, state: 'off' } }, calls }));
-  assert.deepEqual(labels(surface, '.options > button'), ['AC', 'off', 'Details']);
-  assert.equal(power(surface)?.getAttribute('aria-pressed'), 'false');
+  assert.equal(power(root)?.getAttribute('aria-pressed'), 'false');
   escape();
 });
 
-test('the mode is a list that sets it, and Details opens the pop-up and gives the button back', () => {
-  history.replaceState(null, '', location.pathname);
+test('a named menu shows its name, its current option and its own icon, and dims with its show rule', () => {
   const calls: ServiceCall[] = [];
-  const { surface, button } = climate({ ...AC, state: 'off' }, calls);
+  const nav: NavControl = {
+    ...AC_NAV,
+    controls: [
+      ...(AC_NAV.controls ?? []),
+      {
+        type: 'select',
+        entity: 'climate.room_ac',
+        attribute: 'fan_modes',
+        name: 'Fan',
+        icon: 'mdi:fan',
+        show: { not: ['off'] },
+      },
+    ],
+  };
+  const fan = {
+    ...AC,
+    attributes: { ...AC.attributes, fan_modes: ['auto', 'low', 'high'], fan_mode: 'low' },
+  };
+  const { root, button, draw } = climate(fan, calls, nav);
   press(button);
-  pick(surface, 'off', 1);
-  const list = surface.querySelector('.overlay.scenes [role="menu"]');
-  assert.ok(list);
-  assert.equal(list.getAttribute('aria-label'), 'AC');
-  press([...list.querySelectorAll('button')].find((row) => row.textContent?.trim() === 'cool'));
+  assert.deepEqual(options(root), ['AC: cool', 'Target temperature', 'Fan: Low']);
+  assert.equal(
+    Reflect.get(option(root, 'Fan: Low')?.querySelector('ha-icon') ?? {}, 'icon'),
+    'mdi:fan',
+  );
+  press(option(root, 'Fan: Low'));
+  assert.deepEqual(list(root), ['Fan', ['Auto', 'Low', 'High']]);
+  assert.equal(menuOf(root)?.querySelector('.head > .title')?.textContent, 'Fan');
+  press(row(root, 'High'));
+  assert.deepEqual(calls.at(-1)?.data, { fan_mode: 'high' });
+  press(back(root));
+  draw(fakeHass({ states: { 'climate.room_ac': { ...fan, state: 'off' } }, calls }));
+  assert.deepEqual(dimmed(root), ['Target temperature', 'Fan: Low']);
+  escape();
+});
+
+test('a mode row sets the mode and leaves the list open', () => {
+  const calls: ServiceCall[] = [];
+  const { root, button } = climate({ ...AC, state: 'off' }, calls);
+  press(button);
+  press(option(root, 'AC: off'));
+  press(row(root, 'cool'));
   assert.deepEqual(calls.at(-1)?.data, { hvac_mode: 'cool' });
-  assert.equal(surface.querySelector('.overlay'), null);
-  assert.equal(button.getAttribute('aria-expanded'), 'false');
-  press(button);
-  pick(surface, 'Details', 1);
-  assert.equal(location.hash, '#room-ac');
-  assert.equal(surface.querySelector('.options'), null);
-  assert.equal(button.getAttribute('aria-expanded'), 'false');
-  history.replaceState(null, '', location.pathname);
+  assert.ok(list(root));
+  assert.equal(button.getAttribute('aria-expanded'), 'true');
+  escape();
 });
 
 test('a pop-up chip with nothing a square opens, or no controls at all, stays a link to its pop-up', () => {

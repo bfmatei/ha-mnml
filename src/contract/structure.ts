@@ -331,6 +331,8 @@ const SLIDER: Keys<SliderControl> = {
 const SELECT: Keys<SelectControl> = {
   entity: need(entity(['select', 'climate', 'timer'])),
   attribute: choice(MODE_ATTRIBUTES),
+  name: text(),
+  icon: icon(),
   primary: flag(),
   color: color(),
   when: rule(),

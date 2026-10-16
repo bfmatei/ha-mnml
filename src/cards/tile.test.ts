@@ -933,20 +933,22 @@ test('a large square glows only while its light is on', async () => {
   assert.equal(out.querySelector('.glow'), null);
 });
 
-test('a tap on the lights of a large square opens its options, its toggle first, in place of its column, and an option turns the square into its control', async () => {
+test("a tap on the lights of a large square opens its options inside the square, its toggle in the button's place, and an option makes the square that list", async () => {
   const out = await paint(ROOM, ROOM_HASS);
   const lights = out.querySelector<HTMLElement>('.column > .lights');
   assert.ok(lights);
   lights.click();
-  const options = out.querySelector('.square > .options');
-  assert.ok(options);
-  assert.deepEqual(labels(options, '.control'), ['Lights', 'Scenes', 'Brightness']);
-  options.querySelector<HTMLElement>('[aria-label="Brightness"]')?.click();
-  assert.equal(out.querySelector('.square > .options'), null);
-  assert.ok(out.querySelector('.square > .overlay mnml-slider'));
+  const menu = out.querySelector('.square > .square-menu');
+  assert.ok(menu);
+  assert.deepEqual(labels(out, '.square-menu > .control'), ['Lights', 'Scenes', 'Brightness']);
+  assert.equal(out.querySelector('.square-menu > .power')?.getAttribute('aria-pressed'), 'true');
+  menu.querySelector<HTMLElement>('.option[aria-label="Scenes"]')?.click();
+  assert.equal(menu.classList.contains('whole'), true);
+  assert.equal(menu.querySelector('.rows')?.getAttribute('aria-label'), 'Scenes');
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
 });
 
-test("a large square's open options follow its light, gaining its sliders when it turns on", async () => {
+test("a large square's open options follow its light, its sliders dimmed until it turns on", async () => {
   const off = fakeHass({
     ...ROOM_HASS,
     states: {
@@ -975,23 +977,18 @@ test("a large square's open options follow its light, gaining its sliders when i
     off,
   );
   out.querySelector<HTMLElement>('.column > .lights')?.click();
-  assert.deepEqual(labels(out, '.square > .options > .control'), ['Lights', 'Scenes']);
+  assert.deepEqual(labels(out, '.square-menu > .option'), ['Scenes', 'Brightness']);
+  assert.deepEqual(labels(out, '.square-menu > .option.off'), ['Brightness']);
+  assert.equal(out.querySelector('.square-menu > .power')?.getAttribute('aria-pressed'), 'false');
   const made = out.host;
   assert.ok(made instanceof MnmlTileCard);
   made.hass = ROOM_HASS;
   await made.updateComplete;
-  assert.deepEqual(labels(out, '.square > .options > .control'), [
-    'Lights',
-    'Scenes',
-    'Brightness',
-  ]);
-  assert.equal(
-    out.querySelector('.square > .options > .control')?.getAttribute('aria-pressed'),
-    'true',
-  );
+  assert.deepEqual(labels(out, '.square-menu > .option.off'), []);
+  assert.equal(out.querySelector('.square-menu > .power')?.getAttribute('aria-pressed'), 'true');
 });
 
-test("a pop-up chip with controls in a large square's column opens its menu in place of its pop-up", async () => {
+test("a pop-up chip with controls in a large square's column opens its options in place of its pop-up", async () => {
   const out = await paint(
     {
       ...ROOM,
@@ -1009,10 +1006,17 @@ test("a pop-up chip with controls in a large square's column opens its menu in p
   );
   const ac = out.querySelector<HTMLElement>('.column > [aria-label="AC"]');
   assert.ok(ac);
-  assert.equal(ac.getAttribute('aria-haspopup'), 'true');
+  assert.equal(ac.getAttribute('aria-expanded'), 'false');
   ac.click();
   assert.equal(location.hash, '');
-  assert.deepEqual(labels(out, '.square > .options > .control'), ['cool', 'Details']);
+  assert.deepEqual(labels(out, '.square-menu > .option'), ['AC: cool']);
+  out.querySelector<HTMLElement>('.square-menu > .option')?.click();
+  assert.deepEqual(
+    [...out.querySelectorAll('.square-menu > .rows > button')].map((row) =>
+      row.textContent?.trim(),
+    ),
+    ['off', 'cool'],
+  );
 });
 
 test('a small square is its icon in a well and its name, with a coloured chip of any kind as a cell, and no buttons nor readings', async () => {

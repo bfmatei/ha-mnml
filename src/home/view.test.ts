@@ -891,12 +891,13 @@ test("a heating's pop-up shows its schedule and a slider per preset temperature;
   );
 });
 
-test('a tap that costs asks first: the lock while locked, the garage door while closed, the alarm while armed, vacation while off, cancelling a print, clearing the notifications', () => {
+test('a tap that costs asks first: the garage door while closed, the alarm while armed, vacation while off, cancelling a print, clearing the notifications; the lock acts at once', () => {
   const chips = under(DEMO, 'chips');
   const lock = chips.find(
     (chip) => chip['type'] === 'toggle' && String(chip['entity']).startsWith('lock.'),
   );
-  assert.deepEqual(lock?.['confirm'], { is: ['locked'] });
+  assert.ok(lock);
+  assert.equal(lock['confirm'], undefined);
   const garage = chips.find(
     (chip) => chip['type'] === 'toggle' && String(chip['entity']).startsWith('cover.'),
   );

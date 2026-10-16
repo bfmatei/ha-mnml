@@ -109,6 +109,31 @@ test('an unavailable entity keeps its action controls as inert orange displays',
   assert.ok(service.querySelector('ha-icon'), "a service keeps the control's own icon");
 });
 
+test('a named menu takes its name, and its icon where the current option has none', () => {
+  const hass = fakeHass({
+    states: {
+      'climate.ac': {
+        state: 'cool',
+        attributes: { friendly_name: 'AC', fan_modes: ['low', 'high'], fan_mode: 'low' },
+      },
+    },
+  });
+  const menu = lane(
+    [
+      {
+        type: 'select',
+        entity: 'climate.ac',
+        attribute: 'fan_modes',
+        name: 'Fan',
+        icon: 'mdi:fan',
+      },
+    ],
+    { hass, host: fakeHost() },
+  )?.children[0];
+  assert.equal(menu?.getAttribute('aria-label'), 'Fan');
+  assert.equal(Reflect.get(menu?.querySelector('ha-icon') ?? {}, 'icon'), 'mdi:fan');
+});
+
 test('a chip goes orange for an unavailable entity, and a nav chip still navigates', () => {
   const nav: Controls = [
     { type: 'nav', entity: 'update.a', popup: '#x', color: 'blue', when: { not: ['off'] } },
@@ -329,6 +354,38 @@ function feel(): { felt: unknown[]; stop: () => void } {
     },
   };
 }
+
+test('a lock locking, unlocking or opening says so, and a press on it, or one that meets it there, calls nothing and goes no further', () => {
+  for (const state of ['locking', 'unlocking', 'opening']) {
+    const calls: ServiceCall[] = [];
+    const hass = fakeHass({
+      states: { 'lock.door': { state, attributes: { friendly_name: 'Door' } } },
+      calls,
+    });
+    const moving = lane([{ type: 'toggle', entity: 'lock.door', color: 'red' }], {
+      hass,
+      host: fakeHost({ hass }),
+    });
+    const shown = moving?.children[0];
+    assert.ok(shown instanceof HTMLButtonElement, state);
+    assert.equal(tipOf(shown), `Door: ${state}`);
+    const beyond = vi.fn();
+    moving?.addEventListener('click', beyond);
+    shown.click();
+    assert.deepEqual(calls, []);
+    assert.equal(beyond.mock.calls.length, 0);
+  }
+  const calls: ServiceCall[] = [];
+  const raced = lane([{ type: 'toggle', entity: 'lock.door' }], {
+    hass: fakeHass({ states: { 'lock.door': { state: 'unlocked' } } }),
+    host: fakeHost({
+      hass: fakeHass({ states: { 'lock.door': { state: 'locking' } }, calls }),
+    }),
+  });
+  assert.ok(raced?.children[0] instanceof HTMLButtonElement);
+  raced.children[0].click();
+  assert.deepEqual(calls, []);
+});
 
 test("a toggle fires Home Assistant's light haptic as it acts, and a call that fails fires its failure haptic", async () => {
   const { felt, stop } = feel();
