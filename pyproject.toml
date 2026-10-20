@@ -32,7 +32,7 @@ dev = [
   "home-assistant-frontend==20260930.3",
   "mypy>=2.4.0",
   "pytest-homeassistant-custom-component==0.13.372",
-  "ruff>=0.17.0",
+  "ruff>=0.17.1",
 ]
 
 [[tool.mypy.overrides]]
