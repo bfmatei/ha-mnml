@@ -53,7 +53,7 @@
     "minify-literals": "^2.2.0",
     "oxfmt": "^0.74.0",
     "oxlint": "^1.88.0",
-    "oxlint-tsgolint": "^7.0.2004",
+    "oxlint-tsgolint": "^7.0.2005",
     "playwright": "^1.64.1",
     "rolldown": "^1.2.15",
     "vitest": "^5.0.5",
