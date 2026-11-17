@@ -42,7 +42,7 @@
     "zip": "node tools/zip.ts"
   },
   "dependencies": {
-    "home-assistant-js-websocket": "^9.7.1",
+    "home-assistant-js-websocket": "^9.8.1",
     "lit": "^3.3.3"
   },
   "devDependencies": {
