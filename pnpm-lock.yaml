@@ -167,8 +167,8 @@ importers:
   .:
     dependencies:
       home-assistant-js-websocket:
-        specifier: ^9.7.1
-        version: 9.7.1
+        specifier: ^9.8.1
+        version: 9.8.1
       lit:
         specifier: ^3.3.3
         version: 3.3.3
@@ -1274,8 +1274,8 @@ packages:
     resolution: {integrity: sha512-c8B/VNLmxRcmqqenRA9t+9IyOjf9+V6lTxPaUJLqOCONdQkWZ0ETYgX0qbtJqPsgCNusT9MZ5Jeidw8Eb9tn2g==}
     engines: {node: '>=20'}
 
-  home-assistant-js-websocket@9.7.1:
-    resolution: {integrity: sha512-zOAiyF+gUc/IsiswYdWKns6SCBbvWb8iJtMX9+Dk0wlbdfcp+I38T2Vx36krWeWMk/GPwoSiYwCs5hk/+Hsn7w==}
+  home-assistant-js-websocket@9.8.1:
+    resolution: {integrity: sha512-WvovbrSoYLTKfh6aY5SxSWPPy50/mLWLCihQL8G2N+2e3mTrg3QTQCAp4R32/LwbkRBDGj0XNs6JFj8e2IYEUw==}
 
   html-encoding-sniffer@7.0.0:
     resolution: {integrity: sha512-UikN5yr7xsCDAq87Or5or0PAlD3HJJOKVzM05az588WnpDJ4Ux7a2A53Qi6gofGg2/EtvF/H4hCi/TXfCW4Y6w==}
@@ -2631,7 +2631,7 @@ snapshots:
       slash: 5.1.0
       unicorn-magic: 0.4.1
 
-  home-assistant-js-websocket@9.7.1: {}
+  home-assistant-js-websocket@9.8.1: {}
 
   html-encoding-sniffer@7.0.0:
     dependencies:
