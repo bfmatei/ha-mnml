@@ -47,7 +47,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
-    "jsdom": "^30.1.2",
+    "jsdom": "^31.0.1",
     "knip": "^6.45.1",
     "markdownlint-cli2": "^0.24.1",
     "minify-literals": "^2.2.0",
