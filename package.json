@@ -51,7 +51,7 @@
     "knip": "^6.45.1",
     "markdownlint-cli2": "^0.24.1",
     "minify-literals": "^2.2.0",
-    "oxfmt": "^0.75.0",
+    "oxfmt": "^0.79.0",
     "oxlint": "^1.88.0",
     "oxlint-tsgolint": "^7.0.2006",
     "playwright": "^1.65.1",
